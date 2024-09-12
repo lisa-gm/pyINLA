@@ -34,7 +34,7 @@ If by any chances you run on a weird Apple Mac with arm64 architecture, ```conda
 ```
 $ conda create -n pyinla python=3.11
 $ conda activate pyinla
-$ pip install numpy>=1.23.2 scipy matplotlib pydantic pytest pytest-cov pytest-mpi coverage black isort ruff pre-commit
+$ pip install numpy scipy matplotlib pydantic pytest pytest-cov pytest-mpi coverage black isort ruff pre-commit
 $ cd path/to/pyinla
 $ pip install --no-dependencies -e .
 ```
