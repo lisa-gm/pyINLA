@@ -9,7 +9,6 @@ authors = [
     { name = "Vincent Maillou", email = "vmaillou@iis.ee.ethz.ch" },
 ]
 description = "Python implementation of the method of integrated nested Laplace approximations (INLA)"
-license = { file = "LICENSE" }
 license = {text = "BSD-3-Clause"}
 classifiers = [
     "Programming Language :: Python :: 3",
