@@ -33,8 +33,9 @@ dependencies = [
     "ruff",
 ]
 [project.optional-dependencies]
-cupy = ["cupy==13.2.0"]
 mpi4py = ["mpi4py"]
+cupy = ["cupy==13.2.0"]
+serinv = ["serinv @ git+https://github.com/vincent-maillou/serinv"]
 
 [project.urls]
 Code = "https://github.com/lisa-gm/pyINLA"
