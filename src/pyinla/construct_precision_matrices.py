@@ -49,8 +49,20 @@ def Q_spatio_temporal(theta, c0, g1, g2, g3, M0, M1, M2):
         + pow(exp_theta3, 2) * spkron(M2, q1s)
     )
     end_time = time.time()
-    print("SciPy: Time Kronecker product: {:.3f} seconds".format(end_time - start_time))
+    print(
+        "SciPy: Time Kronecker product   : {:.3f} seconds".format(end_time - start_time)
+    )
     # print("kronecker product: \n", kronecker_product[:10,:10].toarray())
+    # print("nnz(Qst): ", kronecker_product.nnz)
+    kronecker_product = kronecker_product.tocsr()
+
+    # find number of zeros in kronecker_product.data
+    # num_zeros = np.sum(kronecker_product.data == 0)
+    # print("Number of zeros in kronecker_product.data: ", num_zeros)
+
+    # Eliminate stored zeros
+    # kronecker_product.eliminate_zeros()
+    # print("nnz(Qst) after eliminating zeros: ", kronecker_product.nnz)
 
     return kronecker_product
 
@@ -120,5 +132,11 @@ def construct_Q(nb, theta, Qst, AxTAx):
     # print("norm(Q2 - Q): ", np.linalg.norm(Q2 - Q))
     # Q_dense = Q.toarray()
     # print("Q[-5:,-5:]:\n", Q_dense[-5:,-5:])
+
+    # print("nnz(Q): ", Q.nnz)
+
+    # eliminate stored zeros
+    # Q.eliminate_zeros()
+    # print("nnz(Q) after eliminating zeros: ", Q.nnz)
 
     return Q

@@ -5,13 +5,29 @@ import cupy as cp
 import numpy as np
 from construct_precision_matrices import Q_spatio_temporal, construct_Q
 from construct_precision_matrices_dev import Q_spatio_temporal_dev, construct_Q_dev
+from cupyx.scipy.sparse import coo_matrix as cpcoo_matrix
 from cupyx.scipy.sparse import csr_matrix as cpcsr_matrix
 from cupyx.scipy.sparse import kron as cpkron
 from matrix_utilities import read_CSC, read_sym_CSC
-from scipy.sparse import diags
+from scipy.sparse import csr_matrix, diags
 from scipy.sparse import eye as speye
 from scipy.sparse import kron as spkron
 from scipy.sparse import random
+from scipy.sparse.linalg import norm
+
+
+def eliminate_zeros_cupy(cupy_sparse_matrix):
+    # Convert to COO format
+    coo = cupy_sparse_matrix.tocoo()
+
+    # Filter out zero entries
+    mask = coo.data != 0
+    coo_filtered = cpcoo_matrix(
+        (coo.data[mask], (coo.row[mask], coo.col[mask])), shape=coo.shape
+    )
+
+    # Convert back to CSR format
+    return coo_filtered.tocsr()
 
 
 # Function to generate a random sparse matrix
@@ -20,6 +36,16 @@ def generate_sparse_matrix(rows, cols, density=0.1):
     if rows > 1000:
         density = 200 / rows
     return random(rows, cols, density=density, format="csr")
+
+
+def find_nan_indices(matrix):
+    # Create a boolean matrix where True indicates the presence of NaN
+    nan_mask = np.isnan(matrix)
+
+    # Find the indices of NaN values
+    nan_indices = np.argwhere(nan_mask)
+
+    return nan_indices
 
 
 if __name__ == "__main__":
@@ -190,6 +216,7 @@ if __name__ == "__main__":
         Ax = read_CSC(file_path + "/" + file_name_Ax)
 
         AxTAx = Ax.T @ Ax
+        AxTAx.eliminate_zeros()
 
         theta_initial = [1, 1, 1, 1]
         theta = theta_initial
@@ -210,12 +237,37 @@ if __name__ == "__main__":
 
         ## is the GPU getting too full??
         Ax_dev = cpcsr_matrix(Ax)
+
+        # AxTAx_dev = cpcsr_matrix(AxTAx)
+
+        # Multiplication introduces zero elements in csr structure
+        # DONT USE AxTAx_dev.eliminate_zeros() on device -> corrupts the matrix
         AxTAx_dev = Ax_dev.T @ Ax_dev
+
+        num_zeros = cp.sum(AxTAx_dev.data == 0)
+        print("Number of zeros in AxTAx.data: ", num_zeros)
+
+        AxTAx_dev = eliminate_zeros_cupy(AxTAx_dev)
+
+        num_zeros = cp.sum(AxTAx_dev.data == 0)
+        print("Number of zeros in AxTAx.data after elimination: ", num_zeros)
+
+        AxTAx_from_dev = AxTAx_dev.get()
+        print("norm(AxTAx - AxTAx_from_dev): ", norm(AxTAx - AxTAx_from_dev))
+
+        print("size(data(AxTAx)): ", AxTAx.data.shape)
+        print("size(data(AxTAx_dev)): ", AxTAx_dev.data.shape)
+
+        Ax_memory = Ax.data.nbytes + Ax.indices.nbytes + Ax.indptr.nbytes
+        print(f"Ax allocated memory     : {Ax_memory / (1024**2):.2f} MB")
 
         Ax_dev_memory = (
             Ax_dev.data.nbytes + Ax_dev.indices.nbytes + Ax_dev.indptr.nbytes
         )
         print(f"Ax    allocated GPU memory: {Ax_dev_memory / (1024**2):.2f} MB")
+
+        AxTAx_memory = AxTAx.data.nbytes + AxTAx.indices.nbytes + AxTAx.indptr.nbytes
+        print(f"AxTAx allocated memory  : {AxTAx_memory / (1024**2):.2f} MB")
 
         AxTAx_dev_memory = (
             AxTAx_dev.data.nbytes + AxTAx_dev.indices.nbytes + AxTAx_dev.indptr.nbytes
@@ -226,43 +278,89 @@ if __name__ == "__main__":
         print("theta_initial: ", theta_initial)
         theta_dev = cp.array(theta_initial)
 
-        # m = 1
-        # for i in range(m):
+        print("Constructing Q ...")
 
-        # run loop over changing values of theta, recompute Q
-        # theta = theta_initial + [0, 1e-1, 1e-1, 1e-1]
+        m = 1
+        for i in range(m):
+            print("\nIteration: ", i)
+            # make this a reference and not a copy ...
+            t_start = time.time()
+            Qst = Q_spatio_temporal(theta[1:], c0, g1, g2, g3, M0, M1, M2)
+            Qst = csr_matrix(Qst)
 
-        # make this a reference and not a copy ...
-        Qst = Q_spatio_temporal(theta[1:], c0, g1, g2, g3, M0, M1, M2)
+            Q = construct_Q(nb, theta, Qst, AxTAx)
+            t_end = time.time()
 
-        t_start = time.time()
-        Q = construct_Q(nb, theta, Qst, AxTAx)
-        t_end = time.time()
+            # print("Q:\n", Q[1:10,1:10].toarray())
+            print(
+                "SciPy: Total time to construct Q: {:.3f} seconds".format(
+                    t_end - t_start
+                )
+            )
+            # print("Qst[1:10,1:10]:\n", Qst[:10,:10].toarray())
 
-        # print("Q:\n", Q[1:10,1:10].toarray())
-        print("Time to construct Q: {:.3f} seconds".format(t_end - t_start))
-        # print("Qst[1:10,1:10]:\n", Qst[:10,:10].toarray())
+            t_start = time.time()
+            Qst_dev = Q_spatio_temporal_dev(
+                theta_dev[1:], c0_dev, g1_dev, g2_dev, g3_dev, M0_dev, M1_dev, M2_dev
+            )
+            Q_dev = construct_Q_dev(nb, theta_dev, Qst_dev, AxTAx_dev)
+            t_end = time.time()
+            print(
+                "CuPy:  Total time to construct Q: {:.3f} seconds".format(
+                    t_end - t_start
+                )
+            )
 
-        Qst_dev = Q_spatio_temporal_dev(
-            theta_dev[1:], c0_dev, g1_dev, g2_dev, g3_dev, M0_dev, M1_dev, M2_dev
+            theta = theta + np.random.rand(len(theta))
+            theta_dev = cp.array(theta)
+            # theta_dev = theta_dev + cp.random.rand(theta_dev.shape[0])
+
+        # Qst_from_dev = Qst_dev.get() #Q_dev.get()
+        # print("nnz(Qst_from_dev): ", Qst_from_dev.nnz)
+        # print("norm(Qst - Qst_from_dev): ", norm(Qst - Qst_from_dev))
+
+        mempool = cp.get_default_memory_pool()
+        pinned_mempool = cp.get_default_pinned_memory_pool()
+
+        print(
+            "\nGPU Memory pool used            : {:.2f} MB".format(
+                mempool.used_bytes() / 1024**2
+            )
         )
-        Q_dev = construct_Q_dev(nb, theta_dev, Qst_dev, AxTAx_dev)
+        print(
+            "GPU mempool total               : {:.2f} MB".format(
+                mempool.total_bytes() / 1024**2
+            )
+        )
+        print(
+            "GPU Pinned memory n free blocks : {:.2f} MB".format(
+                pinned_mempool.n_free_blocks() / 1024**2
+            )
+        )
 
-        theta_dev = theta_dev + cp.random.rand(theta_dev.shape[0])
+        # theoretical memory usage
+        Q_memory = Q.data.nbytes + Q.indices.nbytes + Q.indptr.nbytes
+        print(f"\nQ allocated memory    : {Q_memory / (1024**2):.2f} MB")
 
-        # Q_from_dev = cpx.empty_like_pinned(Q_dev)
-        # Q_dev.get(out=Q_from_dev)
+        Qst_memory = Qst.data.nbytes + Qst.indices.nbytes + Qst.indptr.nbytes
+        print(f"Qst allocated memory    : {Qst_memory / (1024**2):.2f} MB")
+
+        AxTAx_memory = AxTAx.data.nbytes + AxTAx.indices.nbytes + AxTAx.indptr.nbytes
+        print(f"AxTAx allocated memory  : {AxTAx_memory / (1024**2):.2f} MB")
+
+        Ax_memory = Ax.data.nbytes + Ax.indices.nbytes + Ax.indptr.nbytes
+        print(f"Ax allocated memory     : {Ax_memory / (1024**2):.2f} MB")
+
+        print(
+            f"Sum of allocated memory : {(Q_memory + Qst_memory + AxTAx_memory + Ax_memory) / (1024**2):.2f} MB"
+        )
+
         Q_from_dev = Q_dev.get()
+        print("\nnorm(Q - Q_from_dev): ", norm(Q - Q_from_dev))
 
-        print("norm(Q - Q_from_dev): ", np.linalg.norm(Q - Q_from_dev))
-
-        print("Q: ", Q.data)
-
-        print("Q_from_dev: ", Q_from_dev.data)
-
-        # Assert that Q and Q_from_dev sparse matrices are equal without densifying them
-        assert cp.allclose(Q.data, Q_from_dev.data)
-        assert cp.all(Q.indices, Q_from_dev.indices)
-        assert cp.all(Q.indptr, Q_from_dev.indptr)
+        # find maximum difference between the two matrices
+        diff = Q - Q_from_dev
+        max_diff = np.max(np.abs(diff))
+        print("max_diff: ", max_diff)
 
         # isequal = np.allclose(Q.toarray(), Q_from_dev.toarray())

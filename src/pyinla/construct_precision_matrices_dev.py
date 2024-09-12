@@ -42,7 +42,9 @@ def Q_spatio_temporal_dev(
         + pow(exp_theta3_dev, 2) * cpkron(M2_dev, q1s_dev)
     )
     end_time = time.time()
-    print("CuPy:  Time Kronecker product: {:.3f} seconds".format(end_time - start_time))
+    print(
+        "CuPy:  Time Kronecker product   : {:.3f} seconds".format(end_time - start_time)
+    )
 
     # kronecker_product_csr_from_gpu = kronecker_product_gpu.get()
     # print("kronecker_product_csr_from_gpu: \n", kronecker_product_csr_from_gpu[:10,:10].toarray())
@@ -51,14 +53,14 @@ def Q_spatio_temporal_dev(
     # nnz = kronecker_product_gpu.nnz
     # print("Number of nonzeros: ", nnz)
 
-    Qst_gpu_memory = (
-        kronecker_product_dev.data.nbytes
-        + kronecker_product_dev.indices.nbytes
-        + kronecker_product_dev.indptr.nbytes
-    )
+    # Qst_gpu_memory = (
+    #     kronecker_product_dev.data.nbytes
+    #     + kronecker_product_dev.indices.nbytes
+    #     + kronecker_product_dev.indptr.nbytes
+    # )
     # total_gpu_memory = kronecker_product_dev.data.nbytes + kronecker_product_dev.row.nbytes + kronecker_product_dev.col.nbytes
 
-    print(f"Qst    allocated GPU memory: {Qst_gpu_memory / (1024**2):.2f} MB")
+    # print(f"Qst    allocated GPU memory: {Qst_gpu_memory / (1024**2):.2f} MB")
 
     return kronecker_product_dev
 
