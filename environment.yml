@@ -130,4 +130,3 @@ dependencies:
   - yaml=0.2.5=h7b6447c_0
   - zlib=1.2.13=h5eee18b_1
   - zstd=1.5.5=hc292b87_2
-prefix: /home/vmaillou/.conda/envs/pyinla
