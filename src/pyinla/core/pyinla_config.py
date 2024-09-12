@@ -4,13 +4,21 @@ import tomllib
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, conint
 
 
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model: Literal["regression", "spatio-temporal"] = None
+
+    # --- Model parameters ---------------------------------------------
+    n_fixed_effects: conint(ge=0)
+
+    # Spatial model
+
+    # Temporal model
+    constraint_model: bool = False
 
 
 class OptimizerConfig(BaseModel):
