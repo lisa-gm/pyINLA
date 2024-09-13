@@ -39,6 +39,13 @@ class SpatioTemporal(Model):
             self.a.shape[1] == self.nb + self.ns + self.nt
         ), "Design matrix has incorrect number of columns."
 
+        # Load model hyperparameters
+        self.theta = {
+            "spatial_range": pyinla_config.theta_spatial_range,
+            "temporal_range": pyinla_config.theta_temporal_range,
+            "sd_spatio_temporal": pyinla_config.theta_sd_spatio_temporal,
+        }
+
     def _check_dimensions_spatial_matrices(self) -> None:
         """Check the dimensions of the model."""
         # Spatial matrices checks

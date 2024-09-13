@@ -4,27 +4,120 @@ import tomllib
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, conint
+from pydantic import BaseModel, ConfigDict, PositiveInt, conint, model_validator
+from typing_extensions import Self
 
 
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    model: Literal["regression", "spatio-temporal"] = None
+    type: Literal["regression", "spatio-temporal"] = None
 
     # --- Model parameters ---------------------------------------------
-    n_fixed_effects: conint(ge=0)
+    n_fixed_effects: conint(ge=0) = 0
 
-    # Spatial model
-
-    # Temporal model
+    # Spatio-temporal model
     constraint_model: bool = False
 
+    spatial_domain_dimension: PositiveInt = 2
 
-class OptimizerConfig(BaseModel):
+    theta_spatial_range: float = None
+    theta_temporal_range: float = None
+    theta_sd_spatio_temporal: float = None
+
+    @model_validator(mode="after")
+    def check_theta(self) -> Self:
+        if self.type == "spatio-temporal":
+            assert self.theta_spatial_range is not None, "Spatial range is required."
+            assert self.theta_temporal_range is not None, "Temporal range is required."
+            assert (
+                self.theta_sd_spatio_temporal is not None
+            ), "Spatio-temporal standard deviation is required."
+
+        return self
+
+
+class PriorHyperparametersConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    optimizer: Literal["bfgs"] = "bfgs"
+    type: Literal["gaussian", "penalized_complexity"] = "gaussian"
+
+    # --- Gaussian prior hyperparameters ---
+    # Spatio-temporal model
+    mean_theta_spatial_range: float = 0.0
+    mean_theta_temporal_range: float = 0.0
+    mean_theta_sd_spatio_temporal: float = 0.0
+
+    variance_theta_spatial_range: float = 1.0
+    variance_theta_temporal_range: float = 1.0
+    variance_theta_sd_spatio_temporal: float = 1.0
+
+    # --- Penalized complexity prior hyperparameters ---
+    # Spatio-temporal model
+    alpha_theta_spatial_range: float = None
+    alpha_theta_temporal_range: float = None
+    alpha_theta_sd_spatio_temporal: float = None
+
+    u_theta_spatial_range: float = None
+    u_theta_temporal_range: float = None
+    u_theta_sd_spatio_temporal: float = None
+
+    # Likelihood
+    # Gaussian likelihood
+    alpha_theta_observations: float = None
+    u_theta_observations: float = None
+
+    @model_validator(mode="after")
+    def check_alpha(self) -> Self:
+        if self.type == "penalized_complexity":
+            assert (
+                self.alpha_theta_spatial_range is not None
+            ), "Spatial range alpha is required."
+            assert (
+                self.alpha_theta_temporal_range is not None
+            ), "Temporal range alpha is required."
+            assert (
+                self.alpha_theta_sd_spatio_temporal is not None
+            ), "Spatio-temporal standard deviation alpha is required."
+
+        return self
+
+    @model_validator(mode="after")
+    def check_u(self) -> Self:
+        if self.type == "penalized_complexity":
+            assert (
+                self.u_theta_spatial_range is not None
+            ), "Spatial range u is required."
+            assert (
+                self.u_theta_temporal_range is not None
+            ), "Temporal range u is required."
+            assert (
+                self.u_theta_sd_spatio_temporal is not None
+            ), "Spatio-temporal standard deviation u is required."
+
+        return self
+
+
+class LikelihoodConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["gaussian", "poisson", "binomial"] = None
+
+    # Gaussian likelihood
+    theta_observations: float = None
+
+    # Poisson likelihood
+
+    # Binomial likelihood
+
+    @model_validator(mode="after")
+    def check_theta(self) -> Self:
+        if self.type == "gaussian":
+            assert (
+                self.theta_observations is not None
+            ), "Observations hyperparameter is required."
+
+        return self
 
 
 class PyinlaConfig(BaseModel):
@@ -32,7 +125,8 @@ class PyinlaConfig(BaseModel):
 
     # --- Simulation parameters ---------------------------------------
     model: ModelConfig = ModelConfig()
-    optimizer: OptimizerConfig = OptimizerConfig()
+    prior_hyperparameters: PriorHyperparametersConfig = PriorHyperparametersConfig()
+    likelihood: LikelihoodConfig = LikelihoodConfig()
 
     # --- Directory paths ----------------------------------------------
     simulation_dir: Path = Path("./pyinla/")
@@ -40,6 +134,17 @@ class PyinlaConfig(BaseModel):
     @property
     def input_dir(self) -> Path:
         return self.simulation_dir / "inputs/"
+
+    @model_validator(mode="after")
+    def check_likelihood_prior_hyperparameters(self) -> Self:
+        if self.likelihood.type == "gaussian":
+            assert (
+                self.prior_hyperparameters.alpha_theta_observations is not None
+            ), "Gaussian likelihood requires alpha theta observations."
+            assert (
+                self.prior_hyperparameters.u_theta_observations is not None
+            ), "Gaussian likelihood requires u theta observations."
+        return self
 
 
 def parse_config(config_file: Path) -> PyinlaConfig:

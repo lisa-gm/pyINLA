@@ -1,6 +1,6 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from abc import ABC, abstractmethod
+from abc import ABC
 
 from scipy.sparse import load_npz
 
@@ -10,11 +10,6 @@ from pyinla.core.pyinla_config import PyinlaConfig
 class Model(ABC):
     """Abstract core class for statistical models."""
 
-    @property
-    @abstractmethod
-    def system(self) -> str:
-        ...
-
     def __init__(
         self,
         pyinla_config: PyinlaConfig,
@@ -22,7 +17,7 @@ class Model(ABC):
         """Initializes the model."""
         self.pyinla_config = pyinla_config
 
-        self.nb = self.pyinla_config.n_fixed_effects
+        self.nb = self.pyinla_config.model.n_fixed_effects
 
         # Load observation vector
         self.y = load_npz(pyinla_config.input_dir / "y.npz")
