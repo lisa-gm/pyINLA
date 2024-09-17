@@ -2,7 +2,7 @@
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.sparse import sp_array
+from scipy.sparse import sparray
 
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -20,10 +20,18 @@ class GaussianLikelihood(Likelihood):
         """Initializes the Gaussian likelihood."""
         super().__init__(pyinla_config, n_observations)
 
+        self.theta_initial = {
+            "theta_observations": pyinla_config.likelihood.theta_observations
+        }
+
+    def get_theta_initial(self) -> dict:
+        """Get the likelihood initial hyperparameters."""
+        return self.theta_initial
+
     def evaluate_likelihood(
         self,
         y: ArrayLike,
-        a: sp_array,
+        a: sparray,
         x: ArrayLike,
         **kwargs,
     ) -> float:
@@ -33,7 +41,7 @@ class GaussianLikelihood(Likelihood):
         ----------
         y : ArrayLike
             Vector of the observations.
-        a : sp_array
+        a : sparray
             Design matrix.
         x : ArrayLike
             Vector of the latent parameters.
@@ -47,13 +55,13 @@ class GaussianLikelihood(Likelihood):
         likelihood : float
             Likelihood.
         """
-        theta_likelihood = kwargs["theta_likelihood"]
+        theta_observations = kwargs["theta_observations"]
 
         yAx = y - a @ x
 
         likelihood = (
-            0.5 * theta_likelihood * self.n_observations
-            - 0.5 * yAx.T @ yAx * np.exp(theta_likelihood)
+            0.5 * theta_observations * self.n_observations
+            - 0.5 * yAx.T @ yAx * np.exp(theta_observations)
         )
 
         return likelihood

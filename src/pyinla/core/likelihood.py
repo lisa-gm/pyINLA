@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 from numpy.typing import ArrayLike
-from scipy.sparse import sp_array
+from scipy.sparse import sparray
 
 from pyinla.core.pyinla_config import PyinlaConfig
 
@@ -25,7 +25,7 @@ class Likelihood(ABC):
     def evaluate_likelihood(
         self,
         y: ArrayLike,
-        a: sp_array,
+        a: sparray,
         x: ArrayLike,
         **kwargs,
     ) -> float:
@@ -35,7 +35,7 @@ class Likelihood(ABC):
         ----------
         y : ArrayLike
             Vector of the observations.
-        a : sp_array
+        a : sparray
             Design matrix.
         x : ArrayLike
             Vector of the latent parameters.
@@ -45,4 +45,9 @@ class Likelihood(ABC):
         likelihood : float
             Likelihood.
         """
+        pass
+
+    @abstractmethod
+    def get_theta_initial(self) -> dict:
+        """Get the likelihood initial hyperparameters."""
         pass

@@ -12,10 +12,11 @@ class SpatioTemporal(Model):
     def __init__(
         self,
         pyinla_config: PyinlaConfig,
+        n_latent_parameters: int,
         **kwargs,
     ) -> None:
         """Initializes the model."""
-        super().__init__(pyinla_config)
+        super().__init__(pyinla_config, n_latent_parameters)
 
         # Load spatial_matrices
         self.c0 = load_npz(pyinla_config.input_dir / "c0.npz")
@@ -36,14 +37,14 @@ class SpatioTemporal(Model):
 
         # Check that design_matrix shape match spatio-temporal fields
         assert (
-            self.a.shape[1] == self.nb + self.ns + self.nt
-        ), "Design matrix has incorrect number of columns."
+            self.n_latent_parameters == self.nb + self.ns * self.nt
+        ), f"Design matrix has incorrect number of columns. \n    n_latent_parameters: {self.n_latent_parameters}\n    nb: {self.nb} + ns: {self.ns} * nt: {self.nt} = {self.nb + self.ns * self.nt}"
 
         # Load model hyperparameters
-        self.theta = {
-            "spatial_range": pyinla_config.theta_spatial_range,
-            "temporal_range": pyinla_config.theta_temporal_range,
-            "sd_spatio_temporal": pyinla_config.theta_sd_spatio_temporal,
+        self.theta_initial = {
+            "spatial_range": pyinla_config.model.theta_spatial_range,
+            "temporal_range": pyinla_config.model.theta_temporal_range,
+            "sd_spatio_temporal": pyinla_config.model.theta_sd_spatio_temporal,
         }
 
     def _check_dimensions_spatial_matrices(self) -> None:
@@ -66,3 +67,7 @@ class SpatioTemporal(Model):
         assert (
             self.m0.shape == self.m1.shape == self.m2.shape
         ), "Dimensions of temporal matrices do not match."
+
+    def get_theta_initial(self) -> dict:
+        """Get the model hyperparameters."""
+        return self.theta_initial

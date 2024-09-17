@@ -43,7 +43,7 @@ class ModelConfig(BaseModel):
 class PriorHyperparametersConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["gaussian", "penalized_complexity"] = "gaussian"
+    type: Literal["gaussian", "penalized-complexity"] = "gaussian"
 
     # --- Gaussian prior hyperparameters ---------------------------------------
     # ----- Models -----
@@ -86,7 +86,7 @@ class PriorHyperparametersConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_alpha(self) -> Self:
-        if self.type == "penalized_complexity":
+        if self.type == "penalized-complexity":
             assert (
                 self.alpha_theta_spatial_range is not None
             ), "Spatial range alpha is required."
@@ -101,7 +101,7 @@ class PriorHyperparametersConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_u(self) -> Self:
-        if self.type == "penalized_complexity":
+        if self.type == "penalized-complexity":
             assert (
                 self.u_theta_spatial_range is not None
             ), "Spatial range u is required."
@@ -167,13 +167,14 @@ class PyinlaConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_likelihood_prior_hyperparameters(self) -> Self:
-        if self.likelihood.type == "gaussian":
-            assert (
-                self.prior_hyperparameters.alpha_theta_observations is not None
-            ), "Gaussian likelihood requires alpha theta observations."
-            assert (
-                self.prior_hyperparameters.u_theta_observations is not None
-            ), "Gaussian likelihood requires u theta observations."
+        if self.prior_hyperparameters.type == "penalized-complexity":
+            if self.likelihood.type == "gaussian":
+                assert (
+                    self.prior_hyperparameters.alpha_theta_observations is not None
+                ), "Gaussian likelihood requires alpha theta observations."
+                assert (
+                    self.prior_hyperparameters.u_theta_observations is not None
+                ), "Gaussian likelihood requires u theta observations."
         return self
 
 
