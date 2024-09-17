@@ -13,10 +13,13 @@ class ModelConfig(BaseModel):
 
     type: Literal["regression", "spatio-temporal"] = None
 
-    # --- Model parameters ---------------------------------------------
+    # --- Model parameters -----------------------------------------------------
     n_fixed_effects: conint(ge=0) = 0
 
-    # Spatio-temporal model
+    # ----- Regression model -----
+    ...
+
+    # ----- Spatio-temporal model -----
     constraint_model: bool = False
 
     spatial_domain_dimension: PositiveInt = 2
@@ -42,8 +45,12 @@ class PriorHyperparametersConfig(BaseModel):
 
     type: Literal["gaussian", "penalized_complexity"] = "gaussian"
 
-    # --- Gaussian prior hyperparameters ---
-    # Spatio-temporal model
+    # --- Gaussian prior hyperparameters ---------------------------------------
+    # ----- Models -----
+    # Regression
+    ...
+
+    # Spatio-temporal
     mean_theta_spatial_range: float = 0.0
     mean_theta_temporal_range: float = 0.0
     mean_theta_sd_spatio_temporal: float = 0.0
@@ -52,8 +59,23 @@ class PriorHyperparametersConfig(BaseModel):
     variance_theta_temporal_range: float = 1.0
     variance_theta_sd_spatio_temporal: float = 1.0
 
-    # --- Penalized complexity prior hyperparameters ---
-    # Spatio-temporal model
+    # ----- Likelihood -----
+    # Gaussian likelihood
+    mean_theta_observations: float = 0.0
+    variance_theta_observations: float = 1.0
+
+    # Poisson likelihood
+    ...
+
+    # Binomial likelihood
+    ...
+
+    # --- Penalized complexity prior hyperparameters ---------------------------
+    # ----- Models -----
+    # Regression
+    ...
+
+    # Spatio-temporal
     alpha_theta_spatial_range: float = None
     alpha_theta_temporal_range: float = None
     alpha_theta_sd_spatio_temporal: float = None
@@ -62,10 +84,16 @@ class PriorHyperparametersConfig(BaseModel):
     u_theta_temporal_range: float = None
     u_theta_sd_spatio_temporal: float = None
 
-    # Likelihood
+    # ----- Likelihood -----
     # Gaussian likelihood
     alpha_theta_observations: float = None
     u_theta_observations: float = None
+
+    # Poisson likelihood
+    ...
+
+    # Binomial likelihood
+    ...
 
     @model_validator(mode="after")
     def check_alpha(self) -> Self:

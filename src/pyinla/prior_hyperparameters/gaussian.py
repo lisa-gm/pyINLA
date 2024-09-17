@@ -4,7 +4,6 @@ import numpy as np
 
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
 from pyinla.core.pyinla_config import PyinlaConfig
-from pyinla.utils.theta_utils import make_theta_array
 
 
 class GaussianPriorHyperparameters(PriorHyperparameters):
@@ -43,8 +42,34 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
         self, theta_model: dict, theta_likelihood: dict
     ) -> np.ndarray:
         """Evaluate the log prior hyperparameters."""
-        theta = make_theta_array(theta_model, theta_likelihood)
-        # TODO: Fix the mean and variance
-        log_prior = -0.5 * np.sum((theta - self.mean) ** 2 / self.variance)
+        log_prior: float = 0.0
+
+        # Log prior from model
+        if self.pyinla_config.model.type == "spatio-temporal":
+            log_prior_spatial_range = (
+                theta_model["spatial_range"] - self.mean_theta_spatial_range
+            ) ** 2 / self.variance_theta_spatial_range
+
+            log_prior_temporal_range = (
+                theta_model["temporal_range"] - self.mean_theta_temporal_range
+            ) ** 2 / self.variance_theta_temporal_range
+
+            log_prior_sd_spatio_temporal = (
+                theta_model["sd_spatio_temporal"] - self.mean_theta_sd_spatio_temporal
+            ) ** 2 / self.variance_theta_sd_spatio_temp
+
+            log_prior += -0.5 * (
+                log_prior_spatial_range
+                + log_prior_temporal_range
+                + log_prior_sd_spatio_temporal
+            )
+
+        # Log prior from likelihood
+        if self.pyinla_config.likelihood.type == "gaussian":
+            log_prior_likelihood = (
+                theta_likelihood["observations"] - self.mean_theta_observations
+            ) ** 2 / self.variance_theta_observations
+
+            log_prior += -0.5 * log_prior_likelihood
 
         return log_prior

@@ -15,3 +15,8 @@ class PriorHyperparameters(ABC):
         """Initializes the prior hyperparameters."""
 
         self.pyinla_config = pyinla_config
+
+    @abstractmethod
+    def evaluate_log_prior(self, theta_model: dict, theta_likelihood: dict) -> float:
+        """Evaluate the log prior hyperparameters."""
+        pass

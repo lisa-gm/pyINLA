@@ -1,21 +1,21 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from abc import ABC, abstractmethod
+import numpy as np
 
+from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
 
 
-class Likelihood(ABC):
-    """Abstract core class for likelihood."""
+class PoissonLikelihood(Likelihood):
+    """Poisson likelihood."""
 
     def __init__(
         self,
         pyinla_config: PyinlaConfig,
+        **kwargs,
     ) -> None:
-        """Initializes the likelihood."""
+        """Initializes the Poisson likelihood."""
+        super().__init__(pyinla_config)
 
-        self.pyinla_config = pyinla_config
-
-    @abstractmethod
     def evaluate_likelihood(self, theta_likelihood: dict) -> float:
         pass
