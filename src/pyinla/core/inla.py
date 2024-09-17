@@ -114,7 +114,8 @@ class INLA:
             theta_model, theta_likelihood
         )
 
-        x = ...
+        # TODO: implement _inner_loop()
+        x = np.zeros((self.a.shape[1]), dtype=self.y.dtype)
 
         likelihood = self.likelihood.evaluate_likelihood(theta_likelihood, x)
 
