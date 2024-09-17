@@ -2,6 +2,7 @@
 
 import numpy as np
 from scipy.optimize import minimize
+from scipy.sparse import load_npz
 
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.likelihoods.binomial import BinomialLikelihood
@@ -31,13 +32,28 @@ class INLA:
     ) -> None:
         self.pyinla_config = pyinla_config
 
-        # Initialize model
+        # --- Load observation vector
+        self.y = np.load(pyinla_config.input_dir / "y.npy")
+        self.n_observations = self.y.shape[0]
+
+        # --- Load design matrix
+        self.a = load_npz(pyinla_config.input_dir / "a.npz")
+
+        # --- Load latent parameters vector
+        try:
+            self.x = np.load(pyinla_config.input_dir / "x.npy")
+        except FileNotFoundError:
+            self.x = np.zeros((self.a.shape[1]), dtype=self.y.dtype)
+
+        self._check_dimensions()
+
+        # --- Initialize model
         if self.pyinla_config.model == "regression":
             self.model = Regression(pyinla_config)
         elif self.pyinla_config.model == "spatio-temporal":
             self.model = SpatioTemporal(pyinla_config)
 
-        # Initialize prior hyperparameters
+        # --- Initialize prior hyperparameters
         if self.pyinla_config.prior_hyperparameters == "gaussian":
             self.prior_hyperparameters = GaussianPriorHyperparameters(pyinla_config)
         elif self.pyinla_config.prior_hyperparameters == "penalized_complexity":
@@ -45,15 +61,15 @@ class INLA:
                 pyinla_config
             )
 
-        # Initialize likelihood
+        # --- Initialize likelihood
         if self.pyinla_config.likelihood.type == "gaussian":
-            self.likelihood = GaussianLikelihood(pyinla_config)
+            self.likelihood = GaussianLikelihood(pyinla_config, self.n_observations)
         elif self.pyinla_config.likelihood.type == "poisson":
-            self.likelihood = PoissonLikelihood(pyinla_config)
+            self.likelihood = PoissonLikelihood(pyinla_config, self.n_observations)
         elif self.pyinla_config.likelihood.type == "binomial":
-            self.likelihood = BinomialLikelihood(pyinla_config)
+            self.likelihood = BinomialLikelihood(pyinla_config, self.n_observations)
 
-        # Initialize theta
+        # --- Initialize theta
         self.theta_initial = theta_dict2array(
             self.model.get_theta(), self.likelihood.get_theta()
         )
@@ -84,6 +100,11 @@ class INLA:
             self.theta_star, self.model.get_theta(), self.likelihood.get_theta()
         )
 
+    def _check_dimensions_observations(self) -> None:
+        """Check the dimensions of the model."""
+        assert self.y.shape[0] == self.a.shape[0], "Dimensions of y and A do not match."
+        assert self.x.shape[0] == self.a.shape[1], "Dimensions of x and A do not match."
+
     def _evaluate_f(self, theta: np.ndarray) -> float:
         theta_model, theta_likelihood = theta_array2dict(
             theta, self.model.get_theta(), self.likelihood.get_theta()
@@ -93,18 +114,23 @@ class INLA:
             theta_model, theta_likelihood
         )
 
-        likelihood = self.likelihood.evaluate_likelihood(theta_likelihood)
+        x = ...
 
-        prior_lattent_parameters = ...
+        likelihood = self.likelihood.evaluate_likelihood(theta_likelihood, x)
 
-        conditional_lattent_parameters = ...
+        prior_latent_parameters = 0.0
+
+        conditional_latent_parameters = 0.0
 
         return (
             log_prior
             + likelihood
-            + prior_lattent_parameters
-            + conditional_lattent_parameters
+            + prior_latent_parameters
+            - conditional_latent_parameters
         )
 
     def _evaluate_grad_f(self):
+        pass
+
+    def _inner_iteration(self):
         pass

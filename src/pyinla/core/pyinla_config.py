@@ -84,17 +84,6 @@ class PriorHyperparametersConfig(BaseModel):
     u_theta_temporal_range: float = None
     u_theta_sd_spatio_temporal: float = None
 
-    # ----- Likelihood -----
-    # Gaussian likelihood
-    alpha_theta_observations: float = None
-    u_theta_observations: float = None
-
-    # Poisson likelihood
-    ...
-
-    # Binomial likelihood
-    ...
-
     @model_validator(mode="after")
     def check_alpha(self) -> Self:
         if self.type == "penalized_complexity":
@@ -125,27 +114,40 @@ class PriorHyperparametersConfig(BaseModel):
 
         return self
 
+    # ----- Likelihood -----
+    # Gaussian likelihood
+    alpha_theta_observations: float = None
+    u_theta_observations: float = None
+
+    # Poisson likelihood
+    ...
+
+    # Binomial likelihood
+    ...
+
 
 class LikelihoodConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["gaussian", "poisson", "binomial"] = None
 
-    # Gaussian likelihood
+    # --- Gaussian likelihood --------------------------------------------------
     theta_observations: float = None
-
-    # Poisson likelihood
-
-    # Binomial likelihood
 
     @model_validator(mode="after")
     def check_theta(self) -> Self:
         if self.type == "gaussian":
             assert (
                 self.theta_observations is not None
-            ), "Observations hyperparameter is required."
+            ), "In case of a Gaussian likelihood the observations hyperparameter is required."
 
         return self
+
+    # --- Poisson likelihood ---------------------------------------------------
+    ...
+
+    # --- Binomial likelihood --------------------------------------------------
+    link_function: Literal["sigmoid"] = "sigmoid"
 
 
 class PyinlaConfig(BaseModel):

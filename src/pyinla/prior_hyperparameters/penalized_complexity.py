@@ -64,32 +64,39 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
         self, theta_model: dict, theta_likelihood: dict
     ) -> np.ndarray:
         """Evaluate the prior hyperparameters."""
-
         log_prior = 0.0
 
-        if self.pyinla_config.model_type == "spatio-temporal":
-            # TODO: Check dimensions of spatial field
-            log_prior += (
-                np.log(self.lambda_theta_spatial_range)
-                - self.lambda_theta_spatial_range * np.exp(theta_model["spatial_range"])
-                - theta_model["spatial_range"]
-            )
+        # --- Log prior from model ---------------------------------------------
+        if self.pyinla_config.model.type == "regression":
+            pass
+        elif self.pyinla_config.model_type == "spatio-temporal":
+            if self.pyinla_config.model.spatial_domain_dimension == 2:
+                # 2-D... should be correct
+                log_prior += (
+                    np.log(self.lambda_theta_spatial_range)
+                    - self.lambda_theta_spatial_range
+                    * np.exp(theta_model["spatial_range"])
+                    - theta_model["spatial_range"]
+                )
 
-            log_prior += (
-                np.log(self.lambda_theta_temporal_range)
-                - self.lambda_theta_temporal_range
-                * np.exp(0.5 * theta_model["temporal_range"])
-                + np.log(0.5)
-                - theta_model["temporal_range"]
-            )
+                log_prior += (
+                    np.log(self.lambda_theta_temporal_range)
+                    - self.lambda_theta_temporal_range
+                    * np.exp(0.5 * theta_model["temporal_range"])
+                    + np.log(0.5)
+                    - theta_model["temporal_range"]
+                )
 
-            log_prior += (
-                np.log(self.lambda_theta_sd_spatio_temporal)
-                - self.lambda_theta_sd_spatio_temporal
-                * np.exp(theta_model["sd_spatio_temporal"])
-                + theta_model["sd_spatio_temporal"]
-            )
+                log_prior += (
+                    np.log(self.lambda_theta_sd_spatio_temporal)
+                    - self.lambda_theta_sd_spatio_temporal
+                    * np.exp(theta_model["sd_spatio_temporal"])
+                    + theta_model["sd_spatio_temporal"]
+                )
+            else:
+                raise ValueError("Not implemented for other than 2D cases")
 
+        # --- Log prior from likelihood ----------------------------------------
         if self.pyinla_config.likelihood.type == "gaussian":
             log_prior += (
                 np.log(self.lambda_theta_observations)
@@ -97,3 +104,9 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
                 * np.exp(theta_likelihood["observations"])
                 - theta_likelihood["observations"]
             )
+        elif self.pyinla_config.likelihood.type == "poisson":
+            pass
+        elif self.pyinla_config.likelihood.type == "binomial":
+            pass
+
+        return log_prior
