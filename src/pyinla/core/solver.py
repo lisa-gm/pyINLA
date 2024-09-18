@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 
 from numpy.typing import ArrayLike
+from scipy.sparse import sparray
 
 from pyinla.core.pyinla_config import PyinlaConfig
 
@@ -18,16 +19,16 @@ class Solver(ABC):
         self.pyinla_config = pyinla_config
 
     @abstractmethod
-    def cholesky(self) -> None:
+    def cholesky(self, A: sparray) -> None:
         """Compute Cholesky factor of input matrix."""
         pass
 
     @abstractmethod
-    def solve(self) -> ArrayLike:
+    def solve(self, rhs: ArrayLike) -> ArrayLike:
         """Solve linear system using Cholesky factor."""
         pass
 
     @abstractmethod
     def logdet(self) -> float:
-        """Compute logdet of input matrix using cholesky factor."""
+        """Compute logdet of input matrix using Cholesky factor."""
         pass
