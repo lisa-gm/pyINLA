@@ -3,6 +3,7 @@
 import numpy as np
 from numpy.typing import ArrayLike
 from scipy.sparse import sparray
+from scipy.sparse import diags
 
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -41,3 +42,25 @@ class PoissonLikelihood(Likelihood):
         likelihood = np.dot(Ax, y) - np.sum(self.e * np.exp(Ax))
 
         return likelihood
+
+    def evaluate_gradient_likelihood(
+        self,
+        y: ArrayLike,
+        eta: ArrayLike,
+        theta_likelihood: dict = None,
+    ) -> ArrayLike:
+
+        gradient_likelihood = y - self.e * np.exp(eta)
+
+        return gradient_likelihood
+
+    def evaluate_hessian_likelihood(
+        self,
+        y: ArrayLike,
+        eta: ArrayLike,
+        theta_likelihood: dict = None,
+    ) -> ArrayLike:
+
+        hessian_likelihood = -diags(self.e * np.exp(eta))
+
+        return hessian_likelihood

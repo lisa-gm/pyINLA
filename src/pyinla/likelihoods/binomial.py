@@ -41,7 +41,14 @@ class BinomialLikelihood(Likelihood):
         x: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
-        sig = self.link_function(a @ x)
-        likelihood = np.dot(y, np.log(sig)) + np.dot(self.n_trials - y, np.log(1 - sig))
 
-        return likelihood
+        raise NotImplementedError
+
+    def evaluate_gradient_likelihood(
+        self,
+        y: ArrayLike,
+        eta: ArrayLike,
+        theta_likelihood: dict = None,
+    ) -> ArrayLike:
+
+        raise NotImplementedError
