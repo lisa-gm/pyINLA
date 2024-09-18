@@ -16,22 +16,13 @@ jobs:
           environment-file: environment.yml
           activate-environment: pyinla
 
-      - name: Initialize Conda
-        run: |
-          source $CONDA/bin/activate
-          conda init bash
-          source ~/.bashrc
-          conda activate pyinla
-
       - name: Install package in editable mode
         run: |
-          conda activate pyinla
-          pip install -e .
+          conda run -n pyinla pip install -e .
 
       - name: Run tests
         run: |
-          conda activate pyinla
-          pytest --cov=src/pyinla --cov-report=term --cov-report=xml tests/
+          conda run -n pyinla pytest --cov=src/pyinla --cov-report=term --cov-report=xml tests/
       
       - name: Code Coverage Summary
         uses: irongut/CodeCoverageSummary@v1.3.0
