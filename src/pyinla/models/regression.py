@@ -1,5 +1,8 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
+from numpy.typing import ArrayLike
+from scipy.sparse import sparray
+
 from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
 
@@ -24,3 +27,18 @@ class Regression(Model):
     def get_theta_initial(self) -> dict:
         """Get the model hyperparameters."""
         return {}
+
+    def construct_Q_prior(self, theta_model: dict = None) -> float:
+        """Construct the prior precision matrix."""
+        pass
+
+    def construct_Q_conditional(
+        self,
+        Q_prior: sparray,
+        y: ArrayLike,
+        a: sparray,
+        x: ArrayLike,
+        theta_model: dict = None,
+    ) -> float:
+        """Construct the conditional precision matrix."""
+        pass

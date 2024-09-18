@@ -55,6 +55,11 @@ class GaussianLikelihood(Likelihood):
         likelihood : float
             Likelihood.
         """
+        if theta_likelihood is None:
+            raise ValueError(
+                "theta_likelihood must be provided to evaluate gaussian likelihood."
+            )
+
         theta_observations = theta_likelihood["theta_observations"]
 
         yAx = y - a @ x

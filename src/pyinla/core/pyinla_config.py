@@ -15,6 +15,7 @@ class ModelConfig(BaseModel):
 
     # --- Model parameters -----------------------------------------------------
     n_fixed_effects: conint(ge=0) = 0
+    fixed_effects_prior_precision: float = 0.001
 
     # ----- Regression model -----
     ...

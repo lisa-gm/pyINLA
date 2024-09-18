@@ -44,9 +44,9 @@ class INLA:
 
         # --- Load latent parameters vector
         try:
-            self.x_initial = np.load(pyinla_config.input_dir / "x.npy")
+            self.x = np.load(pyinla_config.input_dir / "x.npy")
         except FileNotFoundError:
-            self.x_initial = np.zeros((self.a.shape[1]), dtype=self.y.dtype)
+            self.x = np.zeros((self.a.shape[1]), dtype=self.y.dtype)
 
         self._check_dimensions()
 
@@ -124,29 +124,38 @@ class INLA:
     def _check_dimensions(self) -> None:
         """Check the dimensions of the model."""
         assert self.y.shape[0] == self.a.shape[0], "Dimensions of y and A do not match."
-        assert (
-            self.x_initial.shape[0] == self.a.shape[1]
-        ), "Dimensions of x and A do not match."
+        assert self.x.shape[0] == self.a.shape[1], "Dimensions of x and A do not match."
 
     def _evaluate_f(self, theta_i: np.ndarray) -> float:
         theta_model, theta_likelihood = theta_array2dict(
             theta_i, self.model.get_theta_initial(), self.likelihood.get_theta_initial()
         )
 
+        # --- Evaluate the log prior
         log_prior = self.prior_hyperparameters.evaluate_log_prior(
             theta_model, theta_likelihood
         )
 
-        # TODO: implement _inner_loop()
-        x = self.x_initial
+        # --- Construct the prior precision matrix
+        Q_prior = self.model.construct_Q_prior(theta_model)
 
+        # --- Optimize x (latent parameters) and construct conditional precision matrix
+        Q_conditional, self.x_star = self._inner_iteration(Q_prior, self.x, theta_model)
+
+        # --- Evaluate likelihood of the optimized latent parameters
         likelihood = self.likelihood.evaluate_likelihood(
-            self.y, self.a, x, theta_likelihood
+            self.y, self.a, self.x_star, theta_likelihood
         )
 
-        prior_latent_parameters = 0.0
+        # --- Compute the prior latent parameters
+        prior_latent_parameters = self._compute_prior_latent_parameters(
+            Q_prior, self.x_star
+        )
 
-        conditional_latent_parameters = 0.0
+        # --- Compute the conditional latent parameters
+        conditional_latent_parameters = self._compute_conditional_latent_parameters(
+            Q_conditional, self.x_star
+        )
 
         return (
             log_prior
@@ -158,5 +167,22 @@ class INLA:
     def _evaluate_grad_f(self):
         pass
 
-    def _inner_iteration(self):
+    def _inner_iteration(self, Q_prior, x_i, theta_model):
+        pass
+        """x_ip1 = np.zeros_like(x_i)
+        eps = 0.001
+
+        while np.norm(x_ip1 - x_i) >= eps:
+            Q_conditional = self.model.construct_Q_conditional(
+                Q_prior,
+                self.y,
+                self.a,
+                x_i,
+                theta_model,
+            )"""
+
+    def _compute_prior_latent_parameters(self):
+        pass
+
+    def _compute_conditional_latent_parameters(self):
         pass
