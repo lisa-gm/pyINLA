@@ -18,18 +18,19 @@ class ScipySolver(Solver):
         pyinla_config: PyinlaConfig,
     ) -> None:
         """Initializes the solver."""
-        self.pyinla_config = pyinla_config
+        super().__init__(pyinla_config)
+
         self.L: sparray = None
 
-    def cholesky(self, Q: sparray) -> None:
+    def cholesky(self, A: sparray) -> None:
         """Compute Cholesky factor of input matrix."""
 
-        n = Q.shape[0]
-        LU = splu(Q, diag_pivot_thresh=0)
+        n = A.shape[0]
+        LU = splu(A, diag_pivot_thresh=0)
 
         if (LU.perm_r == np.arange(n)).all() and (
             LU.U.diagonal() > 0
-        ).all():  # check the matrix A is positive definite.
+        ).all():  # Check the matrix A is positive definite.
             self.L = LU.L.dot(diags(LU.U.diagonal() ** 0.5))
         else:
             raise ValueError("The matrix is not positive definite")
@@ -49,7 +50,7 @@ class ScipySolver(Solver):
         return x
 
     def logdet(self) -> float:
-        """Compute logdet of input matrix using cholesky factor."""
+        """Compute logdet of input matrix using Cholesky factor."""
 
         if self.L is None:
             raise ValueError("Cholesky factor not computed")
