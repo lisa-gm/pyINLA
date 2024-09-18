@@ -29,3 +29,12 @@ Python implementation of the methodology of integrated nested Laplace approximat
     $ cd path/to/pyinla
     $ pip install --no-dependencies -e .
 ```
+
+If by any chances you run on a weird Apple Mac with arm64 architecture, ```conda-forge``` packages might not be available. In this case, you can install the dependencies manually using ```pip```:
+```
+$ conda create -n pyinla python=3.11
+$ conda activate pyinla
+$ pip install numpy scipy matplotlib pydantic pytest pytest-cov pytest-mpi coverage black isort ruff pre-commit
+$ cd path/to/pyinla
+$ pip install --no-dependencies -e .
+```

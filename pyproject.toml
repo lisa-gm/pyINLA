@@ -30,6 +30,7 @@ dependencies = [
     "black",
     "isort",
     "ruff",
+    "pre-commit",
 ]
 [project.optional-dependencies]
 mpi4py = ["mpi4py"]
