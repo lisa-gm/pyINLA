@@ -2,9 +2,8 @@
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.sparse import sparray, diags
+from scipy.sparse import diags, sparray
 from scipy.sparse.linalg import splu, spsolve_triangular
-
 
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.core.solver import Solver

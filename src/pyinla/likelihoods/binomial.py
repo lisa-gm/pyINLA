@@ -41,7 +41,6 @@ class BinomialLikelihood(Likelihood):
         x: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
-
         raise NotImplementedError
 
     def evaluate_gradient_likelihood(
@@ -50,5 +49,4 @@ class BinomialLikelihood(Likelihood):
         eta: ArrayLike,
         theta_likelihood: dict = None,
     ) -> ArrayLike:
-
         raise NotImplementedError

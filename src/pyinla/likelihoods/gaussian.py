@@ -2,8 +2,7 @@
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.sparse import sparray
-from scipy.sparse import eye
+from scipy.sparse import eye, sparray
 
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
