@@ -16,9 +16,15 @@ jobs:
           environment-file: environment.yml
           activate-environment: pyinla
 
+      - name: Initialize Conda
+        run: |
+          source $CONDA/bin/activate
+          conda init bash
+          source ~/.bashrc
+          conda activate pyinla
+
       - name: Install package in editable mode
         run: |
-          conda init
           conda activate pyinla
           pip install -e .
 
