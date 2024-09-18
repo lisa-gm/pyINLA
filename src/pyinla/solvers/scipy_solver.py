@@ -23,13 +23,11 @@ class ScipySolver(Solver):
 
     def cholesky(self, A: sparray) -> None:
         """Compute Cholesky factor of input matrix."""
+        A = A.tocsc()
 
-        n = A.shape[0]
-        LU = splu(A, diag_pivot_thresh=0)
+        LU = splu(A, diag_pivot_thresh=0, permc_spec="NATURAL")
 
-        if (LU.perm_r == np.arange(n)).all() and (
-            LU.U.diagonal() > 0
-        ).all():  # Check the matrix A is positive definite.
+        if (LU.U.diagonal() > 0).all():  # Check the matrix A is positive definite.
             self.L = LU.L.dot(diags(LU.U.diagonal() ** 0.5))
         else:
             raise ValueError("The matrix is not positive definite")

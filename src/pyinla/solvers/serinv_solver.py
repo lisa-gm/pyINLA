@@ -10,7 +10,7 @@ from pyinla.core.solver import Solver
 try:
     from serinv import pobtaf, pobtas
 except ImportError:
-    raise ImportError("Serinv is not installed")
+    print("Serinv not installed. Please install serinv to use SerinvSolver.")
 
 
 class SerinvSolver(Solver):
