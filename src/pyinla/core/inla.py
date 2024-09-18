@@ -2,7 +2,8 @@
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.optimize import minimize
+
+# from scipy.optimize import minimize
 from scipy.sparse import load_npz
 
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -43,9 +44,9 @@ class INLA:
 
         # --- Load latent parameters vector
         try:
-            self.x = np.load(pyinla_config.input_dir / "x.npy")
+            self.x_initial = np.load(pyinla_config.input_dir / "x.npy")
         except FileNotFoundError:
-            self.x = np.zeros((self.a.shape[1]), dtype=self.y.dtype)
+            self.x_initial = np.zeros((self.a.shape[1]), dtype=self.y.dtype)
 
         self._check_dimensions()
 
@@ -91,22 +92,26 @@ class INLA:
     def run(self) -> np.ndarray:
         """Fit the model using INLA."""
 
-        result = minimize(
-            self.theta_initial,
-            self._evaluate_f,
-            self._evaluate_grad_f,
-            method="BFGS",
-        )
+        f_init = self._evaluate_f(self.theta_initial)
 
-        if result.success:
-            print(
-                "Optimization converged successfully after", result.nit, "iterations."
-            )
-            self.theta_star = result.x
-            return True
-        else:
-            print("Optimization did not converge.")
-            return False
+        return f_init
+
+        # result = minimize(
+        #     self.theta_initial,
+        #     self._evaluate_f,
+        #     self._evaluate_grad_f,
+        #     method="BFGS",
+        # )
+
+        # if result.success:
+        #     print(
+        #         "Optimization converged successfully after", result.nit, "iterations."
+        #     )
+        #     self.theta_star = result.x
+        #     return True
+        # else:
+        #     print("Optimization did not converge.")
+        #     return False
 
     def get_theta_star(self) -> dict:
         """Get the optimal theta."""
@@ -119,7 +124,9 @@ class INLA:
     def _check_dimensions(self) -> None:
         """Check the dimensions of the model."""
         assert self.y.shape[0] == self.a.shape[0], "Dimensions of y and A do not match."
-        assert self.x.shape[0] == self.a.shape[1], "Dimensions of x and A do not match."
+        assert (
+            self.x_initial.shape[0] == self.a.shape[1]
+        ), "Dimensions of x and A do not match."
 
     def _evaluate_f(self, theta_i: np.ndarray) -> float:
         theta_model, theta_likelihood = theta_array2dict(
@@ -131,9 +138,11 @@ class INLA:
         )
 
         # TODO: implement _inner_loop()
-        x = np.zeros((self.a.shape[1]), dtype=self.y.dtype)
+        x = self.x_initial
 
-        likelihood = self.likelihood.evaluate_likelihood(theta_likelihood, x)
+        likelihood = self.likelihood.evaluate_likelihood(
+            self.y, self.a, x, theta_likelihood
+        )
 
         prior_latent_parameters = 0.0
 

@@ -35,7 +35,7 @@ class PoissonLikelihood(Likelihood):
         y: ArrayLike,
         a: sparray,
         x: ArrayLike,
-        **kwargs,
+        theta_likelihood: dict = None,
     ) -> float:
         Ax = a @ x
         likelihood = np.dot(Ax, y) - np.sum(self.e * np.exp(Ax))

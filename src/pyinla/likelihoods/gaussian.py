@@ -33,7 +33,7 @@ class GaussianLikelihood(Likelihood):
         y: ArrayLike,
         a: sparray,
         x: ArrayLike,
-        **kwargs,
+        theta_likelihood: dict = None,
     ) -> float:
         """Evaluate a Gaussian likelihood.
 
@@ -55,7 +55,7 @@ class GaussianLikelihood(Likelihood):
         likelihood : float
             Likelihood.
         """
-        theta_observations = kwargs["theta_observations"]
+        theta_observations = theta_likelihood["theta_observations"]
 
         yAx = y - a @ x
 

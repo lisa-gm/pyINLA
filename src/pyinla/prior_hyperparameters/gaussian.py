@@ -66,7 +66,7 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
 
             log_prior_sd_spatio_temporal = (
                 theta_model["sd_spatio_temporal"] - self.mean_theta_sd_spatio_temporal
-            ) ** 2 / self.variance_theta_sd_spatio_temp
+            ) ** 2 / self.variance_theta_sd_spatio_temporal
 
             log_prior += -0.5 * (
                 log_prior_spatial_range
@@ -77,7 +77,7 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
         # --- Log prior from likelihood ----------------------------------------
         if self.pyinla_config.likelihood.type == "gaussian":
             log_prior_likelihood = (
-                theta_likelihood["observations"] - self.mean_theta_observations
+                theta_likelihood["theta_observations"] - self.mean_theta_observations
             ) ** 2 / self.variance_theta_observations
 
             log_prior += -0.5 * log_prior_likelihood

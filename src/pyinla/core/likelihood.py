@@ -27,7 +27,7 @@ class Likelihood(ABC):
         y: ArrayLike,
         a: sparray,
         x: ArrayLike,
-        **kwargs,
+        theta_likelihood: dict = None,
     ) -> float:
         """Evaluate the likelihood.
 

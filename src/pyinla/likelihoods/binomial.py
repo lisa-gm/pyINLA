@@ -39,7 +39,7 @@ class BinomialLikelihood(Likelihood):
         y: ArrayLike,
         a: sparray,
         x: ArrayLike,
-        **kwargs,
+        theta_likelihood: dict = None,
     ) -> float:
         sig = self.link_function(a @ x)
         likelihood = np.dot(y, np.log(sig)) + np.dot(self.n_trials - y, np.log(1 - sig))
