@@ -141,9 +141,10 @@ class SpatioTemporal(Model):
         self,
         Q_prior: sparray,
         a: sparray,
-        d: sparray,
+        hessian_likelihood: sparray,
     ) -> float:
         """Construct the conditional precision matrix."""
-        pass
 
-        # Q_conditional = Q_prior + a.T @ d @ a
+        Q_conditional = Q_prior + a.T @ hessian_likelihood @ a
+
+        return Q_conditional

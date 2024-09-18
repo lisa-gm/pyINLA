@@ -47,6 +47,32 @@ class Likelihood(ABC):
         """
         pass
 
+    # @abstractmethod
+    # def evaluate_grad_likelihood(
+    #     self,
+    #     y: ArrayLike,
+    #     a: sparray,
+    #     x: ArrayLike,
+    #     theta_likelihood: dict = None,
+    # ) -> ArrayLike:
+    #     """Evaluate the gradient of the likelihood wrt to eta = Ax.
+
+    #     Parameters
+    #     ----------
+    #     y : ArrayLike
+    #         Vector of the observations.
+    #     a : sparray
+    #         Design matrix.
+    #     x : ArrayLike
+    #         Vector of the latent parameters.
+
+    #     Returns
+    #     -------
+    #     grad_likelihood : ArrayLike
+    #         Gradient of the likelihood.
+    #     """
+    #     pass
+
     @abstractmethod
     def get_theta_initial(self) -> dict:
         """Get the likelihood initial hyperparameters."""

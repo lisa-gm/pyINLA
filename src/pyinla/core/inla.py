@@ -16,6 +16,8 @@ from pyinla.prior_hyperparameters.gaussian import GaussianPriorHyperparameters
 from pyinla.prior_hyperparameters.penalized_complexity import (
     PenalizedComplexityPriorHyperparameters,
 )
+from pyinla.solvers.scipy_solver import ScipySolver
+from pyinla.solvers.serinv_solver import SerinvSolver
 from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
 
 
@@ -33,6 +35,8 @@ class INLA:
         pyinla_config: PyinlaConfig,
     ) -> None:
         self.pyinla_config = pyinla_config
+
+        self.eps_inner_iteration = self.pyinla_config.eps_inner_iteration
 
         # --- Load observation vector
         self.y = np.load(pyinla_config.input_dir / "y.npy")
@@ -82,6 +86,19 @@ class INLA:
         else:
             raise ValueError(
                 f"Likelihood '{self.pyinla_config.likelihood.type}' not implemented."
+            )
+
+        # --- Initialize solver
+        if self.pyinla_config.solver.type == "scipy":
+            self.solver_Q_prior = ScipySolver(pyinla_config)
+            self.solver_Q_conditional = ScipySolver(pyinla_config)
+        elif self.pyinla_config.solver.type == "serinv":
+            self.solver_Q_prior = SerinvSolver(pyinla_config)
+            self.solver_Q_conditional = SerinvSolver(pyinla_config)
+
+        else:
+            raise ValueError(
+                f"Solver '{self.pyinla_config.solver.type}' not implemented."
             )
 
         # --- Initialize theta
@@ -168,18 +185,35 @@ class INLA:
         pass
 
     def _inner_iteration(self, Q_prior, x_i, theta_model):
-        pass
-        """x_ip1 = np.zeros_like(x_i)
-        eps = 0.001
+        x_update = np.zeros_like(x_i)
+        x_i_norm = 1
+        while x_i_norm >= self.eps_inner_iteration:
+            x_i[:] += x_update[:]
 
-        while np.norm(x_ip1 - x_i) >= eps:
+            Ax = self.a @ x_i
+
+            gradient_likelihood = self.likelihood.evaluate_grad_likelihood(
+                Ax,
+                self.y,
+            )
+
+            rhs = -1 * Q_prior @ x_i + Ax.T @ gradient_likelihood
+
+            hessian_likelihood = self.likelihood.evaluate_hess_likelihood(Ax, self.y)
+
             Q_conditional = self.model.construct_Q_conditional(
                 Q_prior,
-                self.y,
                 self.a,
-                x_i,
-                theta_model,
-            )"""
+                hessian_likelihood,
+            )
+
+            self.solver_Q_conditional.cholesky(Q_conditional)
+
+            x_update[:] = self.solver_Q_conditional.solve(rhs)
+
+            x_i_norm = np.norm(x_update)
+
+        return Q_conditional, x_i
 
     def _compute_prior_latent_parameters(self):
         pass

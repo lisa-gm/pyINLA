@@ -151,15 +151,25 @@ class LikelihoodConfig(BaseModel):
     link_function: Literal["sigmoid"] = "sigmoid"
 
 
+class SolverConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["scipy", "serinv"] = "scipy"
+
+
 class PyinlaConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # --- Simulation parameters ---------------------------------------
+    # --- Model parameters -----------------------------------------------------
     model: ModelConfig = ModelConfig()
     prior_hyperparameters: PriorHyperparametersConfig = PriorHyperparametersConfig()
     likelihood: LikelihoodConfig = LikelihoodConfig()
 
-    # --- Directory paths ----------------------------------------------
+    # --- Simulation parameters ------------------------------------------------
+    solver: SolverConfig = SolverConfig()
+    eps_inner_iterations: float = 1e-3
+
+    # --- Directory paths ------------------------------------------------------
     simulation_dir: Path = Path("./pyinla/")
 
     @property
