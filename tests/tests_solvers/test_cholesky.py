@@ -1,9 +1,8 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-import pytest
 import numpy as np
+import pytest
 from scipy import sparse
-
 
 from pyinla.core.solver import Solver
 from pyinla.solvers.scipy_solver import ScipySolver
