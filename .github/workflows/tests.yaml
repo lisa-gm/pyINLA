@@ -18,6 +18,7 @@ jobs:
 
       - name: Install package in editable mode
         run: |
+          conda init
           conda activate pyinla
           pip install -e .
 
