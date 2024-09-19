@@ -1,7 +1,8 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-import numpy as np
 import math
+
+import numpy as np
 from numpy.typing import ArrayLike
 
 # from scipy.optimize import minimize
@@ -262,7 +263,6 @@ class INLA:
         return log_conditional_latent_parameters
 
     def _evaluate_GMRF(self, x_star, solver_instance, Q, x_mean=None):
-
         # n = x_star.shape[0]
 
         # write solver function that checks if current theta matches theta of solver
