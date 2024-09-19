@@ -217,13 +217,28 @@ class INLA:
 
         return Q_conditional, x_i
 
-    #
-    def _evaluate_prior_latent_parameters(self, x_star, Q_prior):
+    def _evaluate_prior_latent_parameters(self, Q_prior, x_star):
         """Evaluation of the prior of the latent parameters at x_star using the prior precision matrix Q_prior and assuming mean zero.
+
+        Notes
+        -----
+
         The prior of the latent parameters is by definition a multivariate normal distribution with mean 0 and precision matrix Q_prior
         which is evaluated at x_star in log-scale.
         The evaluation requires the computation of the log determinant of Q_prior.
         log normal: 0.5*log(1/(2*pi)^n * |Q_prior|)) - 0.5 * x_star.T @ Q_prior @ x_star
+
+        Parameters
+        ----------
+        Q_prior : ArrayLike
+            Prior precision matrix.
+        x_star : ArrayLike
+            Latent parameters.
+
+        Returns
+        -------
+        logprior : float
+            Log prior of the latent parameters evaluated at x_star
         """
 
         n = x_star.shape[0]
@@ -239,12 +254,29 @@ class INLA:
 
         return log_prior_latent_parameters
 
-    def _evaluate_conditional_latent_parameters(self, x_star, Q_conditional, x_mean):
+    def _evaluate_conditional_latent_parameters(self, Q_conditional, x_star, x_mean):
         """Evaluation of the conditional of the latent parameters at x_star using the conditional precision matrix Q_conditional and the mean x_mean.
+
+        Notes
+        -----
         The conditional of the latent parameters is by definition a multivariate normal distribution with mean x_mean and precision matrix Q_conditional
         which is evaluated at x_star in log-scale.
         The evaluation requires the computation of the log determinant of Q_conditional.
         log normal: 0.5*log(1/(2*pi)^n * |Q_conditional|)) - 0.5 * (x_star - x_mean).T @ Q_conditional @ (x_star - x_mean)
+
+        Parameters
+        ----------
+        Q_conditional : ArrayLike
+            Conditional precision matrix.
+        x_star : ArrayLike
+            Latent parameters.
+        x_mean : ArrayLike
+            Mean of the latent parameters.
+
+        Returns
+        -------
+        log_conditional : float
+            Log conditional of the latent parameters evaluated at x_star
         """
 
         n = x_star.shape[0]

@@ -1,9 +1,8 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
+""" import numpy as np
 import pytest
-import numpy as np
 from scipy import sparse
-
 from scipy.stats import multivariate_normal
 
 from pyinla.core import INLA
@@ -16,8 +15,7 @@ def test_evaluate_prior_latent_parameters(
     pobta_dense,
     pyinla_config,
 ):
-    ...
-    """ inla_instance = INLA(pyinla_config)
+    inla_instance = INLA(pyinla_config)
 
     Q_prior = sparse.csr_matrix(pobta_dense)
     x_star = np.random.randn(pobta_dense.shape[0])
