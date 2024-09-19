@@ -4,10 +4,14 @@ import numpy as np
 import pytest
 
 from pyinla.core.pyinla_config import PyinlaConfig
+from pyinla.solvers.scipy_solver import ScipySolver
 
-SEED = 63
+SOLVER = [ScipySolver]
 
-np.random.seed(SEED)
+
+@pytest.fixture(params=SOLVER, autouse=True)
+def solver(request):
+    return request.param
 
 
 @pytest.fixture(scope="function", autouse=False)
