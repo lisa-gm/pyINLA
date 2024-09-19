@@ -1,6 +1,7 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import numpy as np
+import math
 from numpy.typing import ArrayLike
 
 # from scipy.optimize import minimize
@@ -148,29 +149,29 @@ class INLA:
             theta_i, self.model.get_theta_initial(), self.likelihood.get_theta_initial()
         )
 
-        # --- Evaluate the log prior
+        # --- Evaluate the log prior of the hyperparameters
         log_prior = self.prior_hyperparameters.evaluate_log_prior(
             theta_model, theta_likelihood
         )
 
-        # --- Construct the prior precision matrix
+        # --- Construct the prior precision matrix of the latent parameters
         Q_prior = self.model.construct_Q_prior(theta_model)
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
         Q_conditional, self.x_star = self._inner_iteration(Q_prior, self.x, theta_model)
 
-        # --- Evaluate likelihood of the optimized latent parameters
+        # --- Evaluate likelihood at the optimized latent parameters x_star
         likelihood = self.likelihood.evaluate_likelihood(
             self.y, self.a, self.x_star, theta_likelihood
         )
 
-        # --- Compute the prior latent parameters
-        prior_latent_parameters = self._compute_prior_latent_parameters(
+        # --- Evaluate the prior of the latent parameters at x_star
+        prior_latent_parameters = self._evaluate_prior_latent_parameters(
             Q_prior, self.x_star
         )
 
-        # --- Compute the conditional latent parameters
-        conditional_latent_parameters = self._compute_conditional_latent_parameters(
+        # --- Evaluate the conditional of the latent parameters at x_star
+        conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
             Q_conditional, self.x_star
         )
 
@@ -215,8 +216,55 @@ class INLA:
 
         return Q_conditional, x_i
 
-    def _compute_prior_latent_parameters(self):
-        pass
+    #
+    def _evaluate_prior_latent_parameters(self, x_star, Q_prior):
+        """Evaluation of the prior of the latent parameters at x_star using the prior precision matrix Q_prior and assuming mean zero.
+        The prior of the latent parameters is by definition a multivariate normal distribution with mean 0 and precision matrix Q_prior
+        which is evaluated at x_star in log-scale.
+        The evaluation requires the computation of the log determinant of Q_prior.
+        log normal: 0.5*log(1/(2*pi)^n * |Q_prior|)) - 0.5 * x_star.T @ Q_prior @ x_star
+        """
 
-    def _compute_conditional_latent_parameters(self):
+        n = x_star.shape[0]
+
+        self.solver_Q_prior.cholesky(Q_prior)
+        logdet_Q_prior = self.solver_Q_prior.logdet()
+
+        log_prior_latent_parameters = (
+            -n / 2 * np.log(2 * math.pi)
+            + 0.5 * logdet_Q_prior
+            - 0.5 * x_star.T @ Q_prior @ x_star
+        )
+
+        return log_prior_latent_parameters
+
+    def _evaluate_conditional_latent_parameters(self, x_star, Q_conditional, x_mean):
+        """Evaluation of the conditional of the latent parameters at x_star using the conditional precision matrix Q_conditional and the mean x_mean.
+        The conditional of the latent parameters is by definition a multivariate normal distribution with mean x_mean and precision matrix Q_conditional
+        which is evaluated at x_star in log-scale.
+        The evaluation requires the computation of the log determinant of Q_conditional.
+        log normal: 0.5*log(1/(2*pi)^n * |Q_conditional|)) - 0.5 * (x_star - x_mean).T @ Q_conditional @ (x_star - x_mean)
+        """
+
+        n = x_star.shape[0]
+
+        # get current theta, check if this theta matches the theta used to construct Q_conditional
+        # if yes, check if L already computed, if yes -> takes this L
+        self.solver_Q_conditional.cholesky(Q_conditional)
+        logdet_Q_conditional = self.solver_Q_conditional.logdet()
+
+        log_conditional_latent_parameters = (
+            -n / 2 * np.log(2 * math.pi)
+            + 0.5 * logdet_Q_conditional
+            - 0.5 * (x_star - x_mean).T @ Q_conditional @ (x_star - x_mean)
+        )
+
+        return log_conditional_latent_parameters
+
+    def _evaluate_GMRF(self, x_star, solver_instance, Q, x_mean=None):
+
+        # n = x_star.shape[0]
+
+        # write solver function that checks if current theta matches theta of solver
+        # self.solver_instance.cholesky(Q)
         pass
