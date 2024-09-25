@@ -3,17 +3,17 @@
 import pytest
 
 from pyinla.core.pyinla_config import PyinlaConfig
-from pyinla.likelihoods.gaussian import GaussianLikelihood
-from pyinla.likelihoods.poisson import PoissonLikelihood
-from pyinla.likelihoods.binomial import BinomialLikelihood
+
+# from pyinla.likelihoods.binomial import BinomialLikelihood
+# from pyinla.likelihoods.gaussian import GaussianLikelihood
+# from pyinla.likelihoods.poisson import PoissonLikelihood
+
+# LIKELIHOODS = [BinomialLikelihood, GaussianLikelihood, PoissonLikelihood]  #
 
 
-LIKELIHOODS = [BinomialLikelihood]  # GaussianLikelihood, , PoissonLikelihood
-
-
-@pytest.fixture(params=LIKELIHOODS, autouse=True)
-def likelihood(request):
-    return request.param
+# @pytest.fixture(params=LIKELIHOODS, autouse=True)
+# def likelihood(request):
+#     return request.param
 
 
 @pytest.fixture

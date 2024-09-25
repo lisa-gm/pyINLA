@@ -113,6 +113,10 @@ class INLA:
 
         f_init = self._evaluate_f(self.theta_initial)
 
+        grad_f_init = self._evaluate_gradient_f(self.theta_initial)
+        print(f"Initial function value: {f_init}")
+        print(f"Initial gradient: {grad_f_init}")
+
         return f_init
 
         # result = minimize(
@@ -178,12 +182,13 @@ class INLA:
         Q_prior = self.model.construct_Q_prior(theta_model)
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
-        Q_conditional, self.x_star = self._inner_iteration(Q_prior, self.x, theta_model)
+        Q_conditional, self.x_star = self._inner_iteration(
+            Q_prior, self.x, theta_model, theta_likelihood
+        )
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
-        likelihood = self.likelihood.evaluate_likelihood(
-            self.y, self.a, self.x_star, theta_likelihood
-        )
+        eta = self.a @ self.x_star
+        likelihood = self.likelihood.evaluate_likelihood(self.y, eta, theta_likelihood)
 
         # --- Evaluate the prior of the latent parameters at x_star
         prior_latent_parameters = self._evaluate_prior_latent_parameters(
@@ -192,7 +197,7 @@ class INLA:
 
         # --- Evaluate the conditional of the latent parameters at x_star
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
-            Q_conditional, self.x_star
+            Q_conditional, self.x_star, self.x_star
         )
 
         return (
@@ -202,7 +207,7 @@ class INLA:
             - conditional_latent_parameters
         )
 
-    def _evaluate_grad_f(self, theta_i: np.ndarray, eps_grad_f=1e-3) -> np.ndarray:
+    def _evaluate_gradient_f(self, theta_i: np.ndarray, eps_grad_f=1e-3) -> np.ndarray:
         """evaluate the gradient of the objective function f(theta) = log(p(theta|y)).
 
         Notes
@@ -227,29 +232,32 @@ class INLA:
             theta_plus[i] += eps_grad_f
             theta_minus[i] -= eps_grad_f
 
-            f_plus = self._evaluate_objective_function(theta_plus)
-            f_minus = self._evaluate_objective_function(theta_minus)
+            f_plus = self._evaluate_f(theta_plus)
+            f_minus = self._evaluate_f(theta_minus)
 
             grad_f[i] = (f_plus - f_minus) / (2 * eps_grad_f)
 
         return grad_f
 
-    def _inner_iteration(self, Q_prior, x_i, theta_model):
+    def _inner_iteration(self, Q_prior, x_i, theta_model, theta_likelihood):
         x_update = np.zeros_like(x_i)
         x_i_norm = 1
+
+        counter = 0
         while x_i_norm >= self.eps_inner_iteration:
             x_i[:] += x_update[:]
 
             Ax = self.a @ x_i
 
-            gradient_likelihood = self.likelihood.evaluate_grad_likelihood(
-                Ax,
-                self.y,
+            gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
+                Ax, self.y, theta_likelihood
             )
 
             rhs = -1 * Q_prior @ x_i + Ax.T @ gradient_likelihood
 
-            hessian_likelihood = self.likelihood.evaluate_hess_likelihood(Ax, self.y)
+            hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(
+                Ax, self.y, theta_likelihood
+            )
 
             Q_conditional = self.model.construct_Q_conditional(
                 Q_prior,
@@ -261,8 +269,10 @@ class INLA:
 
             x_update[:] = self.solver_Q_conditional.solve(rhs)
 
-            x_i_norm = np.norm(x_update)
+            x_i_norm = np.linalg.norm(x_update)
+            counter += 1
 
+        print("Inner iteration converged after", counter, "iterations.")
         return Q_conditional, x_i
 
     def _evaluate_prior_latent_parameters(self, Q_prior, x_star):
@@ -327,18 +337,21 @@ class INLA:
             Log conditional of the latent parameters evaluated at x_star
         """
 
-        n = x_star.shape[0]
+        # n = x_star.shape[0]
 
         # get current theta, check if this theta matches the theta used to construct Q_conditional
         # if yes, check if L already computed, if yes -> takes this L
         self.solver_Q_conditional.cholesky(Q_conditional)
         logdet_Q_conditional = self.solver_Q_conditional.logdet()
 
-        log_conditional_latent_parameters = (
-            -n / 2 * np.log(2 * math.pi)
-            + 0.5 * logdet_Q_conditional
-            - 0.5 * (x_star - x_mean).T @ Q_conditional @ (x_star - x_mean)
-        )
+        # TODO: evaluate it at the mean -> this becomes zero ...
+        # log_conditional_latent_parameters = (
+        #     -n / 2 * np.log(2 * math.pi)
+        #     + 0.5 * logdet_Q_conditional
+        #     - 0.5 * (x_star - x_mean).T @ Q_conditional @ (x_star - x_mean)
+        # )
+
+        log_conditional_latent_parameters = 0.5 * logdet_Q_conditional
 
         return log_conditional_latent_parameters
 

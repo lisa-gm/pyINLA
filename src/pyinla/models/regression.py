@@ -1,7 +1,7 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from numpy.typing import ArrayLike
-from scipy.sparse import sparray
+# from numpy.typing import ArrayLike
+from scipy.sparse import eye, sparray
 
 from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -28,17 +28,23 @@ class Regression(Model):
         """Get the model hyperparameters."""
         return {}
 
-    def construct_Q_prior(self, theta_model: dict = None) -> float:
+    def construct_Q_prior(self, theta_model: dict = None) -> sparray:
         """Construct the prior precision matrix."""
-        pass
+
+        # Construct the prior precision matrix
+        Q_prior = self.fixed_effects_prior_precision * eye(self.nb)
+
+        return Q_prior
 
     def construct_Q_conditional(
         self,
         Q_prior: sparray,
-        y: ArrayLike,
         a: sparray,
-        x: ArrayLike,
-        theta_model: dict = None,
-    ) -> float:
+        hessian_likelihood: sparray,
+    ) -> sparray:
         """Construct the conditional precision matrix."""
-        pass
+
+        # TODO: think about where the negative comes in ...
+        Q_conditional = Q_prior - a.T @ hessian_likelihood @ a
+
+        return Q_conditional

@@ -1,6 +1,7 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-""" import numpy as np
+""" 
+import numpy as np
 import pytest
 from scipy import sparse
 from scipy.stats import multivariate_normal
@@ -28,4 +29,5 @@ def test_evaluate_prior_latent_parameters(
     # evaluate multivariate normal density at x_star given Q_prior
     log_prior_inla = inla_instance._evaluate_prior_latent_parameters(Q_prior, x_star)
 
-    assert np.allclose(log_prior_inla, log_prior_ref) """
+    assert np.allclose(log_prior_inla, log_prior_ref)
+"""

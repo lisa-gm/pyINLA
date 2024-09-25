@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from numpy.typing import ArrayLike
+# from numpy.typing import ArrayLike
 from scipy.sparse import sparray
 
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -31,7 +31,7 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def construct_Q_prior(self, theta_model: dict = None) -> float:
+    def construct_Q_prior(self, theta_model: dict = None) -> sparray:
         """Construct the prior precision matrix."""
         pass
 
@@ -39,10 +39,10 @@ class Model(ABC):
     def construct_Q_conditional(
         self,
         Q_prior: sparray,
-        y: ArrayLike,
         a: sparray,
-        x: ArrayLike,
-        theta_model: dict = None,
-    ) -> float:
-        """Construct the conditional precision matrix."""
+        hessian_likelihood: sparray,
+    ) -> sparray:
+        """Construct the conditional precision matrix.
+        #TODO: hessian_likelihood always diagonal (for all models). How to pass this best?
+        """
         pass

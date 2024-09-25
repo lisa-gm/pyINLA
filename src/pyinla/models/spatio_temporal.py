@@ -73,7 +73,7 @@ class SpatioTemporal(Model):
         """Get the model hyperparameters."""
         return self.theta_initial
 
-    def construct_Q_prior(self, theta_model: dict = None) -> float:
+    def construct_Q_prior(self, theta_model: dict = None) -> sparray:
         """Construct the prior precision matrix."""
         if theta_model is None:
             raise ValueError("theta_model must be provided.")
@@ -131,7 +131,7 @@ class SpatioTemporal(Model):
             (data, indices, indptr),
             shape=(
                 Q_spatio_temporal.shape[0] + self.nb,
-                Q_spatio_temporal[1] + self.nb,
+                Q_spatio_temporal.shape[1] + self.nb,
             ),
         )
 
@@ -145,6 +145,6 @@ class SpatioTemporal(Model):
     ) -> float:
         """Construct the conditional precision matrix."""
 
-        Q_conditional = Q_prior + a.T @ hessian_likelihood @ a
+        Q_conditional = Q_prior - a.T @ hessian_likelihood @ a
 
         return Q_conditional

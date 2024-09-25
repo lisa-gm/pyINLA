@@ -2,11 +2,12 @@
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.sparse import sparray
 
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.utils.link_functions import sigmoid
+
+# from scipy.sparse import sparray
 
 
 class BinomialLikelihood(Likelihood):
@@ -39,12 +40,11 @@ class BinomialLikelihood(Likelihood):
         eta: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
-
         # hardcoded link function for now: ONLY sigmoid
         linkEta = sigmoid(eta)
         # dot(y, log(linkEta)) + dot(Ntrials - y, log(1 - linkEta))
-        likelihood = np.dot(
-            y, np.log(linkEta) + np.dot(self.n_trials - y, np.log(1 - linkEta))
+        likelihood = np.dot(y, np.log(linkEta)) + np.dot(
+            self.n_trials - y, np.log(1 - linkEta)
         )
 
         return likelihood

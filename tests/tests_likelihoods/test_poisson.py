@@ -1,17 +1,16 @@
 import numpy as np
 import pytest
 from scipy import sparse
-from scipy.sparse import eye
-import math
-
+from scipy.special import gammaln
 
 # from scipy.stats import multivariate_normal
 from scipy.stats import poisson
-from scipy.special import gammaln
 
 from pyinla.core.likelihood import Likelihood
+from pyinla.likelihoods.poisson import PoissonLikelihood
 
 
+@pytest.mark.parametrize("likelihood", [PoissonLikelihood])
 @pytest.mark.parametrize("n_observations", [1, 2, 3, 9])
 @pytest.mark.parametrize("n_latent_parameters", [1, 2, 3, 8])
 @pytest.mark.parametrize("theta_observations", [-0.1, 0.0, 0.1, 0.2])
@@ -23,7 +22,6 @@ def test_poisson(
     theta_observations: float,
     pyinla_config,
 ):
-
     theta_likelihood["theta_observations"] = theta_observations
 
     a = sparse.random(n_observations, n_latent_parameters, density=0.5)
