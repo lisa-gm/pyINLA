@@ -25,8 +25,7 @@ class Likelihood(ABC):
     def evaluate_likelihood(
         self,
         y: ArrayLike,
-        a: sparray,
-        x: ArrayLike,
+        eta: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
         """Evaluate the likelihood.
@@ -35,10 +34,8 @@ class Likelihood(ABC):
         ----------
         y : ArrayLike
             Vector of the observations.
-        a : sparray
-            Design matrix.
-        x : ArrayLike
-            Vector of the latent parameters.
+        eta : ArrayLike
+            Vector of the linear predictor.
 
         Returns
         -------

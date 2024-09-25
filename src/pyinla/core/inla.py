@@ -40,7 +40,7 @@ class INLA:
 
         self.eps_inner_iteration = self.pyinla_config.eps_inner_iteration
 
-        # --- Load observation vector
+        # # --- Load observation vector
         self.y = np.load(pyinla_config.input_dir / "y.npy")
         self.n_observations = self.y.shape[0]
 
@@ -146,6 +146,25 @@ class INLA:
         assert self.x.shape[0] == self.a.shape[1], "Dimensions of x and A do not match."
 
     def _evaluate_f(self, theta_i: np.ndarray) -> float:
+        """evaluate the objective function f(theta) = log(p(theta|y)).
+
+        Notes
+        -----
+
+        The objective function f(theta) is an approximation of the log posterior of the hyperparameters theta evaluated at theta_i in log-scale.
+        Consisting of the following 4 terms: log prior hyperparameters, log likelihood, log prior of the latent parameters, and log conditional of the latent parameters.
+
+        Args
+        ----
+
+        theta_i (np.ndarray): Hyperparameters theta.
+
+        Returns
+        -------
+
+        float: function value f(theta) evaluated at theta_i.
+        """
+
         theta_model, theta_likelihood = theta_array2dict(
             theta_i, self.model.get_theta_initial(), self.likelihood.get_theta_initial()
         )
@@ -183,8 +202,37 @@ class INLA:
             - conditional_latent_parameters
         )
 
-    def _evaluate_grad_f(self):
-        pass
+    def _evaluate_grad_f(self, theta_i: np.ndarray, eps_grad_f=1e-3) -> np.ndarray:
+        """evaluate the gradient of the objective function f(theta) = log(p(theta|y)).
+
+        Notes
+        -----
+        Evaluate the gradient of the objective function f(theta) = log(p(theta|y)) wrt to theta
+        using a finite difference approximation. For now implement only central difference scheme.
+
+        Returns
+        -------
+        grad_f : np.ndarray
+            Gradient of the objective function f(theta) evaluated at theta_i.
+
+        """
+
+        dim_theta = theta_i.shape[0]
+        grad_f = np.zeros(dim_theta)
+
+        for i in range(dim_theta):
+            theta_plus = theta_i.copy()
+            theta_minus = theta_i.copy()
+
+            theta_plus[i] += eps_grad_f
+            theta_minus[i] -= eps_grad_f
+
+            f_plus = self._evaluate_objective_function(theta_plus)
+            f_minus = self._evaluate_objective_function(theta_minus)
+
+            grad_f[i] = (f_plus - f_minus) / (2 * eps_grad_f)
+
+        return grad_f
 
     def _inner_iteration(self, Q_prior, x_i, theta_model):
         x_update = np.zeros_like(x_i)

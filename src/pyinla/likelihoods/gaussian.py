@@ -15,7 +15,6 @@ class GaussianLikelihood(Likelihood):
         self,
         pyinla_config: PyinlaConfig,
         n_observations: int,
-        **kwargs,
     ) -> None:
         """Initializes the Gaussian likelihood."""
         super().__init__(pyinla_config, n_observations)
@@ -31,20 +30,25 @@ class GaussianLikelihood(Likelihood):
     def evaluate_likelihood(
         self,
         y: ArrayLike,
-        a: sparray,
-        x: ArrayLike,
+        eta: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
         """Evaluate a Gaussian likelihood.
+
+        Notes
+        -----
+
+        Evaluate Gaussian log-likelihood for a given set of observations, latent parameters, and design matrix, where
+        the observations are assumed to be identically and independently distributed given eta (=A*x). Leading to:
+        log (p(y|eta)) = -0.5 * n * log(2 * pi) - 0.5 * n * theta_observations - 0.5 * exp(theta_observations) * (y - eta)^T * (y - eta)
+        where the constant in front of the likelihood is omitted.
 
         Parameters
         ----------
         y : ArrayLike
             Vector of the observations.
-        a : sparray
-            Design matrix.
-        x : ArrayLike
-            Vector of the latent parameters.
+        eta : ArrayLike
+            Vector of the linear predictor.
         kwargs : dict
             Extra arguments.
             theta_likelihood : float
@@ -62,11 +66,11 @@ class GaussianLikelihood(Likelihood):
 
         theta_observations = theta_likelihood["theta_observations"]
 
-        yAx = y - a @ x
+        yEta = y - eta
 
         likelihood = (
             0.5 * theta_observations * self.n_observations
-            - 0.5 * yAx.T @ yAx * np.exp(theta_observations)
+            - 0.5 * yEta.T @ yEta * np.exp(theta_observations)
         )
 
         return likelihood

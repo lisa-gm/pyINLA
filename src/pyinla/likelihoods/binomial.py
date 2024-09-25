@@ -16,7 +16,6 @@ class BinomialLikelihood(Likelihood):
         self,
         pyinla_config: PyinlaConfig,
         n_observations: int,
-        **kwargs,
     ) -> None:
         """Initializes the Binomial likelihood."""
         super().__init__(pyinla_config, n_observations)
@@ -37,13 +36,28 @@ class BinomialLikelihood(Likelihood):
     def evaluate_likelihood(
         self,
         y: ArrayLike,
-        a: sparray,
-        x: ArrayLike,
+        eta: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
-        raise NotImplementedError
+
+        # hardcoded link function for now: ONLY sigmoid
+        linkEta = sigmoid(eta)
+        # dot(y, log(linkEta)) + dot(Ntrials - y, log(1 - linkEta))
+        likelihood = np.dot(
+            y, np.log(linkEta) + np.dot(self.n_trials - y, np.log(1 - linkEta))
+        )
+
+        return likelihood
 
     def evaluate_gradient_likelihood(
+        self,
+        y: ArrayLike,
+        eta: ArrayLike,
+        theta_likelihood: dict = None,
+    ) -> ArrayLike:
+        raise NotImplementedError
+
+    def evaluate_hessian_likelihood(
         self,
         y: ArrayLike,
         eta: ArrayLike,

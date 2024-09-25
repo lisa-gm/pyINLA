@@ -167,7 +167,7 @@ class PyinlaConfig(BaseModel):
 
     # --- Simulation parameters ------------------------------------------------
     solver: SolverConfig = SolverConfig()
-    eps_inner_iterations: float = 1e-3
+    eps_inner_iteration: float = 1e-3
 
     # --- Directory paths ------------------------------------------------------
     simulation_dir: Path = Path("./pyinla/")

@@ -15,7 +15,6 @@ class PoissonLikelihood(Likelihood):
         self,
         pyinla_config: PyinlaConfig,
         n_observations: int,
-        **kwargs,
     ) -> None:
         """Initializes the Poisson likelihood."""
         super().__init__(pyinla_config, n_observations)
@@ -33,12 +32,10 @@ class PoissonLikelihood(Likelihood):
     def evaluate_likelihood(
         self,
         y: ArrayLike,
-        a: sparray,
-        x: ArrayLike,
+        eta: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
-        Ax = a @ x
-        likelihood = np.dot(Ax, y) - np.sum(self.e * np.exp(Ax))
+        likelihood = np.dot(eta, y) - np.sum(self.e * np.exp(eta))
 
         return likelihood
 
