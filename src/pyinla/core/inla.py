@@ -12,8 +12,8 @@ from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.likelihoods.binomial import BinomialLikelihood
 from pyinla.likelihoods.gaussian import GaussianLikelihood
 from pyinla.likelihoods.poisson import PoissonLikelihood
-from pyinla.models.regression import Regression
-from pyinla.models.spatio_temporal import SpatioTemporal
+from pyinla.models.regression import RegressionModel
+from pyinla.models.spatio_temporal import SpatioTemporalModel
 from pyinla.prior_hyperparameters.gaussian import GaussianPriorHyperparameters
 from pyinla.prior_hyperparameters.penalized_complexity import (
     PenalizedComplexityPriorHyperparameters,
@@ -58,10 +58,10 @@ class INLA:
 
         # --- Initialize model
         if self.pyinla_config.model.type == "regression":
-            self.model = Regression(pyinla_config, self.n_latent_parameters)
+            self.model = RegressionModel(pyinla_config, self.n_latent_parameters)
             print("Regression model initialized.")
         elif self.pyinla_config.model.type == "spatio-temporal":
-            self.model = SpatioTemporal(pyinla_config, self.n_latent_parameters)
+            self.model = SpatioTemporalModel(pyinla_config, self.n_latent_parameters)
             print("Spatio-temporal model initialized.")
         else:
             raise ValueError(
@@ -122,8 +122,6 @@ class INLA:
         print(f"Initial function value: {f_init}")
         print(f"Initial gradient: {grad_f_init}")
 
-        return f_init
-
         # result = minimize(
         #     self.theta_initial,
         #     self._evaluate_f,
@@ -140,6 +138,8 @@ class INLA:
         # else:
         #     print("Optimization did not converge.")
         #     return False
+
+        return f_init
 
     def get_theta_star(self) -> dict:
         """Get the optimal theta."""
@@ -251,6 +251,11 @@ class INLA:
 
         counter = 0
         while x_i_norm >= self.eps_inner_iteration:
+
+            if counter > 20:
+                print("Inner iteration did not converge! Counter : ", counter)
+                raise ValueError
+
             x_i[:] += x_update[:]
 
             eta = self.a @ x_i

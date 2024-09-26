@@ -7,7 +7,7 @@ from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
 
 
-class Regression(Model):
+class RegressionModel(Model):
     """Fit a regression model."""
 
     def __init__(

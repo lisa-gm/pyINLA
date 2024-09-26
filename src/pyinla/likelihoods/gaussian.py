@@ -2,7 +2,7 @@
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.sparse import eye, sparray
+from scipy.sparse import eye
 
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -66,11 +66,11 @@ class GaussianLikelihood(Likelihood):
 
         theta_observations = theta_likelihood["theta_observations"]
 
-        yEta = y - eta
+        yEta = eta - y
 
         likelihood = (
             0.5 * theta_observations * self.n_observations
-            - 0.5 * yEta.T @ yEta * np.exp(theta_observations)
+            - 0.5 * np.exp(theta_observations) * yEta.T @ yEta
         )
 
         return likelihood
@@ -106,7 +106,7 @@ class GaussianLikelihood(Likelihood):
 
         theta_observations = theta_likelihood["theta_observations"]
 
-        gradient_likelihood = -np.exp(theta_observations) * (y - eta)
+        gradient_likelihood = -np.exp(theta_observations) * (eta - y)
 
         return gradient_likelihood
 

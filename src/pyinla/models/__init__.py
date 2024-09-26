@@ -1,6 +1,6 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from pyinla.models.regression import Regression
-from pyinla.models.spatio_temporal import SpatioTemporal
+from pyinla.models.regression import RegressionModel
+from pyinla.models.spatio_temporal import SpatioTemporalModel
 
-__all__ = ["Regression", "SpatioTemporal"]
+__all__ = ["RegressionModel", "SpatioTemporalModel"]

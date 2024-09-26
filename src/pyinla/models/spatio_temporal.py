@@ -7,7 +7,7 @@ from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
 
 
-class SpatioTemporal(Model):
+class SpatioTemporalModel(Model):
     """Fit a spatio-temporal model."""
 
     def __init__(
