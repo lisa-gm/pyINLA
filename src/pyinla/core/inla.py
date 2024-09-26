@@ -52,15 +52,17 @@ class INLA:
         try:
             self.x = np.load(pyinla_config.input_dir / "x.npy")
         except FileNotFoundError:
-            self.x = np.zeros((self.a.shape[1]), dtype=self.y.dtype)
+            self.x = np.ones((self.a.shape[1]), dtype=float)
 
         self._check_dimensions()
 
         # --- Initialize model
         if self.pyinla_config.model.type == "regression":
             self.model = Regression(pyinla_config, self.n_latent_parameters)
+            print("Regression model initialized.")
         elif self.pyinla_config.model.type == "spatio-temporal":
             self.model = SpatioTemporal(pyinla_config, self.n_latent_parameters)
+            print("Spatio-temporal model initialized.")
         else:
             raise ValueError(
                 f"Model '{self.pyinla_config.model.type}' not implemented."
@@ -81,10 +83,13 @@ class INLA:
         # --- Initialize likelihood
         if self.pyinla_config.likelihood.type == "gaussian":
             self.likelihood = GaussianLikelihood(pyinla_config, self.n_observations)
+            print("Gaussian likelihood initialized.")
         elif self.pyinla_config.likelihood.type == "poisson":
             self.likelihood = PoissonLikelihood(pyinla_config, self.n_observations)
+            print("Poisson likelihood initialized.")
         elif self.pyinla_config.likelihood.type == "binomial":
             self.likelihood = BinomialLikelihood(pyinla_config, self.n_observations)
+            print("Binomial likelihood initialized.")
         else:
             raise ValueError(
                 f"Likelihood '{self.pyinla_config.likelihood.type}' not implemented."
@@ -182,6 +187,7 @@ class INLA:
         Q_prior = self.model.construct_Q_prior(theta_model)
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
+        print("initial x:", self.x)
         Q_conditional, self.x_star = self._inner_iteration(
             Q_prior, self.x, theta_model, theta_likelihood
         )
@@ -247,16 +253,16 @@ class INLA:
         while x_i_norm >= self.eps_inner_iteration:
             x_i[:] += x_update[:]
 
-            Ax = self.a @ x_i
+            eta = self.a @ x_i
 
             gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
-                Ax, self.y, theta_likelihood
+                self.y, eta, theta_likelihood
             )
 
-            rhs = -1 * Q_prior @ x_i + Ax.T @ gradient_likelihood
+            rhs = -1 * Q_prior @ x_i + self.a.T @ gradient_likelihood
 
             hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(
-                Ax, self.y, theta_likelihood
+                self.y, eta, theta_likelihood
             )
 
             Q_conditional = self.model.construct_Q_conditional(
@@ -266,10 +272,10 @@ class INLA:
             )
 
             self.solver_Q_conditional.cholesky(Q_conditional)
-
             x_update[:] = self.solver_Q_conditional.solve(rhs)
 
             x_i_norm = np.linalg.norm(x_update)
+            print(f"Inner iteration {counter} norm: {x_i_norm}")
             counter += 1
 
         print("Inner iteration converged after", counter, "iterations.")
