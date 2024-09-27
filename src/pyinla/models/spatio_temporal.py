@@ -70,7 +70,15 @@ class SpatioTemporalModel(Model):
         ), "Dimensions of temporal matrices do not match."
 
     def get_theta_initial(self) -> dict:
-        """Get the model hyperparameters."""
+        """Get the initial theta of the model. This dictionary is constructed
+        at instanciation of the model. It has to be stored in the model as
+        theta is specific to the model.
+
+        Returns
+        -------
+        theta_inital_model : dict
+            Dictionary of initial hyperparameters.
+        """
         return self.theta_initial
 
     def construct_Q_prior(self, theta_model: dict = None) -> sparray:

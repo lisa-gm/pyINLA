@@ -27,8 +27,16 @@ class Model(ABC):
 
     @abstractmethod
     def get_theta_initial(self) -> dict:
-        """Get the model initial hyperparameters."""
-        pass
+        """Get the initial theta of the model. This dictionary is constructed
+        at instanciation of the model. It has to be stored in the model as
+        theta is specific to the model.
+
+        Returns
+        -------
+        theta_inital_model : dict
+            Dictionary of initial hyperparameters.
+        """
+        ...
 
     @abstractmethod
     def construct_Q_prior(self, theta_model: dict = None) -> sparray:
