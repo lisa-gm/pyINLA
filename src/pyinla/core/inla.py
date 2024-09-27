@@ -6,7 +6,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 # from scipy.optimize import minimize
-from scipy.sparse import load_npz
+from scipy.sparse import load_npz, sparray
 
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.likelihoods.binomial import BinomialLikelihood
@@ -39,6 +39,7 @@ class INLA:
         self.pyinla_config = pyinla_config
 
         self.eps_inner_iteration = self.pyinla_config.eps_inner_iteration
+        self.eps_gradient_f = self.pyinla_config.eps_gradient_f
 
         # # --- Load observation vector
         self.y = np.load(pyinla_config.input_dir / "y.npy")
@@ -163,15 +164,15 @@ class INLA:
         The objective function f(theta) is an approximation of the log posterior of the hyperparameters theta evaluated at theta_i in log-scale.
         Consisting of the following 4 terms: log prior hyperparameters, log likelihood, log prior of the latent parameters, and log conditional of the latent parameters.
 
-        Args
-        ----
-
-        theta_i (np.ndarray): Hyperparameters theta.
+        Parameters
+        ----------
+        theta_i : ArrayLike
+            Hyperparameters theta.
 
         Returns
         -------
-
-        float: function value f(theta) evaluated at theta_i.
+        objective_function_evalutation : float
+            Function value f(theta) evaluated at theta_i.
         """
 
         theta_model, theta_likelihood = theta_array2dict(
@@ -188,22 +189,20 @@ class INLA:
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
         print("initial x:", self.x)
-        Q_conditional, self.x_star = self._inner_iteration(
-            Q_prior, self.x, theta_model, theta_likelihood
-        )
+        Q_conditional, self.x = self._inner_iteration(Q_prior, self.x, theta_likelihood)
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
-        eta = self.a @ self.x_star
+        eta = self.a @ self.x
         likelihood = self.likelihood.evaluate_likelihood(self.y, eta, theta_likelihood)
 
         # --- Evaluate the prior of the latent parameters at x_star
         prior_latent_parameters = self._evaluate_prior_latent_parameters(
-            Q_prior, self.x_star
+            Q_prior, self.x
         )
 
         # --- Evaluate the conditional of the latent parameters at x_star
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
-            Q_conditional, self.x_star, self.x_star
+            Q_conditional, self.x, self.x
         )
 
         return (
@@ -213,7 +212,7 @@ class INLA:
             - conditional_latent_parameters
         )
 
-    def _evaluate_gradient_f(self, theta_i: np.ndarray, eps_grad_f=1e-3) -> np.ndarray:
+    def _evaluate_gradient_f(self, theta_i: np.ndarray) -> np.ndarray:
         """evaluate the gradient of the objective function f(theta) = log(p(theta|y)).
 
         Notes
@@ -231,21 +230,25 @@ class INLA:
         dim_theta = theta_i.shape[0]
         grad_f = np.zeros(dim_theta)
 
+        # TODO: Theses evaluations are independant and can be performed
+        # in parallel.
         for i in range(dim_theta):
             theta_plus = theta_i.copy()
             theta_minus = theta_i.copy()
 
-            theta_plus[i] += eps_grad_f
-            theta_minus[i] -= eps_grad_f
+            theta_plus[i] += self.eps_gradient_f
+            theta_minus[i] -= self.eps_gradient_f
 
             f_plus = self._evaluate_f(theta_plus)
             f_minus = self._evaluate_f(theta_minus)
 
-            grad_f[i] = (f_plus - f_minus) / (2 * eps_grad_f)
+            grad_f[i] = (f_plus - f_minus) / (2 * self.eps_gradient_f)
 
         return grad_f
 
-    def _inner_iteration(self, Q_prior, x_i, theta_model, theta_likelihood):
+    def _inner_iteration(
+        self, Q_prior: sparray, x_i: ArrayLike, theta_likelihood: dict
+    ):
         x_update = np.zeros_like(x_i)
         x_i_norm = 1
 
@@ -286,31 +289,32 @@ class INLA:
         print("Inner iteration converged after", counter, "iterations.")
         return Q_conditional, x_i
 
-    def _evaluate_prior_latent_parameters(self, Q_prior, x_star):
-        """Evaluation of the prior of the latent parameters at x_star using the prior precision matrix Q_prior and assuming mean zero.
-
-        Notes
-        -----
-
-        The prior of the latent parameters is by definition a multivariate normal distribution with mean 0 and precision matrix Q_prior
-        which is evaluated at x_star in log-scale.
-        The evaluation requires the computation of the log determinant of Q_prior.
-        log normal: 0.5*log(1/(2*pi)^n * |Q_prior|)) - 0.5 * x_star.T @ Q_prior @ x_star
+    def _evaluate_prior_latent_parameters(self, Q_prior: sparray, x: ArrayLike):
+        """Evaluation of the prior of the latent parameters at x using the prior precision matrix Q_prior and assuming mean zero.
 
         Parameters
         ----------
         Q_prior : ArrayLike
             Prior precision matrix.
-        x_star : ArrayLike
+        x : ArrayLike
             Latent parameters.
+
+        Notes
+        -----
+        The prior of the latent parameters is by definition a multivariate normal
+        distribution with mean 0 and precision matrix Q_prior which is evaluated at
+        x in log-scale. The evaluation requires the computation of the log
+        determinant of Q_prior.
+        Log normal:
+        .. math:: 0.5*log(1/(2*\pi)^n * |Q_prior|)) - 0.5 * x.T Q_prior x
 
         Returns
         -------
         logprior : float
-            Log prior of the latent parameters evaluated at x_star
+            Log prior of the latent parameters evaluated at x
         """
 
-        n = x_star.shape[0]
+        n = x.shape[0]
 
         self.solver_Q_prior.cholesky(Q_prior)
         logdet_Q_prior = self.solver_Q_prior.logdet()
@@ -318,26 +322,26 @@ class INLA:
         log_prior_latent_parameters = (
             -n / 2 * np.log(2 * math.pi)
             + 0.5 * logdet_Q_prior
-            - 0.5 * x_star.T @ Q_prior @ x_star
+            - 0.5 * x.T @ Q_prior @ x
         )
 
         return log_prior_latent_parameters
 
-    def _evaluate_conditional_latent_parameters(self, Q_conditional, x_star, x_mean):
-        """Evaluation of the conditional of the latent parameters at x_star using the conditional precision matrix Q_conditional and the mean x_mean.
+    def _evaluate_conditional_latent_parameters(self, Q_conditional, x, x_mean):
+        """Evaluation of the conditional of the latent parameters at x using the conditional precision matrix Q_conditional and the mean x_mean.
 
         Notes
         -----
         The conditional of the latent parameters is by definition a multivariate normal distribution with mean x_mean and precision matrix Q_conditional
-        which is evaluated at x_star in log-scale.
+        which is evaluated at x in log-scale.
         The evaluation requires the computation of the log determinant of Q_conditional.
-        log normal: 0.5*log(1/(2*pi)^n * |Q_conditional|)) - 0.5 * (x_star - x_mean).T @ Q_conditional @ (x_star - x_mean)
+        log normal: 0.5*log(1/(2*pi)^n * |Q_conditional|)) - 0.5 * (x - x_mean).T @ Q_conditional @ (x - x_mean)
 
         Parameters
         ----------
         Q_conditional : ArrayLike
             Conditional precision matrix.
-        x_star : ArrayLike
+        x : ArrayLike
             Latent parameters.
         x_mean : ArrayLike
             Mean of the latent parameters.
@@ -345,10 +349,10 @@ class INLA:
         Returns
         -------
         log_conditional : float
-            Log conditional of the latent parameters evaluated at x_star
+            Log conditional of the latent parameters evaluated at x
         """
 
-        # n = x_star.shape[0]
+        # n = x.shape[0]
 
         # get current theta, check if this theta matches the theta used to construct Q_conditional
         # if yes, check if L already computed, if yes -> takes this L
@@ -359,7 +363,7 @@ class INLA:
         # log_conditional_latent_parameters = (
         #     -n / 2 * np.log(2 * math.pi)
         #     + 0.5 * logdet_Q_conditional
-        #     - 0.5 * (x_star - x_mean).T @ Q_conditional @ (x_star - x_mean)
+        #     - 0.5 * (x - x_mean).T @ Q_conditional @ (x - x_mean)
         # )
 
         log_conditional_latent_parameters = 0.5 * logdet_Q_conditional
