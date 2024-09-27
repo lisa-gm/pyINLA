@@ -69,7 +69,7 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
             log_prior_sd_spatio_temporal = (
                 self.precision_theta_spatio_temporal_variation
                 * (
-                    theta_model["sd_spatio_temporal"]
+                    theta_model["spatio_temporal_variation"]
                     - self.mean_theta_spatio_temporal_variation
                 )
                 ** 2

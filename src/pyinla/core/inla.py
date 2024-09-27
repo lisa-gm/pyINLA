@@ -114,6 +114,9 @@ class INLA:
             self.model.get_theta_initial(), self.likelihood.get_theta_initial()
         )
 
+        # self.counter = 0
+        # self.min_f = 1e10
+
     def run(self) -> np.ndarray:
         """Fit the model using INLA."""
 
@@ -124,10 +127,10 @@ class INLA:
         print(f"Initial gradient: {grad_f_init}")
 
         # result = minimize(
-        #     self.theta_initial,
         #     self._evaluate_f,
-        #     self._evaluate_grad_f,
+        #     self.theta_initial,
         #     method="BFGS",
+        #     jac=self._evaluate_gradient_f,
         # )
 
         # if result.success:
@@ -135,10 +138,13 @@ class INLA:
         #         "Optimization converged successfully after", result.nit, "iterations."
         #     )
         #     self.theta_star = result.x
+        #     print("Optimal theta:", self.theta_star)
         #     return True
         # else:
         #     print("Optimization did not converge.")
         #     return False
+
+        # print("counter:", self.counter)
 
         return f_init
 
@@ -205,12 +211,19 @@ class INLA:
             Q_conditional, self.x, self.x
         )
 
-        return (
+        f_theta = -1 * (
             log_prior
             + likelihood
             + prior_latent_parameters
             - conditional_latent_parameters
         )
+
+        if f_theta < self.min_f:
+            self.min_f = f_theta
+            self.counter += 1
+            print(f"Minimum function value: {self.min_f}. Counter: {self.counter}")
+
+        return f_theta
 
     def _evaluate_gradient_f(self, theta_i: np.ndarray) -> np.ndarray:
         """evaluate the gradient of the objective function f(theta) = log(p(theta|y)).

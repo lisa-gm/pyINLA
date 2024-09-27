@@ -8,20 +8,14 @@ from pyinla.utils import sigmoid
 
 
 def test_binomial_evaluate_likelihood(
+    generate_binomial_data,
     n_observations: int,
     n_latent_parameters: int,
     theta_observations: float,
     pyinla_config,
 ):
-    theta_likelihood: dict = {"theta_observations": theta_observations}
 
-    a = sparse.random(n_observations, n_latent_parameters, density=0.5)
-    x = np.random.randn(n_latent_parameters)
-    eta = a @ x
-
-    n_trials = np.ones(len(eta), dtype=int)
-    prob = sigmoid(eta)
-    y = np.random.binomial(n=n_trials, p=prob)
+    y, eta, n_trials, prob, theta_likelihood = generate_binomial_data
 
     likelihood_instance = BinomialLikelihood(pyinla_config, n_observations)
 

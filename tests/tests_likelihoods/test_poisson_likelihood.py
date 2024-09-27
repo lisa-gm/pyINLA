@@ -1,5 +1,6 @@
 import numpy as np
-from scipy import sparse
+import autograd.numpy as anp
+from autograd import grad, hessian
 from scipy.special import gammaln
 from scipy.stats import poisson
 
@@ -7,19 +8,12 @@ from pyinla.likelihoods.poisson import PoissonLikelihood
 
 
 def test_poisson_evaluate_likelihood(
+    generate_poisson_data,
     n_observations: int,
-    n_latent_parameters: int,
-    theta_observations: float,
     pyinla_config,
 ):
-    theta_likelihood: dict = {"theta_observations": theta_observations}
 
-    a = sparse.random(n_observations, n_latent_parameters, density=0.5)
-    x = np.random.randn(n_latent_parameters)
-    eta = a @ x
-    lam = np.exp(eta)
-    y = np.random.poisson(lam=lam)
-
+    y, eta, lam, theta_likelihood = generate_poisson_data
     likelihood_instance = PoissonLikelihood(pyinla_config, n_observations)
 
     # Neglects constant in likelihood (w/o  - sum(log(y!)))
@@ -32,9 +26,42 @@ def test_poisson_evaluate_likelihood(
     assert np.allclose(likelihood_inla, poisson_ref)
 
 
-def test_poisson_evaluate_gradient():
-    ...
+def test_poisson_evaluate_gradient(
+    generate_poisson_data,
+    n_observations: int,
+    pyinla_config,
+):
+
+    y, eta, lam, theta_likelihood = generate_poisson_data
+    likelihood_instance = PoissonLikelihood(pyinla_config, n_observations)
+
+    grad_likelihood_inla = likelihood_instance.evaluate_gradient_likelihood(
+        y, eta, theta_likelihood
+    )
+
+    eta_anp = anp.array(eta)
+    auto_grad = grad(likelihood_instance.evaluate_likelihood_autodiff, 1)
+    grad_likelihood_ref = auto_grad(y, eta_anp, theta_likelihood)
+
+    assert np.allclose(grad_likelihood_inla, grad_likelihood_ref)
 
 
-def test_poisson_evaluate_hessian():
-    ...
+def test_poisson_evaluate_hessian(
+    generate_poisson_data,
+    n_observations: int,
+    pyinla_config,
+):
+
+    y, eta, _, theta_likelihood = generate_poisson_data
+    likelihood_instance = PoissonLikelihood(pyinla_config, n_observations)
+
+    hessian_likelihood_inla = likelihood_instance.evaluate_hessian_likelihood(
+        y, eta, theta_likelihood
+    )
+    hessian_likelihood_inla = hessian_likelihood_inla.toarray()
+
+    eta_anp = anp.array(eta)
+    auto_hessian = hessian(likelihood_instance.evaluate_likelihood_autodiff, 1)
+    hessian_likelihood_ref = auto_hessian(y, eta_anp, theta_likelihood)
+
+    assert np.allclose(hessian_likelihood_inla, hessian_likelihood_ref)
