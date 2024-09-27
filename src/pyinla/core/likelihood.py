@@ -3,7 +3,6 @@
 from abc import ABC, abstractmethod
 
 from numpy.typing import ArrayLike
-from scipy.sparse import sparray
 
 from pyinla.core.pyinla_config import PyinlaConfig
 

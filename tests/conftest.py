@@ -2,20 +2,15 @@
 
 import numpy as np
 import pytest
-
 from numpy.typing import ArrayLike
 
-from pyinla.core.pyinla_config import PyinlaConfig
-from pyinla.solvers.scipy_solver import ScipySolver
-
 from pyinla.core.likelihood import Likelihood
-from pyinla.likelihoods.gaussian import GaussianLikelihood
-from pyinla.likelihoods.poisson import PoissonLikelihood
-from pyinla.likelihoods.binomial import BinomialLikelihood
-
 from pyinla.core.model import Model
+from pyinla.core.pyinla_config import PyinlaConfig
+from pyinla.likelihoods.gaussian import GaussianLikelihood
 from pyinla.models.regression import RegressionModel
 from pyinla.models.spatio_temporal import SpatioTemporalModel
+from pyinla.solvers.scipy_solver import ScipySolver
 
 SOLVER = [ScipySolver]
 
@@ -99,7 +94,6 @@ def pyinla_config_initialize_theta(
     theta_prior_mean: ArrayLike,
     theta_prior_variance: ArrayLike,
 ):
-
     pyinla_config = PyinlaConfig()
 
     counter = 0

@@ -2,7 +2,7 @@
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.sparse import diags, sparray
+from scipy.sparse import diags
 
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig

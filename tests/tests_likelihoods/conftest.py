@@ -1,30 +1,20 @@
-# write functions that generate small test cases
-
 import pytest
 
-from pyinla.core.pyinla_config import PyinlaConfig
-
-# from pyinla.likelihoods.binomial import BinomialLikelihood
-# from pyinla.likelihoods.gaussian import GaussianLikelihood
-# from pyinla.likelihoods.poisson import PoissonLikelihood
-
-# LIKELIHOODS = [BinomialLikelihood, GaussianLikelihood, PoissonLikelihood]  #
+N_OBSERVATIONS = [1, 2, 3, 9]
+N_LATENT_PARAMETERS = [1, 2, 3, 8]
+THETA_OBSERVATIONS = [-0.1, 0.0, 0.1, 0.2]
 
 
-# @pytest.fixture(params=LIKELIHOODS, autouse=True)
-# def likelihood(request):
-#     return request.param
+@pytest.fixture(params=N_OBSERVATIONS, autouse=True)
+def n_observations(request):
+    return request.param
 
 
-@pytest.fixture
-def theta_likelihood():
-    return {"theta_observations": -0.1}
+@pytest.fixture(params=N_LATENT_PARAMETERS, autouse=True)
+def n_latent_parameters(request):
+    return request.param
 
 
-@pytest.fixture(scope="function", autouse=False)
-def pyinla_config(likelihood):
-    """Returns a PyinlaConfig object."""
-
-    pyinla_config = PyinlaConfig()
-
-    return pyinla_config
+@pytest.fixture(params=THETA_OBSERVATIONS, autouse=True)
+def theta_observations(request):
+    return request.param
