@@ -251,7 +251,6 @@ class INLA:
 
         counter = 0
         while x_i_norm >= self.eps_inner_iteration:
-
             if counter > 20:
                 print("Inner iteration did not converge! Counter : ", counter)
                 raise ValueError

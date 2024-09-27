@@ -3,8 +3,19 @@
 import numpy as np
 import pytest
 
+from numpy.typing import ArrayLike
+
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.solvers.scipy_solver import ScipySolver
+
+from pyinla.core.likelihood import Likelihood
+from pyinla.likelihoods.gaussian import GaussianLikelihood
+from pyinla.likelihoods.poisson import PoissonLikelihood
+from pyinla.likelihoods.binomial import BinomialLikelihood
+
+from pyinla.core.model import Model
+from pyinla.models.regression import RegressionModel
+from pyinla.models.spatio_temporal import SpatioTemporalModel
 
 SOLVER = [ScipySolver]
 
@@ -77,5 +88,57 @@ def pyinla_config(solver):
         pyinla_config.solver.type = "scipy"
     elif solver == "SerinvSolver":
         pyinla_config.solver.type = "serinv"
+
+    return pyinla_config
+
+
+@pytest.fixture(scope="function", autouse=False)
+def pyinla_config_initialize_theta(
+    model: Model,
+    likelihood: Likelihood,
+    theta_prior_mean: ArrayLike,
+    theta_prior_variance: ArrayLike,
+):
+
+    pyinla_config = PyinlaConfig()
+
+    counter = 0
+    if Model == RegressionModel and Likelihood == GaussianLikelihood:
+        pyinla_config.prior_hyperparamters.mean_theta_observations = theta_prior_mean[
+            counter
+        ]
+        pyinla_config.prior_hyperparamters.precision_theta_observations = (
+            theta_prior_variance[counter]
+        )
+        counter += 1
+
+    elif Model == SpatioTemporalModel:
+        pyinla_config.prior_hyperparamters.mean_theta_spatial_range = theta_prior_mean[
+            counter
+        ]
+        pyinla_config.prior_hyperparamters.precision_theta_spatial_range = (
+            theta_prior_variance[counter]
+        )
+        counter += 1
+
+        pyinla_config.prior_hyperparamters.mean_theta_temporal_range = theta_prior_mean[
+            counter
+        ]
+        pyinla_config.prior_hyperparamters.precision_theta_temporal_range = (
+            theta_prior_variance[counter]
+        )
+        counter += 1
+
+        pyinla_config.prior_hyperparamters.mean_theta_spatio_temporal_variation = (
+            theta_prior_mean[counter]
+        )
+        pyinla_config.prior_hyperparamters.precision_theta_spatio_temporal_variation = (
+            theta_prior_variance[counter]
+        )
+        counter += 1
+
+    else:
+        print("undefined model!")
+        raise ValueError
 
     return pyinla_config
