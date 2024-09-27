@@ -5,7 +5,7 @@ from scipy.stats import multivariate_normal
 from pyinla.likelihoods.gaussian import GaussianLikelihood
 
 
-def test_gaussian(
+def test_gaussian_evaluate_likelihood(
     n_observations: int,
     n_latent_parameters: int,
     theta_observations: float,
@@ -29,3 +29,9 @@ def test_gaussian(
     multivariate_normal_ref += 0.5 * n_observations * np.log(2 * np.pi)
 
     assert np.allclose(likelihood_inla, multivariate_normal_ref)
+
+
+def test_gaussian_evaluate_gradient(): ...
+
+
+def test_gaussian_evaluate_hessian(): ...

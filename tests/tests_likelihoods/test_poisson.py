@@ -6,7 +6,7 @@ from scipy.stats import poisson
 from pyinla.likelihoods.poisson import PoissonLikelihood
 
 
-def test_poisson(
+def test_poisson_evaluate_likelihood(
     n_observations: int,
     n_latent_parameters: int,
     theta_observations: float,
@@ -30,3 +30,9 @@ def test_poisson(
     poisson_ref = poisson_ref_vec.sum() + gammaln(y + 1).sum()
 
     assert np.allclose(likelihood_inla, poisson_ref)
+
+
+def test_poisson_evaluate_gradient(): ...
+
+
+def test_poisson_evaluate_hessian(): ...

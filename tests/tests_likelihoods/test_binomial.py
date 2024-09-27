@@ -7,7 +7,7 @@ from pyinla.likelihoods.binomial import BinomialLikelihood
 from pyinla.utils import sigmoid
 
 
-def test_binomial(
+def test_binomial_evaluate_likelihood(
     n_observations: int,
     n_latent_parameters: int,
     theta_observations: float,
@@ -36,3 +36,9 @@ def test_binomial(
     print(f"poisson_ref: {binom_ref}")
 
     assert np.allclose(likelihood_inla, binom_ref)
+
+
+def test_binomial_evaluate_gradient(): ...
+
+
+def test_binomial_evaluate_hessian(): ...
