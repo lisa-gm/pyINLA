@@ -250,6 +250,7 @@ class INLA:
         x_i_norm = 1
 
         counter = 0
+        print(f"Inner iteration {counter} norm: {x_i_norm}")
         while x_i_norm >= self.eps_inner_iteration:
             if counter > 20:
                 print("Inner iteration did not converge! Counter : ", counter)
@@ -279,8 +280,8 @@ class INLA:
             x_update[:] = self.solver_Q_conditional.solve(rhs)
 
             x_i_norm = np.linalg.norm(x_update)
-            print(f"Inner iteration {counter} norm: {x_i_norm}")
             counter += 1
+            print(f"Inner iteration {counter} norm: {x_i_norm}")
 
         print("Inner iteration converged after", counter, "iterations.")
         return Q_conditional, x_i

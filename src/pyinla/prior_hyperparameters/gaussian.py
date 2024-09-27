@@ -24,8 +24,8 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
             self.mean_theta_temporal_range = (
                 pyinla_config.prior_hyperparameters.mean_theta_temporal_range
             )
-            self.mean_theta_sd_spatio_temporal = (
-                pyinla_config.prior_hyperparameters.mean_theta_sd_spatio_temporal
+            self.mean_theta_spatio_temporal_variation = (
+                pyinla_config.prior_hyperparameters.mean_theta_spatio_temporal_variation
             )
 
             self.precision_theta_spatial_range = (
@@ -34,8 +34,8 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
             self.precision_theta_temporal_range = (
                 pyinla_config.prior_hyperparameters.precision_theta_temporal_range
             )
-            self.precision_theta_sd_spatio_temporal = (
-                pyinla_config.prior_hyperparameters.precision_theta_sd_spatio_temporal
+            self.precision_theta_spatio_temporal_variation = (
+                pyinla_config.prior_hyperparameters.precision_theta_spatio_temporal_variation
             )
 
         if pyinla_config.likelihood.type == "gaussian":
@@ -67,10 +67,10 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
             )
 
             log_prior_sd_spatio_temporal = (
-                self.precision_theta_sd_spatio_temporal
+                self.precision_theta_spatio_temporal_variation
                 * (
                     theta_model["sd_spatio_temporal"]
-                    - self.mean_theta_sd_spatio_temporal
+                    - self.mean_theta_spatio_temporal_variation
                 )
                 ** 2
             )
