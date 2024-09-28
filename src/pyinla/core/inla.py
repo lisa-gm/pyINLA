@@ -5,7 +5,7 @@ import math
 import numpy as np
 from numpy.typing import ArrayLike
 
-# from scipy.optimize import minimize
+from scipy.optimize import minimize
 from scipy.sparse import load_npz, sparray
 
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -114,37 +114,59 @@ class INLA:
             self.model.get_theta_initial(), self.likelihood.get_theta_initial()
         )
 
-        # self.counter = 0
-        # self.min_f = 1e10
+        self.counter = 0
+        self.min_f = 1e10
+
+        print("INLA initialized.")
+        print("Model:", self.pyinla_config.model.type)
+        if len(self.model.get_theta_initial()) > 0:
+            print(
+                "Prior hyperparameters:", self.pyinla_config.prior_hyperparameters.type
+            )
+            print(
+                f"Prior theta: {self.prior_hyperparameters.mean_theta_observations}, precision : {self.prior_hyperparameters.precision_theta_observations}"
+            )
+            print("Initial theta:", self.theta_initial)
+        print("Likelihood:", self.pyinla_config.likelihood.type)
 
     def run(self) -> np.ndarray:
         """Fit the model using INLA."""
 
         f_init = self._evaluate_f(self.theta_initial)
-
-        grad_f_init = self._evaluate_gradient_f(self.theta_initial)
         print(f"Initial function value: {f_init}")
-        print(f"Initial gradient: {grad_f_init}")
 
-        # result = minimize(
-        #     self._evaluate_f,
-        #     self.theta_initial,
-        #     method="BFGS",
-        #     jac=self._evaluate_gradient_f,
-        # )
+        if len(self.theta_initial) > 0:
+            grad_f_init = self._evaluate_gradient_f(self.theta_initial)
+            print(f"Initial gradient: {grad_f_init}")
 
-        # if result.success:
-        #     print(
-        #         "Optimization converged successfully after", result.nit, "iterations."
-        #     )
-        #     self.theta_star = result.x
-        #     print("Optimal theta:", self.theta_star)
-        #     return True
-        # else:
-        #     print("Optimization did not converge.")
-        #     return False
+            result = minimize(
+                self._evaluate_f,
+                self.theta_initial,
+                method="BFGS",
+                jac=self._evaluate_gradient_f,
+                options={
+                    # "maxiter": 3,
+                    "gtol": 1e-3,
+                },
+            )
 
-        # print("counter:", self.counter)
+            if result.success:
+                print(
+                    "Optimization converged successfully after",
+                    result.nit,
+                    "iterations.",
+                )
+                self.theta_star = result.x
+                print("Optimal theta:", self.theta_star)
+                print("Latent parameters:", self.x)
+                return True
+            else:
+                print("Optimization did not converge.")
+                return False
+
+            print("counter:", self.counter)
+
+        print("Latent parameters:", self.x)
 
         return f_init
 
@@ -184,9 +206,10 @@ class INLA:
         theta_model, theta_likelihood = theta_array2dict(
             theta_i, self.model.get_theta_initial(), self.likelihood.get_theta_initial()
         )
+        print(f"theta : {theta_i}")
 
         # --- Evaluate the log prior of the hyperparameters
-        log_prior = self.prior_hyperparameters.evaluate_log_prior(
+        log_prior_hyperparameters = self.prior_hyperparameters.evaluate_log_prior(
             theta_model, theta_likelihood
         )
 
@@ -194,7 +217,6 @@ class INLA:
         Q_prior = self.model.construct_Q_prior(theta_model)
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
-        print("initial x:", self.x)
         Q_conditional, self.x = self._inner_iteration(Q_prior, self.x, theta_likelihood)
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
@@ -212,16 +234,18 @@ class INLA:
         )
 
         f_theta = -1 * (
-            log_prior
+            log_prior_hyperparameters
             + likelihood
             + prior_latent_parameters
             - conditional_latent_parameters
         )
 
-        if f_theta < self.min_f:
-            self.min_f = f_theta
-            self.counter += 1
-            print(f"Minimum function value: {self.min_f}. Counter: {self.counter}")
+        print(f"Function value: {f_theta}")
+
+        # if f_theta < self.min_f:
+        #     self.min_f = f_theta
+        #     self.counter += 1
+        #     print(f"Minimum function value: {self.min_f}. Counter: {self.counter}")
 
         return f_theta
 
@@ -256,6 +280,8 @@ class INLA:
             f_minus = self._evaluate_f(theta_minus)
 
             grad_f[i] = (f_plus - f_minus) / (2 * self.eps_gradient_f)
+
+        print(f"Gradient: {grad_f}")
 
         return grad_f
 

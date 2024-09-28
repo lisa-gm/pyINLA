@@ -63,7 +63,7 @@ class PriorHyperparametersConfig(BaseModel):
     # ----- Likelihood -----
     # Gaussian likelihood
     mean_theta_observations: float = 0.0
-    precision_theta_observations: float = 1.0
+    precision_theta_observations: float = 0.5
 
     # Poisson likelihood
     ...

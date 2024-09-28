@@ -105,7 +105,6 @@ class GaussianLikelihood(Likelihood):
             )
 
         theta_observations = theta_likelihood["theta_observations"]
-
         gradient_likelihood = -np.exp(theta_observations) * (eta - y)
 
         return gradient_likelihood
