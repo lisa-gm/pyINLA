@@ -27,7 +27,7 @@ class ModelConfig(BaseModel):
 
     theta_spatial_range: float = None
     theta_temporal_range: float = None
-    theta_sd_spatio_temporal: float = None
+    theta_spatio_temporal_variation: float = None
 
     @model_validator(mode="after")
     def check_theta(self) -> Self:
@@ -35,8 +35,8 @@ class ModelConfig(BaseModel):
             assert self.theta_spatial_range is not None, "Spatial range is required."
             assert self.theta_temporal_range is not None, "Temporal range is required."
             assert (
-                self.theta_sd_spatio_temporal is not None
-            ), "Spatio-temporal standard deviation is required."
+                self.theta_spatio_temporal_variation is not None
+            ), "Spatio-temporal variation is required."
 
         return self
 
@@ -79,11 +79,11 @@ class PriorHyperparametersConfig(BaseModel):
     # Spatio-temporal
     alpha_theta_spatial_range: float = None
     alpha_theta_temporal_range: float = None
-    alpha_theta_sd_spatio_temporal: float = None
+    alpha_theta_spatio_temporal_variation: float = None
 
     u_theta_spatial_range: float = None
     u_theta_temporal_range: float = None
-    u_theta_sd_spatio_temporal: float = None
+    u_theta_spatio_temporal_variation: float = None
 
     @model_validator(mode="after")
     def check_alpha(self) -> Self:
@@ -95,7 +95,7 @@ class PriorHyperparametersConfig(BaseModel):
                 self.alpha_theta_temporal_range is not None
             ), "Temporal range alpha is required."
             assert (
-                self.alpha_theta_sd_spatio_temporal is not None
+                self.alpha_theta_spatio_temporal_variation is not None
             ), "Spatio-temporal standard deviation alpha is required."
 
         return self
@@ -110,7 +110,7 @@ class PriorHyperparametersConfig(BaseModel):
                 self.u_theta_temporal_range is not None
             ), "Temporal range u is required."
             assert (
-                self.u_theta_sd_spatio_temporal is not None
+                self.u_theta_spatio_temporal_variation is not None
             ), "Spatio-temporal standard deviation u is required."
 
         return self

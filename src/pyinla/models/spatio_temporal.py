@@ -45,7 +45,7 @@ class SpatioTemporalModel(Model):
         self.theta_initial = {
             "spatial_range": pyinla_config.model.theta_spatial_range,
             "temporal_range": pyinla_config.model.theta_temporal_range,
-            "sd_spatio_temporal": pyinla_config.model.theta_sd_spatio_temporal,
+            "spatio_temporal_variation": pyinla_config.model.theta_spatio_temporal_variation,
         }
 
     def _check_dimensions_spatial_matrices(self) -> None:
@@ -88,7 +88,9 @@ class SpatioTemporalModel(Model):
 
         theta_spatial_range = np.exp(theta_model["spatial_range"])
         theta_temporal_range = np.exp(theta_model["temporal_range"])
-        theta_sd_spatio_temporal = np.exp(theta_model["sd_spatio_temporal"])
+        theta_spatio_temporal_variation = np.exp(
+            theta_model["spatio_temporal_variation"]
+        )
 
         q1s = pow(theta_spatial_range, 2) * self.c0 + self.g1
         q2s = (
@@ -103,7 +105,7 @@ class SpatioTemporalModel(Model):
             + self.g3
         )
 
-        Q_spatio_temporal = pow(theta_sd_spatio_temporal, 2) * (
+        Q_spatio_temporal = pow(theta_spatio_temporal_variation, 2) * (
             kron(self.m0, q3s)
             + theta_temporal_range * kron(self.m1, q2s)
             + pow(theta_temporal_range, 2) * kron(self.m2, q1s)
