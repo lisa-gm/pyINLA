@@ -162,4 +162,8 @@ cython_debug/
 #.idea/
 
 dev/*
+<<<<<<< HEAD
+data/*
+=======
 settings.json
+>>>>>>> 190a6f131c84ce8316abf641c82659e8b936ac45
