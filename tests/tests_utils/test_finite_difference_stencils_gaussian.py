@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy.sparse import diags
 
-from pyinla.likelihoods.poisson import PoissonLikelihood
+from pyinla.likelihoods.gaussian import GaussianLikelihood
 from pyinla.utils import (
     gradient_finite_difference_3pt,
     gradient_finite_difference_5pt,
@@ -12,14 +12,15 @@ from pyinla.utils import (
 
 
 @pytest.mark.parametrize("n_observations", [10, 100, 500])
-def test_finite_difference_poisson(
-    generate_poisson_data,
+def test_finite_difference_gaussian(
+    generate_gaussian_data,
     n_observations: int,
     pyinla_config,
 ):
-    eta, y, _, theta_likelihood = generate_poisson_data
+    a, x, y, theta_likelihood = generate_gaussian_data
+    eta = a @ x
 
-    likelihood_instance = PoissonLikelihood(pyinla_config, n_observations)
+    likelihood_instance = GaussianLikelihood(pyinla_config, n_observations)
     grad_likelihood_inla = likelihood_instance.evaluate_gradient_likelihood(
         eta, y, theta_likelihood
     )
