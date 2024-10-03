@@ -4,7 +4,6 @@ import math
 
 import numpy as np
 from numpy.typing import ArrayLike
-
 from scipy.optimize import minimize
 from scipy.sparse import load_npz, sparray
 
@@ -221,7 +220,7 @@ class INLA:
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
         eta = self.a @ self.x
-        likelihood = self.likelihood.evaluate_likelihood(self.y, eta, theta_likelihood)
+        likelihood = self.likelihood.evaluate_likelihood(eta, self.y, theta_likelihood)
 
         # --- Evaluate the prior of the latent parameters at x_star
         prior_latent_parameters = self._evaluate_prior_latent_parameters(
@@ -303,13 +302,13 @@ class INLA:
             eta = self.a @ x_i
 
             gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
-                self.y, eta, theta_likelihood
+                eta, self.y, theta_likelihood
             )
 
             rhs = -1 * Q_prior @ x_i + self.a.T @ gradient_likelihood
 
             hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(
-                self.y, eta, theta_likelihood
+                eta, self.y, theta_likelihood
             )
 
             Q_conditional = self.model.construct_Q_conditional(
