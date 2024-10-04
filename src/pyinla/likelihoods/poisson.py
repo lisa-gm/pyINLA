@@ -1,7 +1,7 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-import numpy as np
 import autograd.numpy as anp
+import numpy as np
 from numpy.typing import ArrayLike
 from scipy.sparse import diags
 
@@ -32,19 +32,18 @@ class PoissonLikelihood(Likelihood):
 
     def evaluate_likelihood(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
-
         likelihood = np.dot(eta, y) - np.sum(self.e * np.exp(eta))
 
         return likelihood
 
     def evaluate_likelihood_autodiff(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
         likelihood = anp.dot(eta, y) - anp.sum(self.e * anp.exp(eta))
@@ -53,8 +52,8 @@ class PoissonLikelihood(Likelihood):
 
     def evaluate_gradient_likelihood(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> ArrayLike:
         gradient_likelihood = y - self.e * np.exp(eta)
@@ -63,8 +62,8 @@ class PoissonLikelihood(Likelihood):
 
     def evaluate_hessian_likelihood(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> ArrayLike:
         hessian_likelihood = -diags(self.e * np.exp(eta))

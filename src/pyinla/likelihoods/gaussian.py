@@ -29,8 +29,8 @@ class GaussianLikelihood(Likelihood):
 
     def evaluate_likelihood(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
         """Evaluate a Gaussian likelihood.
@@ -45,10 +45,10 @@ class GaussianLikelihood(Likelihood):
 
         Parameters
         ----------
-        y : ArrayLike
-            Vector of the observations.
         eta : ArrayLike
             Vector of the linear predictor.
+        y : ArrayLike
+            Vector of the observations.
         kwargs : dict
             Extra arguments.
             theta_likelihood : float
@@ -77,18 +77,18 @@ class GaussianLikelihood(Likelihood):
 
     def evaluate_gradient_likelihood(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> ArrayLike:
         """Evaluate the gradient of the likelihood wrt to eta = Ax.
 
         Parameters
         ----------
-        y : ArrayLike
-            Vector of the observations.
         eta : ArrayLike
             Vector of the linear predictor.
+        y : ArrayLike
+            Vector of the observations.
         kwargs : dict
             Extra arguments.
             theta_likelihood : float
@@ -111,18 +111,18 @@ class GaussianLikelihood(Likelihood):
 
     def evaluate_hessian_likelihood(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> ArrayLike:
         """Evaluate the Hessian of the likelihood wrt to eta = Ax.
 
         Parameters
         ----------
-        y : ArrayLike
-            Vector of the observations.
         eta : ArrayLike
             Vector of the linear predictor.
+        y : ArrayLike
+            Vector of the observations.
         kwargs : dict
             Extra arguments.
             theta_likelihood : float

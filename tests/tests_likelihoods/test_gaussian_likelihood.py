@@ -15,7 +15,7 @@ def test_gaussian_evaluate_likelihood(
     likelihood_instance = GaussianLikelihood(pyinla_config, n_observations)
 
     eta = a @ x
-    likelihood_inla = likelihood_instance.evaluate_likelihood(y, eta, theta_likelihood)
+    likelihood_inla = likelihood_instance.evaluate_likelihood(eta, y, theta_likelihood)
 
     # Reference using scipy.stats.multivariate_normal
     Sigma = 1 / np.exp(theta_observations) * np.eye(n_observations)
@@ -39,11 +39,11 @@ def test_gaussian_evaluate_gradient(
     likelihood_instance = GaussianLikelihood(pyinla_config, n_observations)
 
     grad_likelihood_inla = likelihood_instance.evaluate_gradient_likelihood(
-        y, eta, theta_likelihood
+        eta, y, theta_likelihood
     )
 
-    auto_grad = grad(likelihood_instance.evaluate_likelihood, 1)
-    grad_likelihood_ref = auto_grad(y, eta, theta_likelihood)
+    auto_grad = grad(likelihood_instance.evaluate_likelihood, 0)
+    grad_likelihood_ref = auto_grad(eta, y, theta_likelihood)
 
     # assert np.allclose(2, 2)
     assert np.allclose(grad_likelihood_inla, grad_likelihood_ref)
@@ -62,11 +62,11 @@ def test_gaussian_evaluate_hessian(
     likelihood_instance = GaussianLikelihood(pyinla_config, n_observations)
 
     hessian_likelihood_inla = likelihood_instance.evaluate_hessian_likelihood(
-        y, eta, theta_likelihood
+        eta, y, theta_likelihood
     )
     hessian_likelihood_inla = hessian_likelihood_inla.toarray()
 
-    auto_hessian = hessian(likelihood_instance.evaluate_likelihood, 1)
-    hessian_likelihood_ref = auto_hessian(y, eta, theta_likelihood)
+    auto_hessian = hessian(likelihood_instance.evaluate_likelihood, 0)
+    hessian_likelihood_ref = auto_hessian(eta, y, theta_likelihood)
 
     assert np.allclose(hessian_likelihood_inla, hessian_likelihood_ref)

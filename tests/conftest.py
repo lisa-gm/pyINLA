@@ -207,7 +207,7 @@ def generate_poisson_data(
     lam = np.exp(eta)
     y = np.random.poisson(lam=lam)
 
-    return y, eta, lam, theta_likelihood
+    return eta, y, lam, theta_likelihood
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -225,4 +225,4 @@ def generate_binomial_data(
     prob = sigmoid(eta)
     y = np.random.binomial(n=n_trials, p=prob)
 
-    return y, eta, n_trials, prob, theta_likelihood
+    return eta, y, n_trials, prob, theta_likelihood

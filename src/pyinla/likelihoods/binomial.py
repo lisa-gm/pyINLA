@@ -40,18 +40,18 @@ class BinomialLikelihood(Likelihood):
 
     def evaluate_likelihood(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
         """Evalutate the a binomial likelihood.
 
         Parameters
         ----------
-        y : ArrayLike
-            Vector of the observations.
         eta : ArrayLike
             Vector of the linear predictor.
+        y : ArrayLike
+            Vector of the observations.
 
         Notes
         -----
@@ -72,16 +72,16 @@ class BinomialLikelihood(Likelihood):
 
     def evaluate_gradient_likelihood(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> ArrayLike:
         raise NotImplementedError
 
     def evaluate_hessian_likelihood(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> ArrayLike:
         raise NotImplementedError
