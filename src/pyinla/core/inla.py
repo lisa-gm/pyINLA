@@ -1,6 +1,7 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import math
+import os
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -102,6 +103,9 @@ class INLA:
             )
 
         # --- Initialize solver
+        num_threads = os.getenv("OMP_NUM_THREADS")
+        print(f"OMP_NUM_THREADS: {num_threads}")
+
         if self.pyinla_config.solver.type == "scipy":
             self.solver_Q_prior = ScipySolver(pyinla_config)
             self.solver_Q_conditional = ScipySolver(pyinla_config)
@@ -152,7 +156,6 @@ class INLA:
     def run(self) -> np.ndarray:
         """Fit the model using INLA."""
 
-        print("theta initial:", self.theta_initial)
         self.f_value = self._evaluate_f(self.theta_initial)
         print(f"Initial function value: {self.f_value}")
 
@@ -188,7 +191,7 @@ class INLA:
 
             print("counter:", self.counter)
 
-        print("Latent parameters:", self.x)
+        # self._placeholder_marginals_latent_parameters(Q_conditional)
 
         return True
 
@@ -315,7 +318,7 @@ class INLA:
         x_update = np.zeros_like(x_i)
         x_i_norm = 1
 
-        print("theta: ", self.theta)
+        # print("theta: ", self.theta)
         # print("x_i[:10] : ", x_i[:10])
         # print("Q_prior[:10, :10] : ", Q_prior[:10, :10].toarray())
 
@@ -330,11 +333,12 @@ class INLA:
 
             eta = self.a @ x_i
 
+            # TODO: need to vectorize !!
             gradient_likelihood = gradient_finite_difference_5pt(
                 self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
             )
 
-            # gradient_likelihood_comp = self.likelihood.evaluate_gradient_likelihood(
+            # gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
             #     eta, self.y, theta_likelihood
             # )
             # if not np.allclose(
@@ -348,12 +352,13 @@ class INLA:
 
             rhs = -1 * Q_prior @ x_i + self.a.T @ gradient_likelihood
 
+            # TODO: need to vectorize
             hessian_likelihood_diag = hessian_diag_finite_difference_5pt(
                 self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
             )
             hessian_likelihood = diags(hessian_likelihood_diag)
 
-            # hessian_likelihood_comp = self.likelihood.evaluate_hessian_likelihood(
+            # hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(
             #     eta, self.y, theta_likelihood
             # )
             # if not np.allclose(
@@ -473,3 +478,12 @@ class INLA:
         # write solver function that checks if current theta matches theta of solver
         # self.solver_instance.cholesky(Q)
         pass
+
+    def _placeholder_marginals_latent_parameters(self, Q_conditional):
+        self.solver_Q_conditional.cholesky(Q_conditional)
+        self.solver_Q_conditional.full_inverse()
+        Q_inverse_selected = self.solver_Q_conditional.extract_selected_inverse(
+            self.solver_Q_conditional.A_inv
+        )
+
+        return Q_inverse_selected
