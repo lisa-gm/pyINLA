@@ -56,9 +56,9 @@ class PriorHyperparametersConfig(BaseModel):
     mean_theta_temporal_range: float = 0.0
     mean_theta_spatio_temporal_variation: float = 0.0
 
-    precision_theta_spatial_range: float = 1.0
-    precision_theta_temporal_range: float = 1.0
-    precision_theta_spatio_temporal_variation: float = 1.0
+    precision_theta_spatial_range: float = 0.5
+    precision_theta_temporal_range: float = 0.5
+    precision_theta_spatio_temporal_variation: float = 0.5
 
     # ----- Likelihood -----
     # Gaussian likelihood

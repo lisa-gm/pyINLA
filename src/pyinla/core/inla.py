@@ -4,7 +4,6 @@ import math
 
 import numpy as np
 from numpy.typing import ArrayLike
-
 from scipy.optimize import minimize
 from scipy.sparse import load_npz, sparray
 
@@ -54,6 +53,8 @@ class INLA:
             self.x = np.load(pyinla_config.input_dir / "x.npy")
         except FileNotFoundError:
             self.x = np.ones((self.a.shape[1]), dtype=float)
+
+        print("x[:10] : ", self.x[:10])
 
         self._check_dimensions()
 
@@ -114,6 +115,9 @@ class INLA:
             self.model.get_theta_initial(), self.likelihood.get_theta_initial()
         )
 
+        self.theta = self.theta_initial
+        self.f_value = 1e10
+
         self.counter = 0
         self.min_f = 1e10
 
@@ -121,10 +125,22 @@ class INLA:
         print("Model:", self.pyinla_config.model.type)
         if len(self.model.get_theta_initial()) > 0:
             print(
-                "Prior hyperparameters:", self.pyinla_config.prior_hyperparameters.type
+                "Prior hyperparameters model:",
+                self.pyinla_config.prior_hyperparameters.type,
             )
             print(
-                f"Prior theta: {self.prior_hyperparameters.mean_theta_observations}, precision : {self.prior_hyperparameters.precision_theta_observations}"
+                f"Prior theta model - spatial range.             mean : {self.prior_hyperparameters.mean_theta_spatial_range}, precision : {self.prior_hyperparameters.precision_theta_spatial_range}\n"
+                f"Prior theta model - temporal range.            mean : {self.prior_hyperparameters.mean_theta_temporal_range}, precision : {self.prior_hyperparameters.precision_theta_temporal_range}\n"
+                f"Prior theta model - spatio-temporal variation. mean : {self.prior_hyperparameters.mean_theta_spatio_temporal_variation}, precision : {self.prior_hyperparameters.precision_theta_spatio_temporal_variation}\n"
+            )
+
+        if len(self.likelihood.get_theta_initial()) > 0:
+            print(
+                "Prior hyperparameters likelihood:",
+                self.pyinla_config.prior_hyperparameters.type,
+            )
+            print(
+                f"Prior theta likelihood. Mean : {self.prior_hyperparameters.mean_theta_observations}, precision : {self.prior_hyperparameters.precision_theta_observations}\n"
             )
             print("Initial theta:", self.theta_initial)
         print("Likelihood:", self.pyinla_config.likelihood.type)
@@ -132,8 +148,9 @@ class INLA:
     def run(self) -> np.ndarray:
         """Fit the model using INLA."""
 
-        f_init = self._evaluate_f(self.theta_initial)
-        print(f"Initial function value: {f_init}")
+        print("theta initial:", self.theta_initial)
+        self.f_value = self._evaluate_f(self.theta_initial)
+        print(f"Initial function value: {self.f_value}")
 
         if len(self.theta_initial) > 0:
             grad_f_init = self._evaluate_gradient_f(self.theta_initial)
@@ -145,8 +162,9 @@ class INLA:
                 method="BFGS",
                 jac=self._evaluate_gradient_f,
                 options={
-                    # "maxiter": 3,
-                    "gtol": 1e-3,
+                    "maxiter": 100,
+                    "gtol": 1e-1,
+                    "disp": True,
                 },
             )
 
@@ -157,8 +175,8 @@ class INLA:
                     "iterations.",
                 )
                 self.theta_star = result.x
-                print("Optimal theta:", self.theta_star)
-                print("Latent parameters:", self.x)
+                # print("Optimal theta:", self.theta_star)
+                # print("Latent parameters:", self.x)
                 return True
             else:
                 print("Optimization did not converge.")
@@ -168,12 +186,12 @@ class INLA:
 
         print("Latent parameters:", self.x)
 
-        return f_init
+        return True
 
     def get_theta_star(self) -> dict:
         """Get the optimal theta."""
         return theta_array2dict(
-            self.theta_star,
+            self.theta_initial,
             self.model.get_theta_initial(),
             self.likelihood.get_theta_initial(),
         )
@@ -203,10 +221,11 @@ class INLA:
             Function value f(theta) evaluated at theta_i.
         """
 
+        self.theta = theta_i
+
         theta_model, theta_likelihood = theta_array2dict(
             theta_i, self.model.get_theta_initial(), self.likelihood.get_theta_initial()
         )
-        print(f"theta : {theta_i}")
 
         # --- Evaluate the log prior of the hyperparameters
         log_prior_hyperparameters = self.prior_hyperparameters.evaluate_log_prior(
@@ -240,12 +259,13 @@ class INLA:
             - conditional_latent_parameters
         )
 
-        print(f"Function value: {f_theta}")
+        # print(f"theta: {theta_i},      Function value: {f_theta}")
 
-        # if f_theta < self.min_f:
-        #     self.min_f = f_theta
-        #     self.counter += 1
-        #     print(f"Minimum function value: {self.min_f}. Counter: {self.counter}")
+        if f_theta < self.min_f:
+            self.min_f = f_theta
+            self.counter += 1
+            print(f"theta: {theta_i},      Function value: {f_theta}")
+            # print(f"Minimum function value: {self.min_f}. Counter: {self.counter}")
 
         return f_theta
 
@@ -291,10 +311,14 @@ class INLA:
         x_update = np.zeros_like(x_i)
         x_i_norm = 1
 
+        print("theta: ", self.theta)
+        # print("x_i[:10] : ", x_i[:10])
+        # print("Q_prior[:10, :10] : ", Q_prior[:10, :10].toarray())
+
         counter = 0
-        print(f"Inner iteration {counter} norm: {x_i_norm}")
+        # print(f"Inner iteration {counter} norm: {x_i_norm}")
         while x_i_norm >= self.eps_inner_iteration:
-            if counter > 20:
+            if counter > 50:
                 print("Inner iteration did not converge! Counter : ", counter)
                 raise ValueError
 

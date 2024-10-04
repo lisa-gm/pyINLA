@@ -1,7 +1,7 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import numpy as np
-from scipy.sparse import csr_matrix, kron, load_npz, sparray
+from scipy.sparse import csc_matrix, kron, load_npz, sparray
 
 from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -91,6 +91,9 @@ class SpatioTemporalModel(Model):
         theta_spatio_temporal_variation = np.exp(
             theta_model["spatio_temporal_variation"]
         )
+        # print("theta_spatial_range: ", theta_spatial_range)
+        # print("theta_temporal_range: ", theta_temporal_range)
+        # print("theta_spatio_temporal_variation: ", theta_spatio_temporal_variation)
 
         q1s = pow(theta_spatial_range, 2) * self.c0 + self.g1
         q2s = (
@@ -110,6 +113,9 @@ class SpatioTemporalModel(Model):
             + theta_temporal_range * kron(self.m1, q2s)
             + pow(theta_temporal_range, 2) * kron(self.m2, q1s)
         )
+
+        if Q_spatio_temporal is not csc_matrix:
+            Q_spatio_temporal = csc_matrix(Q_spatio_temporal)
 
         # Construct block diagonal matrix Q fixed effects
         Q_fixed_effects_data = np.full(self.nb, self.fixed_effects_prior_precision)
@@ -137,7 +143,7 @@ class SpatioTemporalModel(Model):
             ]
         )
 
-        Q_prior = csr_matrix(
+        Q_prior = csc_matrix(
             (data, indices, indptr),
             shape=(
                 Q_spatio_temporal.shape[0] + self.nb,
