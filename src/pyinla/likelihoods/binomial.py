@@ -34,7 +34,7 @@ class BinomialLikelihood(Likelihood):
                 f"Link function {pyinla_config.likelihood.link_function} not implemented."
             )
 
-    def get_theta_initial(self) -> dict:
+    def get_theta(self) -> dict:
         """Get the likelihood initial hyperparameters."""
         return {}
 

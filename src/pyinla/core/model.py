@@ -26,7 +26,7 @@ class Model(ABC):
         self.n_latent_parameters = n_latent_parameters
 
     @abstractmethod
-    def get_theta_initial(self) -> dict:
+    def get_theta(self) -> dict:
         """Get the initial theta of the model. This dictionary is constructed
         at instanciation of the model. It has to be stored in the model as
         theta is specific to the model.

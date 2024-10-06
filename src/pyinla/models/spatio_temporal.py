@@ -42,7 +42,7 @@ class SpatioTemporalModel(Model):
         ), f"Design matrix has incorrect number of columns. \n    n_latent_parameters: {self.n_latent_parameters}\n    nb: {self.nb} + ns: {self.ns} * nt: {self.nt} = {self.nb + self.ns * self.nt}"
 
         # Load model hyperparameters
-        self.theta_initial = {
+        self.theta = {
             "spatial_range": pyinla_config.model.theta_spatial_range,
             "temporal_range": pyinla_config.model.theta_temporal_range,
             "spatio_temporal_variation": pyinla_config.model.theta_spatio_temporal_variation,
@@ -69,7 +69,7 @@ class SpatioTemporalModel(Model):
             self.m0.shape == self.m1.shape == self.m2.shape
         ), "Dimensions of temporal matrices do not match."
 
-    def get_theta_initial(self) -> dict:
+    def get_theta(self) -> dict:
         """Get the initial theta of the model. This dictionary is constructed
         at instanciation of the model. It has to be stored in the model as
         theta is specific to the model.
@@ -77,12 +77,15 @@ class SpatioTemporalModel(Model):
         Returns
         -------
         theta_inital_model : dict
-            Dictionary of initial hyperparameters.
+            Dictionary of hyperparameters. Theta gets when calling construct_Q_prior.
         """
-        return self.theta_initial
+        return self.theta
 
     def construct_Q_prior(self, theta_model: dict = None) -> sparray:
         """Construct the prior precision matrix."""
+
+        self.theta = theta_model
+
         if theta_model is None:
             raise ValueError("theta_model must be provided.")
 
