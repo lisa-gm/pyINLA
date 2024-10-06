@@ -166,3 +166,4 @@ data/*
 settings.json
 *.npz
 *.npy
+*.dat
