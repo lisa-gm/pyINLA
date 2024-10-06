@@ -120,7 +120,7 @@ class INLA:
 
         # --- Initialize theta
         self.theta_initial: ArrayLike = theta_dict2array(
-            self.model.get_theta_initial(), self.likelihood.get_theta_initial()
+            self.model.get_theta(), self.likelihood.get_theta()
         )
 
         self.theta = self.theta_initial
@@ -129,9 +129,12 @@ class INLA:
         self.counter = 0
         self.min_f = 1e10
 
+        # --- set up recurrent variables
+        self.Q_conditional: sparray = None
+
         print("INLA initialized.")
         print("Model:", self.pyinla_config.model.type)
-        if len(self.model.get_theta_initial()) > 0:
+        if len(self.model.get_theta()) > 0:
             print(
                 "Prior hyperparameters model:",
                 self.pyinla_config.prior_hyperparameters.type,
@@ -142,7 +145,7 @@ class INLA:
                 f"Prior theta model - spatio-temporal variation. mean : {self.prior_hyperparameters.mean_theta_spatio_temporal_variation}, precision : {self.prior_hyperparameters.precision_theta_spatio_temporal_variation}\n"
             )
 
-        if len(self.likelihood.get_theta_initial()) > 0:
+        if len(self.likelihood.get_theta()) > 0:
             print(
                 "Prior hyperparameters likelihood:",
                 self.pyinla_config.prior_hyperparameters.type,
@@ -159,7 +162,7 @@ class INLA:
         self.f_value = self._evaluate_f(self.theta_initial)
         print(f"Initial function value: {self.f_value}")
 
-        if len(self.theta_initial) > 0:
+        if len(self.theta) > 0:
             grad_f_init = self._evaluate_gradient_f(self.theta_initial)
             print(f"Initial gradient: {grad_f_init}")
 
@@ -181,26 +184,33 @@ class INLA:
                     result.nit,
                     "iterations.",
                 )
-                self.theta_star = result.x
+                self.theta = result.x
+                theta_model, theta_likelihood = theta_array2dict(
+                    self.theta, self.model.get_theta(), self.likelihood.get_theta()
+                )
                 # print("Optimal theta:", self.theta_star)
                 # print("Latent parameters:", self.x)
-                return True
             else:
                 print("Optimization did not converge.")
                 return False
 
             print("counter:", self.counter)
 
-        # self._placeholder_marginals_latent_parameters(Q_conditional)
+        # TODO: check that Q_conditional was constructed using the right theta
+        if self.Q_conditional is not None:
+            self._placeholder_marginals_latent_parameters(self.Q_conditional)
+        else:
+            print("Q_conditional not defined.")
+            raise ValueError
 
         return True
 
     def get_theta_star(self) -> dict:
         """Get the optimal theta."""
         return theta_array2dict(
-            self.theta_initial,
-            self.model.get_theta_initial(),
-            self.likelihood.get_theta_initial(),
+            self.theta,
+            self.model.get_theta(),
+            self.likelihood.get_theta(),
         )
 
     def _check_dimensions(self) -> None:
@@ -231,7 +241,7 @@ class INLA:
         self.theta = theta_i
 
         theta_model, theta_likelihood = theta_array2dict(
-            theta_i, self.model.get_theta_initial(), self.likelihood.get_theta_initial()
+            theta_i, self.model.get_theta(), self.likelihood.get_theta()
         )
 
         # --- Evaluate the log prior of the hyperparameters
@@ -243,7 +253,9 @@ class INLA:
         Q_prior = self.model.construct_Q_prior(theta_model)
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
-        Q_conditional, self.x = self._inner_iteration(Q_prior, self.x, theta_likelihood)
+        self.Q_conditional, self.x = self._inner_iteration(
+            Q_prior, self.x, theta_likelihood
+        )
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
         eta = self.a @ self.x
@@ -256,7 +268,7 @@ class INLA:
 
         # --- Evaluate the conditional of the latent parameters at x_star
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
-            Q_conditional, self.x, self.x
+            self.Q_conditional, self.x, self.x
         )
 
         f_theta = -1 * (
@@ -392,7 +404,8 @@ class INLA:
         return Q_conditional, x_i
 
     def _evaluate_prior_latent_parameters(self, Q_prior: sparray, x: ArrayLike):
-        """Evaluation of the prior of the latent parameters at x using the prior precision matrix Q_prior and assuming mean zero.
+        """Evaluation of the prior of the latent parameters at x using the prior precision
+        matrix Q_prior and assuming mean zero.
 
         Parameters
         ----------
@@ -480,10 +493,26 @@ class INLA:
         pass
 
     def _placeholder_marginals_latent_parameters(self, Q_conditional):
-        self.solver_Q_conditional.cholesky(Q_conditional)
+        # self.solver_Q_conditional.cholesky(Q_conditional)
+        # TODO: add proper check that current theta & theta of Q_conditional match
+        theta_model, _ = theta_array2dict(
+            self.theta, self.model.get_theta(), self.likelihood.get_theta()
+        )
+        if self.model.get_theta() != theta_model:
+            print("theta of Q_conditional does not match current theta")
+            raise ValueError
+
         self.solver_Q_conditional.full_inverse()
         Q_inverse_selected = self.solver_Q_conditional.extract_selected_inverse(
             self.solver_Q_conditional.A_inv
+        )
+
+        # min_size = min(self.n_latent_parameters, 6)
+        # print(f"Q_inverse_selected[:{min_size}, :{min_size}]: \n", Q_inverse_selected[:min_size, :min_size].toarray())
+
+        latent_parameters_marginal_sd = np.sqrt(Q_inverse_selected.diagonal())
+        print(
+            f"standard deviation fixed effects: {latent_parameters_marginal_sd[-self.pyinla_config.model.n_fixed_effects:]}"
         )
 
         return Q_inverse_selected

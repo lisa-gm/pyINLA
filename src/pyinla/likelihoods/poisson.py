@@ -26,7 +26,7 @@ class PoissonLikelihood(Likelihood):
         except FileNotFoundError:
             self.e = np.ones((n_observations), dtype=int)
 
-    def get_theta_initial(self) -> dict:
+    def get_theta(self) -> dict:
         """Get the likelihood initial hyperparameters."""
         return {}
 

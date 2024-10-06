@@ -36,8 +36,7 @@ class ScipySolver(Solver):
         if self.non_zero_rows is None:
             self.non_zero_rows, self.non_zero_cols = A.nonzero()
 
-        print("type(A): ", type(A))
-        print("Calling ScipySolver.cholesky now.")
+        # print("Calling ScipySolver.cholesky now.")
 
         t_chol = time.time()
         LU = splu(A, diag_pivot_thresh=0, permc_spec="NATURAL")
@@ -48,7 +47,7 @@ class ScipySolver(Solver):
         else:
             raise ValueError("The matrix is not positive definite")
 
-        print("ScipySolver.cholesky done. Time taken: ", t_chol)
+        # print("ScipySolver.cholesky done. Time taken: ", t_chol)
 
     def solve(
         self,

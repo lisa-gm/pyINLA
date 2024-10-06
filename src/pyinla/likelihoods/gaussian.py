@@ -19,13 +19,11 @@ class GaussianLikelihood(Likelihood):
         """Initializes the Gaussian likelihood."""
         super().__init__(pyinla_config, n_observations)
 
-        self.theta_initial = {
-            "theta_observations": pyinla_config.likelihood.theta_observations
-        }
+        self.theta = {"theta_observations": pyinla_config.likelihood.theta_observations}
 
-    def get_theta_initial(self) -> dict:
+    def get_theta(self) -> dict:
         """Get the likelihood initial hyperparameters."""
-        return self.theta_initial
+        return self.theta
 
     def evaluate_likelihood(
         self,
