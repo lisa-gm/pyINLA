@@ -12,4 +12,6 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 ### make it run pytest from the pyINLA base directory
 cd $HOME/pyINLA
 
+conda activate pyinla
+
 srun pytest .
