@@ -46,4 +46,5 @@ conda install -c conda-forge numpy scipy matplotlib pydantic pytest pytest-cov p
 
 You might run into the sqlite3 error, in this case do:
 ```
+conda install conda-forge::sqlite
 ```
