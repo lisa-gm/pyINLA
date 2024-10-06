@@ -41,5 +41,9 @@ $ pip install --no-dependencies -e .
 
 Conda-forge dependancies
 ```
-conda install -c conda-forge numpy scipy matplotlib pydantic pytest pytest-cov pytest-mpi coverage black isort ruff pre-commit
+conda install -c conda-forge numpy scipy matplotlib pydantic pytest pytest-cov pytest-mpi coverage black isort ruff pre-commit autograd
+```
+
+You might run into the sqlite3 error, in this case do:
+```
 ```
