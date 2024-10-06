@@ -1,0 +1,13 @@
+simulation_dir = "."
+
+[model]
+type = "regression"
+n_fixed_effects = 6
+
+[likelihood]
+type = "gaussian"
+theta_observations = 1.5
+
+[prior_hyperparameters]
+mean_theta_observations = 3.5
+precision_theta_observations = 0.5
