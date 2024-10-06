@@ -31,6 +31,7 @@ dependencies = [
     "isort",
     "ruff",
     "pre-commit",
+    "autograd",
 ]
 [project.optional-dependencies]
 mpi4py = ["mpi4py"]
