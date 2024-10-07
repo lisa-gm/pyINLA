@@ -42,6 +42,7 @@ class INLA:
     ) -> None:
         self.pyinla_config = pyinla_config
 
+        self.minimize_max_iter = self.pyinla_config.minimize_max_iter
         self.eps_inner_iteration = self.pyinla_config.eps_inner_iteration
         self.eps_gradient_f = self.pyinla_config.eps_gradient_f
 
@@ -172,7 +173,7 @@ class INLA:
                 method="BFGS",
                 jac=self._evaluate_gradient_f,
                 options={
-                    "maxiter": 100,
+                    "maxiter": self.minimize_max_iter,
                     "gtol": 1e-1,
                     "disp": True,
                 },

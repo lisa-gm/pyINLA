@@ -167,6 +167,7 @@ class PyinlaConfig(BaseModel):
 
     # --- Simulation parameters ------------------------------------------------
     solver: SolverConfig = SolverConfig()
+    minimize_max_iter: PositiveInt = 100
     eps_inner_iteration: float = 1e-3
     eps_gradient_f: float = 1e-3
 
