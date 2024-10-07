@@ -1,4 +1,5 @@
 simulation_dir = "."
+minimize_max_iter = 1
 
 [model]
 type = "spatio-temporal"
