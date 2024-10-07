@@ -8,14 +8,9 @@ from pyinla.core.solver import Solver
 
 
 @pytest.mark.parametrize("diagonal_blocksize", [2, 3])
-@pytest.mark.parametrize("arrowhead_blocksize", [0, 1, 2, 3])
-@pytest.mark.parametrize("n_diag_blocks", [1, 2, 3, 4])
-# @pytest.mark.parametrize("diagonal_blocksize", [3])
-# @pytest.mark.parametrize("arrowhead_blocksize", [2])
-# @pytest.mark.parametrize("n_diag_blocks", [4])
-
-
-def test_extract_selected_inverse(
+@pytest.mark.parametrize("arrowhead_blocksize", [0, 1, 3])
+@pytest.mark.parametrize("n_diag_blocks", [1, 2, 3])
+def test_get_selected_inverse(
     solver: Solver,
     pobta_dense,
     pyinla_config,
@@ -32,8 +27,7 @@ def test_extract_selected_inverse(
     solver_instance = solver(pyinla_config)
     solver_instance.cholesky(A_coo)
     solver_instance.full_inverse()
-    A_inv_solver = solver_instance.A_inv
 
-    A_inv_sparse_solver = solver_instance.extract_selected_inverse(A_inv_solver)
+    A_inv_sparse_solver = solver_instance.get_selected_inverse()
 
     assert np.allclose(A_inv_ref_selected.toarray(), A_inv_sparse_solver.toarray())

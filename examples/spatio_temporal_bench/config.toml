@@ -1,6 +1,9 @@
 simulation_dir = "."
 minimize_max_iter = 1
 
+[solver]
+type = "cusparse"
+
 [model]
 type = "spatio-temporal"
 theta_spatial_range = 2

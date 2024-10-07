@@ -140,7 +140,7 @@ class SerinvSolver(Solver):
         """Compute full inverse of A."""
         raise NotImplementedError
 
-    def extract_selected_inverse(self) -> sparray:
+    def get_selected_inverse(self) -> sparray:
         """extract values of the inverse of A that are nonzero in A."""
         raise NotImplementedError
 

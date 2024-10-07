@@ -154,7 +154,7 @@ class LikelihoodConfig(BaseModel):
 class SolverConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["scipy", "serinv"] = "scipy"
+    type: Literal["scipy", "cusparse"] = "scipy"
 
 
 class PyinlaConfig(BaseModel):

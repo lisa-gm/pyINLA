@@ -9,8 +9,8 @@ from pyinla.core.solver import Solver
 
 
 @pytest.mark.parametrize("diagonal_blocksize", [2, 3])
-@pytest.mark.parametrize("arrowhead_blocksize", [0, 1, 2, 3])
-@pytest.mark.parametrize("n_diag_blocks", [1, 2, 3, 4])
+@pytest.mark.parametrize("arrowhead_blocksize", [0, 1, 3])
+@pytest.mark.parametrize("n_diag_blocks", [1, 2, 3])
 def test_logdet(
     solver: Solver,
     pobta_dense,

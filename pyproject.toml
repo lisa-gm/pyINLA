@@ -32,6 +32,7 @@ dependencies = [
     "ruff",
     "pre-commit",
     "autograd",
+    "pytest-xdist",
 ]
 [project.optional-dependencies]
 mpi4py = ["mpi4py"]

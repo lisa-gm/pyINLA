@@ -20,7 +20,7 @@ from pyinla.prior_hyperparameters.penalized_complexity import (
     PenalizedComplexityPriorHyperparameters,
 )
 from pyinla.solvers.scipy_solver import ScipySolver
-from pyinla.solvers.serinv_solver import SerinvSolver
+from pyinla.solvers.cusparse_solver import CuSparseSolver
 from pyinla.utils.finite_difference_stencils import (
     gradient_finite_difference_5pt,
     hessian_diag_finite_difference_5pt,
@@ -112,9 +112,9 @@ class INLA:
         if self.pyinla_config.solver.type == "scipy":
             self.solver_Q_prior = ScipySolver(pyinla_config)
             self.solver_Q_conditional = ScipySolver(pyinla_config)
-        elif self.pyinla_config.solver.type == "serinv":
-            self.solver_Q_prior = SerinvSolver(pyinla_config)
-            self.solver_Q_conditional = SerinvSolver(pyinla_config)
+        elif self.pyinla_config.solver.type == "cusparse":
+            self.solver_Q_prior = CuSparseSolver(pyinla_config)
+            self.solver_Q_conditional = CuSparseSolver(pyinla_config)
 
         else:
             raise ValueError(
@@ -535,9 +535,7 @@ class INLA:
             raise ValueError
 
         self.solver_Q_conditional.full_inverse()
-        Q_inverse_selected = self.solver_Q_conditional.extract_selected_inverse(
-            self.solver_Q_conditional.A_inv
-        )
+        Q_inverse_selected = self.solver_Q_conditional.get_selected_inverse()
 
         # min_size = min(self.n_latent_parameters, 6)
         # print(f"Q_inverse_selected[:{min_size}, :{min_size}]: \n", Q_inverse_selected[:min_size, :min_size].toarray())

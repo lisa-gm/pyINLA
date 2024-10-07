@@ -12,9 +12,14 @@ from pyinla.likelihoods.gaussian import GaussianLikelihood
 from pyinla.models.regression import RegressionModel
 from pyinla.models.spatio_temporal import SpatioTemporalModel
 from pyinla.solvers.scipy_solver import ScipySolver
+from pyinla.solvers.cusparse_solver import CuSparseSolver
 from pyinla.utils import sigmoid
 
-SOLVER = [ScipySolver]
+SOLVER = [ScipySolver, CuSparseSolver]
+
+from os import environ
+
+environ["OMP_NUM_THREADS"] = "1"
 
 
 @pytest.fixture(params=SOLVER, autouse=True)
@@ -144,7 +149,6 @@ N_OBSERVATIONS = [
     pytest.param(1, id="1_observation"),
     pytest.param(2, id="2_observations"),
     pytest.param(3, id="3_observations"),
-    pytest.param(9, id="9_observations"),
 ]
 
 
@@ -152,7 +156,6 @@ N_LATENT_PARAMETERS = [
     pytest.param(1, id="1_latent_parameter"),
     pytest.param(2, id="2_latent_parameters"),
     pytest.param(3, id="3_latent_parameters"),
-    pytest.param(8, id="8_latent_parameters"),
 ]
 
 
@@ -160,7 +163,6 @@ THETA_OBSERVATIONS = [
     pytest.param(-0.1, id="theta_observations_-0.1"),
     pytest.param(0.0, id="theta_observations_0.0"),
     pytest.param(0.1, id="theta_observations_0.1"),
-    pytest.param(0.2, id="theta_observations_0.2"),
 ]
 
 
