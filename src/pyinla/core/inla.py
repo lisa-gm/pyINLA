@@ -119,6 +119,7 @@ class INLA:
 
         self.counter = 0
         self.min_f = 1e10
+        self.f_value = 1e10
 
         print("INLA initialized.")
         print("Model:", self.pyinla_config.model.type)
@@ -135,8 +136,8 @@ class INLA:
     def run(self) -> np.ndarray:
         """Fit the model using INLA."""
 
-        f_init = self._evaluate_f(self.theta_initial)
-        print(f"Initial function value: {f_init}")
+        self.f_value = self._evaluate_f(self.theta_initial)
+        # print(f"Initial function value: {self.f_value}")
 
         if len(self.theta_initial) > 0:
             grad_f_init = self._evaluate_gradient_f(self.theta_initial)
@@ -160,6 +161,7 @@ class INLA:
                     "iterations.",
                 )
                 self.theta_star = result.x
+                self.f_value = result.fun
                 print("Optimal theta:", self.theta_star)
                 print("Latent parameters:", self.x)
                 return True
@@ -169,9 +171,9 @@ class INLA:
 
             print("counter:", self.counter)
 
-        print("Latent parameters:", self.x)
+        # print("Latent parameters:", self.x)
 
-        return f_init
+        return self.f_value
 
     def get_theta_star(self) -> dict:
         """Get the optimal theta."""
@@ -243,7 +245,7 @@ class INLA:
             - conditional_latent_parameters
         )
 
-        print(f"Function value: {f_theta}")
+        # print(f"Function value: {f_theta}")
 
         # if f_theta < self.min_f:
         #     self.min_f = f_theta
@@ -356,7 +358,7 @@ class INLA:
 
             x_i_norm = np.linalg.norm(x_update)
             counter += 1
-            print(f"Inner iteration {counter} norm: {x_i_norm}")
+            # print(f"Inner iteration {counter} norm: {x_i_norm}")
 
         print("Inner iteration converged after", counter, "iterations.")
         return Q_conditional, x_i

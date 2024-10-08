@@ -5,8 +5,8 @@ import pytest
 from numpy.typing import ArrayLike
 from scipy import sparse
 
-from pyinla.core.likelihood import Likelihood
-from pyinla.core.model import Model
+# from pyinla.core.likelihood import Likelihood
+# from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.likelihoods.gaussian import GaussianLikelihood
 from pyinla.models.regression import RegressionModel
@@ -16,10 +16,44 @@ from pyinla.utils import sigmoid
 
 SOLVER = [ScipySolver]
 
+MODEL = [RegressionModel]  # , SpatioTemporalModel]
+LIKELIHOOD = [GaussianLikelihood]
+
+
+@pytest.fixture(params=MODEL, autouse=True)
+def model(request):
+    return request.param
+
+
+@pytest.fixture(params=LIKELIHOOD, autouse=True)
+def likelihood(request):
+    return request.param
+
 
 @pytest.fixture(params=SOLVER, autouse=True)
 def solver(request):
     return request.param
+
+
+@pytest.fixture(scope="function", autouse=False)
+def generate_theta_dict(
+    model,
+    likelihood,
+):
+    theta_model = {}
+    theta_likelihood = {}
+
+    if likelihood == GaussianLikelihood:
+        theta_likelihood = {"theta_observations": 0.3}
+
+    if model == SpatioTemporalModel:
+        theta_model = {
+            "spatial_range": 0.5,
+            "temporal_range": 0.3,
+            "spatio_temporal_variation": 0.7,
+        }
+
+    return theta_model, theta_likelihood
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -91,53 +125,58 @@ def pyinla_config(solver):
 
 @pytest.fixture(scope="function", autouse=False)
 def pyinla_config_initialize_theta(
-    model: Model,
-    likelihood: Likelihood,
+    model,
+    likelihood,
     theta_prior_mean: ArrayLike,
-    theta_prior_variance: ArrayLike,
+    theta_prior_precision: ArrayLike,
 ):
-    pyinla_config = PyinlaConfig()
+    pyinla_config_initialize_theta = PyinlaConfig()
+
+    if model == "RegressionModel":
+        pyinla_config_initialize_theta.model.type = "regression"
+    elif model == "SpatioTemporalModel":
+        pyinla_config_initialize_theta.model.type = "spatio-temporal"
+
+    if likelihood == "GaussianLikelihood":
+        pyinla_config_initialize_theta.likelihood.type = "gaussian"
 
     counter = 0
-    if Model == RegressionModel and Likelihood == GaussianLikelihood:
-        pyinla_config.prior_hyperparamters.mean_theta_observations = theta_prior_mean[
+
+    if model == SpatioTemporalModel:
+        pyinla_config_initialize_theta.prior_hyperparameters.mean_theta_spatial_range = theta_prior_mean[
             counter
         ]
-        pyinla_config.prior_hyperparamters.precision_theta_observations = (
-            theta_prior_variance[counter]
-        )
-        counter += 1
-
-    elif Model == SpatioTemporalModel:
-        pyinla_config.prior_hyperparamters.mean_theta_spatial_range = theta_prior_mean[
+        pyinla_config_initialize_theta.prior_hyperparameters.precision_theta_spatial_range = theta_prior_precision[
             counter
         ]
-        pyinla_config.prior_hyperparamters.precision_theta_spatial_range = (
-            theta_prior_variance[counter]
-        )
         counter += 1
 
-        pyinla_config.prior_hyperparamters.mean_theta_temporal_range = theta_prior_mean[
+        pyinla_config_initialize_theta.prior_hyperparameters.mean_theta_temporal_range = theta_prior_mean[
             counter
         ]
-        pyinla_config.prior_hyperparamters.precision_theta_temporal_range = (
-            theta_prior_variance[counter]
-        )
+        pyinla_config_initialize_theta.prior_hyperparameters.precision_theta_temporal_range = theta_prior_precision[
+            counter
+        ]
         counter += 1
 
-        pyinla_config.prior_hyperparamters.mean_theta_spatio_temporal_variation = (
+        pyinla_config_initialize_theta.prior_hyperparameters.mean_theta_spatio_temporal_variation = theta_prior_mean[
+            counter
+        ]
+        pyinla_config_initialize_theta.prior_hyperparameters.precision_theta_spatio_temporal_variation = theta_prior_precision[
+            counter
+        ]
+        counter += 1
+
+    if likelihood == GaussianLikelihood:
+        pyinla_config_initialize_theta.prior_hyperparameters.mean_theta_observations = (
             theta_prior_mean[counter]
         )
-        pyinla_config.prior_hyperparamters.precision_theta_spatio_temporal_variation = (
-            theta_prior_variance[counter]
-        )
+        pyinla_config_initialize_theta.prior_hyperparameters.precision_theta_observations = theta_prior_precision[
+            counter
+        ]
         counter += 1
 
-    else:
-        print("undefined model!")
-        raise ValueError
-
-    return pyinla_config
+    return pyinla_config_initialize_theta
 
 
 N_OBSERVATIONS = [
