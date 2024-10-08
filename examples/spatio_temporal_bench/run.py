@@ -16,8 +16,8 @@ if __name__ == "__main__":
     f_init = pyinla.run()
     toc = time.perf_counter()
 
-    print("Initial f:", f_init)
+    # print("Initial f:", f_init)
     theta_star = pyinla.get_theta_star()
-    print("Optimal theta:", theta_star)
+    # print("Optimal theta:", theta_star)
 
     print(f"Elapsed time: {toc - tic:.2f} s")

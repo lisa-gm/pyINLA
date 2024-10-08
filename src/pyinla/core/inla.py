@@ -1,7 +1,6 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import math
-import os
 
 import numpy as np
 import time
@@ -10,22 +9,30 @@ from scipy.optimize import minimize
 from scipy.sparse import diags, load_npz, sparray
 
 from pyinla.core.pyinla_config import PyinlaConfig
+
 from pyinla.likelihoods.binomial import BinomialLikelihood
 from pyinla.likelihoods.gaussian import GaussianLikelihood
 from pyinla.likelihoods.poisson import PoissonLikelihood
+
 from pyinla.models.regression import RegressionModel
 from pyinla.models.spatio_temporal import SpatioTemporalModel
+
 from pyinla.prior_hyperparameters.gaussian import GaussianPriorHyperparameters
 from pyinla.prior_hyperparameters.penalized_complexity import (
     PenalizedComplexityPriorHyperparameters,
 )
+
 from pyinla.solvers.scipy_solver import ScipySolver
 from pyinla.solvers.cusparse_solver import CuSparseSolver
+from pyinla.solvers.serinv_solver import SerinvSolverCPU
+
 from pyinla.utils.finite_difference_stencils import (
     gradient_finite_difference_5pt,
     hessian_diag_finite_difference_5pt,
 )
 from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
+
+from cupy.cuda import nvtx
 
 
 class INLA:
@@ -62,17 +69,13 @@ class INLA:
         except FileNotFoundError:
             self.x = np.ones((self.a.shape[1]), dtype=float)
 
-        print("x[:10] : ", self.x[:10])
-
         self._check_dimensions()
 
         # --- Initialize model
         if self.pyinla_config.model.type == "regression":
             self.model = RegressionModel(pyinla_config, self.n_latent_parameters)
-            print("Regression model initialized.")
         elif self.pyinla_config.model.type == "spatio-temporal":
             self.model = SpatioTemporalModel(pyinla_config, self.n_latent_parameters)
-            print("Spatio-temporal model initialized.")
         else:
             raise ValueError(
                 f"Model '{self.pyinla_config.model.type}' not implemented."
@@ -93,29 +96,34 @@ class INLA:
         # --- Initialize likelihood
         if self.pyinla_config.likelihood.type == "gaussian":
             self.likelihood = GaussianLikelihood(pyinla_config, self.n_observations)
-            print("Gaussian likelihood initialized.")
         elif self.pyinla_config.likelihood.type == "poisson":
             self.likelihood = PoissonLikelihood(pyinla_config, self.n_observations)
-            print("Poisson likelihood initialized.")
         elif self.pyinla_config.likelihood.type == "binomial":
             self.likelihood = BinomialLikelihood(pyinla_config, self.n_observations)
-            print("Binomial likelihood initialized.")
         else:
             raise ValueError(
                 f"Likelihood '{self.pyinla_config.likelihood.type}' not implemented."
             )
 
         # --- Initialize solver
-        num_threads = os.getenv("OMP_NUM_THREADS")
-        print(f"OMP_NUM_THREADS: {num_threads}")
-
         if self.pyinla_config.solver.type == "scipy":
             self.solver_Q_prior = ScipySolver(pyinla_config)
             self.solver_Q_conditional = ScipySolver(pyinla_config)
         elif self.pyinla_config.solver.type == "cusparse":
             self.solver_Q_prior = CuSparseSolver(pyinla_config)
             self.solver_Q_conditional = CuSparseSolver(pyinla_config)
-
+        elif self.pyinla_config.solver.type == "serinv_cpu":
+            if self.pyinla_config.model.type == "regression":
+                raise ValueError(
+                    f"Solver '{self.pyinla_config.solver.type}' not implemented for regression model."
+                )
+            else:
+                self.solver_Q_prior = SerinvSolverCPU(
+                    pyinla_config, self.model.ns, self.model.nb, self.model.nt
+                )
+                self.solver_Q_conditional = SerinvSolverCPU(
+                    pyinla_config, self.model.ns, self.model.nb, self.model.nt
+                )
         else:
             raise ValueError(
                 f"Solver '{self.pyinla_config.solver.type}' not implemented."
@@ -128,15 +136,14 @@ class INLA:
 
         self.theta = self.theta_initial
         self.f_value = 1e10
-
         self.counter = 0
         self.min_f = 1e10
 
-        # --- set up recurrent variables
+        # --- Set up recurrent variables
         self.Q_conditional: sparray = None
 
-        print("INLA initialized.", flush=True)
-        print("Model:", self.pyinla_config.model.type, flush=True)
+        print("INLA initialized...", flush=True)
+        """ print("Model:", self.pyinla_config.model.type, flush=True)
         if len(self.model.get_theta()) > 0:
             print(
                 "Prior hyperparameters model:",
@@ -161,18 +168,17 @@ class INLA:
                 flush=True,
             )
             print("   Initial theta:", self.theta_initial, flush=True)
-        print("   Likelihood:", self.pyinla_config.likelihood.type, flush=True)
+        print("   Likelihood:", self.pyinla_config.likelihood.type, flush=True) """
 
     def run(self) -> np.ndarray:
         """Fit the model using INLA."""
 
         self.f_value = self._evaluate_f(self.theta_initial)
-        print(f"Initial function value: {self.f_value}", flush=True)
 
         if len(self.theta) > 0:
-            grad_f_init = self._evaluate_gradient_f(self.theta_initial)
-            print(f"Initial gradient: {grad_f_init}", flush=True)
+            print("Starting minimization...", flush=True)
 
+            tic = time.perf_counter()
             result = minimize(
                 self._evaluate_f,
                 self.theta_initial,
@@ -184,6 +190,10 @@ class INLA:
                     "disp": True,
                 },
             )
+            toc = time.perf_counter()
+            print(f"1-Minimize iteration time: {toc - tic} s", flush=True)
+
+            # TODO: Compute Q with the optimized theta
 
             if result.success:
                 print(
@@ -226,7 +236,7 @@ class INLA:
         assert self.y.shape[0] == self.a.shape[0], "Dimensions of y and A do not match."
         assert self.x.shape[0] == self.a.shape[1], "Dimensions of x and A do not match."
 
-    def _evaluate_f(self, theta_i: np.ndarray) -> float:
+    def _evaluate_f(self, theta_i: np.ndarray, from_minimize: bool = False) -> float:
         """evaluate the objective function f(theta) = log(p(theta|y)).
 
         Notes
@@ -246,8 +256,6 @@ class INLA:
             Function value f(theta) evaluated at theta_i.
         """
 
-        print("Evaluate f()", flush=True)
-
         self.theta = theta_i
 
         theta_model, theta_likelihood = theta_array2dict(
@@ -255,52 +263,30 @@ class INLA:
         )
 
         # --- Evaluate the log prior of the hyperparameters
-        tic = time.perf_counter()
         log_prior_hyperparameters = self.prior_hyperparameters.evaluate_log_prior(
             theta_model, theta_likelihood
         )
-        toc = time.perf_counter()
-        print("   (1/6) evaluate_log_prior time:", toc - tic, flush=True)
 
         # --- Construct the prior precision matrix of the latent parameters
-        tic = time.perf_counter()
         Q_prior = self.model.construct_Q_prior(theta_model)
-        toc = time.perf_counter()
-        print("   (2/6) construct_Q_prior time:", toc - tic, flush=True)
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
-        tic = time.perf_counter()
         self.Q_conditional, self.x = self._inner_iteration(
             Q_prior, self.x, theta_likelihood
         )
-        toc = time.perf_counter()
-        print("   (3/6) inner_iteration time:", toc - tic, flush=True)
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
-        tic = time.perf_counter()
         eta = self.a @ self.x
         likelihood = self.likelihood.evaluate_likelihood(eta, self.y, theta_likelihood)
-        toc = time.perf_counter()
-        print("   (4/6) evaluate_likelihood time:", toc - tic, flush=True)
 
         # --- Evaluate the prior of the latent parameters at x_star
-        tic = time.perf_counter()
         prior_latent_parameters = self._evaluate_prior_latent_parameters(
             Q_prior, self.x
         )
-        toc = time.perf_counter()
-        print("   (5/6) evaluate_prior_latent_parameters time:", toc - tic, flush=True)
 
         # --- Evaluate the conditional of the latent parameters at x_star
-        tic = time.perf_counter()
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
             self.Q_conditional, self.x, self.x
-        )
-        toc = time.perf_counter()
-        print(
-            "   (6/6) evaluate_conditional_latent_parameters time:",
-            toc - tic,
-            flush=True,
         )
 
         f_theta = -1 * (
@@ -315,7 +301,7 @@ class INLA:
         if f_theta < self.min_f:
             self.min_f = f_theta
             self.counter += 1
-            print(f"theta: {theta_i},      Function value: {f_theta}", flush=True)
+            # print(f"theta: {theta_i},      Function value: {f_theta}", flush=True)
             # print(f"Minimum function value: {self.min_f}. Counter: {self.counter}")
 
         return f_theta
@@ -335,9 +321,6 @@ class INLA:
 
         """
 
-        print("Evaluate gradient_f()", flush=True)
-
-        tic = time.perf_counter()
         dim_theta = theta_i.shape[0]
         grad_f = np.zeros(dim_theta)
 
@@ -354,10 +337,6 @@ class INLA:
             f_minus = self._evaluate_f(theta_minus)
 
             grad_f[i] = (f_plus - f_minus) / (2 * self.eps_gradient_f)
-        toc = time.perf_counter()
-        print("   evaluate_gradient_f time:", toc - tic, flush=True)
-
-        print(f"Gradient: {grad_f}", flush=True)
 
         return grad_f
 
@@ -367,17 +346,13 @@ class INLA:
         x_update = np.zeros_like(x_i)
         x_i_norm = 1
 
-        print("   Starting inner iteration", flush=True)
-
         counter = 0
         while x_i_norm >= self.eps_inner_iteration:
             if counter > self.inner_iteration_max_iter:
                 raise ValueError(
                     f"Inner iteration did not converge after {counter} iterations."
                 )
-            print(f"      inner iteration {counter} norm: {x_i_norm}", flush=True)
 
-            tic = time.perf_counter()
             x_i[:] += x_update[:]
             eta = self.a @ x_i
 
@@ -388,10 +363,7 @@ class INLA:
             gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
                 eta, self.y, theta_likelihood
             )
-            toc = time.perf_counter()
-            print("         evaluate_likelihood time:", toc - tic, flush=True)
 
-            tic = time.perf_counter()
             rhs = -1 * Q_prior @ x_i + self.a.T @ gradient_likelihood
 
             # TODO: need to vectorize
@@ -402,37 +374,22 @@ class INLA:
             hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(
                 eta, self.y, theta_likelihood
             )
-            toc = time.perf_counter()
-            print(
-                "         hessian_diag_finite_difference_5pt time:",
-                toc - tic,
-                flush=True,
-            )
 
-            tic = time.perf_counter()
             Q_conditional = self.model.construct_Q_conditional(
                 Q_prior,
                 self.a,
                 hessian_likelihood,
             )
-            toc = time.perf_counter()
-            print("         construct_Q_conditional time:", toc - tic, flush=True)
 
-            tic = time.perf_counter()
+            nvtx.RangePush("cholesky")
             self.solver_Q_conditional.cholesky(Q_conditional)
-            toc = time.perf_counter()
-            print("         cholesky time:", toc - tic, flush=True)
+            nvtx.RangePop()
 
-            tic = time.perf_counter()
             x_update[:] = self.solver_Q_conditional.solve(rhs)
-            toc = time.perf_counter()
-            print("         solve time:", toc - tic, flush=True)
 
             x_i_norm = np.linalg.norm(x_update)
             counter += 1
-            print(f"Inner iteration {counter} norm: {x_i_norm}")
 
-        print("Inner iteration converged after", counter, "iterations.")
         return Q_conditional, x_i
 
     def _evaluate_prior_latent_parameters(self, Q_prior: sparray, x: ArrayLike):

@@ -13,22 +13,25 @@ except ImportError:
     print("Serinv not installed. Please install serinv to use SerinvSolver.")
 
 
-class SerinvSolver(Solver):
+class SerinvSolverCPU(Solver):
     """Serinv Solver class."""
 
     def __init__(
         self,
         pyinla_config: PyinlaConfig,
+        diagonal_blocksize: int,
+        arrowhead_blocksize: int,
+        n_diagonal_blocks: int,
     ) -> None:
         """Initializes the SerinV solver."""
         super().__init__(pyinla_config)
 
-        self.diagonal_blocksize = ...
-        self.arrowhead_blocksize = ...
-        self.n_diagonal_blocks = ...
-        self.dtype = ...
+        self.diagonal_blocksize = diagonal_blocksize
+        self.arrowhead_blocksize = arrowhead_blocksize
+        self.n_diagonal_blocks = n_diagonal_blocks
+        self.dtype = np.float64
 
-        # --- Initialize memory for BTA-array storage
+        # --- Initialize pinned-memory for BTA-array storage
         self.A_diagonal_blocks = np.empty(
             (self.n_diagonal_blocks, self.diagonal_blocksize, self.diagonal_blocksize),
             dtype=self.dtype,
@@ -49,6 +52,16 @@ class SerinvSolver(Solver):
             (self.arrowhead_blocksize, self.arrowhead_blocksize),
             dtype=self.dtype,
         )
+
+        # Print the allocated memory for the BTA-array
+        total_bytes = (
+            self.A_diagonal_blocks.nbytes
+            + self.A_lower_diagonal_blocks.nbytes
+            + self.A_arrow_bottom_blocks.nbytes
+            + self.A_arrow_tip_block.nbytes
+        )
+        total_gb = total_bytes / (1024**3)
+        print(f"Allocated memory for BTA-array: {total_gb:.2f} GB", flush=True)
 
         # --- Make aliases for L
         self.L_diagonal_blocks = self.A_diagonal_blocks
@@ -111,30 +124,40 @@ class SerinvSolver(Solver):
 
         A_csr = A.tocsr()
 
+        A_csr_slice = A_csr[
+            0 : self.diagonal_blocksize,
+            0 : self.diagonal_blocksize,
+        ]
+
         for i in range(self.n_diagonal_blocks):
-            self.A_diagonal_blocks[i] = A_csr[
+
+            csr_slice = A_csr[
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-            ].toarray()
+            ]
+
+            self.A_diagonal_blocks[i, :, :] = csr_slice.todense()
 
             if i < self.n_diagonal_blocks - 1:
-                self.A_lower_diagonal_blocks[i] = A_csr[
+                csr_slice = A_csr[
                     (i + 1)
                     * self.diagonal_blocksize : (i + 2)
                     * self.diagonal_blocksize,
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                ].toarray()
+                ]
 
-            self.A_arrow_bottom_blocks[i] = A_csr[
+                self.A_lower_diagonal_blocks[i, :, :] = csr_slice.todense()
+
+            csr_slice = A_csr[
+                -self.arrowhead_blocksize :,
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                self.n_diagonal_blocks
-                * self.diagonal_blocksize : (self.n_diagonal_blocks + 1)
-                * self.diagonal_blocksize,
-            ].toarray()
+            ]
 
-        self.A_arrow_tip_block = A_csr[
-            -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
-        ]
+            self.A_arrow_bottom_blocks[i, :, :] = csr_slice.todense()
+
+        csr_slice = A_csr[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :]
+
+        self.A_arrow_tip_block[:, :] = csr_slice.todense()
 
     def full_inverse(self) -> ArrayLike:
         """Compute full inverse of A."""

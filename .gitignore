@@ -168,3 +168,5 @@ settings.json
 *.npy
 *.dat
 *.out
+*.nsys-rep
+*.sqlite
