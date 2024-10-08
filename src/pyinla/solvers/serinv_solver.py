@@ -124,11 +124,6 @@ class SerinvSolverCPU(Solver):
 
         A_csr = A.tocsr()
 
-        A_csr_slice = A_csr[
-            0 : self.diagonal_blocksize,
-            0 : self.diagonal_blocksize,
-        ]
-
         for i in range(self.n_diagonal_blocks):
 
             csr_slice = A_csr[
