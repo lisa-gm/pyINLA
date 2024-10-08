@@ -2,11 +2,17 @@
 
 import time
 
-import numpy as np
+# import numpy as np
 from numpy.typing import ArrayLike
-import cupy as cp
-from cupyx.scipy.sparse import csc_matrix, diags, spmatrix
-from cupyx.scipy.sparse.linalg import splu, spsolve_triangular
+
+try:
+    import cupy as cp
+    from cupyx.scipy.sparse import csc_matrix, diags, spmatrix
+    from cupyx.scipy.sparse.linalg import splu, spsolve_triangular
+except ImportError:
+    print("CuPy is required for CuSparseSolver.")
+    from scipy.sparse import csc_matrix, diags, spmatrix
+    from scipy.sparse.linalg import splu, spsolve_triangular
 
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.core.solver import Solver
