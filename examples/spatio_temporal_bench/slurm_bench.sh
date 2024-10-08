@@ -4,10 +4,11 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=32
-#SBATCH --account=hck23
 #SBATCH --reservation=eurohack24
 
+set -x
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export OPENBLAS_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 conda activate pyinla
 

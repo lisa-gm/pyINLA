@@ -229,7 +229,7 @@ def gradient_finite_difference_3pt_gpu(
 if __name__ == "__main__":
     n = 10000  # Size of the matrix
 
-    batch_size_list = [1, 10, 100, 1000]
+    batch_size_list = [1, 10, 100, 1000, 100000]
     time_list_greedy = np.zeros(len(batch_size_list))
     time_list_cpu = np.zeros(len(batch_size_list))
     time_list_gpu = np.zeros(len(batch_size_list))
@@ -267,6 +267,7 @@ if __name__ == "__main__":
 
         print(
             f"Batch size: {batch_size_list[i]}, norm greedy:  {np.linalg.norm(grad_fd_greedy - grad_analytical)}, norm cpu vectorized:  {np.linalg.norm(grad_fd - grad_analytical)}, norm gpu:  {np.linalg.norm(grad_fd_gpu - grad_analytical)}",
+            flush=True,
         )
 
     print("Time list greedy:   ", time_list_greedy)
