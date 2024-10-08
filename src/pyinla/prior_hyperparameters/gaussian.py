@@ -74,6 +74,11 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
                 )
                 ** 2
             )
+
+            # print("theta_model['spatial_range']: ", theta_model["spatial_range"], ". mean_theta_spatial_range: ", self.mean_theta_spatial_range)
+            # print("theta_model['temporal_range']: ", theta_model["temporal_range"], ". mean_theta_temporal_range: ", self.mean_theta_temporal_range)
+            # print("theta_model['spatio_temporal_variation']: ", theta_model["spatio_temporal_variation"], ". mean_theta_spatio_temporal_variation: ", self.mean_theta_spatio_temporal_variation)
+
             log_prior += -0.5 * (
                 log_prior_spatial_range
                 + log_prior_temporal_range

@@ -92,6 +92,6 @@ class Likelihood(ABC):
         pass
 
     @abstractmethod
-    def get_theta_initial(self) -> dict:
+    def get_theta(self) -> dict:
         """Get the likelihood initial hyperparameters."""
         pass
