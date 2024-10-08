@@ -1,13 +1,13 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import numpy as np
-from scipy.sparse import csr_matrix, kron, load_npz, sparray
+from scipy.sparse import csc_matrix, kron, load_npz, sparray
 
 from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
 
 
-class SpatioTemporal(Model):
+class SpatioTemporalModel(Model):
     """Fit a spatio-temporal model."""
 
     def __init__(
@@ -42,10 +42,10 @@ class SpatioTemporal(Model):
         ), f"Design matrix has incorrect number of columns. \n    n_latent_parameters: {self.n_latent_parameters}\n    nb: {self.nb} + ns: {self.ns} * nt: {self.nt} = {self.nb + self.ns * self.nt}"
 
         # Load model hyperparameters
-        self.theta_initial = {
+        self.theta = {
             "spatial_range": pyinla_config.model.theta_spatial_range,
             "temporal_range": pyinla_config.model.theta_temporal_range,
-            "sd_spatio_temporal": pyinla_config.model.theta_sd_spatio_temporal,
+            "spatio_temporal_variation": pyinla_config.model.theta_spatio_temporal_variation,
         }
 
     def _check_dimensions_spatial_matrices(self) -> None:
@@ -69,18 +69,34 @@ class SpatioTemporal(Model):
             self.m0.shape == self.m1.shape == self.m2.shape
         ), "Dimensions of temporal matrices do not match."
 
-    def get_theta_initial(self) -> dict:
-        """Get the model hyperparameters."""
-        return self.theta_initial
+    def get_theta(self) -> dict:
+        """Get the initial theta of the model. This dictionary is constructed
+        at instanciation of the model. It has to be stored in the model as
+        theta is specific to the model.
 
-    def construct_Q_prior(self, theta_model: dict = None) -> float:
+        Returns
+        -------
+        theta_inital_model : dict
+            Dictionary of hyperparameters. Theta gets when calling construct_Q_prior.
+        """
+        return self.theta
+
+    def construct_Q_prior(self, theta_model: dict = None) -> sparray:
         """Construct the prior precision matrix."""
+
+        self.theta = theta_model
+
         if theta_model is None:
             raise ValueError("theta_model must be provided.")
 
         theta_spatial_range = np.exp(theta_model["spatial_range"])
         theta_temporal_range = np.exp(theta_model["temporal_range"])
-        theta_sd_spatio_temporal = np.exp(theta_model["sd_spatio_temporal"])
+        theta_spatio_temporal_variation = np.exp(
+            theta_model["spatio_temporal_variation"]
+        )
+        # print("theta_spatial_range: ", theta_spatial_range)
+        # print("theta_temporal_range: ", theta_temporal_range)
+        # print("theta_spatio_temporal_variation: ", theta_spatio_temporal_variation)
 
         q1s = pow(theta_spatial_range, 2) * self.c0 + self.g1
         q2s = (
@@ -95,11 +111,14 @@ class SpatioTemporal(Model):
             + self.g3
         )
 
-        Q_spatio_temporal = pow(theta_sd_spatio_temporal, 2) * (
+        Q_spatio_temporal = pow(theta_spatio_temporal_variation, 2) * (
             kron(self.m0, q3s)
             + theta_temporal_range * kron(self.m1, q2s)
             + pow(theta_temporal_range, 2) * kron(self.m2, q1s)
         )
+
+        if Q_spatio_temporal is not csc_matrix:
+            Q_spatio_temporal = csc_matrix(Q_spatio_temporal)
 
         # Construct block diagonal matrix Q fixed effects
         Q_fixed_effects_data = np.full(self.nb, self.fixed_effects_prior_precision)
@@ -127,11 +146,11 @@ class SpatioTemporal(Model):
             ]
         )
 
-        Q_prior = csr_matrix(
+        Q_prior = csc_matrix(
             (data, indices, indptr),
             shape=(
                 Q_spatio_temporal.shape[0] + self.nb,
-                Q_spatio_temporal[1] + self.nb,
+                Q_spatio_temporal.shape[1] + self.nb,
             ),
         )
 
@@ -145,6 +164,6 @@ class SpatioTemporal(Model):
     ) -> float:
         """Construct the conditional precision matrix."""
 
-        Q_conditional = Q_prior + a.T @ hessian_likelihood @ a
+        Q_conditional = Q_prior - a.T @ hessian_likelihood @ a
 
         return Q_conditional

@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from numpy.typing import ArrayLike
+# from numpy.typing import ArrayLike
 from scipy.sparse import sparray
 
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -26,12 +26,20 @@ class Model(ABC):
         self.n_latent_parameters = n_latent_parameters
 
     @abstractmethod
-    def get_theta_initial(self) -> dict:
-        """Get the model initial hyperparameters."""
-        pass
+    def get_theta(self) -> dict:
+        """Get the initial theta of the model. This dictionary is constructed
+        at instanciation of the model. It has to be stored in the model as
+        theta is specific to the model.
+
+        Returns
+        -------
+        theta_inital_model : dict
+            Dictionary of initial hyperparameters.
+        """
+        ...
 
     @abstractmethod
-    def construct_Q_prior(self, theta_model: dict = None) -> float:
+    def construct_Q_prior(self, theta_model: dict = None) -> sparray:
         """Construct the prior precision matrix."""
         pass
 
@@ -39,10 +47,10 @@ class Model(ABC):
     def construct_Q_conditional(
         self,
         Q_prior: sparray,
-        y: ArrayLike,
         a: sparray,
-        x: ArrayLike,
-        theta_model: dict = None,
-    ) -> float:
-        """Construct the conditional precision matrix."""
+        hessian_likelihood: sparray,
+    ) -> sparray:
+        """Construct the conditional precision matrix.
+        #TODO: hessian_likelihood always diagonal (for all models). How to pass this best?
+        """
         pass

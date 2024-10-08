@@ -32,3 +32,13 @@ class Solver(ABC):
     def logdet(self) -> float:
         """Compute logdet of input matrix using Cholesky factor."""
         pass
+
+    @abstractmethod
+    def full_inverse(self) -> ArrayLike:
+        """Compute inverse of input matrix using Cholesky factor."""
+        pass
+
+    @abstractmethod
+    def selected_inverse(self) -> ArrayLike:
+        """Compute inverse of selected rows of input matrix using Cholesky factor."""
+        pass

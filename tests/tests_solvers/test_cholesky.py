@@ -5,10 +5,8 @@ import pytest
 from scipy import sparse
 
 from pyinla.core.solver import Solver
-from pyinla.solvers.scipy_solver import ScipySolver
 
 
-@pytest.mark.parametrize("solver", [ScipySolver])
 @pytest.mark.parametrize("diagonal_blocksize", [2, 3])
 @pytest.mark.parametrize("arrowhead_blocksize", [0, 1, 2, 3])
 @pytest.mark.parametrize("n_diag_blocks", [1, 2, 3, 4])

@@ -135,3 +135,16 @@ class SerinvSolver(Solver):
         self.A_arrow_tip_block = A_csr[
             -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
         ]
+
+    def full_inverse(self) -> ArrayLike:
+        """Compute full inverse of A."""
+        raise NotImplementedError
+
+    def extract_selected_inverse(self) -> sparray:
+        """extract values of the inverse of A that are nonzero in A."""
+        raise NotImplementedError
+
+    def selected_inverse(self) -> sparray:
+        """Compute inverse of nonzero sparsity pattern of L."""
+
+        raise NotImplementedError

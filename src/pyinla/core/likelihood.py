@@ -3,7 +3,6 @@
 from abc import ABC, abstractmethod
 
 from numpy.typing import ArrayLike
-from scipy.sparse import sparray
 
 from pyinla.core.pyinla_config import PyinlaConfig
 
@@ -24,21 +23,18 @@ class Likelihood(ABC):
     @abstractmethod
     def evaluate_likelihood(
         self,
+        eta: ArrayLike,
         y: ArrayLike,
-        a: sparray,
-        x: ArrayLike,
         theta_likelihood: dict = None,
     ) -> float:
         """Evaluate the likelihood.
 
         Parameters
         ----------
+        eta : ArrayLike
+            Vector of the linear predictor.
         y : ArrayLike
             Vector of the observations.
-        a : sparray
-            Design matrix.
-        x : ArrayLike
-            Vector of the latent parameters.
 
         Returns
         -------
@@ -50,8 +46,8 @@ class Likelihood(ABC):
     @abstractmethod
     def evaluate_gradient_likelihood(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> ArrayLike:
         """Evaluate the gradient of the likelihood wrt to eta = Ax.
@@ -74,18 +70,18 @@ class Likelihood(ABC):
     @abstractmethod
     def evaluate_hessian_likelihood(
         self,
-        y: ArrayLike,
         eta: ArrayLike,
+        y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> ArrayLike:
         """Evaluate the Hessian of the likelihood wrt to eta = Ax.
 
         Parameters
         ----------
-        y : ArrayLike
-            Vector of the observations.
         eta : ArrayLike
             Vector of the linear predictor.
+        y : ArrayLike
+            Vector of the observations.
 
 
         Returns
@@ -96,6 +92,6 @@ class Likelihood(ABC):
         pass
 
     @abstractmethod
-    def get_theta_initial(self) -> dict:
+    def get_theta(self) -> dict:
         """Get the likelihood initial hyperparameters."""
         pass

@@ -10,19 +10,19 @@ from pyinla.core.solver import Solver
 @pytest.mark.parametrize("diagonal_blocksize", [2, 3])
 @pytest.mark.parametrize("arrowhead_blocksize", [0, 1, 2, 3])
 @pytest.mark.parametrize("n_diag_blocks", [1, 2, 3, 4])
-def test_solve(
+def test_cholesky(
     solver: Solver,
     pobta_dense,
     pyinla_config,
 ):
-    rhs = np.random.rand(pobta_dense.shape[0])
+    A_csc = sparse.csr_matrix(pobta_dense)
 
-    X_ref = np.linalg.solve(pobta_dense, rhs)
+    A_inv_ref = np.linalg.inv(pobta_dense)
 
-    A_csr = sparse.csr_matrix(pobta_dense)
     solver_instance = solver(pyinla_config)
-    solver_instance.cholesky(A_csr)
+    solver_instance.cholesky(A_csc)
+    solver_instance.full_inverse()
 
-    X_solver = solver_instance.solve(rhs)
+    A_inv_solver = solver_instance.A_inv
 
-    assert np.allclose(X_solver, X_ref)
+    assert np.allclose(A_inv_solver, A_inv_ref)
