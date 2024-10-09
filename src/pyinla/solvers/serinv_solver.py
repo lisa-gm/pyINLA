@@ -8,7 +8,7 @@ from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.core.solver import Solver
 
 try:
-    from serinv import pobtaf, pobtas
+    from serinv import pobtaf, pobtas, pobtf
 except ImportError:
     print("Serinv not installed. Please install serinv to use SerinvSolver.")
 
@@ -69,58 +69,64 @@ class SerinvSolverCPU(Solver):
         self.L_arrow_bottom_blocks = self.A_arrow_bottom_blocks
         self.L_arrow_tip_block = self.A_arrow_tip_block
 
-        self.cholesky_computed: bool = False
-
-    def cholesky(self, A: sparray) -> None:
+    def cholesky(self, A: sparray, sparsity: str = "bta") -> None:
         """Compute Cholesky factor of input matrix."""
 
-        self._sparray_to_bta(A)
+        if sparsity == "bta":
+            self._sparray_to_structured(A, sparsity="bta")
 
-        (
-            self.L_diagonal_blocks,
-            self.L_lower_diagonal_blocks,
-            self.L_arrow_bottom_blocks,
-            self.L_arrow_tip_block,
-        ) = pobtaf(
-            self.A_diagonal_blocks,
-            self.A_lower_diagonal_blocks,
-            self.A_arrow_bottom_blocks,
-            self.A_arrow_tip_block,
-        )
+            (
+                self.L_diagonal_blocks,
+                self.L_lower_diagonal_blocks,
+                self.L_arrow_bottom_blocks,
+                self.L_arrow_tip_block,
+            ) = pobtaf(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                self.A_arrow_bottom_blocks,
+                self.A_arrow_tip_block,
+            )
 
-        self.cholesky_computed = True
+        elif sparsity == "bt":
+            self._sparray_to_structured(A, sparsity="bt")
 
-    def solve(self, rhs: ArrayLike) -> ArrayLike:
+            (
+                self.L_diagonal_blocks,
+                self.L_lower_diagonal_blocks,
+            ) = pobtf(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+            )
+
+    def solve(self, rhs: ArrayLike, sparsity: str = "bta") -> ArrayLike:
         """Solve linear system using Cholesky factor."""
 
-        if not self.cholesky_computed:
-            raise ValueError("Cholesky factor not computed")
+        if sparsity == "bta":
+            return pobtas(
+                self.L_diagonal_blocks,
+                self.L_lower_diagonal_blocks,
+                self.L_arrow_bottom_blocks,
+                self.L_arrow_tip_block,
+                rhs,
+            )
+        else:
+            raise NotImplementedError("Solve is only supported for BTA sparsity")
 
-        return pobtas(
-            self.L_diagonal_blocks,
-            self.L_lower_diagonal_blocks,
-            self.L_arrow_bottom_blocks,
-            self.L_arrow_tip_block,
-            rhs,
-        )
-
-    def logdet(self) -> float:
+    def logdet(self, sparsity: str = "bta") -> float:
         """Compute logdet of input matrix using Cholesky factor."""
-
-        if not self.cholesky_computed:
-            raise ValueError("Cholesky factor not computed")
 
         logdet: float = 0.0
 
         for i in range(self.n_diagonal_blocks):
             logdet += np.sum(np.log(self.L_diagonal_blocks[i].diagonal()))
 
-        logdet += np.sum(np.log(self.L_arrow_tip_block.diagonal()))
+        if sparsity == "bta":
+            logdet += np.sum(np.log(self.L_arrow_tip_block.diagonal()))
 
         return 2 * logdet
 
-    def _sparray_to_bta(self, A: sparray) -> None:
-        """Map sparray to BTA."""
+    def _sparray_to_structured(self, A: sparray, sparsity: str) -> None:
+        """Map sparray to BT or BTA."""
 
         A_csr = A.tocsr()
 
@@ -143,16 +149,18 @@ class SerinvSolverCPU(Solver):
 
                 self.A_lower_diagonal_blocks[i, :, :] = csr_slice.todense()
 
-            csr_slice = A_csr[
-                -self.arrowhead_blocksize :,
-                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-            ]
+            if sparsity == "bta":
+                csr_slice = A_csr[
+                    -self.arrowhead_blocksize :,
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                ]
 
-            self.A_arrow_bottom_blocks[i, :, :] = csr_slice.todense()
+                self.A_arrow_bottom_blocks[i, :, :] = csr_slice.todense()
 
-        csr_slice = A_csr[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :]
+        if sparsity == "bta":
+            csr_slice = A_csr[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :]
 
-        self.A_arrow_tip_block[:, :] = csr_slice.todense()
+            self.A_arrow_tip_block[:, :] = csr_slice.todense()
 
     def full_inverse(self) -> ArrayLike:
         """Compute full inverse of A."""

@@ -32,8 +32,6 @@ from pyinla.utils.finite_difference_stencils import (
 )
 from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
 
-from cupy.cuda import nvtx
-
 
 class INLA:
     """Integrated Nested Laplace Approximation (INLA).
@@ -106,28 +104,9 @@ class INLA:
             )
 
         # --- Initialize solver
-        if self.pyinla_config.solver.type == "scipy":
-            self.solver_Q_prior = ScipySolver(pyinla_config)
-            self.solver_Q_conditional = ScipySolver(pyinla_config)
-        elif self.pyinla_config.solver.type == "cusparse":
-            self.solver_Q_prior = CuSparseSolver(pyinla_config)
-            self.solver_Q_conditional = CuSparseSolver(pyinla_config)
-        elif self.pyinla_config.solver.type == "serinv_cpu":
-            if self.pyinla_config.model.type == "regression":
-                raise ValueError(
-                    f"Solver '{self.pyinla_config.solver.type}' not implemented for regression model."
-                )
-            else:
-                self.solver_Q_prior = SerinvSolverCPU(
-                    pyinla_config, self.model.ns, self.model.nb, self.model.nt
-                )
-                self.solver_Q_conditional = SerinvSolverCPU(
-                    pyinla_config, self.model.ns, self.model.nb, self.model.nt
-                )
-        else:
-            raise ValueError(
-                f"Solver '{self.pyinla_config.solver.type}' not implemented."
-            )
+        self.solver = SerinvSolverCPU(
+            pyinla_config, self.model.ns, self.model.nb, self.model.nt
+        )
 
         # --- Initialize theta
         self.theta_initial: ArrayLike = theta_dict2array(
@@ -381,11 +360,9 @@ class INLA:
                 hessian_likelihood,
             )
 
-            nvtx.RangePush("cholesky")
-            self.solver_Q_conditional.cholesky(Q_conditional)
-            nvtx.RangePop()
+            self.solver.cholesky(Q_conditional, sparsity="bta")
 
-            x_update[:] = self.solver_Q_conditional.solve(rhs)
+            x_update[:] = self.solver.solve(rhs, sparsity="bta")
 
             x_i_norm = np.linalg.norm(x_update)
             counter += 1
@@ -420,8 +397,8 @@ class INLA:
 
         n = x.shape[0]
 
-        self.solver_Q_prior.cholesky(Q_prior)
-        logdet_Q_prior = self.solver_Q_prior.logdet()
+        self.solver.cholesky(Q_prior, sparsity="bt")
+        logdet_Q_prior = self.solver.logdet(sparsity="bt")
 
         log_prior_latent_parameters = (
             -n / 2 * np.log(2 * math.pi)
@@ -460,8 +437,8 @@ class INLA:
 
         # get current theta, check if this theta matches the theta used to construct Q_conditional
         # if yes, check if L already computed, if yes -> takes this L
-        self.solver_Q_conditional.cholesky(Q_conditional)
-        logdet_Q_conditional = self.solver_Q_conditional.logdet()
+        self.solver.cholesky(Q_conditional, sparsity="bta")
+        logdet_Q_conditional = self.solver.logdet(sparsity="bta")
 
         # TODO: evaluate it at the mean -> this becomes zero ...
         # log_conditional_latent_parameters = (
@@ -491,8 +468,8 @@ class INLA:
             print("theta of Q_conditional does not match current theta")
             raise ValueError
 
-        self.solver_Q_conditional.full_inverse()
-        Q_inverse_selected = self.solver_Q_conditional.get_selected_inverse()
+        self.solver.full_inverse()
+        Q_inverse_selected = self.solver.get_selected_inverse()
 
         # min_size = min(self.n_latent_parameters, 6)
         # print(f"Q_inverse_selected[:{min_size}, :{min_size}]: \n", Q_inverse_selected[:min_size, :min_size].toarray())
