@@ -22,6 +22,7 @@ from pyinla.prior_hyperparameters.penalized_complexity import (
 )
 from pyinla.solvers.cusparse_solver import CuSparseSolver
 from pyinla.solvers.scipy_solver import ScipySolver
+from pyinla.solvers.serinv_solver import SerinvSolverCPU
 
 # from pyinla.utils.finite_difference_stencils import (
 #     gradient_finite_difference_5pt,
@@ -29,6 +30,9 @@ from pyinla.solvers.scipy_solver import ScipySolver
 # )
 from pyinla.utils.other_utils import print_mpi
 from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
+
+# from cupy.cuda import nvtx
+
 
 comm_rank = MPI.COMM_WORLD.Get_rank()
 comm_size = MPI.COMM_WORLD.Get_size()
@@ -122,7 +126,18 @@ class INLA:
         elif self.pyinla_config.solver.type == "cusparse":
             self.solver_Q_prior = CuSparseSolver(pyinla_config)
             self.solver_Q_conditional = CuSparseSolver(pyinla_config)
-
+        elif self.pyinla_config.solver.type == "serinv_cpu":
+            if self.pyinla_config.model.type == "regression":
+                raise ValueError(
+                    f"Solver '{self.pyinla_config.solver.type}' not implemented for regression model."
+                )
+            else:
+                self.solver_Q_prior = SerinvSolverCPU(
+                    pyinla_config, self.model.ns, self.model.nb, self.model.nt
+                )
+                self.solver_Q_conditional = SerinvSolverCPU(
+                    pyinla_config, self.model.ns, self.model.nb, self.model.nt
+                )
         else:
             raise ValueError(
                 f"Solver '{self.pyinla_config.solver.type}' not implemented."
@@ -141,7 +156,7 @@ class INLA:
         self.counter = 0
         self.min_f = 1e10
 
-        # --- set up recurrent variables
+        # --- Set up recurrent variables
         self.Q_conditional: sparray = None
 
         print_mpi("INLA initialized.", flush=True)
@@ -182,7 +197,7 @@ class INLA:
             grad_f_init = self._evaluate_gradient_f(self.theta_initial)
             print_mpi(f"Initial gradient: {grad_f_init}", flush=True)
 
-            t_mininize = time.perf_counter()
+            tic = time.perf_counter()
             result = minimize(
                 self._objective_function,
                 self.theta_initial,
@@ -195,8 +210,8 @@ class INLA:
                     "disp": False,
                 },
             )
-            t_mininize = time.perf_counter() - t_mininize
-            print_mpi(f"Minimize time: {t_mininize}", flush=True)
+            toc = time.perf_counter()
+            print_mpi(f"1-Minimize iteration time: {toc - tic} s", flush=True)
 
             if result.success:
                 print_mpi(
@@ -218,12 +233,12 @@ class INLA:
             # print_mpi("counter:", self.counter, flush=True)
 
         # TODO: check that Q_conditional was constructed using the right theta
-        if comm_rank == 0:
-            if self.Q_conditional is not None:
-                self._placeholder_marginals_latent_parameters(self.Q_conditional)
-            else:
-                print_mpi("Q_conditional not defined.", flush=True)
-                raise ValueError
+        # if comm_rank == 0:
+        #     if self.Q_conditional is not None:
+        #         self._placeholder_marginals_latent_parameters(self.Q_conditional)
+        #     else:
+        #         print_mpi("Q_conditional not defined.", flush=True)
+        #         raise ValueError
 
         return True
 

@@ -1,5 +1,6 @@
 simulation_dir = "."
 
+
 [model]
 type = "regression"
 n_fixed_effects = 6
