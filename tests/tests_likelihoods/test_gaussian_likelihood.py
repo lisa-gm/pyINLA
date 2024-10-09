@@ -3,15 +3,18 @@ from autograd import grad, hessian
 from scipy.stats import multivariate_normal
 
 from pyinla.likelihoods.gaussian import GaussianLikelihood
+from pyinla.core.pyinla_config import PyinlaConfig
+
+pyinla_config = PyinlaConfig()
 
 
 def test_gaussian_evaluate_likelihood(
     generate_gaussian_data,
     n_observations: int,
     theta_observations: float,
-    pyinla_config,
 ):
     a, x, y, theta_likelihood = generate_gaussian_data
+
     likelihood_instance = GaussianLikelihood(pyinla_config, n_observations)
 
     eta = a @ x
@@ -31,7 +34,6 @@ def test_gaussian_evaluate_gradient(
     n_observations: int,
     n_latent_parameters: int,
     theta_observations: float,
-    pyinla_config,
 ):
     a, x, y, theta_likelihood = generate_gaussian_data
     eta = a @ x
@@ -54,7 +56,6 @@ def test_gaussian_evaluate_hessian(
     n_observations: int,
     n_latent_parameters: int,
     theta_observations: float,
-    pyinla_config,
 ):
     a, x, y, theta_likelihood = generate_gaussian_data
     eta = a @ x

@@ -3,6 +3,7 @@ from scipy.special import gammaln
 from scipy.stats import binom
 
 from pyinla.likelihoods.binomial import BinomialLikelihood
+from pyinla.core.pyinla_config import PyinlaConfig
 
 
 def test_binomial_evaluate_likelihood(
@@ -10,9 +11,10 @@ def test_binomial_evaluate_likelihood(
     n_observations: int,
     n_latent_parameters: int,
     theta_observations: float,
-    pyinla_config,
 ):
     eta, y, n_trials, prob, theta_likelihood = generate_binomial_data
+
+    pyinla_config = PyinlaConfig()
 
     likelihood_instance = BinomialLikelihood(pyinla_config, n_observations)
 
@@ -29,9 +31,7 @@ def test_binomial_evaluate_likelihood(
     assert np.allclose(likelihood_inla, binom_ref)
 
 
-def test_binomial_evaluate_gradient():
-    ...
+def test_binomial_evaluate_gradient(): ...
 
 
-def test_binomial_evaluate_hessian():
-    ...
+def test_binomial_evaluate_hessian(): ...

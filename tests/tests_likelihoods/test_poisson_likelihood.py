@@ -5,14 +5,17 @@ from scipy.special import gammaln
 from scipy.stats import poisson
 
 from pyinla.likelihoods.poisson import PoissonLikelihood
+from pyinla.core.pyinla_config import PyinlaConfig
+
+pyinla_config = PyinlaConfig()
 
 
 def test_poisson_evaluate_likelihood(
     generate_poisson_data,
     n_observations: int,
-    pyinla_config,
 ):
     eta, y, lam, theta_likelihood = generate_poisson_data
+
     likelihood_instance = PoissonLikelihood(pyinla_config, n_observations)
 
     # Neglects constant in likelihood (w/o  - sum(log(y!)))
@@ -28,7 +31,6 @@ def test_poisson_evaluate_likelihood(
 def test_poisson_evaluate_gradient(
     generate_poisson_data,
     n_observations: int,
-    pyinla_config,
 ):
     eta, y, lam, theta_likelihood = generate_poisson_data
     likelihood_instance = PoissonLikelihood(pyinla_config, n_observations)
@@ -47,7 +49,6 @@ def test_poisson_evaluate_gradient(
 def test_poisson_evaluate_hessian(
     generate_poisson_data,
     n_observations: int,
-    pyinla_config,
 ):
     eta, y, _, theta_likelihood = generate_poisson_data
     likelihood_instance = PoissonLikelihood(pyinla_config, n_observations)

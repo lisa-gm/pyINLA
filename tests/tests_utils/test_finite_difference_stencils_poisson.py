@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from scipy.sparse import diags
 
+from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.likelihoods.poisson import PoissonLikelihood
 from pyinla.utils import (
     gradient_finite_difference_3pt,
@@ -15,9 +16,10 @@ from pyinla.utils import (
 def test_finite_difference_poisson(
     generate_poisson_data,
     n_observations: int,
-    pyinla_config,
 ):
     eta, y, _, theta_likelihood = generate_poisson_data
+
+    pyinla_config = PyinlaConfig()
 
     likelihood_instance = PoissonLikelihood(pyinla_config, n_observations)
     grad_likelihood_inla = likelihood_instance.evaluate_gradient_likelihood(

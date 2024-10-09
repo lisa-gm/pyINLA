@@ -14,12 +14,17 @@ def test_cholesky(
     solver: Solver,
     pobta_dense,
     pyinla_config,
+    diagonal_blocksize,
+    arrowhead_blocksize,
+    n_diag_blocks,
 ):
     A_csc = sparse.csr_matrix(pobta_dense)
 
     A_inv_ref = np.linalg.inv(pobta_dense)
 
-    solver_instance = solver(pyinla_config)
+    solver_instance = solver(
+        pyinla_config, diagonal_blocksize, arrowhead_blocksize, n_diag_blocks
+    )
     solver_instance.cholesky(A_csc)
     solver_instance.full_inverse()
 
