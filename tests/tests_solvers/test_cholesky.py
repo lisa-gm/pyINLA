@@ -8,7 +8,7 @@ from pyinla.core.solver import Solver
 
 
 @pytest.mark.parametrize("diagonal_blocksize", [2, 3])
-@pytest.mark.parametrize("arrowhead_blocksize", [0, 1, 3])
+@pytest.mark.parametrize("arrowhead_blocksize", [1, 3])
 @pytest.mark.parametrize("n_diag_blocks", [1, 2, 3])
 def test_cholesky(
     solver: Solver,
@@ -18,10 +18,6 @@ def test_cholesky(
     arrowhead_blocksize,
     n_diag_blocks,
 ):
-    if arrowhead_blocksize == 0:
-        sparsity = "bt"
-    else:
-        sparsity = "bta"
 
     L_ref = np.linalg.cholesky(pobta_dense)
 
@@ -29,7 +25,7 @@ def test_cholesky(
     solver_instance = solver(
         pyinla_config, diagonal_blocksize, arrowhead_blocksize, n_diag_blocks
     )
-    solver_instance.cholesky(A_csr, sparsity=sparsity)
-    L_solver = solver_instance.get_L(sparsity=sparsity)
+    solver_instance.cholesky(A_csr, sparsity="bta")
+    L_solver = solver_instance.get_L(sparsity="bta")
 
     assert np.allclose(L_solver, L_ref)

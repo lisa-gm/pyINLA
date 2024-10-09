@@ -88,6 +88,7 @@ class SerinvSolverCPU(Solver):
             )
 
         elif sparsity == "bt":
+
             self._sparray_to_structured(A, sparsity="bt")
 
             (
@@ -97,6 +98,9 @@ class SerinvSolverCPU(Solver):
                 self.A_diagonal_blocks,
                 self.A_lower_diagonal_blocks,
             )
+
+            # Factorize the unconnected tip of the arrow
+            self.L_arrow_tip_block[:, :] = np.linalg.cholesky(self.A_arrow_tip_block)
 
     def solve(self, rhs: ArrayLike, sparsity: str = "bta") -> ArrayLike:
         """Solve linear system using Cholesky factor."""
@@ -112,7 +116,7 @@ class SerinvSolverCPU(Solver):
         else:
             raise NotImplementedError("Solve is only supported for BTA sparsity")
 
-    def logdet(self, sparsity: str = "bta") -> float:
+    def logdet(self) -> float:
         """Compute logdet of input matrix using Cholesky factor."""
 
         logdet: float = 0.0
@@ -120,8 +124,7 @@ class SerinvSolverCPU(Solver):
         for i in range(self.n_diagonal_blocks):
             logdet += np.sum(np.log(self.L_diagonal_blocks[i].diagonal()))
 
-        if sparsity == "bta":
-            logdet += np.sum(np.log(self.L_arrow_tip_block.diagonal()))
+        logdet += np.sum(np.log(self.L_arrow_tip_block.diagonal()))
 
         return 2 * logdet
 

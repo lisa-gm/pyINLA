@@ -7,8 +7,7 @@ from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.solvers.scipy_solver import ScipySolver
 from pyinla.solvers.serinv_solver import SerinvSolverCPU
 
-SOLVER = [ScipySolver]
-# SOLVER = [ScipySolver, SerinvSolverCPU]
+SOLVER = [ScipySolver, SerinvSolverCPU]
 
 from os import environ
 
