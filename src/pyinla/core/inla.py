@@ -404,7 +404,7 @@ class INLA:
         n = x.shape[0]
 
         self.solver.cholesky(Q_prior, sparsity="bt")
-        logdet_Q_prior = self.solver.logdet(sparsity="bt")
+        logdet_Q_prior = self.solver.logdet()
 
         log_prior_latent_parameters = (
             -n / 2 * np.log(2 * math.pi)
@@ -444,7 +444,7 @@ class INLA:
         # get current theta, check if this theta matches the theta used to construct Q_conditional
         # if yes, check if L already computed, if yes -> takes this L
         self.solver.cholesky(Q_conditional, sparsity="bta")
-        logdet_Q_conditional = self.solver.logdet(sparsity="bta")
+        logdet_Q_conditional = self.solver.logdet()
 
         # TODO: evaluate it at the mean -> this becomes zero ...
         # log_conditional_latent_parameters = (
