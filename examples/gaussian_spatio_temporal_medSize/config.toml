@@ -1,0 +1,31 @@
+simulation_dir = "."
+
+minimize_max_iter=1
+
+[model]
+type = "spatio-temporal"
+theta_spatial_range = 2
+theta_temporal_range = 3
+theta_spatio_temporal_variation = -3
+n_fixed_effects = 6
+
+[likelihood]
+type = "gaussian"
+theta_observations = 2
+
+[solver]
+type = "serinv_cpu"   
+
+
+[prior_hyperparameters]
+type = "gaussian"
+mean_theta_spatial_range = 1
+mean_theta_temporal_range = 3.7
+mean_theta_spatio_temporal_variation = -5.9
+
+precision_theta_spatial_range = 0.5
+precision_theta_temporal_range = 0.5
+precision_theta_spatio_temporal_variation = 0.5
+
+mean_theta_observations = 1.4
+precision_theta_observations = 0.5

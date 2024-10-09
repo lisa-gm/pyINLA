@@ -5,6 +5,8 @@ import numpy as np
 from pyinla.core.inla import INLA
 from pyinla.core.pyinla_config import parse_config
 
+from pyinla.utils.other_utils import print_mpi
+
 path = os.path.dirname(__file__)
 
 ################# regression model - gaussian likelihood ##################
@@ -22,10 +24,10 @@ if __name__ == "__main__":
     # print("Initial f:", f_init)
 
     theta_final = pyinla.theta
-    print("Final theta:", theta_final)
+    print_mpi("Final theta:", theta_final)
 
     x_final = pyinla.x
-    print("Final x:", x_final)
+    print_mpi("Final x:", x_final)
 
     os.makedirs(f"{path}/outputs", exist_ok=True)
 

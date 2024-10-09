@@ -6,6 +6,7 @@ from scipy.sparse import csc_matrix, kron, load_npz, sparray
 from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
 
+from cupyx.profiler import time_range
 
 class SpatioTemporalModel(Model):
     """Fit a spatio-temporal model."""
@@ -81,6 +82,7 @@ class SpatioTemporalModel(Model):
         """
         return self.theta
 
+    @time_range()
     def construct_Q_prior(self, theta_model: dict = None) -> sparray:
         """Construct the prior precision matrix."""
 
@@ -111,11 +113,12 @@ class SpatioTemporalModel(Model):
             + self.g3
         )
 
-        Q_spatio_temporal = pow(theta_spatio_temporal_variation, 2) * (
-            kron(self.m0, q3s)
-            + theta_temporal_range * kron(self.m1, q2s)
-            + pow(theta_temporal_range, 2) * kron(self.m2, q1s)
-        )
+        with time_range('sparseKroneckerProduct', color_id=0):
+            Q_spatio_temporal = pow(theta_spatio_temporal_variation, 2) * (
+                kron(self.m0, q3s)
+                + theta_temporal_range * kron(self.m1, q2s)
+                + pow(theta_temporal_range, 2) * kron(self.m2, q1s)
+            )
 
         if Q_spatio_temporal is not csc_matrix:
             Q_spatio_temporal = csc_matrix(Q_spatio_temporal)
@@ -156,6 +159,7 @@ class SpatioTemporalModel(Model):
 
         return Q_prior
 
+    @time_range()
     def construct_Q_conditional(
         self,
         Q_prior: sparray,
