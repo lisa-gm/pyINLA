@@ -28,7 +28,7 @@ class ScipySolver(Solver):
         self.rows = None
         self.cols = None
 
-    def cholesky(self, A: sparray) -> None:
+    def cholesky(self, A: sparray, **kwargs) -> None:
         """Compute Cholesky factor of input matrix."""
 
         A = csc_matrix(A)
@@ -47,11 +47,10 @@ class ScipySolver(Solver):
         else:
             raise ValueError("The matrix is not positive definite")
 
-        # print("ScipySolver.cholesky done. Time taken: ", t_chol)
-
     def solve(
         self,
         rhs: ArrayLike,
+        **kwargs,
     ) -> ArrayLike:
         """Solve linear system using Cholesky factor."""
 
@@ -63,7 +62,10 @@ class ScipySolver(Solver):
 
         return x
 
-    def logdet(self) -> float:
+    def logdet(
+        self,
+        **kwargs,
+    ) -> float:
         """Compute logdet of input matrix using Cholesky factor."""
 
         if self.L is None:
@@ -71,7 +73,10 @@ class ScipySolver(Solver):
 
         return 2 * np.sum(np.log(self.L.diagonal()))
 
-    def full_inverse(self) -> None:
+    def full_inverse(
+        self,
+        **kwargs,
+    ) -> None:
         """Compute inverse of input matrix using Cholesky factor."""
 
         if self.L is None:
@@ -82,7 +87,10 @@ class ScipySolver(Solver):
         )
         self.A_inv = L_inv.T @ L_inv
 
-    def get_selected_inverse(self) -> sparray:
+    def get_selected_inverse(
+        self,
+        **kwargs,
+    ) -> sparray:
         """
         Create a sparse matrix A_inv_selected which contains all the entries of A_inv
         at locations where A is non-zero, and zero otherwise.
@@ -109,7 +117,10 @@ class ScipySolver(Solver):
 
         return A_inv_selected
 
-    def selected_inverse(self) -> sparray:
+    def selected_inverse(
+        self,
+        **kwargs,
+    ) -> sparray:
         """Compute inverse of nonzero sparsity pattern of L."""
 
         raise NotImplementedError

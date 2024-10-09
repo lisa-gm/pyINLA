@@ -23,7 +23,6 @@ from pyinla.prior_hyperparameters.penalized_complexity import (
 )
 
 from pyinla.solvers.scipy_solver import ScipySolver
-from pyinla.solvers.cusparse_solver import CuSparseSolver
 from pyinla.solvers.serinv_solver import SerinvSolverCPU
 
 from pyinla.utils.finite_difference_stencils import (
@@ -104,9 +103,16 @@ class INLA:
             )
 
         # --- Initialize solver
-        self.solver = SerinvSolverCPU(
-            pyinla_config, self.model.ns, self.model.nb, self.model.nt
-        )
+        if self.pyinla_config.solver.type == "scipy":
+            self.solver = ScipySolver(pyinla_config)
+        elif self.pyinla_config.solver.type == "serinv_cpu":
+            self.solver = SerinvSolverCPU(
+                pyinla_config, self.model.ns, self.model.nb, self.model.nt
+            )
+        else:
+            raise ValueError(
+                f"Solver '{self.pyinla_config.solver.type}' not implemented."
+            )
 
         # --- Initialize theta
         self.theta_initial: ArrayLike = theta_dict2array(
