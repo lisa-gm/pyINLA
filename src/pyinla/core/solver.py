@@ -14,6 +14,7 @@ class Solver(ABC):
     def __init__(
         self,
         pyinla_config: PyinlaConfig,
+        **kwargs,
     ) -> None:
         """Initializes the solver."""
         self.pyinla_config = pyinla_config
@@ -41,4 +42,9 @@ class Solver(ABC):
     @abstractmethod
     def selected_inverse(self, **kwargs) -> ArrayLike:
         """Compute inverse of selected rows of input matrix using Cholesky factor."""
+        pass
+
+    @abstractmethod
+    def get_L(self, **kwargs) -> ArrayLike:
+        """Get L as a dense array."""
         pass

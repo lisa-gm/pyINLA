@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from scipy.sparse import diags
 
+from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.likelihoods.gaussian import GaussianLikelihood
 from pyinla.utils import (
     gradient_finite_difference_3pt,
@@ -15,10 +16,11 @@ from pyinla.utils import (
 def test_finite_difference_gaussian(
     generate_gaussian_data,
     n_observations: int,
-    pyinla_config,
 ):
     a, x, y, theta_likelihood = generate_gaussian_data
     eta = a @ x
+
+    pyinla_config = PyinlaConfig()
 
     likelihood_instance = GaussianLikelihood(pyinla_config, n_observations)
     grad_likelihood_inla = likelihood_instance.evaluate_gradient_likelihood(

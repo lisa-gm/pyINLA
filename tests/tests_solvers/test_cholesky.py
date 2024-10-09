@@ -14,12 +14,22 @@ def test_cholesky(
     solver: Solver,
     pobta_dense,
     pyinla_config,
+    diagonal_blocksize,
+    arrowhead_blocksize,
+    n_diag_blocks,
 ):
+    if arrowhead_blocksize == 0:
+        sparsity = "bt"
+    else:
+        sparsity = "bta"
+
     L_ref = np.linalg.cholesky(pobta_dense)
 
     A_csr = sparse.csr_matrix(pobta_dense)
-    solver_instance = solver(pyinla_config)
-    solver_instance.cholesky(A_csr)
-    L_solver = solver_instance.L.toarray()
+    solver_instance = solver(
+        pyinla_config, diagonal_blocksize, arrowhead_blocksize, n_diag_blocks
+    )
+    solver_instance.cholesky(A_csr, sparsity=sparsity)
+    L_solver = solver_instance.get_L(sparsity=sparsity)
 
     assert np.allclose(L_solver, L_ref)

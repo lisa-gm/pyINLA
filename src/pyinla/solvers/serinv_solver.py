@@ -174,3 +174,44 @@ class SerinvSolverCPU(Solver):
         """Compute inverse of nonzero sparsity pattern of L."""
 
         raise NotImplementedError
+
+    def get_L(self, sparsity: str = "bta") -> ArrayLike:
+        """Get L as a dense array."""
+
+        n = self.diagonal_blocksize * self.n_diagonal_blocks
+
+        if sparsity == "bta":
+            n += self.arrowhead_blocksize
+
+        L = np.zeros(
+            (n, n),
+            dtype=self.A_diagonal_blocks.dtype,
+        )
+
+        for i in range(self.n_diagonal_blocks):
+
+            L[
+                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+            ] = self.A_diagonal_blocks[i, :, :]
+
+            if i < self.n_diagonal_blocks - 1:
+                L[
+                    (i + 1)
+                    * self.diagonal_blocksize : (i + 2)
+                    * self.diagonal_blocksize,
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                ] = self.A_lower_diagonal_blocks[i, :, :]
+
+            if sparsity == "bta":
+                L[
+                    -self.arrowhead_blocksize :,
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                ] = self.A_arrow_bottom_blocks[i, :, :]
+
+        if sparsity == "bta":
+            L[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :] = (
+                self.A_arrow_tip_block[:, :]
+            )
+
+        return L

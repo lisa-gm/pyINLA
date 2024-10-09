@@ -14,13 +14,18 @@ def test_solve(
     solver: Solver,
     pobta_dense,
     pyinla_config,
+    diagonal_blocksize,
+    arrowhead_blocksize,
+    n_diag_blocks,
 ):
     rhs = np.random.rand(pobta_dense.shape[0])
 
     X_ref = np.linalg.solve(pobta_dense, rhs)
 
     A_csr = sparse.csr_matrix(pobta_dense)
-    solver_instance = solver(pyinla_config)
+    solver_instance = solver(
+        pyinla_config, diagonal_blocksize, arrowhead_blocksize, n_diag_blocks
+    )
     solver_instance.cholesky(A_csr)
 
     X_solver = solver_instance.solve(rhs)

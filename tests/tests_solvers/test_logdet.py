@@ -15,11 +15,16 @@ def test_logdet(
     solver: Solver,
     pobta_dense,
     pyinla_config,
+    diagonal_blocksize,
+    arrowhead_blocksize,
+    n_diag_blocks,
 ):
     sign, absLogdet = slogdet(pobta_dense)
 
     A_csr = sparse.csr_matrix(pobta_dense)
-    solver_instance = solver(pyinla_config)
+    solver_instance = solver(
+        pyinla_config, diagonal_blocksize, arrowhead_blocksize, n_diag_blocks
+    )
     solver_instance.cholesky(A_csr)
     logdet_solver = solver_instance.logdet()
 

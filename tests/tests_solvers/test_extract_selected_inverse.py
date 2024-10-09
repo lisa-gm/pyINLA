@@ -14,6 +14,9 @@ def test_get_selected_inverse(
     solver: Solver,
     pobta_dense,
     pyinla_config,
+    diagonal_blocksize,
+    arrowhead_blocksize,
+    n_diag_blocks,
 ):
     A_coo = sparse.coo_matrix(pobta_dense)
 
@@ -24,7 +27,9 @@ def test_get_selected_inverse(
             A_coo.row[i], A_coo.col[i]
         ]
 
-    solver_instance = solver(pyinla_config)
+    solver_instance = solver(
+        pyinla_config, diagonal_blocksize, arrowhead_blocksize, n_diag_blocks
+    )
     solver_instance.cholesky(A_coo)
     solver_instance.full_inverse()
 

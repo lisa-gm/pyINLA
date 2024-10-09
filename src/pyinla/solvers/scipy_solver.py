@@ -17,6 +17,9 @@ class ScipySolver(Solver):
     def __init__(
         self,
         pyinla_config: PyinlaConfig,
+        diagonal_blocksize: int,
+        arrowhead_blocksize: int,
+        n_diagonal_blocks: int,
     ) -> None:
         """Initializes the solver."""
         super().__init__(pyinla_config)
@@ -124,3 +127,7 @@ class ScipySolver(Solver):
         """Compute inverse of nonzero sparsity pattern of L."""
 
         raise NotImplementedError
+
+    def get_L(self, **kwargs) -> ArrayLike:
+        """Get L as a dense array."""
+        return self.L.toarray()
