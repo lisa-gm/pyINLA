@@ -7,7 +7,8 @@ import time
 import numpy as np
 from mpi4py import MPI
 from numpy.typing import ArrayLike
-from scipy.optimize import minimize
+
+# from scipy.optimize import minimize
 from scipy.sparse import load_npz, sparray  # diags,
 
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -31,7 +32,14 @@ from pyinla.solvers.serinv_solver import SerinvSolverCPU
 from pyinla.utils.other_utils import print_mpi
 from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
 
+# try:
 # from cupy.cuda import nvtx
+from cupyx.profiler import time_range
+
+# CUDA_AVAIL = True
+# except:
+#     CUDA_AVAIL = False
+#     pass
 
 
 comm_rank = MPI.COMM_WORLD.Get_rank()
@@ -123,6 +131,7 @@ class INLA:
         if self.pyinla_config.solver.type == "scipy":
             self.solver_Q_prior = ScipySolver(pyinla_config)
             self.solver_Q_conditional = ScipySolver(pyinla_config)
+            print_mpi("Scipy solver initialized.")
         elif self.pyinla_config.solver.type == "cusparse":
             self.solver_Q_prior = CuSparseSolver(pyinla_config)
             self.solver_Q_conditional = CuSparseSolver(pyinla_config)
@@ -138,6 +147,7 @@ class INLA:
                 self.solver_Q_conditional = SerinvSolverCPU(
                     pyinla_config, self.model.ns, self.model.nb, self.model.nt
                 )
+                print_mpi("Serinv CPU solver initialized.")
         else:
             raise ValueError(
                 f"Solver '{self.pyinla_config.solver.type}' not implemented."
@@ -190,47 +200,52 @@ class INLA:
     def run(self) -> np.ndarray:
         """Fit the model using INLA."""
 
+        tic = time.perf_counter()
         self.f_value, self.gradient_f = self._objective_function(self.theta_initial)
-        print_mpi(f"Initial function value: {self.f_value}", flush=True)
+        toc = time.perf_counter()
+        print_mpi(
+            f"MPI size: {comm_size}. Time objective function call: {toc - tic} s. f value: {self.f_value}",
+            flush=True,
+        )
 
-        if len(self.theta) > 0:
-            grad_f_init = self._evaluate_gradient_f(self.theta_initial)
-            print_mpi(f"Initial gradient: {grad_f_init}", flush=True)
+        # if len(self.theta) > 0:
+        #     # grad_f_init = self._evaluate_gradient_f(self.theta_initial)
+        #     # print_mpi(f"Initial gradient: {grad_f_init}", flush=True)
 
-            tic = time.perf_counter()
-            result = minimize(
-                self._objective_function,
-                self.theta_initial,
-                method="BFGS",
-                jac=True,
-                options={
-                    "maxiter": self.minimize_max_iter,
-                    # "maxiter": 1,
-                    "gtol": 1e-1,
-                    "disp": False,
-                },
-            )
-            toc = time.perf_counter()
-            print_mpi(f"1-Minimize iteration time: {toc - tic} s", flush=True)
+        #     tic = time.perf_counter()
+        #     result = minimize(
+        #         self._objective_function,
+        #         self.theta_initial,
+        #         method="BFGS",
+        #         jac=True,
+        #         options={
+        #             "maxiter": self.minimize_max_iter,
+        #             # "maxiter": 1,
+        #             "gtol": 1e-1,
+        #             "disp": False,
+        #         },
+        #     )
+        #     toc = time.perf_counter()
+        #     print_mpi(f"1-Minimize iteration time: {toc - tic} s", flush=True)
 
-            if result.success:
-                print_mpi(
-                    "Optimization converged successfully after",
-                    result.nit,
-                    "iterations.",
-                    flush=True,
-                )
-                self.theta = result.x
-                theta_model, theta_likelihood = theta_array2dict(
-                    self.theta, self.model.get_theta(), self.likelihood.get_theta()
-                )
-                # print_mpi("Optimal theta:", self.theta_star)
-                # print_mpi("Latent parameters:", self.x)
-            else:
-                print_mpi("Optimization did not converge.", flush=True)
-                return False
+        #     if result.success:
+        #         print_mpi(
+        #             "Optimization converged successfully after",
+        #             result.nit,
+        #             "iterations.",
+        #             flush=True,
+        #         )
+        #         self.theta = result.x
+        #         theta_model, theta_likelihood = theta_array2dict(
+        #             self.theta, self.model.get_theta(), self.likelihood.get_theta()
+        #         )
+        #         # print_mpi("Optimal theta:", self.theta_star)
+        #         # print_mpi("Latent parameters:", self.x)
+        #     else:
+        #         print_mpi("Optimization did not converge.", flush=True)
+        #         return False
 
-            # print_mpi("counter:", self.counter, flush=True)
+        # print_mpi("counter:", self.counter, flush=True)
 
         # TODO: check that Q_conditional was constructed using the right theta
         # if comm_rank == 0:
@@ -255,9 +270,11 @@ class INLA:
         assert self.y.shape[0] == self.a.shape[0], "Dimensions of y and A do not match."
         assert self.x.shape[0] == self.a.shape[1], "Dimensions of x and A do not match."
 
+    @time_range()
     def _objective_function(self, theta_i: np.ndarray) -> float:
         """Objective function for optimization."""
 
+        t_objective_function = time.perf_counter()
         # generate theta matrix with different theta's to evaluate
         # currently central difference scheme is used for gradient
         number_f_evaluations = 2 * self.dim_theta + 1
@@ -285,8 +302,14 @@ class INLA:
         for i in range(number_f_evaluations):
             if task_to_rank[i] == comm_rank:
                 # print("Rank: ", comm_rank, "i: ", i, "main_eval: ", main_eval_list[i])
+                t_f_eval = time.perf_counter()
                 f_values_local[i] = self._evaluate_f(
                     theta_mat[:, i], main_eval=main_eval_list[i]
+                )
+                t_f_eval = time.perf_counter() - t_f_eval
+                print(
+                    f"Rank: {comm_rank}, i: {i}, f_value: {f_values_local[i]}, time: {t_f_eval}",
+                    flush=True,
                 )
 
         MPI.COMM_WORLD.Barrier()
@@ -336,13 +359,22 @@ class INLA:
         # print_mpi(f"Gradient old: {gradient_f_theta_old}", flush=True)
 
         # broadcast self.x from current theta from rank 0 to all other ranks for next iteration
+
+        t_mpi_bcast = time.perf_counter()
         MPI.COMM_WORLD.Barrier()
         MPI.COMM_WORLD.Bcast(self.x, root=0)
 
         MPI.COMM_WORLD.Barrier()
 
+        t_mpi_bcast = time.perf_counter() - t_mpi_bcast
+        print_mpi(f"MPI_Bcast time: {t_mpi_bcast}", flush=True)
+
+        t_objective_function = time.perf_counter() - t_objective_function
+        print_mpi(f"Objective function time: {t_objective_function}", flush=True)
+
         return (f_theta, gradient_f_theta)
 
+    @time_range()
     def _evaluate_f(self, theta_i: np.ndarray, main_eval: bool = True) -> float:
         """evaluate the objective function f(theta) = log(p(theta|y)).
 
@@ -487,6 +519,7 @@ class INLA:
 
         return grad_f
 
+    @time_range()
     def _inner_iteration(
         self, Q_prior: sparray, x_i: ArrayLike, theta_likelihood: dict
     ):
@@ -562,6 +595,7 @@ class INLA:
         # print_mpi("Inner iteration converged after", counter, "iterations.")
         return Q_conditional, x_i
 
+    @time_range()
     def _evaluate_prior_latent_parameters(self, Q_prior: sparray, x: ArrayLike):
         """Evaluation of the prior of the latent parameters at x using the prior precision
         matrix Q_prior and assuming mean zero.
@@ -601,6 +635,7 @@ class INLA:
 
         return log_prior_latent_parameters
 
+    @time_range()
     def _evaluate_conditional_latent_parameters(self, Q_conditional, x, x_mean):
         """Evaluation of the conditional of the latent parameters at x using the conditional precision matrix Q_conditional and the mean x_mean.
 
