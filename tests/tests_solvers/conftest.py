@@ -5,9 +5,9 @@ import pytest
 
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.solvers.scipy_solver import ScipySolver
-from pyinla.solvers.serinv_solver import SerinvSolverCPU
+from pyinla.solvers.serinv_solver import SerinvSolverCPU, SerinvSolverGPU
 
-SOLVER = [ScipySolver, SerinvSolverCPU]
+SOLVER = [ScipySolver, SerinvSolverCPU, SerinvSolverGPU]
 
 from os import environ
 

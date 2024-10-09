@@ -23,7 +23,7 @@ from pyinla.prior_hyperparameters.penalized_complexity import (
 )
 
 from pyinla.solvers.scipy_solver import ScipySolver
-from pyinla.solvers.serinv_solver import SerinvSolverCPU
+from pyinla.solvers.serinv_solver import SerinvSolverCPU, SerinvSolverGPU
 
 from pyinla.utils.finite_difference_stencils import (
     gradient_finite_difference_5pt,
@@ -107,6 +107,10 @@ class INLA:
             self.solver = ScipySolver(pyinla_config)
         elif self.pyinla_config.solver.type == "serinv_cpu":
             self.solver = SerinvSolverCPU(
+                pyinla_config, self.model.ns, self.model.nb, self.model.nt
+            )
+        elif self.pyinla_config.solver.type == "serinv_gpu":
+            self.solver = SerinvSolverGPU(
                 pyinla_config, self.model.ns, self.model.nb, self.model.nt
             )
         else:
