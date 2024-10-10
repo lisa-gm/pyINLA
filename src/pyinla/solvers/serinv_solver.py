@@ -7,6 +7,9 @@ from scipy.sparse import sparray
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.core.solver import Solver
 
+from cupyx.profiler import time_range
+
+
 try:
     from serinv import pobtaf, pobtas
 except ImportError:
@@ -71,25 +74,29 @@ class SerinvSolverCPU(Solver):
 
         self.cholesky_computed: bool = False
 
+    @time_range()
     def cholesky(self, A: sparray) -> None:
         """Compute Cholesky factor of input matrix."""
 
-        self._sparray_to_bta(A)
+        with time_range('initializeBTAblocks', color_id=0):
+            self._sparray_to_bta(A)
 
-        (
-            self.L_diagonal_blocks,
-            self.L_lower_diagonal_blocks,
-            self.L_arrow_bottom_blocks,
-            self.L_arrow_tip_block,
-        ) = pobtaf(
-            self.A_diagonal_blocks,
-            self.A_lower_diagonal_blocks,
-            self.A_arrow_bottom_blocks,
-            self.A_arrow_tip_block,
-        )
+        with time_range('callPobtaf', color_id=0):
+            (
+                self.L_diagonal_blocks,
+                self.L_lower_diagonal_blocks,
+                self.L_arrow_bottom_blocks,
+                self.L_arrow_tip_block,
+            ) = pobtaf(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                self.A_arrow_bottom_blocks,
+                self.A_arrow_tip_block,
+            )
 
         self.cholesky_computed = True
 
+    @time_range()
     def solve(self, rhs: ArrayLike) -> ArrayLike:
         """Solve linear system using Cholesky factor."""
 

@@ -4,7 +4,6 @@ import numpy as np
 
 from pyinla.core.inla import INLA
 from pyinla.core.pyinla_config import parse_config
-
 from pyinla.utils.other_utils import print_mpi
 
 path = os.path.dirname(__file__)

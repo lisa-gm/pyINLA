@@ -1,12 +1,12 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import numpy as np
+from cupyx.profiler import time_range
 from scipy.sparse import csc_matrix, kron, load_npz, sparray
 
 from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
 
-from cupyx.profiler import time_range
 
 class SpatioTemporalModel(Model):
     """Fit a spatio-temporal model."""
@@ -113,7 +113,7 @@ class SpatioTemporalModel(Model):
             + self.g3
         )
 
-        with time_range('sparseKroneckerProduct', color_id=0):
+        with time_range("sparseKroneckerProduct", color_id=0):
             Q_spatio_temporal = pow(theta_spatio_temporal_variation, 2) * (
                 kron(self.m0, q3s)
                 + theta_temporal_range * kron(self.m1, q2s)
