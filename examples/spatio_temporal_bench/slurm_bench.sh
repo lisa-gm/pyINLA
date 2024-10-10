@@ -2,8 +2,8 @@
 #####SBATCH --uenv=prgenv-gnu/24.7:v3
 #####SBATCH --view=modules
 #SBATCH --nodes=1
-#SBATCH --ntasks=3
-#SBATCH --ntasks-per-node=3
+#SBATCH --ntasks=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=72
 #SBATCH --gpus-per-task=1
 #SBATCH --output=output_gaussian_spatioTemporal_bench.out
