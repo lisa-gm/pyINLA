@@ -351,15 +351,17 @@ class SerinvSolverGPU(Solver):
 
             # with time_range('pobtafBT', color_id=0):
             (
-                self.L_diagonal_blocks,
-                self.L_lower_diagonal_blocks,
+                self.L_diagonal_blocks_d,
+                self.L_lower_diagonal_blocks_d,
             ) = pobtf(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
+                self.A_diagonal_blocks_d,
+                self.A_lower_diagonal_blocks_d,
             )
 
             # Factorize the unconnected tip of the arrow
-            self.L_arrow_tip_block[:, :] = np.linalg.cholesky(self.A_arrow_tip_block)
+            self.L_arrow_tip_block_d[:, :] = cp.linalg.cholesky(
+                self.A_arrow_tip_block_d
+            )
 
     # @time_range()
     def solve(self, rhs: ArrayLike, sparsity: str = "bta") -> ArrayLike:
