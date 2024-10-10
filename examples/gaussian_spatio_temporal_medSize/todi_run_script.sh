@@ -41,6 +41,6 @@ export NSYS_FILE=gaussian_spatioTemporal_medSize_pinned_numaCtl_gpu_numRanks${nu
 # export OMP_PROC_BIND=true
 # export OMP_PLACES=cores
 set -x
-srun -n ${num_ranks} ./bind.sh ./nsys.sh python sandbox_gaussian_spatioTemporal_medSize.py >output_gaussian_spatioTemporal_medSize_pinned_numaCtl_gpu_numRanks${num_ranks}.txt
+srun -n ${num_ranks} ./bind.sh python sandbox_gaussian_spatioTemporal_medSize.py >output_gaussian_spatioTemporal_medSize_pinned_numaCtl_gpu_numRanks${num_ranks}.txt
 #srun -n ${num_ranks} numactl -l --all --physcpubind=0-${OPENBLAS_NUM_THREADS} ./nsys.sh python sandbox_gaussian_spatioTemporal_medSize.py >output_gaussian_spatioTemporal_medSize_pinned_numaCtl_omp${OMP_NUM_THREADS}_numRanks${num_ranks}.txt
 set +x
