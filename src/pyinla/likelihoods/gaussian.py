@@ -2,10 +2,15 @@
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.sparse import eye
 
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
+
+import cupy as cp
+
+import cupyx as cpx
+from cupyx.profiler import time_range
+from cupyx.scipy.sparse import spmatrix, eye
 
 
 class GaussianLikelihood(Likelihood):
@@ -68,7 +73,7 @@ class GaussianLikelihood(Likelihood):
 
         likelihood = (
             0.5 * theta_observations * self.n_observations
-            - 0.5 * np.exp(theta_observations) * yEta.T @ yEta
+            - 0.5 * cp.exp(theta_observations) * yEta.T @ yEta
         )
 
         return likelihood
@@ -103,7 +108,7 @@ class GaussianLikelihood(Likelihood):
             )
 
         theta_observations = theta_likelihood["theta_observations"]
-        gradient_likelihood = -np.exp(theta_observations) * (eta - y)
+        gradient_likelihood = -cp.exp(theta_observations) * (eta - y)
 
         return gradient_likelihood
 
@@ -138,6 +143,6 @@ class GaussianLikelihood(Likelihood):
 
         theta_observations = theta_likelihood["theta_observations"]
 
-        hessian_likelihood = -np.exp(theta_observations) * eye(self.n_observations)
+        hessian_likelihood = -cp.exp(theta_observations) * eye(self.n_observations)
 
         return hessian_likelihood

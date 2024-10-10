@@ -1,6 +1,7 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -48,7 +49,7 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
 
     def evaluate_log_prior(
         self, theta_model: dict, theta_likelihood: dict
-    ) -> np.ndarray:
+    ) -> ArrayLike:
         """Evaluate the log prior hyperparameters."""
         log_prior: float = 0.0
 

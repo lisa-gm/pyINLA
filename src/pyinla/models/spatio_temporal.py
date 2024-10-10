@@ -1,8 +1,13 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import numpy as np
+from scipy.sparse import load_npz
+
+import cupy as cp
+
+import cupyx as cpx
 from cupyx.profiler import time_range
-from scipy.sparse import csc_matrix, kron, load_npz, sparray
+from cupyx.scipy.sparse import csc_matrix, kron, spmatrix
 
 from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -21,18 +26,30 @@ class SpatioTemporalModel(Model):
         super().__init__(pyinla_config, n_latent_parameters)
 
         # Load spatial_matrices
-        self.c0 = load_npz(pyinla_config.input_dir / "c0.npz")
-        self.g1 = load_npz(pyinla_config.input_dir / "g1.npz")
-        self.g2 = load_npz(pyinla_config.input_dir / "g2.npz")
-        self.g3 = load_npz(pyinla_config.input_dir / "g3.npz")
+        self.c0_h = load_npz(pyinla_config.input_dir / "c0.npz")
+        self.c0 = csc_matrix(self.c0_h)
+
+        self.g1_h = load_npz(pyinla_config.input_dir / "g1.npz")
+        self.g1 = csc_matrix(self.g1_h)
+
+        self.g2_h = load_npz(pyinla_config.input_dir / "g2.npz")
+        self.g2 = csc_matrix(self.g2_h)
+
+        self.g3_h = load_npz(pyinla_config.input_dir / "g3.npz")
+        self.g3 = csc_matrix(self.g3_h)
 
         self.ns = self.c0.shape[0]
         self._check_dimensions_spatial_matrices()
 
         # Load temporal_matrices
-        self.m0 = load_npz(pyinla_config.input_dir / "m0.npz")
-        self.m1 = load_npz(pyinla_config.input_dir / "m1.npz")
-        self.m2 = load_npz(pyinla_config.input_dir / "m2.npz")
+        self.m0_h = load_npz(pyinla_config.input_dir / "m0.npz")
+        self.m0 = csc_matrix(self.m0_h)
+
+        self.m1_h = load_npz(pyinla_config.input_dir / "m1.npz")
+        self.m1 = csc_matrix(self.m1_h)
+
+        self.m2_h = load_npz(pyinla_config.input_dir / "m2.npz")
+        self.m2 = csc_matrix(self.m2_h)
 
         self.nt = self.m0.shape[0]
         self._check_dimensions_temporal_matrices()
@@ -83,7 +100,7 @@ class SpatioTemporalModel(Model):
         return self.theta
 
     @time_range()
-    def construct_Q_prior(self, theta_model: dict = None) -> sparray:
+    def construct_Q_prior(self, theta_model: dict = None) -> spmatrix:
         """Construct the prior precision matrix."""
 
         self.theta = theta_model
@@ -91,9 +108,9 @@ class SpatioTemporalModel(Model):
         if theta_model is None:
             raise ValueError("theta_model must be provided.")
 
-        theta_spatial_range = np.exp(theta_model["spatial_range"])
-        theta_temporal_range = np.exp(theta_model["temporal_range"])
-        theta_spatio_temporal_variation = np.exp(
+        theta_spatial_range = cp.exp(theta_model["spatial_range"])
+        theta_temporal_range = cp.exp(theta_model["temporal_range"])
+        theta_spatio_temporal_variation = cp.exp(
             theta_model["spatio_temporal_variation"]
         )
         # print("theta_spatial_range: ", theta_spatial_range)
@@ -124,9 +141,9 @@ class SpatioTemporalModel(Model):
             Q_spatio_temporal = csc_matrix(Q_spatio_temporal)
 
         # Construct block diagonal matrix Q fixed effects
-        Q_fixed_effects_data = np.full(self.nb, self.fixed_effects_prior_precision)
-        Q_fixed_effects_indices = np.arange(self.nb)
-        Q_fixed_effects_indptr = np.arange(self.nb + 1)
+        Q_fixed_effects_data = cp.full(self.nb, self.fixed_effects_prior_precision)
+        Q_fixed_effects_indices = cp.arange(self.nb)
+        Q_fixed_effects_indptr = cp.arange(self.nb + 1)
 
         # Extract data, indices, and indptr from Q_spatio_temporal
         Q_spatio_temporal_data = Q_spatio_temporal.data
@@ -135,14 +152,14 @@ class SpatioTemporalModel(Model):
         Q_spatio_temporal_shape = Q_spatio_temporal.shape
 
         # Concatenate data, indices, and indptr to form the block diagonal matrix Q
-        data = np.concatenate([Q_spatio_temporal_data, Q_fixed_effects_data])
-        indices = np.concatenate(
+        data = cp.concatenate([Q_spatio_temporal_data, Q_fixed_effects_data])
+        indices = cp.concatenate(
             [
                 Q_spatio_temporal_indices,
                 Q_fixed_effects_indices + Q_spatio_temporal_shape[1],
             ]
         )
-        indptr = np.concatenate(
+        indptr = cp.concatenate(
             [
                 Q_spatio_temporal_indptr,
                 Q_spatio_temporal_indptr[-1] + Q_fixed_effects_indptr[1:],
@@ -162,9 +179,9 @@ class SpatioTemporalModel(Model):
     @time_range()
     def construct_Q_conditional(
         self,
-        Q_prior: sparray,
-        a: sparray,
-        hessian_likelihood: sparray,
+        Q_prior: spmatrix,
+        a: spmatrix,
+        hessian_likelihood: spmatrix,
     ) -> float:
         """Construct the conditional precision matrix."""
 
