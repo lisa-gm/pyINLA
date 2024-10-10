@@ -14,7 +14,7 @@ type = "gaussian"
 theta_observations = 2
 
 [solver]
-type = "serinv_cpu"   
+type = "serinv_gpu"   
 
 
 [prior_hyperparameters]

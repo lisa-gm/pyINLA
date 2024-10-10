@@ -16,7 +16,7 @@ path = os.path.dirname(__file__)
 
 if __name__ == "__main__":
     config = parse_config(f"{path}/config.toml")
-    print("The work directory is:", path)
+    print_mpi("The work directory is:", path)
 
     pyinla = INLA(config)
 

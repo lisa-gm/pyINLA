@@ -21,9 +21,9 @@ from pyinla.prior_hyperparameters.gaussian import GaussianPriorHyperparameters
 from pyinla.prior_hyperparameters.penalized_complexity import (
     PenalizedComplexityPriorHyperparameters,
 )
-from pyinla.solvers.cusparse_solver import CuSparseSolver
+
 from pyinla.solvers.scipy_solver import ScipySolver
-from pyinla.solvers.serinv_solver import SerinvSolverCPU
+from pyinla.solvers.serinv_solver import SerinvSolverCPU, SerinvSolverGPU
 
 # from pyinla.utils.finite_difference_stencils import (
 #     gradient_finite_difference_5pt,
@@ -129,25 +129,15 @@ class INLA:
         print_mpi(f"OMP_NUM_THREADS: {num_threads}")
 
         if self.pyinla_config.solver.type == "scipy":
-            self.solver_Q_prior = ScipySolver(pyinla_config)
-            self.solver_Q_conditional = ScipySolver(pyinla_config)
-            print_mpi("Scipy solver initialized.")
-        elif self.pyinla_config.solver.type == "cusparse":
-            self.solver_Q_prior = CuSparseSolver(pyinla_config)
-            self.solver_Q_conditional = CuSparseSolver(pyinla_config)
+            self.solver = ScipySolver(pyinla_config)
         elif self.pyinla_config.solver.type == "serinv_cpu":
-            if self.pyinla_config.model.type == "regression":
-                raise ValueError(
-                    f"Solver '{self.pyinla_config.solver.type}' not implemented for regression model."
-                )
-            else:
-                self.solver_Q_prior = SerinvSolverCPU(
-                    pyinla_config, self.model.ns, self.model.nb, self.model.nt
-                )
-                self.solver_Q_conditional = SerinvSolverCPU(
-                    pyinla_config, self.model.ns, self.model.nb, self.model.nt
-                )
-                print_mpi("Serinv CPU solver initialized.")
+            self.solver = SerinvSolverCPU(
+                pyinla_config, self.model.ns, self.model.nb, self.model.nt
+            )
+        elif self.pyinla_config.solver.type == "serinv_gpu":
+            self.solver = SerinvSolverGPU(
+                pyinla_config, self.model.ns, self.model.nb, self.model.nt
+            )
         else:
             raise ValueError(
                 f"Solver '{self.pyinla_config.solver.type}' not implemented."
@@ -578,15 +568,9 @@ class INLA:
             # toc = time.perf_counter()
             # print_mpi("         construct_Q_conditional time:", toc - tic, flush=True)
 
-            # tic = time.perf_counter()
-            self.solver_Q_conditional.cholesky(Q_conditional)
-            # toc = time.perf_counter()
-            # print_mpi("         cholesky time:", toc - tic, flush=True)
+            self.solver.cholesky(Q_conditional, sparsity="bta")
 
-            # tic = time.perf_counter()
-            x_update[:] = self.solver_Q_conditional.solve(rhs)
-            # toc = time.perf_counter()
-            # print_mpi("         solve time:", toc - tic, flush=True)
+            x_update[:] = self.solver.solve(rhs, sparsity="bta")
 
             x_i_norm = np.linalg.norm(x_update)
             counter += 1
@@ -624,8 +608,8 @@ class INLA:
 
         n = x.shape[0]
 
-        self.solver_Q_prior.cholesky(Q_prior)
-        logdet_Q_prior = self.solver_Q_prior.logdet()
+        self.solver.cholesky(Q_prior, sparsity="bt")
+        logdet_Q_prior = self.solver.logdet()
 
         log_prior_latent_parameters = (
             -n / 2 * np.log(2 * math.pi)
@@ -665,8 +649,8 @@ class INLA:
 
         # get current theta, check if this theta matches the theta used to construct Q_conditional
         # if yes, check if L already computed, if yes -> takes this L
-        self.solver_Q_conditional.cholesky(Q_conditional)
-        logdet_Q_conditional = self.solver_Q_conditional.logdet()
+        self.solver.cholesky(Q_conditional, sparsity="bta")
+        logdet_Q_conditional = self.solver.logdet()
 
         # TODO: evaluate it at the mean -> this becomes zero ...
         # log_conditional_latent_parameters = (
@@ -696,8 +680,8 @@ class INLA:
             print_mpi("theta of Q_conditional does not match current theta")
             # raise ValueError
 
-        self.solver_Q_conditional.full_inverse()
-        Q_inverse_selected = self.solver_Q_conditional.get_selected_inverse()
+        self.solver.full_inverse()
+        Q_inverse_selected = self.solver.get_selected_inverse()
 
         # min_size = min(self.n_latent_parameters, 6)
         # print_mpi(f"Q_inverse_selected[:{min_size}, :{min_size}]: \n", Q_inverse_selected[:min_size, :min_size].toarray())

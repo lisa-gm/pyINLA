@@ -1,10 +1,10 @@
 #!/bin/bash
 #####SBATCH --uenv=prgenv-gnu/24.7:v3
 #####SBATCH --view=modules
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --ntasks-per-node=4
-#SBATCH --cpus-per-task=32
+#SBATCH --nodes=3
+#SBATCH --ntasks=9
+#SBATCH --ntasks-per-node=3
+#SBATCH --cpus-per-task=72
 ####SBATCH --gpus-per-task=1
 #SBATCH --output=output_gaussian_spatioTemporal_medSize.out
 #SBATCH --error=output_gaussian_spatioTemporal_medSize.err
@@ -13,11 +13,12 @@
 ####SBATCH --partition=debug
 #SBATCH --time=00:15:00
 
-num_ranks=1
+
+num_ranks=${SLURM_NTASKS}
 
 #set -x
 
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export OMP_NUM_THREADS=32
 export OPENBLAS_NUM_THREADS=$((OMP_NUM_THREADS-1))
 
 #conda init
@@ -33,9 +34,11 @@ conda activate pyinla
 
 
 export NSYS=1
-export NSYS_FILE=gaussian_spatioTemporal_medSize_pinned_numaCtl_omp${SLURM_CPUS_PER_TASK}_numRanks${num_ranks}
+export NSYS_FILE=gaussian_spatioTemporal_medSize_pinned_numaCtl_omp${OMP_NUM_THREADS}_numRanks${num_ranks}
 
 # export OMP_PROC_BIND=true
 # export OMP_PLACES=cores
-
-srun -n ${num_ranks} numactl -l --all --physcpubind=0-${SLURM_CPUS_PER_TASK} ./nsys.sh python sandbox_gaussian_spatioTemporal_medSize.py >output_gaussian_spatioTemporal_medSize_pinned_numaCtl_omp${SLURM_CPUS_PER_TASK}_numRanks${num_ranks}.txt
+set -x
+srun -n ${num_ranks} ./bind.sh ./nsys.sh python sandbox_gaussian_spatioTemporal_medSize.py >output_gaussian_spatioTemporal_medSize_pinned_numaCtl_omp${OMP_NUM_THREADS}_numRanks${num_ranks}.txt
+#srun -n ${num_ranks} numactl -l --all --physcpubind=0-${OPENBLAS_NUM_THREADS} ./nsys.sh python sandbox_gaussian_spatioTemporal_medSize.py >output_gaussian_spatioTemporal_medSize_pinned_numaCtl_omp${OMP_NUM_THREADS}_numRanks${num_ranks}.txt
+set +x
