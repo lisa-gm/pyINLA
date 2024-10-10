@@ -15,7 +15,7 @@ try:
     from serinv import pobtaf, pobtas, pobtf
 except ImportError:
     print_mpi("Serinv not installed. Please install serinv to use SerinvSolver.")
-    
+
 
 try:
     import cupy as cp
@@ -80,31 +80,31 @@ class SerinvSolverCPU(Solver):
         self.L_arrow_bottom_blocks = self.A_arrow_bottom_blocks
         self.L_arrow_tip_block = self.A_arrow_tip_block
 
-   # @time_range()
+    # @time_range()
     def cholesky(self, A: sparray, sparsity: str = "bta") -> None:
         """Compute Cholesky factor of input matrix."""
 
         if sparsity == "bta":
-            
+
             self._sparray_to_structured(A, sparsity="bta")
 
             # with time_range('callPobtafBTA', color_id=0):
-                (
-                    self.L_diagonal_blocks,
-                    self.L_lower_diagonal_blocks,
-                    self.L_arrow_bottom_blocks,
-                    self.L_arrow_tip_block,
-                ) = pobtaf(
-                    self.A_diagonal_blocks,
-                    self.A_lower_diagonal_blocks,
-                    self.A_arrow_bottom_blocks,
-                    self.A_arrow_tip_block,
-                )
+            (
+                self.L_diagonal_blocks,
+                self.L_lower_diagonal_blocks,
+                self.L_arrow_bottom_blocks,
+                self.L_arrow_tip_block,
+            ) = pobtaf(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                self.A_arrow_bottom_blocks,
+                self.A_arrow_tip_block,
+            )
 
         elif sparsity == "bt":
             self._sparray_to_structured(A, sparsity="bt")
 
-            with time_range('callPobtafBT', color_id=0):
+            with time_range("callPobtafBT", color_id=0):
                 (
                     self.L_diagonal_blocks,
                     self.L_lower_diagonal_blocks,
@@ -113,10 +113,11 @@ class SerinvSolverCPU(Solver):
                     self.A_lower_diagonal_blocks,
                 )
 
-            # Factorize the unconnected tip of the arrow
-            # with time_range('npCholesky', color_id=0):
-                self.L_arrow_tip_block[:, :] = np.linalg.cholesky(self.A_arrow_tip_block)
-
+                # Factorize the unconnected tip of the arrow
+                # with time_range('npCholesky', color_id=0):
+                self.L_arrow_tip_block[:, :] = np.linalg.cholesky(
+                    self.A_arrow_tip_block
+                )
 
     # @time_range()
     def solve(self, rhs: ArrayLike, sparsity: str = "bta") -> ArrayLike:
@@ -327,7 +328,7 @@ class SerinvSolverGPU(Solver):
         """Compute Cholesky factor of input matrix."""
 
         if sparsity == "bta":
-            #with time_range('initializeBTAblocks', color_id=0):
+            # with time_range('initializeBTAblocks', color_id=0):
             self._sparray_to_structured(A, sparsity="bta")
             self._h2d_buffers(sparsity="bta")
 
