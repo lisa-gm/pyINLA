@@ -17,7 +17,7 @@ try:
     from serinv import pobtaf, pobtas, pobtf
 except ImportError:
     print_mpi("Serinv not installed. Please install serinv to use SerinvSolver.")
-    
+
 
 try:
     import cupy as cp
@@ -87,7 +87,7 @@ class SerinvSolverCPU(Solver):
         """Compute Cholesky factor of input matrix."""
 
         if sparsity == "bta":
-            
+
             self._sparray_to_structured(A, sparsity="bta")
 
             # with time_range('callPobtafBTA', color_id=0):
@@ -121,7 +121,6 @@ class SerinvSolverCPU(Solver):
             # Factorize the unconnected tip of the arrow
             # with time_range('npCholesky', color_id=0):
             self.L_arrow_tip_block[:, :] = np.linalg.cholesky(self.A_arrow_tip_block)
-
 
     @time_range()
     def solve(self, rhs: ArrayLike, sparsity: str = "bta") -> ArrayLike:
@@ -332,7 +331,7 @@ class SerinvSolverGPU(Solver):
         """Compute Cholesky factor of input matrix."""
 
         if sparsity == "bta":
-            #with time_range('initializeBTAblocks', color_id=0):
+            # with time_range('initializeBTAblocks', color_id=0):
             self._sparray_to_structured(A, sparsity="bta")
             self._h2d_buffers(sparsity="bta")
 
