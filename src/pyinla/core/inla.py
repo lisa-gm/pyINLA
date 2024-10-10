@@ -35,6 +35,8 @@ from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
 # try:
 # from cupy.cuda import nvtx
 from cupyx.profiler import time_range
+# from cupy.cuda.nvtx import RangePush, RangePop
+
 
 # CUDA_AVAIL = True
 # except:
@@ -128,6 +130,7 @@ class INLA:
         num_threads = os.getenv("OMP_NUM_THREADS")
         print_mpi(f"OMP_NUM_THREADS: {num_threads}")
 
+        #RangePush("InitializeSolver")
         if self.pyinla_config.solver.type == "scipy":
             self.solver = ScipySolver(pyinla_config)
         elif self.pyinla_config.solver.type == "serinv_cpu":
@@ -142,6 +145,7 @@ class INLA:
             raise ValueError(
                 f"Solver '{self.pyinla_config.solver.type}' not implemented."
             )
+        #RangePop()
 
         # --- Initialize theta
         self.theta_initial: ArrayLike = theta_dict2array(
@@ -190,13 +194,16 @@ class INLA:
     def run(self) -> np.ndarray:
         """Fit the model using INLA."""
 
-        tic = time.perf_counter()
-        self.f_value, self.gradient_f = self._objective_function(self.theta_initial)
-        toc = time.perf_counter()
-        print_mpi(
-            f"MPI size: {comm_size}. Time objective function call: {toc - tic} s. f value: {self.f_value}",
-            flush=True,
-        )
+        maxiter = 1
+        for i in range(maxiter):
+            tic = time.perf_counter()
+            self.f_value, self.gradient_f = self._objective_function(self.theta_initial)
+            toc = time.perf_counter()
+            print_mpi(
+                f"i: {i}. MPI size: {comm_size}. Time objective function call: {toc - tic} s. f value: {self.f_value}",
+                flush=True,
+            )
+            self.theta_initial = self.theta_initial + 0.1
 
         # if len(self.theta) > 0:
         #     # grad_f_init = self._evaluate_gradient_f(self.theta_initial)
@@ -394,27 +401,27 @@ class INLA:
         )
 
         # --- Evaluate the log prior of the hyperparameters
-        # tic = time.perf_counter()
+        tic = time.perf_counter()
         log_prior_hyperparameters = self.prior_hyperparameters.evaluate_log_prior(
             theta_model, theta_likelihood
         )
-        # toc = time.perf_counter()
-        # print_mpi("   (1/6) evaluate_log_prior time:", toc - tic, flush=True)
+        toc = time.perf_counter()
+        print_mpi("   (1/6) evaluate_log_prior time:", toc - tic, flush=True)
 
         # --- Construct the prior precision matrix of the latent parameters
-        # tic = time.perf_counter()
+        tic = time.perf_counter()
         Q_prior = self.model.construct_Q_prior(theta_model)
-        # toc = time.perf_counter()
-        # print_mpi("   (2/6) construct_Q_prior time:", toc - tic, flush=True)
+        toc = time.perf_counter()
+        print_mpi("   (2/6) construct_Q_prior time:", toc - tic, flush=True)
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
         x_local = np.copy(self.x)
-        # tic = time.perf_counter()
-        self.Q_conditional, x_local = self._inner_iteration(
+        tic = time.perf_counter()
+        self.Q_conditional, x_local, logdet_Q_conditional = self._inner_iteration(
             Q_prior, x_local, theta_likelihood
         )
-        # toc = time.perf_counter()
-        # print_mpi("   (3/6) inner_iteration time:", toc - tic, flush=True)
+        toc = time.perf_counter()
+        print_mpi("   (3/6) inner_iteration time:", toc - tic, flush=True)
         # print(f"rank: {comm_rank}. after inner iteration x: ", self.x[:10])
 
         # assign initial guess for x for next iteration
@@ -423,33 +430,34 @@ class INLA:
             self.x = x_local
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
-        # tic = time.perf_counter()
+        tic = time.perf_counter()
         eta = self.a @ x_local
         likelihood = self.likelihood.evaluate_likelihood(eta, self.y, theta_likelihood)
-        # toc = time.perf_counter()
-        # print_mpi("   (4/6) evaluate_likelihood time:", toc - tic, flush=True)
+        toc = time.perf_counter()
+        print_mpi("   (4/6) evaluate_likelihood time:", toc - tic, flush=True)
+        
+        # --- Evaluate the conditional of the latent parameters at x_star
+        tic = time.perf_counter()
+        conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
+            self.Q_conditional, x_local, x_local, logdet_Q_conditional
+        )
+        toc = time.perf_counter()
+        print_mpi(
+            "   (6/6) evaluate_conditional_latent_parameters time:",
+            toc - tic,
+            flush=True,
+        )
 
         # --- Evaluate the prior of the latent parameters at x_star
-        # tic = time.perf_counter()
+        tic = time.perf_counter()
         prior_latent_parameters = self._evaluate_prior_latent_parameters(
             Q_prior, x_local
         )
-        # toc = time.perf_counter()
-        # print_mpi(
-        #     "   (5/6) evaluate_prior_latent_parameters time:", toc - tic, flush=True
-        # )
-
-        # --- Evaluate the conditional of the latent parameters at x_star
-        # tic = time.perf_counter()
-        conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
-            self.Q_conditional, x_local, x_local
+        toc = time.perf_counter()
+        print_mpi(
+            "   (5/6) evaluate_prior_latent_parameters time:", toc - tic, flush=True
         )
-        # toc = time.perf_counter()
-        # print_mpi(
-        #     "   (6/6) evaluate_conditional_latent_parameters time:",
-        #     toc - tic,
-        #     flush=True,
-        # )
+
 
         f_theta = -1 * (
             log_prior_hyperparameters
@@ -535,6 +543,7 @@ class INLA:
             # gradient_likelihood = gradient_finite_difference_5pt(
             #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
             # )
+            # with time_range('computeGradientLik', color_id=0):
             gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
                 eta, self.y, theta_likelihood
             )
@@ -542,6 +551,7 @@ class INLA:
             # print_mpi("         evaluate_likelihood time:", toc - tic, flush=True)
 
             # tic = time.perf_counter()
+            # with time_range('constructRhs', color_id=0):
             rhs = -1 * Q_prior @ x_i + self.a.T @ gradient_likelihood
 
             # TODO: need to vectorize
@@ -549,6 +559,7 @@ class INLA:
             #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
             # )
             # hessian_likelihood = diags(hessian_likelihood_diag)
+            #with time_range('computeHessianLik', color_id=0):
             hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(
                 eta, self.y, theta_likelihood
             )
@@ -559,25 +570,35 @@ class INLA:
             #     flush=True,
             # )
 
-            # tic = time.perf_counter()
+            tic = time.perf_counter()
             Q_conditional = self.model.construct_Q_conditional(
                 Q_prior,
                 self.a,
                 hessian_likelihood,
             )
-            # toc = time.perf_counter()
-            # print_mpi("         construct_Q_conditional time:", toc - tic, flush=True)
+            toc = time.perf_counter()
+            print_mpi("         construct_Q_conditional time:", toc - tic, flush=True)
 
+            tic = time.perf_counter()
             self.solver.cholesky(Q_conditional, sparsity="bta")
+            toc = time.perf_counter()
+            print_mpi("         Solver Call Q_conditional time:", toc - tic, flush=True)
 
+            tic = time.perf_counter()
             x_update[:] = self.solver.solve(rhs, sparsity="bta")
+            toc = time.perf_counter()
+            print_mpi("         solve Q_conditional time:", toc - tic, flush=True)
 
+            # with time_range('computeNorm', color_id=0):
             x_i_norm = np.linalg.norm(x_update)
+                
             counter += 1
             # print_mpi(f"Inner iteration {counter} norm: {x_i_norm}")
+            
+        logdet = self.solver.logdet()
 
         # print_mpi("Inner iteration converged after", counter, "iterations.")
-        return Q_conditional, x_i
+        return Q_conditional, x_i, logdet
 
     @time_range()
     def _evaluate_prior_latent_parameters(self, Q_prior: sparray, x: ArrayLike):
@@ -608,9 +629,14 @@ class INLA:
 
         n = x.shape[0]
 
+ 
+        #with time_range('callCholesky', color_id=0):
         self.solver.cholesky(Q_prior, sparsity="bt")
+            
+        #with time_range('getLogDet', color_id=0):
         logdet_Q_prior = self.solver.logdet()
 
+        #with time_range('compute_xtQx', color_id=0):
         log_prior_latent_parameters = (
             -n / 2 * np.log(2 * math.pi)
             + 0.5 * logdet_Q_prior
@@ -620,7 +646,7 @@ class INLA:
         return log_prior_latent_parameters
 
     @time_range()
-    def _evaluate_conditional_latent_parameters(self, Q_conditional, x, x_mean):
+    def _evaluate_conditional_latent_parameters(self, Q_conditional, x, x_mean, logdet_Q_conditional):
         """Evaluation of the conditional of the latent parameters at x using the conditional precision matrix Q_conditional and the mean x_mean.
 
         Notes
@@ -647,10 +673,12 @@ class INLA:
 
         # n = x.shape[0]
 
+        #TODO: not actually needed. already computed.
         # get current theta, check if this theta matches the theta used to construct Q_conditional
         # if yes, check if L already computed, if yes -> takes this L
-        self.solver.cholesky(Q_conditional, sparsity="bta")
-        logdet_Q_conditional = self.solver.logdet()
+        # self.solver.cholesky(Q_conditional, sparsity="bta")
+        # logdet_Q_conditional = self.solver.logdet()
+        # print_mpi("in evaluate conditional latent. logdet: ", logdet_Q_conditional)
 
         # TODO: evaluate it at the mean -> this becomes zero ...
         # log_conditional_latent_parameters = (

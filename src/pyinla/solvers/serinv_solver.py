@@ -4,6 +4,8 @@ import numpy as np
 from numpy.typing import ArrayLike
 from scipy.sparse import sparray
 
+import time
+
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.core.solver import Solver
 
@@ -80,7 +82,7 @@ class SerinvSolverCPU(Solver):
         self.L_arrow_bottom_blocks = self.A_arrow_bottom_blocks
         self.L_arrow_tip_block = self.A_arrow_tip_block
 
-   # @time_range()
+    @time_range()
     def cholesky(self, A: sparray, sparsity: str = "bta") -> None:
         """Compute Cholesky factor of input matrix."""
 
@@ -89,36 +91,39 @@ class SerinvSolverCPU(Solver):
             self._sparray_to_structured(A, sparsity="bta")
 
             # with time_range('callPobtafBTA', color_id=0):
-                (
-                    self.L_diagonal_blocks,
-                    self.L_lower_diagonal_blocks,
-                    self.L_arrow_bottom_blocks,
-                    self.L_arrow_tip_block,
-                ) = pobtaf(
-                    self.A_diagonal_blocks,
-                    self.A_lower_diagonal_blocks,
-                    self.A_arrow_bottom_blocks,
-                    self.A_arrow_tip_block,
-                )
+            tic = time.perf_counter()
+            (
+                self.L_diagonal_blocks,
+                self.L_lower_diagonal_blocks,
+                self.L_arrow_bottom_blocks,
+                self.L_arrow_tip_block,
+            ) = pobtaf(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                self.A_arrow_bottom_blocks,
+                self.A_arrow_tip_block,
+            )
+            toc = time.perf_counter()
+            print_mpi("                 pobtaf Q_conditional time:", toc - tic, flush=True)
 
         elif sparsity == "bt":
             self._sparray_to_structured(A, sparsity="bt")
 
-            with time_range('callPobtafBT', color_id=0):
-                (
-                    self.L_diagonal_blocks,
-                    self.L_lower_diagonal_blocks,
-                ) = pobtf(
-                    self.A_diagonal_blocks,
-                    self.A_lower_diagonal_blocks,
-                )
+            # with time_range('callPobtafBT', color_id=0):
+            (
+                self.L_diagonal_blocks,
+                self.L_lower_diagonal_blocks,
+            ) = pobtf(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+            )
 
             # Factorize the unconnected tip of the arrow
             # with time_range('npCholesky', color_id=0):
-                self.L_arrow_tip_block[:, :] = np.linalg.cholesky(self.A_arrow_tip_block)
+            self.L_arrow_tip_block[:, :] = np.linalg.cholesky(self.A_arrow_tip_block)
 
 
-    # @time_range()
+    @time_range()
     def solve(self, rhs: ArrayLike, sparsity: str = "bta") -> ArrayLike:
         """Solve linear system using Cholesky factor."""
 
@@ -133,7 +138,7 @@ class SerinvSolverCPU(Solver):
         else:
             raise NotImplementedError("Solve is only supported for BTA sparsity")
 
-    # @time_range()
+    @time_range()
     def logdet(self) -> float:
         """Compute logdet of input matrix using Cholesky factor."""
 
@@ -146,7 +151,7 @@ class SerinvSolverCPU(Solver):
 
         return 2 * logdet
 
-    # @time_range()
+    @time_range()
     def _sparray_to_structured(self, A: sparray, sparsity: str) -> None:
         """Map sparray to BT or BTA."""
 
@@ -322,7 +327,7 @@ class SerinvSolverGPU(Solver):
         self.L_arrow_bottom_blocks_d = self.A_arrow_bottom_blocks_d
         self.L_arrow_tip_block_d = self.A_arrow_tip_block_d
 
-    # @time_range()
+    @time_range()
     def cholesky(self, A: sparray, sparsity: str = "bta") -> None:
         """Compute Cholesky factor of input matrix."""
 
@@ -332,6 +337,8 @@ class SerinvSolverGPU(Solver):
             self._h2d_buffers(sparsity="bta")
 
             # with time_range('PobtafBTA', color_id=0):
+
+            tic = time.perf_counter()
             (
                 self.L_diagonal_blocks_d,
                 self.L_lower_diagonal_blocks_d,
@@ -343,6 +350,9 @@ class SerinvSolverGPU(Solver):
                 self.A_arrow_bottom_blocks_d,
                 self.A_arrow_tip_block_d,
             )
+            toc = time.perf_counter()
+            print_mpi("                 pobtaf Q_conditional time:", toc - tic, flush=True)
+
 
         elif sparsity == "bt":
             # with time_range('initializeBTblocks', color_id=0):
@@ -363,7 +373,7 @@ class SerinvSolverGPU(Solver):
                 self.A_arrow_tip_block_d
             )
 
-    # @time_range()
+    @time_range()
     def solve(self, rhs: ArrayLike, sparsity: str = "bta") -> ArrayLike:
         """Solve linear system using Cholesky factor."""
 
@@ -383,7 +393,7 @@ class SerinvSolverGPU(Solver):
         else:
             raise NotImplementedError("Solve is only supported for BTA sparsity")
 
-    # @time_range()
+    @time_range()
     def logdet(self) -> float:
         """Compute logdet of input matrix using Cholesky factor."""
 
@@ -397,7 +407,7 @@ class SerinvSolverGPU(Solver):
 
         return cp.asnumpy(logdet)
 
-    # @time_range()
+    @time_range()
     def _sparray_to_structured(self, A: sparray, sparsity: str) -> None:
         """Map sparray to BT or BTA."""
 
@@ -435,7 +445,7 @@ class SerinvSolverGPU(Solver):
 
             self.A_arrow_tip_block[:, :] = csr_slice.todense()
 
-    # @time_range()
+    @time_range()
     def _h2d_buffers(self, sparsity: str) -> None:
         """Copy data from host to device."""
 
@@ -447,7 +457,7 @@ class SerinvSolverGPU(Solver):
 
         self.A_arrow_tip_block_d.set(arr=self.A_arrow_tip_block)
 
-    # @time_range()
+    @time_range()
     def _d2h_buffers(self, sparsity: str) -> None:
         """Copy data from host to device."""
 
@@ -472,7 +482,7 @@ class SerinvSolverGPU(Solver):
 
         raise NotImplementedError
 
-    # @time_range()
+    @time_range()
     def get_L(self, sparsity: str = "bta") -> ArrayLike:
         """Get L as a dense array."""
 

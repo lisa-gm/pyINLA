@@ -161,8 +161,9 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-.err
-.out
+*.txt
+*.err
+*.out
 dev/*
 data/*
 settings.json
@@ -171,4 +172,5 @@ settings.json
 *.dat
 *.out
 *.nsys-rep
+*.qdstrm
 *.sqlite

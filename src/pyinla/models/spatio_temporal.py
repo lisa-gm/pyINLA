@@ -113,12 +113,12 @@ class SpatioTemporalModel(Model):
             + self.g3
         )
 
-        with time_range("sparseKroneckerProduct", color_id=0):
-            Q_spatio_temporal = pow(theta_spatio_temporal_variation, 2) * (
-                kron(self.m0, q3s)
-                + theta_temporal_range * kron(self.m1, q2s)
-                + pow(theta_temporal_range, 2) * kron(self.m2, q1s)
-            )
+        # with time_range("sparseKroneckerProduct", color_id=0):
+        Q_spatio_temporal = pow(theta_spatio_temporal_variation, 2) * (
+            kron(self.m0, q3s)
+            + theta_temporal_range * kron(self.m1, q2s)
+            + pow(theta_temporal_range, 2) * kron(self.m2, q1s)
+        )
 
         if Q_spatio_temporal is not csc_matrix:
             Q_spatio_temporal = csc_matrix(Q_spatio_temporal)

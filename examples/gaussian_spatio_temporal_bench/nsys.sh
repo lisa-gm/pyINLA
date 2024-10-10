@@ -14,7 +14,7 @@ size="${OMPI_COMM_WORLD_SIZE:-$SLURM_NTASKS}"
 [[ -z "${NSYS+x}" ]] && NSYS=0
 
 echo "rank: ${rank} hostname: $(hostname) device ID: ${CUDA_VISIBLE_DEVICES}" 
-
+echo "$(nsys --version)"
 
 if [[ "$NSYS" -ne 0 && "$rank" -eq 0 ]]; then
   exec nsys profile --trace=mpi,nvtx,cuda --force-overwrite=true -e NSYS_MPI_STORE_TEAMS_PER_RANK=1 -o "$NSYS_FILE" "$@"

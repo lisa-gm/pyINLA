@@ -1,8 +1,6 @@
 simulation_dir = "."
-minimize_max_iter = 1
 
-[solver]
-type = "scipy"
+minimize_max_iter=1
 
 [model]
 type = "spatio-temporal"
@@ -14,6 +12,9 @@ n_fixed_effects = 6
 [likelihood]
 type = "gaussian"
 theta_observations = 2
+
+[solver]
+type = "serinv_cpu"   
 
 
 [prior_hyperparameters]
