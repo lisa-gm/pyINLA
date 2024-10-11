@@ -80,7 +80,7 @@ class SerinvSolverCPU(Solver):
         self.L_arrow_bottom_blocks = self.A_arrow_bottom_blocks
         self.L_arrow_tip_block = self.A_arrow_tip_block
 
-    # @time_range()
+    @time_range()
     def cholesky(self, A: sparray, sparsity: str = "bta") -> None:
         """Compute Cholesky factor of input matrix."""
 
@@ -88,18 +88,18 @@ class SerinvSolverCPU(Solver):
 
             self._sparray_to_structured(A, sparsity="bta")
 
-            # with time_range('callPobtafBTA', color_id=0):
-            (
-                self.L_diagonal_blocks,
-                self.L_lower_diagonal_blocks,
-                self.L_arrow_bottom_blocks,
-                self.L_arrow_tip_block,
-            ) = pobtaf(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-                self.A_arrow_bottom_blocks,
-                self.A_arrow_tip_block,
-            )
+            with time_range('callPobtafBTA', color_id=0):
+                (
+                    self.L_diagonal_blocks,
+                    self.L_lower_diagonal_blocks,
+                    self.L_arrow_bottom_blocks,
+                    self.L_arrow_tip_block,
+                ) = pobtaf(
+                    self.A_diagonal_blocks,
+                    self.A_lower_diagonal_blocks,
+                    self.A_arrow_bottom_blocks,
+                    self.A_arrow_tip_block,
+                )
 
         elif sparsity == "bt":
             self._sparray_to_structured(A, sparsity="bt")
@@ -114,12 +114,12 @@ class SerinvSolverCPU(Solver):
                 )
 
                 # Factorize the unconnected tip of the arrow
-                # with time_range('npCholesky', color_id=0):
+            with time_range('npCholesky', color_id=0):
                 self.L_arrow_tip_block[:, :] = np.linalg.cholesky(
                     self.A_arrow_tip_block
                 )
 
-    # @time_range()
+    @time_range()
     def solve(self, rhs: ArrayLike, sparsity: str = "bta") -> ArrayLike:
         """Solve linear system using Cholesky factor."""
 
@@ -147,7 +147,7 @@ class SerinvSolverCPU(Solver):
 
         return 2 * logdet
 
-    # @time_range()
+    @time_range()
     def _sparray_to_structured(self, A: sparray, sparsity: str) -> None:
         """Map sparray to BT or BTA."""
 

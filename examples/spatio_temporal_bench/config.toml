@@ -2,7 +2,7 @@ simulation_dir = "."
 minimize_max_iter = 1
 
 [solver]
-type = "scipy"
+type = "serinv_gpu"
 
 [model]
 type = "spatio-temporal"

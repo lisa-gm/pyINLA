@@ -179,13 +179,15 @@ class INLA:
     def run(self) -> ArrayLike:
         """Fit the model using INLA."""
 
-        tic = time.perf_counter()
-        self.f_value, self.gradient_f = self._objective_function(self.theta_initial)
-        toc = time.perf_counter()
-        print_mpi(
-            f"MPI size: {comm_size}. Time objective function call: {toc - tic} s. f value: {self.f_value}",
-            flush=True,
-        )
+        maxiter = 1
+        for i in range(maxiter):
+            tic = time.perf_counter()
+            self.f_value, self.gradient_f = self._objective_function(self.theta_initial)
+            toc = time.perf_counter()
+            print_mpi(
+                f"MPI size: {comm_size}. Time objective function call: {toc - tic} s. f value: {self.f_value}",
+                flush=True,
+            )
 
         # if len(self.theta) > 0:
         #     # grad_f_init = self._evaluate_gradient_f(self.theta_initial)
@@ -401,7 +403,7 @@ class INLA:
         # --- Optimize x (latent parameters) and construct conditional precision matrix
         x_local = cp.copy(self.x)
         # tic = time.perf_counter()
-        self.Q_conditional, x_local = self._inner_iteration(
+        self.Q_conditional, x_local, logdet_Q_conditional = self._inner_iteration(
             Q_prior, x_local, theta_likelihood
         )
         # toc = time.perf_counter()
@@ -433,7 +435,7 @@ class INLA:
         # --- Evaluate the conditional of the latent parameters at x_star
         # tic = time.perf_counter()
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
-            self.Q_conditional, x_local, x_local
+            self.Q_conditional, x_local, x_local, logdet_Q_conditional
         )
         # toc = time.perf_counter()
         # print_mpi(
@@ -559,8 +561,10 @@ class INLA:
             # toc = time.perf_counter()
             # print_mpi("         construct_Q_conditional time:", toc - tic, flush=True)
 
+            with time_range('BTACholesky', )
             self.solver.cholesky(Q_conditional, sparsity="bta")
-
+            logdet_Q_conditional = self.solver.logdet()
+            
             x_update[:] = self.solver.solve(rhs, sparsity="bta")
 
             x_i_norm = cp.linalg.norm(x_update)
@@ -568,7 +572,7 @@ class INLA:
             # print_mpi(f"Inner iteration {counter} norm: {x_i_norm}")
 
         # print_mpi("Inner iteration converged after", counter, "iterations.")
-        return Q_conditional, x_i
+        return Q_conditional, x_i, logdet_Q_conditional
 
     @time_range()
     def _evaluate_prior_latent_parameters(self, Q_prior: spmatrix, x: ArrayLike):
@@ -611,7 +615,7 @@ class INLA:
         return log_prior_latent_parameters
 
     @time_range()
-    def _evaluate_conditional_latent_parameters(self, Q_conditional, x, x_mean):
+    def _evaluate_conditional_latent_parameters(self, Q_conditional, x, x_mean, logdet_Q_conditional):
         """Evaluation of the conditional of the latent parameters at x using the conditional precision matrix Q_conditional and the mean x_mean.
 
         Notes
@@ -640,8 +644,8 @@ class INLA:
 
         # get current theta, check if this theta matches the theta used to construct Q_conditional
         # if yes, check if L already computed, if yes -> takes this L
-        self.solver.cholesky(Q_conditional, sparsity="bta")
-        logdet_Q_conditional = self.solver.logdet()
+        # self.solver.cholesky(Q_conditional, sparsity="bta")
+        # logdet_Q_conditional = self.solver.logdet()
 
         # TODO: evaluate it at the mean -> this becomes zero ...
         # log_conditional_latent_parameters = (
