@@ -130,7 +130,7 @@ class SpatioTemporalModel(Model):
             + self.g3
         )
 
-        with time_range("sparseKroneckerProduct", color_id=0):
+        with time_range("sparseKroneckerProduct", color_id=0, sync=True):
             Q_spatio_temporal = pow(theta_spatio_temporal_variation, 2) * (
                 kron(self.m0, q3s)
                 + theta_temporal_range * kron(self.m1, q2s)

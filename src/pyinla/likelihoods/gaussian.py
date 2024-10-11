@@ -7,6 +7,8 @@ from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
 
 import cupy as cp
+from cupyx.profiler import time_range
+
 
 import cupyx as cpx
 from cupyx.profiler import time_range
@@ -30,6 +32,7 @@ class GaussianLikelihood(Likelihood):
         """Get the likelihood initial hyperparameters."""
         return self.theta
 
+    @time_range()
     def evaluate_likelihood(
         self,
         eta: ArrayLike,
@@ -78,6 +81,7 @@ class GaussianLikelihood(Likelihood):
 
         return likelihood
 
+    @time_range()
     def evaluate_gradient_likelihood(
         self,
         eta: ArrayLike,
@@ -112,6 +116,7 @@ class GaussianLikelihood(Likelihood):
 
         return gradient_likelihood
 
+    @time_range()
     def evaluate_hessian_likelihood(
         self,
         eta: ArrayLike,
