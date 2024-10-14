@@ -4,18 +4,17 @@ import math
 import os
 import time
 
+import cupy as cp
+
+# import cupyx as cpx
 import numpy as np
+from cupyx.profiler import time_range
+from cupyx.scipy.sparse import csc_matrix, spmatrix
 from mpi4py import MPI
 from numpy.typing import ArrayLike
 
 # from scipy.optimize import minimize
 from scipy.sparse import load_npz
-
-import cupy as cp
-
-import cupyx as cpx
-from cupyx.profiler import time_range
-from cupyx.scipy.sparse import spmatrix, csc_matrix
 
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.likelihoods.binomial import BinomialLikelihood
@@ -28,16 +27,12 @@ from pyinla.prior_hyperparameters.penalized_complexity import (
     PenalizedComplexityPriorHyperparameters,
 )
 
-from pyinla.solvers.scipy_solver import ScipySolver
-from pyinla.solvers.serinv_solver import (
-    SerinvSolverCPU,
-    SerinvSolverGPU,
+# from pyinla.solvers.scipy_solver import ScipySolver
+from pyinla.solvers.serinv_solver import (  # SerinvSolverCPU,; SerinvSolverGPU,
     SerinvSolverFullGPU,
 )
-
 from pyinla.utils.other_utils import print_mpi
 from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
-
 
 comm_rank = MPI.COMM_WORLD.Get_rank()
 comm_size = MPI.COMM_WORLD.Get_size()
@@ -179,7 +174,7 @@ class INLA:
     def run(self) -> ArrayLike:
         """Fit the model using INLA."""
 
-        maxiter = 1
+        maxiter = 3
         for i in range(maxiter):
             tic = time.perf_counter()
             self.f_value, self.gradient_f = self._objective_function(self.theta_initial)
@@ -561,10 +556,10 @@ class INLA:
             # toc = time.perf_counter()
             # print_mpi("         construct_Q_conditional time:", toc - tic, flush=True)
 
-            with time_range('BTACholesky', )
+            # with time_range('BTACholesky', )
             self.solver.cholesky(Q_conditional, sparsity="bta")
             logdet_Q_conditional = self.solver.logdet()
-            
+
             x_update[:] = self.solver.solve(rhs, sparsity="bta")
 
             x_i_norm = cp.linalg.norm(x_update)
@@ -615,7 +610,9 @@ class INLA:
         return log_prior_latent_parameters
 
     @time_range()
-    def _evaluate_conditional_latent_parameters(self, Q_conditional, x, x_mean, logdet_Q_conditional):
+    def _evaluate_conditional_latent_parameters(
+        self, Q_conditional, x, x_mean, logdet_Q_conditional
+    ):
         """Evaluation of the conditional of the latent parameters at x using the conditional precision matrix Q_conditional and the mean x_mean.
 
         Notes
