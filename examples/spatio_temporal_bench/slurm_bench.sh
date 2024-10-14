@@ -20,7 +20,7 @@ num_ranks=${SLURM_NTASKS}
 
 #set -x
 
-export OMP_NUM_THREADS=64
+export OMP_NUM_THREADS=32
 export OPENBLAS_NUM_THREADS=$((OMP_NUM_THREADS-1))
 
 #conda init
