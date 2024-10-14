@@ -1,0 +1,64 @@
+0xffffffff
+rank 0 nid005934
+The work directory is: /users/hck24/pyINLA/examples/gaussian_spatio_temporal_bench
+Spatio-temporal model initialized.
+Gaussian likelihood initialized.
+MPI rank: 0, MPI size: 1
+OMP_NUM_THREADS: 32
+Allocated memory for BTA-array: 59.59 GB
+INLA initialized.
+Model: spatio-temporal
+Prior hyperparameters model: gaussian
+  Prior theta model - spatial range. mean : 1.0, precision : 0.5
+  Prior theta model - temporal range. mean : 3.7, precision : 0.5
+  Prior theta model - spatio-temporal variation. mean : -5.9, precision : 0.5
+   Prior hyperparameters likelihood: gaussian
+  Prior theta likelihood. Mean : 1.4, precision : 0.5
+
+   Initial theta: [ 2.  3. -3.  2.]
+   Likelihood: gaussian
+theta: [ 2.  3. -3.  2.],      Function value: 19390201.73471888
+Rank: 0, i: 0, f_value: 19390201.73471888, time: 21.94180074799806
+Rank: 0, i: 1, f_value: 19448144.50382621, time: 19.143164905020967
+Rank: 0, i: 2, f_value: 19391643.84257914, time: 19.10355416999664
+Rank: 0, i: 3, f_value: 19416126.121508345, time: 19.06538979592733
+Rank: 0, i: 4, f_value: 19396701.245236084, time: 19.042942594969645
+theta: [ 1.999  3.    -3.     2.   ],      Function value: 19332478.976286348
+Rank: 0, i: 5, f_value: 19332478.976286348, time: 19.004958908073604
+Rank: 0, i: 6, f_value: 19388762.331622303, time: 18.99058301502373
+Rank: 0, i: 7, f_value: 19364307.37343655, time: 19.00330997398123
+Rank: 0, i: 8, f_value: 19383704.25111907, time: 18.993649380048737
+MPI_Bcast time: 0.0009924130281433463
+Objective function time: 174.44358235003892
+MPI size: 1. Time objective function call: 174.44365857099183 s. f value: 0.0
+Rank: 0, i: 0, f_value: 19390201.73471888, time: 11.931620931020007
+Rank: 0, i: 1, f_value: 19448144.50382621, time: 18.995023163035512
+Rank: 0, i: 2, f_value: 19391643.84257917, time: 18.99556265899446
+Rank: 0, i: 3, f_value: 19416126.12150832, time: 19.002705397084355
+Rank: 0, i: 4, f_value: 19396701.24523607, time: 18.98875465907622
+theta: [ 1.999  3.    -3.     2.   ],      Function value: 19332478.97628631
+Rank: 0, i: 5, f_value: 19332478.97628631, time: 18.99407361797057
+Rank: 0, i: 6, f_value: 19388762.331622303, time: 18.98703066899907
+Rank: 0, i: 7, f_value: 19364307.37343658, time: 19.000928762950934
+Rank: 0, i: 8, f_value: 19383704.251119014, time: 19.014810662018135
+MPI_Bcast time: 4.6814908273518085e-05
+Objective function time: 163.91249928995967
+MPI size: 1. Time objective function call: 163.91252181807067 s. f value: 0.0
+Rank: 0, i: 0, f_value: 19390201.73471888, time: 11.902913580997847
+Rank: 0, i: 1, f_value: 19448144.503826197, time: 19.004507147939876
+Rank: 0, i: 2, f_value: 19391643.842579104, time: 18.99171213794034
+Rank: 0, i: 3, f_value: 19416126.121508334, time: 19.0025480450131
+Rank: 0, i: 4, f_value: 19396701.24523607, time: 18.992827382986434
+Rank: 0, i: 5, f_value: 19332478.976286337, time: 18.97358286497183
+Rank: 0, i: 6, f_value: 19388762.33162231, time: 18.975357679999433
+Rank: 0, i: 7, f_value: 19364307.373436548, time: 18.958624313003384
+Rank: 0, i: 8, f_value: 19383704.25111902, time: 18.957982958992943
+MPI_Bcast time: 4.6911067329347134e-05
+Objective function time: 163.76201598893385
+MPI size: 1. Time objective function call: 163.76203906105366 s. f value: 0.0
+Elapsed time: 502.12 s
+Collecting data...
+Generating '/tmp/nsys-report-7af1.qdstrm'
+[1/1] [0%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [0%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [6%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [5%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [6%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [5%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [6%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [8%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [7%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [9%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [8%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [9%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [8%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [9%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [8%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [9%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [8%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [9%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [11%                         ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [10%                         ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [11%                         ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [10%                         ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [9%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep[1/1] [8%                          ] gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.nsys-rep
+Generated:
+    /users/hck24/pyINLA/examples/gaussian_spatio_temporal_bench/gaussian_spatioTemporal_bench_pinned_numaCtl_allGPU_omp32_numRanks1.qdstrm
