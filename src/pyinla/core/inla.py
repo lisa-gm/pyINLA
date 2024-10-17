@@ -5,6 +5,10 @@ import os
 import time
 
 import numpy as np
+
+# try:
+# from cupy.cuda import nvtx
+from cupyx.profiler import time_range
 from mpi4py import MPI
 from numpy.typing import ArrayLike
 
@@ -21,7 +25,6 @@ from pyinla.prior_hyperparameters.gaussian import GaussianPriorHyperparameters
 from pyinla.prior_hyperparameters.penalized_complexity import (
     PenalizedComplexityPriorHyperparameters,
 )
-
 from pyinla.solvers.scipy_solver import ScipySolver
 from pyinla.solvers.serinv_solver import SerinvSolverCPU, SerinvSolverGPU
 
@@ -32,9 +35,6 @@ from pyinla.solvers.serinv_solver import SerinvSolverCPU, SerinvSolverGPU
 from pyinla.utils.other_utils import print_mpi
 from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
 
-# try:
-# from cupy.cuda import nvtx
-from cupyx.profiler import time_range
 # from cupy.cuda.nvtx import RangePush, RangePop
 
 
@@ -130,7 +130,7 @@ class INLA:
         num_threads = os.getenv("OMP_NUM_THREADS")
         print_mpi(f"OMP_NUM_THREADS: {num_threads}")
 
-        #RangePush("InitializeSolver")
+        # RangePush("InitializeSolver")
         if self.pyinla_config.solver.type == "scipy":
             self.solver = ScipySolver(pyinla_config)
         elif self.pyinla_config.solver.type == "serinv_cpu":
@@ -145,7 +145,7 @@ class INLA:
             raise ValueError(
                 f"Solver '{self.pyinla_config.solver.type}' not implemented."
             )
-        #RangePop()
+        # RangePop()
 
         # --- Initialize theta
         self.theta_initial: ArrayLike = theta_dict2array(
@@ -194,7 +194,7 @@ class INLA:
     def run(self) -> np.ndarray:
         """Fit the model using INLA."""
 
-        maxiter = 1
+        maxiter = 3
         for i in range(maxiter):
             tic = time.perf_counter()
             self.f_value, self.gradient_f = self._objective_function(self.theta_initial)
@@ -435,7 +435,7 @@ class INLA:
         likelihood = self.likelihood.evaluate_likelihood(eta, self.y, theta_likelihood)
         toc = time.perf_counter()
         print_mpi("   (4/6) evaluate_likelihood time:", toc - tic, flush=True)
-        
+
         # --- Evaluate the conditional of the latent parameters at x_star
         tic = time.perf_counter()
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
@@ -457,7 +457,6 @@ class INLA:
         print_mpi(
             "   (5/6) evaluate_prior_latent_parameters time:", toc - tic, flush=True
         )
-
 
         f_theta = -1 * (
             log_prior_hyperparameters
@@ -559,7 +558,7 @@ class INLA:
             #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
             # )
             # hessian_likelihood = diags(hessian_likelihood_diag)
-            #with time_range('computeHessianLik', color_id=0):
+            # with time_range('computeHessianLik', color_id=0):
             hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(
                 eta, self.y, theta_likelihood
             )
@@ -591,10 +590,10 @@ class INLA:
 
             # with time_range('computeNorm', color_id=0):
             x_i_norm = np.linalg.norm(x_update)
-                
+
             counter += 1
             # print_mpi(f"Inner iteration {counter} norm: {x_i_norm}")
-            
+
         logdet = self.solver.logdet()
 
         # print_mpi("Inner iteration converged after", counter, "iterations.")
@@ -629,14 +628,13 @@ class INLA:
 
         n = x.shape[0]
 
- 
-        #with time_range('callCholesky', color_id=0):
+        # with time_range('callCholesky', color_id=0):
         self.solver.cholesky(Q_prior, sparsity="bt")
-            
-        #with time_range('getLogDet', color_id=0):
+
+        # with time_range('getLogDet', color_id=0):
         logdet_Q_prior = self.solver.logdet()
 
-        #with time_range('compute_xtQx', color_id=0):
+        # with time_range('compute_xtQx', color_id=0):
         log_prior_latent_parameters = (
             -n / 2 * np.log(2 * math.pi)
             + 0.5 * logdet_Q_prior
@@ -646,7 +644,9 @@ class INLA:
         return log_prior_latent_parameters
 
     @time_range()
-    def _evaluate_conditional_latent_parameters(self, Q_conditional, x, x_mean, logdet_Q_conditional):
+    def _evaluate_conditional_latent_parameters(
+        self, Q_conditional, x, x_mean, logdet_Q_conditional
+    ):
         """Evaluation of the conditional of the latent parameters at x using the conditional precision matrix Q_conditional and the mean x_mean.
 
         Notes
@@ -673,7 +673,7 @@ class INLA:
 
         # n = x.shape[0]
 
-        #TODO: not actually needed. already computed.
+        # TODO: not actually needed. already computed.
         # get current theta, check if this theta matches the theta used to construct Q_conditional
         # if yes, check if L already computed, if yes -> takes this L
         # self.solver.cholesky(Q_conditional, sparsity="bta")
