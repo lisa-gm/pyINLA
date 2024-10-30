@@ -1,17 +1,17 @@
 #!/bin/bash
 #####SBATCH --uenv=prgenv-gnu/24.7:v3
 #####SBATCH --view=modules
-#SBATCH --nodes=3
-#SBATCH --ntasks=9
+#SBATCH --nodes=1
+#SBATCH --ntasks=3
 #SBATCH --ntasks-per-node=3
 #SBATCH --cpus-per-task=72
 #SBATCH --gpus-per-task=1
 #SBATCH --output=output_gaussian_spatioTemporal_bench.out
 #SBATCH --error=output_gaussian_spatioTemporal_bench.err
-###SBATCH -C gpu
-#SBATCH --reservation=eurohack24
-####SBATCH --partition=debug
-#SBATCH --time=00:15:00
+#SBATCH -C gpu
+###SBATCH --reservation=eurohack24
+#SBATCH --partition=debug
+#SBATCH --time=00:30:00
 
 #export CUDA_VISIBLE_DEVICES=
 

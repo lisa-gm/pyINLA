@@ -1,6 +1,7 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import numpy as np
+from cupyx.profiler import time_range
 from numpy.typing import ArrayLike
 from scipy.sparse import eye
 
@@ -25,6 +26,7 @@ class GaussianLikelihood(Likelihood):
         """Get the likelihood initial hyperparameters."""
         return self.theta
 
+    @time_range()
     def evaluate_likelihood(
         self,
         eta: ArrayLike,
@@ -73,6 +75,7 @@ class GaussianLikelihood(Likelihood):
 
         return likelihood
 
+    @time_range()
     def evaluate_gradient_likelihood(
         self,
         eta: ArrayLike,
@@ -107,6 +110,7 @@ class GaussianLikelihood(Likelihood):
 
         return gradient_likelihood
 
+    @time_range()
     def evaluate_hessian_likelihood(
         self,
         eta: ArrayLike,

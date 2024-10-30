@@ -113,14 +113,14 @@ class SerinvSolverCPU(Solver):
         elif sparsity == "bt":
             self._sparray_to_structured(A, sparsity="bt")
 
-            # with time_range('callPobtafBT', color_id=0):
-            (
-                self.L_diagonal_blocks,
-                self.L_lower_diagonal_blocks,
-            ) = pobtf(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-            )
+            with time_range("callPobtafBT", color_id=0):
+                (
+                    self.L_diagonal_blocks,
+                    self.L_lower_diagonal_blocks,
+                ) = pobtf(
+                    self.A_diagonal_blocks,
+                    self.A_lower_diagonal_blocks,
+                )
 
             # Factorize the unconnected tip of the arrow
             # with time_range('npCholesky', color_id=0):
@@ -351,20 +351,19 @@ class SerinvSolverGPU(Solver):
             self._sparray_to_structured(A, sparsity="bta")
             self._h2d_buffers(sparsity="bta")
 
-            # with time_range('PobtafBTA', color_id=0):
-
             tic = time.perf_counter()
-            (
-                self.L_diagonal_blocks_d,
-                self.L_lower_diagonal_blocks_d,
-                self.L_arrow_bottom_blocks_d,
-                self.L_arrow_tip_block_d,
-            ) = pobtaf(
-                self.A_diagonal_blocks_d,
-                self.A_lower_diagonal_blocks_d,
-                self.A_arrow_bottom_blocks_d,
-                self.A_arrow_tip_block_d,
-            )
+            with time_range("PobtafBTA", color_id=0):
+                (
+                    self.L_diagonal_blocks_d,
+                    self.L_lower_diagonal_blocks_d,
+                    self.L_arrow_bottom_blocks_d,
+                    self.L_arrow_tip_block_d,
+                ) = pobtaf(
+                    self.A_diagonal_blocks_d,
+                    self.A_lower_diagonal_blocks_d,
+                    self.A_arrow_bottom_blocks_d,
+                    self.A_arrow_tip_block_d,
+                )
             toc = time.perf_counter()
             print("                 pobtaf Q_conditional time:", toc - tic, flush=True)
 
@@ -373,14 +372,14 @@ class SerinvSolverGPU(Solver):
             self._sparray_to_structured(A, sparsity="bt")
             self._h2d_buffers(sparsity="bt")
 
-            # with time_range('pobtafBT', color_id=0):
-            (
-                self.L_diagonal_blocks_d,
-                self.L_lower_diagonal_blocks_d,
-            ) = pobtf(
-                self.A_diagonal_blocks_d,
-                self.A_lower_diagonal_blocks_d,
-            )
+            with time_range("pobtafBT", color_id=0):
+                (
+                    self.L_diagonal_blocks_d,
+                    self.L_lower_diagonal_blocks_d,
+                ) = pobtf(
+                    self.A_diagonal_blocks_d,
+                    self.A_lower_diagonal_blocks_d,
+                )
 
             # Factorize the unconnected tip of the arrow
             self.L_arrow_tip_block_d[:, :] = cp.linalg.cholesky(
