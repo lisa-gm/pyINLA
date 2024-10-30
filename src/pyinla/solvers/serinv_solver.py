@@ -1,20 +1,23 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-import numpy as np
-from numpy.typing import ArrayLike
-from scipy.sparse import sparray
-
 import time
+
+import numpy as np
+from cupyx.profiler import time_range
+from cupyx.scipy.linalg import solve_triangular as cp_solve_triangular
+from numpy.typing import ArrayLike
+from scipy.linalg import cholesky as scipy_chol
+from scipy.linalg import solve_triangular as scipy_solve_triangular
+from scipy.sparse import sparray
 
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.core.solver import Solver
-
-from cupyx.profiler import time_range
-
 from pyinla.utils.other_utils import print_mpi
 
 try:
     from serinv import pobtaf, pobtas, pobtf
+
+    # from serinv.cupyfix.cholesky_lowerfill import cholesky_lowerfill
 except ImportError:
     print_mpi("Serinv not installed. Please install serinv to use SerinvSolver.")
 
@@ -87,7 +90,6 @@ class SerinvSolverCPU(Solver):
         """Compute Cholesky factor of input matrix."""
 
         if sparsity == "bta":
-
             self._sparray_to_structured(A, sparsity="bta")
 
             # with time_range('callPobtafBTA', color_id=0):
@@ -104,7 +106,9 @@ class SerinvSolverCPU(Solver):
                 self.A_arrow_tip_block,
             )
             toc = time.perf_counter()
-            print_mpi("                 pobtaf Q_conditional time:", toc - tic, flush=True)
+            print_mpi(
+                "                 pobtaf Q_conditional time:", toc - tic, flush=True
+            )
 
         elif sparsity == "bt":
             self._sparray_to_structured(A, sparsity="bt")
@@ -122,6 +126,15 @@ class SerinvSolverCPU(Solver):
             # with time_range('npCholesky', color_id=0):
             self.L_arrow_tip_block[:, :] = np.linalg.cholesky(self.A_arrow_tip_block)
 
+        elif sparsity == "d":
+            self.L_arrow_tip_block[:, :] = scipy_chol(
+                self.A_arrow_tip_block, lower=True
+            )
+
+        else:
+            print("Sparsity pattern not supported: ", sparsity)
+            raise ValueError
+
     @time_range()
     def solve(self, rhs: ArrayLike, sparsity: str = "bta") -> ArrayLike:
         """Solve linear system using Cholesky factor."""
@@ -134,6 +147,11 @@ class SerinvSolverCPU(Solver):
                 self.L_arrow_tip_block,
                 rhs,
             )
+
+        elif sparsity == "d":
+            y = scipy_solve_triangular(self.L_arrow_tip_block, rhs, lower=True)
+            rhs[:] = scipy_solve_triangular(self.A_arrow_tip_block.T, y, lower=False)
+
         else:
             raise NotImplementedError("Solve is only supported for BTA sparsity")
 
@@ -157,7 +175,6 @@ class SerinvSolverCPU(Solver):
         A_csr = A.tocsr()
 
         for i in range(self.n_diagonal_blocks):
-
             csr_slice = A_csr[
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
@@ -215,7 +232,6 @@ class SerinvSolverCPU(Solver):
         )
 
         for i in range(self.n_diagonal_blocks):
-
             L[
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
@@ -236,9 +252,9 @@ class SerinvSolverCPU(Solver):
                 ] = self.A_arrow_bottom_blocks[i, :, :]
 
         if sparsity == "bta":
-            L[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :] = (
-                self.A_arrow_tip_block[:, :]
-            )
+            L[
+                -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
+            ] = self.A_arrow_tip_block[:, :]
 
         return L
 
@@ -350,8 +366,7 @@ class SerinvSolverGPU(Solver):
                 self.A_arrow_tip_block_d,
             )
             toc = time.perf_counter()
-            print_mpi("                 pobtaf Q_conditional time:", toc - tic, flush=True)
-
+            print("                 pobtaf Q_conditional time:", toc - tic, flush=True)
 
         elif sparsity == "bt":
             # with time_range('initializeBTblocks', color_id=0):
@@ -372,6 +387,16 @@ class SerinvSolverGPU(Solver):
                 self.A_arrow_tip_block_d
             )
 
+        # for dense matrix ...
+        elif sparsity == "d":
+            self.L_arrow_tip_block_d[:, :] = cp.linalg.cholesky(
+                self.A_arrow_tip_block_d
+            )
+
+        else:
+            print("Invalid sparsity pattern: ", sparsity)
+            raise ValueError
+
     @time_range()
     def solve(self, rhs: ArrayLike, sparsity: str = "bta") -> ArrayLike:
         """Solve linear system using Cholesky factor."""
@@ -389,8 +414,18 @@ class SerinvSolverGPU(Solver):
             )
 
             return cp.asnumpy(X_d)
+
+        elif sparsity == "d":
+            # y = cp.zeros_like(rhs_d)
+            y = cp_solve_triangular(self.L_arrow_tip_block_d, rhs_d, lower=True)
+            X_d = cp_solve_triangular(self.L_arrow_tip_block_d.T, y, lower=False)
+
+            return cp.asnumpy(X_d)
+
         else:
-            raise NotImplementedError("Solve is only supported for BTA sparsity")
+            raise NotImplementedError(
+                "Solve is only supported for BTA and dense sparsity"
+            )
 
     @time_range()
     def logdet(self) -> float:
@@ -413,7 +448,6 @@ class SerinvSolverGPU(Solver):
         A_csr = A.tocsr()
 
         for i in range(self.n_diagonal_blocks):
-
             csr_slice = A_csr[
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
@@ -498,7 +532,6 @@ class SerinvSolverGPU(Solver):
         self._d2h_buffers(sparsity)
 
         for i in range(self.n_diagonal_blocks):
-
             L[
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
@@ -519,8 +552,8 @@ class SerinvSolverGPU(Solver):
                 ] = self.A_arrow_bottom_blocks[i, :, :]
 
         if sparsity == "bta":
-            L[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :] = (
-                self.A_arrow_tip_block[:, :]
-            )
+            L[
+                -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
+            ] = self.A_arrow_tip_block[:, :]
 
         return L

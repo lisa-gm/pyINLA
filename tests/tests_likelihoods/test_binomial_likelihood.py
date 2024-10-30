@@ -2,7 +2,10 @@ import numpy as np
 from scipy.special import gammaln
 from scipy.stats import binom
 
+from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.likelihoods.binomial import BinomialLikelihood
+
+pyinla_config = PyinlaConfig()
 
 
 def test_binomial_evaluate_likelihood(
@@ -10,7 +13,6 @@ def test_binomial_evaluate_likelihood(
     n_observations: int,
     n_latent_parameters: int,
     theta_observations: float,
-    pyinla_config,
 ):
     eta, y, n_trials, prob, theta_likelihood = generate_binomial_data
 
