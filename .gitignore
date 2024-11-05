@@ -165,12 +165,8 @@ cython_debug/
 *.err
 *.out
 dev/*
-#examples/*
 data/*
 settings.json
-#*.npz
-#*.npy
-#*.dat
 *.out
 *.nsys-rep
 *.qdstrm
