@@ -12,9 +12,6 @@ from scipy.sparse import csr_matrix
 
 sys.path.append("..")
 
-from save_to_file import write_sparse_csc_matrix
-
-# set seed
 np.random.seed(41)
 
 path = os.path.dirname(__file__)
@@ -60,22 +57,3 @@ if __name__ == "__main__":
 
     # save original hyperparameter theta
     np.save(f"{path}/inputs/theta_original.npy", theta_observations)
-
-    # save the synthetic data in INLA_DIST readable format
-    os.makedirs(f"{path}/INLA_DIST_inputs", exist_ok=True)
-
-    # write theta to file as a column vector
-    dim_theta = 1
-    # write number to file numpy
-    np.savetxt(
-        f"{path}/INLA_DIST_inputs/theta_original_{dim_theta}_1.dat",
-        np.array([theta_observations]),
-    )
-
-    # write y to file as a column vector
-    np.savetxt(f"{path}/INLA_DIST_inputs/y_{n_observations}_1.dat", y)
-
-    # write a to file as a sparse matrix in CSC format
-    write_sparse_csc_matrix(
-        a, f"{path}/INLA_DIST_inputs/Ax_{n_observations}_{n_latent_parameters}.dat"
-    )
