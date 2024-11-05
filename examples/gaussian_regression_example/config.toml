@@ -1,17 +1,3 @@
-simulation_dir = "."
-
-
-[model]
-type = "regression"
-n_fixed_effects = 6
-
-[likelihood]
-type = "gaussian"
-theta_observations = 2
-
-[prior_hyperparameters]
-mean_theta_observations = 3.5
-precision_theta_observations = 0.5
-
-[solver]
-type = "serinv_gpu"
+version https://git-lfs.github.com/spec/v1
+oid sha256:06c7ec3a92e9da83771849a6b0631c4bce1174bf47a13ff40498afb3269d31e9
+size 246
