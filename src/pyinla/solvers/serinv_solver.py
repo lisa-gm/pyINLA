@@ -52,14 +52,27 @@ class SerinvSolverCPU(Solver):
             (self.n_diagonal_blocks, self.diagonal_blocksize, self.diagonal_blocksize),
             dtype=self.dtype,
         )
-        self.A_lower_diagonal_blocks = np.empty(
-            (
-                self.n_diagonal_blocks - 1,
-                self.diagonal_blocksize,
-                self.diagonal_blocksize,
-            ),
-            dtype=self.dtype,
-        )
+
+        if self.n_diagonal_blocks > 0:
+            self.A_lower_diagonal_blocks = np.empty(
+                (
+                    self.n_diagonal_blocks - 1,
+                    self.diagonal_blocksize,
+                    self.diagonal_blocksize,
+                ),
+                dtype=self.dtype,
+            )
+
+        else:
+            self.A_lower_diagonal_blocks = np.empty(
+                (
+                    0,
+                    0,
+                    0,
+                ),
+                dtype=self.dtype,
+            )
+
         self.A_arrow_bottom_blocks = np.empty(
             (self.n_diagonal_blocks, self.arrowhead_blocksize, self.diagonal_blocksize),
             dtype=self.dtype,
@@ -127,6 +140,7 @@ class SerinvSolverCPU(Solver):
             self.L_arrow_tip_block[:, :] = np.linalg.cholesky(self.A_arrow_tip_block)
 
         elif sparsity == "d":
+            self._sparray_to_structured(A, sparsity="d")
             self.L_arrow_tip_block[:, :] = scipy_chol(
                 self.A_arrow_tip_block, lower=True
             )
@@ -150,10 +164,13 @@ class SerinvSolverCPU(Solver):
 
         elif sparsity == "d":
             y = scipy_solve_triangular(self.L_arrow_tip_block, rhs, lower=True)
-            rhs[:] = scipy_solve_triangular(self.A_arrow_tip_block.T, y, lower=False)
+            x = scipy_solve_triangular(self.L_arrow_tip_block.T, y, lower=False)
+            return x
 
         else:
-            raise NotImplementedError("Solve is only supported for BTA sparsity")
+            raise NotImplementedError(
+                "Solve is only supported for BTA sparsity and dense matrix"
+            )
 
     @time_range()
     def logdet(self) -> float:
@@ -200,10 +217,9 @@ class SerinvSolverCPU(Solver):
 
                 self.A_arrow_bottom_blocks[i, :, :] = csr_slice.todense()
 
-        if sparsity == "bta":
-            csr_slice = A_csr[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :]
-
-            self.A_arrow_tip_block[:, :] = csr_slice.todense()
+        # Copy the arrow tip block
+        csr_slice = A_csr[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :]
+        self.A_arrow_tip_block[:, :] = csr_slice.todense()
 
     def full_inverse(self) -> ArrayLike:
         """Compute full inverse of A."""
@@ -221,10 +237,7 @@ class SerinvSolverCPU(Solver):
     def get_L(self, sparsity: str = "bta") -> ArrayLike:
         """Get L as a dense array."""
 
-        n = self.diagonal_blocksize * self.n_diagonal_blocks
-
-        if sparsity == "bta":
-            n += self.arrowhead_blocksize
+        n = self.diagonal_blocksize * self.n_diagonal_blocks + self.arrowhead_blocksize
 
         L = np.zeros(
             (n, n),
@@ -251,10 +264,9 @@ class SerinvSolverCPU(Solver):
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 ] = self.A_arrow_bottom_blocks[i, :, :]
 
-        if sparsity == "bta":
-            L[
-                -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
-            ] = self.A_arrow_tip_block[:, :]
+        L[
+            -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
+        ] = self.A_arrow_tip_block[:, :]
 
         return L
 
@@ -282,18 +294,31 @@ class SerinvSolverGPU(Solver):
             (self.n_diagonal_blocks, self.diagonal_blocksize, self.diagonal_blocksize),
             dtype=self.dtype,
         )
-        self.A_lower_diagonal_blocks = cpx.empty_pinned(
-            (
-                self.n_diagonal_blocks - 1,
-                self.diagonal_blocksize,
-                self.diagonal_blocksize,
-            ),
-            dtype=self.dtype,
-        )
+
+        if n_diagonal_blocks > 0:
+            self.A_lower_diagonal_blocks = cpx.empty_pinned(
+                (
+                    self.n_diagonal_blocks - 1,
+                    self.diagonal_blocksize,
+                    self.diagonal_blocksize,
+                ),
+                dtype=self.dtype,
+            )
+        else:
+            self.A_lower_diagonal_blocks = cpx.empty_pinned(
+                (
+                    0,
+                    0,
+                    0,
+                ),
+                dtype=self.dtype,
+            )
+
         self.A_arrow_bottom_blocks = cpx.empty_pinned(
             (self.n_diagonal_blocks, self.arrowhead_blocksize, self.diagonal_blocksize),
             dtype=self.dtype,
         )
+
         self.A_arrow_tip_block = cpx.empty_pinned(
             (self.arrowhead_blocksize, self.arrowhead_blocksize),
             dtype=self.dtype,
@@ -304,18 +329,31 @@ class SerinvSolverGPU(Solver):
             (self.n_diagonal_blocks, self.diagonal_blocksize, self.diagonal_blocksize),
             dtype=self.dtype,
         )
-        self.A_lower_diagonal_blocks_d = cp.empty(
-            (
-                self.n_diagonal_blocks - 1,
-                self.diagonal_blocksize,
-                self.diagonal_blocksize,
-            ),
-            dtype=self.dtype,
-        )
+
+        if n_diagonal_blocks > 0:
+            self.A_lower_diagonal_blocks_d = cp.empty(
+                (
+                    self.n_diagonal_blocks - 1,
+                    self.diagonal_blocksize,
+                    self.diagonal_blocksize,
+                ),
+                dtype=self.dtype,
+            )
+        else:
+            self.A_lower_diagonal_blocks_d = cp.empty(
+                (
+                    0,
+                    0,
+                    0,
+                ),
+                dtype=self.dtype,
+            )
+
         self.A_arrow_bottom_blocks_d = cp.empty(
             (self.n_diagonal_blocks, self.arrowhead_blocksize, self.diagonal_blocksize),
             dtype=self.dtype,
         )
+
         self.A_arrow_tip_block_d = cp.empty(
             (self.arrowhead_blocksize, self.arrowhead_blocksize),
             dtype=self.dtype,
@@ -351,7 +389,7 @@ class SerinvSolverGPU(Solver):
             self._sparray_to_structured(A, sparsity="bta")
             self._h2d_buffers(sparsity="bta")
 
-            tic = time.perf_counter()
+            # tic = time.perf_counter()
             with time_range("PobtafBTA", color_id=0):
                 (
                     self.L_diagonal_blocks_d,
@@ -364,8 +402,8 @@ class SerinvSolverGPU(Solver):
                     self.A_arrow_bottom_blocks_d,
                     self.A_arrow_tip_block_d,
                 )
-            toc = time.perf_counter()
-            print("                 pobtaf Q_conditional time:", toc - tic, flush=True)
+            # toc = time.perf_counter()
+            # print("                 pobtaf Q_conditional time:", toc - tic, flush=True)
 
         elif sparsity == "bt":
             # with time_range('initializeBTblocks', color_id=0):
@@ -388,6 +426,8 @@ class SerinvSolverGPU(Solver):
 
         # for dense matrix ...
         elif sparsity == "d":
+            self._sparray_to_structured(A, sparsity="d")
+            self._h2d_buffers(sparsity="d")
             self.L_arrow_tip_block_d[:, :] = cp.linalg.cholesky(
                 self.A_arrow_tip_block_d
             )
@@ -472,10 +512,9 @@ class SerinvSolverGPU(Solver):
 
                 self.A_arrow_bottom_blocks[i, :, :] = csr_slice.todense()
 
-        if sparsity == "bta":
-            csr_slice = A_csr[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :]
-
-            self.A_arrow_tip_block[:, :] = csr_slice.todense()
+        # Copy the arrow tip block
+        csr_slice = A_csr[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :]
+        self.A_arrow_tip_block[:, :] = csr_slice.todense()
 
     @time_range()
     def _h2d_buffers(self, sparsity: str) -> None:
@@ -518,10 +557,7 @@ class SerinvSolverGPU(Solver):
     def get_L(self, sparsity: str = "bta") -> ArrayLike:
         """Get L as a dense array."""
 
-        n = self.diagonal_blocksize * self.n_diagonal_blocks
-
-        if sparsity == "bta":
-            n += self.arrowhead_blocksize
+        n = self.diagonal_blocksize * self.n_diagonal_blocks + self.arrowhead_blocksize
 
         L = np.zeros(
             (n, n),
@@ -550,9 +586,9 @@ class SerinvSolverGPU(Solver):
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 ] = self.A_arrow_bottom_blocks[i, :, :]
 
-        if sparsity == "bta":
-            L[
-                -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
-            ] = self.A_arrow_tip_block[:, :]
+        # Copy the arrow tip block
+        L[
+            -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
+        ] = self.A_arrow_tip_block[:, :]
 
         return L

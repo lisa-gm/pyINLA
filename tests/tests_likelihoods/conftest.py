@@ -1,4 +1,4 @@
-# Copyright 2023-2024 ETH Zurich and Quantum Transport Toolbox authors.
+# Copyright 2024 pyINLA authors. All rights reserved.
 
 import numpy as np
 import pytest
@@ -12,11 +12,6 @@ from pyinla.likelihoods.gaussian import GaussianLikelihood
 from pyinla.models.regression import RegressionModel
 from pyinla.models.spatio_temporal import SpatioTemporalModel
 from pyinla.utils import sigmoid
-
-
-from os import environ
-
-environ["OMP_NUM_THREADS"] = "1"
 
 
 @pytest.fixture(scope="function", autouse=False)

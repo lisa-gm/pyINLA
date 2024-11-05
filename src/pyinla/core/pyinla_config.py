@@ -179,6 +179,8 @@ class PyinlaConfig(BaseModel):
     def input_dir(self) -> Path:
         return self.simulation_dir / "inputs/"
 
+    # input_dir: Path = simulation_dir / "inputs/"
+
     @model_validator(mode="after")
     def check_likelihood_prior_hyperparameters(self) -> Self:
         if self.prior_hyperparameters.type == "penalized-complexity":

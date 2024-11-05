@@ -1,12 +1,12 @@
 simulation_dir = "."
 
-minimize_max_iter=1
+minimize_max_iter=30
 
 [model]
 type = "spatio-temporal"
-theta_spatial_range = 2
+theta_spatial_range = 1
 theta_temporal_range = 3
-theta_spatio_temporal_variation = -3
+theta_spatio_temporal_variation = -6
 n_fixed_effects = 6
 
 [likelihood]

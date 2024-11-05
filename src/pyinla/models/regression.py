@@ -19,6 +19,9 @@ class RegressionModel(Model):
         """Initializes the model."""
         super().__init__(pyinla_config, n_latent_parameters)
 
+        self.ns = 0
+        self.nt = 0
+
         # Check that design_matrix shape match number of fixed effects
         assert (
             self.nb == self.n_latent_parameters

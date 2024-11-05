@@ -24,8 +24,8 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
             self.alpha_theta_temporal_range = (
                 pyinla_config.prior_hyperparameters.alpha_theta_temporal_range
             )
-            self.alpha_theta_sd_spatio_temporal = (
-                pyinla_config.prior_hyperparameters.alpha_theta_sd_spatio_temporal
+            self.alpha_theta_spatio_temporal_variation = (
+                pyinla_config.prior_hyperparameters.alpha_theta_spatio_temporal_variation
             )
 
             self.u_theta_spatial_range = (
@@ -34,8 +34,8 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
             self.u_theta_temporal_range = (
                 pyinla_config.prior_hyperparameters.u_theta_temporal_range
             )
-            self.u_theta_sd_spatio_temporal = (
-                pyinla_config.prior_hyperparameters.u_theta_sd_spatio_temporal
+            self.u_theta_spatio_temporal_variation = (
+                pyinla_config.prior_hyperparameters.u_theta_spatio_temporal_variation
             )
 
             self.lambda_theta_spatial_range = -np.log(
@@ -47,9 +47,9 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
             self.lambda_theta_temporal_range = -np.log(
                 self.alpha_theta_temporal_range
             ) * pow(self.u_theta_temporal_range, 0.5)
-            self.lambda_theta_sd_spatio_temporal = (
-                -np.log(self.alpha_theta_sd_spatio_temporal)
-                / self.u_theta_sd_spatio_temporal
+            self.lambda_theta_spatio_temporal_variation = (
+                -np.log(self.alpha_theta_spatio_temporal_variation)
+                / self.u_theta_spatio_temporal_variation
             )
 
         if pyinla_config.likelihood.type == "gaussian":
@@ -60,6 +60,7 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
                 / pyinla_config.prior_hyperparameters.u_theta_observations
             )
 
+    # TODO: input theta in interpretable scale
     def evaluate_log_prior(
         self, theta_model: dict, theta_likelihood: dict
     ) -> np.ndarray:
@@ -88,10 +89,10 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
                 )
 
                 log_prior += (
-                    np.log(self.lambda_theta_sd_spatio_temporal)
-                    - self.lambda_theta_sd_spatio_temporal
-                    * np.exp(theta_model["sd_spatio_temporal"])
-                    + theta_model["sd_spatio_temporal"]
+                    np.log(self.lambda_theta_spatio_temporal_variation)
+                    - self.lambda_theta_spatio_temporal_variation
+                    * np.exp(theta_model["spatio_temporal_variation"])
+                    + theta_model["spatio_temporal_variation"]
                 )
             else:
                 raise ValueError("Not implemented for other than 2D cases")

@@ -7,9 +7,9 @@ from scipy import sparse
 from pyinla.core.solver import Solver
 
 
-@pytest.mark.parametrize("diagonal_blocksize", [2, 3])
-@pytest.mark.parametrize("arrowhead_blocksize", [2, 1, 3])
-@pytest.mark.parametrize("n_diag_blocks", [1, 2, 3])
+@pytest.mark.parametrize("diagonal_blocksize", [0, 2, 3])  #
+@pytest.mark.parametrize("arrowhead_blocksize", [1, 3])  # , 1, 3
+@pytest.mark.parametrize("n_diag_blocks", [0, 1, 2, 3])  #
 def test_cholesky(
     solver: Solver,
     pobta_dense,

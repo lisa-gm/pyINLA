@@ -12,8 +12,7 @@ import numpy as np
 from cupyx.profiler import time_range
 from mpi4py import MPI
 from numpy.typing import ArrayLike
-
-# from scipy.optimize import minimize
+from scipy.optimize import minimize
 from scipy.sparse import load_npz, sparray  # diags,
 
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -85,9 +84,14 @@ class INLA:
 
         self._check_dimensions()
 
+        self.sparsity_Q_conditional = "bta"
+        self.sparsity_Q_prior = "bt"
+
         # --- Initialize model
         if self.pyinla_config.model.type == "regression":
             self.model = RegressionModel(pyinla_config, self.n_latent_parameters)
+            self.sparsity_Q_conditional = "d"
+            self.sparsity_Q_prior = "d"
             print_mpi("Regression model initialized.")
         elif self.pyinla_config.model.type == "spatio-temporal":
             self.model = SpatioTemporalModel(pyinla_config, self.n_latent_parameters)
@@ -152,7 +156,9 @@ class INLA:
         # --- Initialize solver
         # RangePush("InitializeSolver")
         if self.pyinla_config.solver.type == "scipy":
-            self.solver = ScipySolver(pyinla_config)
+            self.solver = ScipySolver(
+                pyinla_config, self.model.ns, self.model.nb, self.model.nt
+            )
         elif self.pyinla_config.solver.type == "serinv_cpu":
             self.solver = SerinvSolverCPU(
                 pyinla_config, self.model.ns, self.model.nb, self.model.nt
@@ -214,53 +220,58 @@ class INLA:
     def run(self) -> np.ndarray:
         """Fit the model using INLA."""
 
-        maxiter = 3
-        for i in range(maxiter):
-            tic = time.perf_counter()
-            self.f_value, self.gradient_f = self._objective_function(self.theta_initial)
-            toc = time.perf_counter()
-            print_mpi(
-                f"i: {i}. MPI size: {comm_size}. Time objective function call: {toc - tic} s. f value: {self.f_value}",
-                flush=True,
-            )
-            self.theta_initial = self.theta_initial + 0.1
-
-        # if len(self.theta) > 0:
-        #     # grad_f_init = self._evaluate_gradient_f(self.theta_initial)
-        #     # print_mpi(f"Initial gradient: {grad_f_init}", flush=True)
-
+        # maxiter = 3
+        # for i in range(maxiter):
         #     tic = time.perf_counter()
-        #     result = minimize(
-        #         self._objective_function,
-        #         self.theta_initial,
-        #         method="BFGS",
-        #         jac=True,
-        #         options={
-        #             "maxiter": self.minimize_max_iter,
-        #             # "maxiter": 1,
-        #             "gtol": 1e-1,
-        #             "disp": False,
-        #         },
-        #     )
+        #     self.f_value, self.gradient_f = self._objective_function(self.theta_initial)
         #     toc = time.perf_counter()
-        #     print_mpi(f"1-Minimize iteration time: {toc - tic} s", flush=True)
+        #     print_mpi(
+        #         f"i: {i}. MPI size: {comm_size}. Time objective function call: {toc - tic} s. f value: {self.f_value}",
+        #         flush=True,
+        #     )
+        #     self.theta_initial = self.theta_initial + 0.1
 
-        #     if result.success:
-        #         print_mpi(
-        #             "Optimization converged successfully after",
-        #             result.nit,
-        #             "iterations.",
-        #             flush=True,
-        #         )
-        #         self.theta = result.x
-        #         theta_model, theta_likelihood = theta_array2dict(
-        #             self.theta, self.model.get_theta(), self.likelihood.get_theta()
-        #         )
-        #         # print_mpi("Optimal theta:", self.theta_star)
-        #         # print_mpi("Latent parameters:", self.x)
-        #     else:
-        #         print_mpi("Optimization did not converge.", flush=True)
-        #         return False
+        if len(self.theta) > 0:
+            # grad_f_init = self._evaluate_gradient_f(self.theta_initial)
+            # print_mpi(f"Initial gradient: {grad_f_init}", flush=True)
+
+            tic = time.perf_counter()
+            result = minimize(
+                self._objective_function,
+                self.theta_initial,
+                method="BFGS",
+                jac=True,
+                options={
+                    "maxiter": self.minimize_max_iter,
+                    # "maxiter": 1,
+                    "gtol": 1e-1,
+                    "disp": False,
+                },
+            )
+            toc = time.perf_counter()
+            print_mpi(f"Total time minimize: {toc - tic} s", flush=True)
+
+            if result.success:
+                print_mpi(
+                    "Optimization converged successfully after",
+                    result.nit,
+                    "iterations.",
+                    flush=True,
+                )
+                self.theta = result.x
+                theta_model, theta_likelihood = theta_array2dict(
+                    self.theta, self.model.get_theta(), self.likelihood.get_theta()
+                )
+                # print_mpi("Optimal theta:", self.theta_star)
+                # print_mpi("Latent parameters:", self.x)
+            else:
+                print_mpi("Optimization did not converge.", flush=True)
+                return False
+
+        # only run inner iteration
+        else:
+            print("in evaluate f.")
+            self.f_value = self._evaluate_f(self.theta_initial)
 
         # print_mpi("counter:", self.counter, flush=True)
 
@@ -324,10 +335,10 @@ class INLA:
                     theta_mat[:, i], main_eval=main_eval_list[i]
                 )
                 t_f_eval = time.perf_counter() - t_f_eval
-                print(
-                    f"Rank: {comm_rank}, i: {i}, f_value: {f_values_local[i]}, time: {t_f_eval}",
-                    flush=True,
-                )
+                # print(
+                #     f"Rank: {comm_rank}, i: {i}, f_value: {f_values_local[i]}, time: {t_f_eval}",
+                #     flush=True,
+                # )
 
         MPI.COMM_WORLD.Barrier()
 
@@ -384,11 +395,14 @@ class INLA:
         MPI.COMM_WORLD.Barrier()
 
         t_mpi_bcast = time.perf_counter() - t_mpi_bcast
-        print_mpi(f"MPI_Bcast time: {t_mpi_bcast}", flush=True)
+        # print_mpi(f"MPI_Bcast time: {t_mpi_bcast}", flush=True)
 
         t_objective_function = time.perf_counter() - t_objective_function
-        print_mpi(f"Objective function time: {t_objective_function}", flush=True)
-
+        theta_i_str = ", ".join([f"{theta:.3f}" for theta in theta_i])
+        print_mpi(
+            f"theta: [{theta_i_str}], Function value: {f_theta:.3f}, time: {t_objective_function:.3f}",
+            flush=True,
+        )
         return (f_theta, gradient_f_theta)
 
     @time_range()
@@ -421,28 +435,28 @@ class INLA:
         )
 
         # --- Evaluate the log prior of the hyperparameters
-        tic = time.perf_counter()
+        # tic = time.perf_counter()
         log_prior_hyperparameters = self.prior_hyperparameters.evaluate_log_prior(
             theta_model, theta_likelihood
         )
-        toc = time.perf_counter()
-        print_mpi("log prior hyperparameters: ", log_prior_hyperparameters)
+        # toc = time.perf_counter()
+        # print_mpi("log prior hyperparameters: ", log_prior_hyperparameters)
         # print_mpi("   (1/6) evaluate_log_prior time:", toc - tic, flush=True)
 
         # --- Construct the prior precision matrix of the latent parameters
-        tic = time.perf_counter()
+        # tic = time.perf_counter()
         Q_prior = self.model.construct_Q_prior(theta_model)
-        toc = time.perf_counter()
-        print_mpi("   (2/6) construct_Q_prior time:", toc - tic, flush=True)
+        # toc = time.perf_counter()
+        # print_mpi("   (2/6) construct_Q_prior time:", toc - tic, flush=True)
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
         x_local = np.copy(self.x)
-        tic = time.perf_counter()
+        # tic = time.perf_counter()
         self.Q_conditional, x_local, logdet_Q_conditional = self._inner_iteration(
             Q_prior, x_local, theta_likelihood
         )
-        toc = time.perf_counter()
-        print_mpi("   (3/6) inner_iteration time:", toc - tic, flush=True)
+        # toc = time.perf_counter()
+        # print_mpi("   (3/6) inner_iteration time:", toc - tic, flush=True)
         # print(f"rank: {comm_rank}. after inner iteration x: ", self.x[:10])
 
         # assign initial guess for x for next iteration
@@ -451,36 +465,36 @@ class INLA:
             self.x = x_local
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
-        tic = time.perf_counter()
+        # tic = time.perf_counter()
         eta = self.a @ x_local
         likelihood = self.likelihood.evaluate_likelihood(eta, self.y, theta_likelihood)
-        toc = time.perf_counter()
+        # toc = time.perf_counter()
         # print_mpi("   (4/6) evaluate_likelihood time:", toc - tic, flush=True)
-        print_mpi("likelihood: ", likelihood)
+        # print_mpi("likelihood: ", likelihood)
 
         # --- Evaluate the conditional of the latent parameters at x_star
-        tic = time.perf_counter()
+        # tic = time.perf_counter()
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
             self.Q_conditional, x_local, x_local, logdet_Q_conditional
         )
-        toc = time.perf_counter()
+        # toc = time.perf_counter()
         # print_mpi(
         #     "   (6/6) evaluate_conditional_latent_parameters time:",
         #     toc - tic,
         #     flush=True,
         # )
-        print_mpi("conditional latent parameters: ", conditional_latent_parameters)
+        # print_mpi("conditional latent parameters: ", conditional_latent_parameters)
 
         # --- Evaluate the prior of the latent parameters at x_star
-        tic = time.perf_counter()
+        # tic = time.perf_counter()
         prior_latent_parameters = self._evaluate_prior_latent_parameters(
             Q_prior, x_local
         )
-        toc = time.perf_counter()
+        # toc = time.perf_counter()
         # print_mpi(
         #     "   (5/6) evaluate_prior_latent_parameters time:", toc - tic, flush=True
         # )
-        print_mpi("prior latent parameters: ", prior_latent_parameters)
+        # print_mpi("prior latent parameters: ", prior_latent_parameters)
 
         f_theta = -1 * (
             log_prior_hyperparameters
@@ -494,7 +508,7 @@ class INLA:
         if f_theta < self.min_f:
             self.min_f = f_theta
             self.counter += 1
-            print_mpi(f"theta: {theta_i},      Function value: {f_theta}", flush=True)
+            # print(f"theta: {theta_i},      Function value: {f_theta}", flush=True)
             # print_mpi(f"Minimum function value: {self.min_f}. Counter: {self.counter}")
 
         return f_theta
@@ -553,6 +567,7 @@ class INLA:
         counter = 0
         while x_i_norm >= self.eps_inner_iteration:
             if counter > self.inner_iteration_max_iter:
+                print_mpi("current theta value: ", self.theta)
                 raise ValueError(
                     f"Inner iteration did not converge after {counter} iterations."
                 )
@@ -603,12 +618,12 @@ class INLA:
             # print_mpi("         construct_Q_conditional time:", toc - tic, flush=True)
 
             # tic = time.perf_counter()
-            self.solver.cholesky(Q_conditional, sparsity="bta")
+            self.solver.cholesky(Q_conditional, sparsity=self.sparsity_Q_conditional)
             # toc = time.perf_counter()
             # print_mpi("         Solver Call Q_conditional time:", toc - tic, flush=True)
 
             # tic = time.perf_counter()
-            x_update[:] = self.solver.solve(rhs, sparsity="bta")
+            x_update[:] = self.solver.solve(rhs, sparsity=self.sparsity_Q_conditional)
             # toc = time.perf_counter()
             # print_mpi("         solve Q_conditional time:", toc - tic, flush=True)
 
@@ -653,7 +668,7 @@ class INLA:
         n = x.shape[0]
 
         # with time_range('callCholesky', color_id=0):
-        self.solver.cholesky(Q_prior, sparsity="bt")
+        self.solver.cholesky(Q_prior, sparsity=self.sparsity_Q_prior)
 
         # with time_range('getLogDet', color_id=0):
         logdet_Q_prior = self.solver.logdet()

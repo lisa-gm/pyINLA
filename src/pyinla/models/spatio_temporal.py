@@ -1,8 +1,11 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
+import math
+
 import numpy as np
 from cupyx.profiler import time_range
 from scipy.sparse import csc_matrix, kron, load_npz, sparray
+from scipy.special import gamma
 
 from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -83,6 +86,135 @@ class SpatioTemporalModel(Model):
         return self.theta
 
     @time_range()
+    def convert_theta_from_interpret2model(
+        self, theta_interpret: dict, dim_spatial_domain=2, manifold="plane"
+    ) -> dict:
+        """Convert theta from interpretable scale to model scale."""
+
+        if dim_spatial_domain != 2:
+            raise ValueError("Only 2D spatial domain is supported for now.")
+
+        # assumes alphas as fixed for now
+        alpha_s = 2
+        alpha_t = 1
+        alpha_e = 1
+
+        # implicit assumption that spatial domain is 2D
+        alpha = alpha_e + alpha_s * (alpha_t - 0.5)
+
+        nu_s = alpha - 1
+        nu_t = alpha_t - 0.5
+
+        log_gamma_s = 0.5 * np.log(8 * nu_s) - theta_interpret["spatial_range"]
+        log_gamma_t = (
+            theta_interpret["temporal_range"]
+            - 0.5 * np.log(8 * nu_t)
+            + alpha_s * log_gamma_s
+        )
+
+        if manifold == "sphere":
+            cR_t = gamma(nu_t) / (gamma(alpha_t) * pow(4 * math.pi, 0.5))
+            cS = 0.0
+            for k in range(50):
+                cS += (2.0 * k + 1.0) / (
+                    4.0
+                    * math.pi
+                    * pow(pow(np.exp(log_gamma_s), 2) + k * (k + 1), alpha)
+                )
+            log_gamma_e = (
+                0.5 * np.log(cR_t)
+                + 0.5 * np.log(cS)
+                - 0.5 * log_gamma_t
+                - theta_interpret["spatio_temporal_variation"]
+            )
+
+        elif manifold == "plane":
+            #  pow(4*M_PI, dim_spatial_domain/2.0) * pow(4*M_PI, dim_temporal_domain/2.0);
+            c1_scaling_constant = pow(4 * math.pi, 1.5)
+            c1 = (
+                gamma(nu_t)
+                * gamma(nu_s)
+                / (gamma(alpha_t) * gamma(alpha) * c1_scaling_constant)
+            )
+            log_gamma_e = (
+                0.5 * np.log(c1)
+                - 0.5 * log_gamma_t
+                - nu_s * log_gamma_s
+                - theta_interpret["spatio_temporal_variation"]
+            )
+        else:
+            raise ValueError("Manifold not supported: ", manifold)
+
+        theta_model = {
+            "spatial_range": log_gamma_s,
+            "temporal_range": log_gamma_t,
+            "spatio_temporal_variation": log_gamma_e,
+        }
+
+        return theta_model
+
+    @time_range()
+    def convert_theta_from_model2interpret(
+        self, theta_model: dict, dim_spatial_domain=2, manifold="plane"
+    ) -> dict:
+        """Convert theta from model scale to interpretable scale."""
+
+        if dim_spatial_domain != 2:
+            raise ValueError("Only 2D spatial domain is supported for now.")
+
+        alpha_t = 1
+        alpha_s = 2
+        alpha_e = 1
+
+        alpha = alpha_e + alpha_s * (alpha_t - 0.5)
+        nu_s = alpha - 1
+        nu_t = alpha_t - 0.5
+
+        gamma_s = np.exp(theta_model["spatial_range"])
+        gamma_t = np.exp(theta_model["temporal_range"])
+        gamma_e = np.exp(theta_model["spatio_temporal_variation"])
+
+        theta_interpret = {}
+        theta_interpret["spatial_range"] = np.log(np.sqrt(8 * nu_s) / gamma_s)
+        theta_interpret["temporal_range"] = np.log(
+            gamma_t * np.sqrt(8 * nu_t) / (pow(gamma_s, alpha_s))
+        )
+
+        if manifold == "sphere":
+            cR_t = gamma(alpha_t - 0.5) / (gamma(alpha_t) * pow(4 * math.pi, 0.5))
+            cS = 0.0
+            for k in range(50):  # compute 1st 50 terms of infinite sum
+                cS += (2.0 * k + 1) / (
+                    4 * math.pi * pow(pow(gamma_s, 2) + k * (k + 1), alpha)
+                )
+            # print(f"cS : {cS}")
+            theta_interpret["spatio_temporal_variation"] = np.log(
+                np.sqrt(cR_t * cS) / (gamma_e * np.sqrt(gamma_t))
+            )
+
+        elif manifold == "plane":
+            c1_scaling_const = pow(4 * math.pi, dim_spatial_domain / 2.0) * pow(
+                4 * math.pi, 0.5
+            )
+            c1 = (
+                gamma(nu_t)
+                * gamma(nu_s)
+                / (gamma(alpha_t) * gamma(alpha) * c1_scaling_const)
+            )
+            theta_interpret["spatio_temporal_variation"] = np.log(
+                np.sqrt(c1)
+                / (
+                    (gamma_e * np.sqrt(gamma_t))
+                    * pow(gamma_s, alpha - dim_spatial_domain / 2)
+                )
+            )
+
+        else:
+            raise ValueError("Manifold not supported: ", manifold)
+
+        return theta_interpret
+
+    @time_range()
     def construct_Q_prior(self, theta_model: dict = None) -> sparray:
         """Construct the prior precision matrix."""
 
@@ -96,9 +228,6 @@ class SpatioTemporalModel(Model):
         theta_spatio_temporal_variation = np.exp(
             theta_model["spatio_temporal_variation"]
         )
-        # print("theta_spatial_range: ", theta_spatial_range)
-        # print("theta_temporal_range: ", theta_temporal_range)
-        # print("theta_spatio_temporal_variation: ", theta_spatio_temporal_variation)
 
         q1s = pow(theta_spatial_range, 2) * self.c0 + self.g1
         q2s = (
@@ -166,7 +295,14 @@ class SpatioTemporalModel(Model):
         a: sparray,
         hessian_likelihood: sparray,
     ) -> float:
-        """Construct the conditional precision matrix."""
+        """Construct the conditional precision matrix.
+
+        Note
+        ----
+        Input of the hessian of the likelihood is a diagonal matrix.
+        The negative hessian is required, therefore the minus in front.
+
+        """
 
         Q_conditional = Q_prior - a.T @ hessian_likelihood @ a
 
