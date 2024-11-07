@@ -88,13 +88,10 @@ class INLA:
         # --- Initialize likelihood
         if self.pyinla_config.likelihood.type == "gaussian":
             self.likelihood = GaussianLikelihood(pyinla_config, self.n_observations)
-            print_mpi("Gaussian likelihood initialized.")
         elif self.pyinla_config.likelihood.type == "poisson":
             self.likelihood = PoissonLikelihood(pyinla_config, self.n_observations)
-            print_mpi("Poisson likelihood initialized.")
         elif self.pyinla_config.likelihood.type == "binomial":
             self.likelihood = BinomialLikelihood(pyinla_config, self.n_observations)
-            print_mpi("Binomial likelihood initialized.")
 
         # --- Initialize solver
         if self.pyinla_config.solver.type == "scipy":
