@@ -22,17 +22,18 @@ dependencies = [
     "numpy>=1.23.2",
     "scipy",
     "matplotlib",
+    "autograd",
     "pydantic",
     "pytest",
     "pytest-cov",
     "pytest-mpi",
+    "pytest-xdist",
     "coverage",
     "black",
     "isort",
     "ruff",
+    "just",
     "pre-commit",
-    "autograd",
-    "pytest-xdist",
 ]
 [project.optional-dependencies]
 mpi4py = ["mpi4py"]
