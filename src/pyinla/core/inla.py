@@ -76,10 +76,6 @@ class INLA:
             self.sparsity_Q_prior = "d"
         elif self.pyinla_config.model.type == "spatio-temporal":
             self.model = SpatioTemporalModel(pyinla_config, self.n_latent_parameters)
-        else:
-            raise ValueError(
-                f"Model '{self.pyinla_config.model.type}' not implemented."
-            )
 
         # --- Initialize prior hyperparameters
         if self.pyinla_config.prior_hyperparameters.type == "gaussian":
@@ -87,10 +83,6 @@ class INLA:
         elif self.pyinla_config.prior_hyperparameters.type == "penalized_complexity":
             self.prior_hyperparameters = PenalizedComplexityPriorHyperparameters(
                 pyinla_config
-            )
-        else:
-            raise ValueError(
-                f"Prior hyperparameters '{self.pyinla_config.prior_hyperparameters.type}' not implemented."
             )
 
         # --- Initialize likelihood
@@ -103,10 +95,6 @@ class INLA:
         elif self.pyinla_config.likelihood.type == "binomial":
             self.likelihood = BinomialLikelihood(pyinla_config, self.n_observations)
             print_mpi("Binomial likelihood initialized.")
-        else:
-            raise ValueError(
-                f"Likelihood '{self.pyinla_config.likelihood.type}' not implemented."
-            )
 
         # --- Initialize solver
         if self.pyinla_config.solver.type == "scipy":
@@ -120,10 +108,6 @@ class INLA:
         elif self.pyinla_config.solver.type == "serinv_gpu":
             self.solver = SerinvSolverGPU(
                 pyinla_config, self.model.ns, self.model.nb, self.model.nt
-            )
-        else:
-            raise ValueError(
-                f"Solver '{self.pyinla_config.solver.type}' not implemented."
             )
 
         # --- Initialize theta
