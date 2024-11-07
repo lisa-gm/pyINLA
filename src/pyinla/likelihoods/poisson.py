@@ -2,9 +2,9 @@
 
 import autograd.numpy as anp
 import numpy as np
-from numpy.typing import ArrayLike
 from scipy.sparse import diags
 
+from pyinla import ArrayLike
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
 

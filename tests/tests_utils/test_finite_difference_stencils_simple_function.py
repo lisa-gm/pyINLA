@@ -2,8 +2,8 @@
 
 import numpy as np
 import pytest
-from numpy.typing import ArrayLike
 
+from pyinla import ArrayLike
 from pyinla.utils.finite_difference_stencils import (
     gradient_finite_difference_3pt,
     gradient_finite_difference_5pt,

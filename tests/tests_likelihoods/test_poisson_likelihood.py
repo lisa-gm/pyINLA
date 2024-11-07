@@ -4,8 +4,8 @@ from autograd import grad, hessian
 from scipy.special import gammaln
 from scipy.stats import poisson
 
-from pyinla.likelihoods.poisson import PoissonLikelihood
 from pyinla.core.pyinla_config import PyinlaConfig
+from pyinla.likelihoods.poisson import PoissonLikelihood
 
 pyinla_config = PyinlaConfig()
 

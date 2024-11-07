@@ -2,8 +2,8 @@ import numpy as np
 from autograd import grad, hessian
 from scipy.stats import multivariate_normal
 
-from pyinla.likelihoods.gaussian import GaussianLikelihood
 from pyinla.core.pyinla_config import PyinlaConfig
+from pyinla.likelihoods.gaussian import GaussianLikelihood
 
 pyinla_config = PyinlaConfig()
 

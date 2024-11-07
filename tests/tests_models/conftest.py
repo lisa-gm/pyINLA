@@ -5,7 +5,7 @@ import pytest
 from pyinla.core.pyinla_config import PyinlaConfig
 
 # import numpy as np
-# from numpy.typing import ArrayLike
+# from pyinla import ArrayLike
 # from scipy import sparse
 
 # from pyinla.core.model import Model

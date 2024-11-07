@@ -3,10 +3,10 @@
 import time
 
 import numpy as np
-from numpy.typing import ArrayLike
 from scipy.sparse import csc_matrix, diags, sparray
 from scipy.sparse.linalg import splu, spsolve_triangular
 
+from pyinla import ArrayLike
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.core.solver import Solver
 

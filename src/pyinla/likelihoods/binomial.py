@@ -2,9 +2,9 @@
 
 import numpy as np
 from autograd.numpy import dot, log
-from numpy.typing import ArrayLike
 from scipy.sparse import diags
 
+from pyinla import ArrayLike
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.utils.link_functions import sigmoid

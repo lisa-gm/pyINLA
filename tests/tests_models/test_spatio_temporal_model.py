@@ -7,7 +7,7 @@ import numpy as np
 # import pytest
 from conftest import pyinla_config_model
 
-# from numpy.typing import ArrayLike
+# from pyinla import ArrayLike
 from scipy import sparse
 from scipy.sparse import triu  # csc_matrix,
 

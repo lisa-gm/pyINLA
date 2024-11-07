@@ -2,9 +2,9 @@
 
 import numpy as np
 import pytest
-from numpy.typing import ArrayLike
 from scipy import sparse
 
+from pyinla import ArrayLike
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig

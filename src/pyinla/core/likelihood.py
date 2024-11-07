@@ -2,8 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from numpy.typing import ArrayLike
-
+from pyinla import ArrayLike
 from pyinla.core.pyinla_config import PyinlaConfig
 
 

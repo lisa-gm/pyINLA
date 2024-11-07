@@ -5,11 +5,11 @@ import time
 import numpy as np
 from cupyx.profiler import time_range
 from cupyx.scipy.linalg import solve_triangular as cp_solve_triangular
-from numpy.typing import ArrayLike
 from scipy.linalg import cholesky as scipy_chol
 from scipy.linalg import solve_triangular as scipy_solve_triangular
 from scipy.sparse import sparray
 
+from pyinla import ArrayLike
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.core.solver import Solver
 from pyinla.utils.other_utils import print_mpi

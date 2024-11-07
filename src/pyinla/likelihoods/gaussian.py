@@ -2,9 +2,9 @@
 
 import numpy as np
 from cupyx.profiler import time_range
-from numpy.typing import ArrayLike
 from scipy.sparse import eye
 
+from pyinla import ArrayLike
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
 

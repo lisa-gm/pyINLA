@@ -1,5 +1,7 @@
 # Copyright 2023-2024 ETH Zurich and Quantum Transport Toolbox authors.
 
+from os import environ
+
 import numpy as np
 import pytest
 
@@ -7,11 +9,8 @@ from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.solvers.scipy_solver import ScipySolver
 from pyinla.solvers.serinv_solver import SerinvSolverCPU, SerinvSolverGPU
 
-SOLVER = [ScipySolver, SerinvSolverCPU, SerinvSolverGPU]
-
-from os import environ
-
 environ["OMP_NUM_THREADS"] = "1"
+SOLVER = [ScipySolver, SerinvSolverCPU, SerinvSolverGPU]
 
 
 @pytest.fixture(params=SOLVER, autouse=True)

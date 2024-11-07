@@ -1,7 +1,8 @@
 # compute 1-dimensional, i.e. element-wise finite differences of vector inputs
 
 import numpy as np
-from numpy.typing import ArrayLike
+
+from pyinla import ArrayLike
 
 
 def gradient_finite_difference_3pt(f, x0: ArrayLike, *args, h: float = 1e-3):

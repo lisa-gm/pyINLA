@@ -1,6 +1,6 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-# from numpy.typing import ArrayLike
+# from pyinla import ArrayLike
 from scipy.sparse import eye, sparray
 
 from pyinla.core.model import Model
