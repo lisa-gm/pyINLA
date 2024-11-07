@@ -1,15 +1,5 @@
 import numpy as np
-from mpi4py import MPI
 from scipy.sparse import csc_matrix, sparray
-
-comm_rank = MPI.COMM_WORLD.Get_rank()
-comm_size = MPI.COMM_WORLD.Get_size()
-
-
-# make print function that only prints if MPI rank is 0
-def print_mpi(*args, **kwargs):
-    if comm_rank == 0:
-        print(*args, **kwargs)
 
 
 def read_sym_CSC(filename: str) -> sparray:

@@ -1,21 +1,38 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from pyinla import MPI_AVAILABLE, ArrayLike
+from pyinla import MPI_AVAILABLE, ArrayLike, comm_rank
 
 if MPI_AVAILABLE:
     from mpi4py import MPI
 
 
-def synchronize(comm: MPI.Comm = MPI.COMM_WORLD):
+def print_msg(*args, **kwargs):
+    """
+    Print a message from a single process.
+
+    Parameters:
+    -----------
+    *args:
+        Variable length argument list.
+    **kwargs:
+        Arbitrary keyword arguments.
+    """
+    if comm_rank == 0:
+        print(*args, **kwargs)
+
+
+def synchronize(comm=None):
     """
     Synchronize all processes within the given communication group.
 
     Parameters:
     -----------
-    comm (MPI.Comm), optional:
+    comm, optional:
         The communication group to synchronize. Default is MPI.COMM_WORLD.
     """
     if MPI_AVAILABLE:
+        if comm is None:
+            comm = MPI.COMM_WORLD
         comm.Barrier()
 
 
@@ -23,7 +40,7 @@ def allreduce(
     sendbuf: ArrayLike,
     recvbuf: ArrayLike,
     op: str = "sum",
-    comm: MPI.Comm = MPI.COMM_WORLD,
+    comm=None,
 ):
     """
     Perform a reduction operation across all processes within the given communication group.
@@ -40,6 +57,8 @@ def allreduce(
         The communication group. Default is MPI.COMM_WORLD.
     """
     if MPI_AVAILABLE:
+        if comm is None:
+            comm = MPI.COMM_WORLD
         if op == "sum":
             comm.Allreduce(sendbuf, recvbuf, op=MPI.SUM)
 
@@ -47,7 +66,7 @@ def allreduce(
 def bcast(
     data: ArrayLike,
     root: int = 0,
-    comm: MPI.Comm = MPI.COMM_WORLD,
+    comm=None,
 ):
     """
     Broadcast data from the root process to all other processes within the given communication group.
@@ -62,4 +81,6 @@ def bcast(
         The communication group. Default is MPI.COMM_WORLD.
     """
     if MPI_AVAILABLE:
+        if comm is None:
+            comm = MPI.COMM_WORLD
         comm.Bcast(data, root=root)

@@ -3,7 +3,6 @@
 import math
 
 import numpy as np
-from cupyx.profiler import time_range
 from scipy.sparse import csc_matrix, kron, load_npz, sparray
 from scipy.special import gamma
 
@@ -85,7 +84,6 @@ class SpatioTemporalModel(Model):
         """
         return self.theta
 
-    @time_range()
     def convert_theta_from_interpret2model(
         self, theta_interpret: dict, dim_spatial_domain=2, manifold="plane"
     ) -> dict:
@@ -153,7 +151,6 @@ class SpatioTemporalModel(Model):
 
         return theta_model
 
-    @time_range()
     def convert_theta_from_model2interpret(
         self, theta_model: dict, dim_spatial_domain=2, manifold="plane"
     ) -> dict:
@@ -214,7 +211,6 @@ class SpatioTemporalModel(Model):
 
         return theta_interpret
 
-    @time_range()
     def construct_Q_prior(self, theta_model: dict = None) -> sparray:
         """Construct the prior precision matrix."""
 
@@ -242,7 +238,7 @@ class SpatioTemporalModel(Model):
             + self.g3
         )
 
-        # with time_range("sparseKroneckerProduct", color_id=0):
+        # withsparseKroneckerProduct", color_id=0):
         Q_spatio_temporal = pow(theta_spatio_temporal_variation, 2) * (
             kron(self.m0, q3s)
             + theta_temporal_range * kron(self.m1, q2s)
@@ -288,7 +284,6 @@ class SpatioTemporalModel(Model):
 
         return Q_prior
 
-    @time_range()
     def construct_Q_conditional(
         self,
         Q_prior: sparray,

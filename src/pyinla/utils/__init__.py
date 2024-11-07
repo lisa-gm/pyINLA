@@ -7,11 +7,11 @@ from pyinla.utils.finite_difference_stencils import (
     hessian_diag_finite_difference_5pt,
 )
 from pyinla.utils.link_functions import sigmoid
-from pyinla.utils.other_utils import print_mpi
+from pyinla.utils.multiprocessing import print_msg
 from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
 
 __all__ = [
-    "print_mpi",
+    "print_msg",
     "theta_dict2array",
     "theta_array2dict",
     "sigmoid",
