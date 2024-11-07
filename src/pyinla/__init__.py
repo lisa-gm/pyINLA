@@ -3,7 +3,8 @@
 import os
 from warnings import warn
 
-from pyinla import ArrayLike
+from numpy.typing import ArrayLike
+
 from pyinla.__about__ import __version__
 
 # Allows user to specify the array module via an environment variable.
