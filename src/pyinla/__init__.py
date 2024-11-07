@@ -49,4 +49,31 @@ try:
 except ImportError as e:
     warn(f"No 'CuPy' backend detected. ({e})")
 
-__all__ = ["__version__", "xp", "sparse", "ArrayLike", "CUPY_AVAILABLE"]
+
+MPI_AVAILABLE = False
+try:
+    from mpi4py import MPI
+
+    comm_rank = MPI.COMM_WORLD.Get_rank()
+    comm_size = MPI.COMM_WORLD.Get_size()
+
+    MPI_AVAILABLE = True
+
+
+except ImportError as e:
+    warn(f"No 'MPI' backend detected. ({e})")
+
+    comm_rank = 0
+    comm_size = 1
+
+
+__all__ = [
+    "__version__",
+    "xp",
+    "sparse",
+    "ArrayLike",
+    "comm_rank",
+    "comm_size",
+    "CUPY_AVAILABLE",
+    "MPI_AVAILABLE",
+]

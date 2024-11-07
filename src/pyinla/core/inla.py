@@ -3,10 +3,9 @@
 import math
 import time
 
-from mpi4py import MPI
 from scipy.optimize import minimize
 
-from pyinla import ArrayLike, sparse, xp
+from pyinla import ArrayLike, comm_rank, comm_size, sparse, xp
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.likelihoods.binomial import BinomialLikelihood
 from pyinla.likelihoods.gaussian import GaussianLikelihood
@@ -20,11 +19,9 @@ from pyinla.prior_hyperparameters.penalized_complexity import (
 from pyinla.solvers.scipy_solver import ScipySolver
 from pyinla.solvers.serinv_solver import SerinvSolverCPU, SerinvSolverGPU
 from pyinla.utils.gpu import set_device
+from pyinla.utils.multiprocessing import allreduce, bcast, synchronize
 from pyinla.utils.other_utils import print_mpi
 from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
-
-comm_rank = MPI.COMM_WORLD.Get_rank()
-comm_size = MPI.COMM_WORLD.Get_size()
 
 
 class INLA:
@@ -273,11 +270,11 @@ class INLA:
                 #     flush=True,
                 # )
 
-        MPI.COMM_WORLD.Barrier()
+        synchronize()
 
         # gather f_values from all ranks using MPI_Allreduce with MPI_SUM
         f_values = xp.zeros(number_f_evaluations)
-        MPI.COMM_WORLD.Allreduce(f_values_local, f_values, op=MPI.SUM)
+        allreduce(f_values_local, f_values, op="sum")
 
         # print_mpi("f_values: ", f_values, flush=True)
 
@@ -322,10 +319,10 @@ class INLA:
         # broadcast self.x from current theta from rank 0 to all other ranks for next iteration
 
         t_mpi_bcast = time.perf_counter()
-        MPI.COMM_WORLD.Barrier()
-        MPI.COMM_WORLD.Bcast(self.x, root=0)
+        synchronize()
+        bcast(self.x, root=0)
 
-        MPI.COMM_WORLD.Barrier()
+        synchronize()
 
         t_mpi_bcast = time.perf_counter() - t_mpi_bcast
         # print_mpi(f"MPI_Bcast time: {t_mpi_bcast}", flush=True)
