@@ -1,7 +1,9 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import numpy as np
+from autograd.numpy import dot, log
 from numpy.typing import ArrayLike
+from scipy.sparse import diags
 
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -70,13 +72,64 @@ class BinomialLikelihood(Likelihood):
 
         return likelihood
 
+    def evaluate_likelihood_autodiff(
+        self,
+        eta: ArrayLike,
+        y: ArrayLike,
+        theta_likelihood: dict = None,
+    ) -> float:
+        """Evalutate the a binomial likelihood. VERSION FOR AUTOGRAD PACKAGE.
+
+        Parameters
+        ----------
+        eta : ArrayLike
+            Vector of the linear predictor.
+        y : ArrayLike
+            Vector of the observations.
+
+        Notes
+        -----
+        For now only a sigmoid link-function is implemented.
+
+        Returns
+        -------
+        likelihood : float
+            Likelihood.
+        """
+        linkEta = self.link_function(eta)
+
+        likelihood = dot(y, log(linkEta)) + dot(self.n_trials - y, log(1 - linkEta))
+
+        return likelihood
+
     def evaluate_gradient_likelihood(
         self,
         eta: ArrayLike,
         y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> ArrayLike:
-        raise NotImplementedError
+        """
+        Evaluate the gradient of the binomial likelihood with respect to eta.
+
+        Parameters
+        ----------
+        eta : ArrayLike
+            Linear predictor.
+        y : ArrayLike
+            Observed data.
+        theta_likelihood : dict, optional
+            Dictionary of likelihood hyperparameters.
+
+        Returns
+        -------
+        grad_likelihood : ArrayLike
+            Gradient of the likelihood with respect to eta.
+        """
+
+        linkEta = self.link_function(eta)
+        grad_likelihood = y - self.n_trials * linkEta
+
+        return grad_likelihood
 
     def evaluate_hessian_likelihood(
         self,
@@ -84,4 +137,25 @@ class BinomialLikelihood(Likelihood):
         y: ArrayLike,
         theta_likelihood: dict = None,
     ) -> ArrayLike:
-        raise NotImplementedError
+        """
+        Evaluate the Hessian of the binomial likelihood with respect to eta.
+
+        Parameters
+        ----------
+        eta : ArrayLike
+            Linear predictor.
+        y : ArrayLike
+            Observed data.
+        theta_likelihood : dict, optional
+            Dictionary of likelihood hyperparameters.
+
+        Returns
+        -------
+        hess_likelihood : ArrayLike
+            Hessian of the likelihood with respect to eta.
+        """
+
+        linkEta = self.link_function(eta)
+        hess_likelihood = -self.n_trials * linkEta * (1 - linkEta)
+
+        return diags(hess_likelihood)

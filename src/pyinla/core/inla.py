@@ -576,6 +576,7 @@ class INLA:
             # tic = time.perf_counter()
             x_i[:] += x_update[:]
             eta = self.a @ x_i
+            # print_mpi("eta: ", eta[:6])
 
             # TODO: need to vectorize !!
             # gradient_likelihood = gradient_finite_difference_5pt(
@@ -585,6 +586,7 @@ class INLA:
             gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
                 eta, self.y, theta_likelihood
             )
+            # print_mpi("gradient_likelihood: ", gradient_likelihood[:6])
             # toc = time.perf_counter()
             # print_mpi("         evaluate_likelihood time:", toc - tic, flush=True)
 
@@ -601,6 +603,7 @@ class INLA:
             hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(
                 eta, self.y, theta_likelihood
             )
+            # print("hessian_likelihood: ", hessian_likelihood.diagonal()[:6])
             # toc = time.perf_counter()
             # print_mpi(
             #     "         hessian_diag_finite_difference_5pt time:",

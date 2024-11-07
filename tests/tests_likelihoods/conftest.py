@@ -143,7 +143,8 @@ def generate_binomial_data(
     a = sparse.random(n_observations, n_latent_parameters, density=0.5)
     x = np.random.randn(n_latent_parameters)
     eta = a @ x
-    n_trials = np.ones(len(eta), dtype=int)
+    # n_trials = np.ones(len(eta), dtype=int)
+    n_trials = np.random.randint(1, 11, size=n_observations)
     prob = sigmoid(eta)
     y = np.random.binomial(n=n_trials, p=prob)
 
