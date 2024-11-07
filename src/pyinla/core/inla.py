@@ -1,20 +1,12 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import math
-import os
 import time
 
-import cupy as cp
-import numpy as np
-
-# try:
-# from cupy.cuda import nvtx
-from cupyx.profiler import time_range
 from mpi4py import MPI
-from numpy.typing import ArrayLike
 from scipy.optimize import minimize
-from scipy.sparse import load_npz, sparray  # diags,
 
+from pyinla import ArrayLike, sparse, xp
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.likelihoods.binomial import BinomialLikelihood
 from pyinla.likelihoods.gaussian import GaussianLikelihood
@@ -27,22 +19,9 @@ from pyinla.prior_hyperparameters.penalized_complexity import (
 )
 from pyinla.solvers.scipy_solver import ScipySolver
 from pyinla.solvers.serinv_solver import SerinvSolverCPU, SerinvSolverGPU
-
-# from pyinla.utils.finite_difference_stencils import (
-#     gradient_finite_difference_5pt,
-#     hessian_diag_finite_difference_5pt,
-# )
+from pyinla.utils.gpu import set_device
 from pyinla.utils.other_utils import print_mpi
 from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
-
-# from cupy.cuda.nvtx import RangePush, RangePop
-
-
-# CUDA_AVAIL = True
-# except:
-#     CUDA_AVAIL = False
-#     pass
-
 
 comm_rank = MPI.COMM_WORLD.Get_rank()
 comm_size = MPI.COMM_WORLD.Get_size()
@@ -68,19 +47,22 @@ class INLA:
         self.eps_inner_iteration = self.pyinla_config.eps_inner_iteration
         self.eps_gradient_f = self.pyinla_config.eps_gradient_f
 
-        # # --- Load observation vector
-        self.y = np.load(pyinla_config.input_dir / "y.npy")
+        # --- Configure HPC
+        set_device(comm_rank)
+
+        # --- Load observation vector
+        self.y = xp.load(pyinla_config.input_dir / "y.npy")
         self.n_observations = self.y.shape[0]
 
         # --- Load design matrix
-        self.a = load_npz(pyinla_config.input_dir / "a.npz")
+        self.a = sparse.load_npz(pyinla_config.input_dir / "a.npz")
         self.n_latent_parameters = self.a.shape[1]
 
         # --- Load latent parameters vector
         try:
-            self.x = np.load(pyinla_config.input_dir / "x.npy")
+            self.x = xp.load(pyinla_config.input_dir / "x.npy")
         except FileNotFoundError:
-            self.x = np.ones((self.a.shape[1]), dtype=float)
+            self.x = xp.ones((self.a.shape[1]), dtype=float)
 
         self._check_dimensions()
 
@@ -92,10 +74,8 @@ class INLA:
             self.model = RegressionModel(pyinla_config, self.n_latent_parameters)
             self.sparsity_Q_conditional = "d"
             self.sparsity_Q_prior = "d"
-            print_mpi("Regression model initialized.")
         elif self.pyinla_config.model.type == "spatio-temporal":
             self.model = SpatioTemporalModel(pyinla_config, self.n_latent_parameters)
-            print_mpi("Spatio-temporal model initialized.")
         else:
             raise ValueError(
                 f"Model '{self.pyinla_config.model.type}' not implemented."
@@ -128,33 +108,7 @@ class INLA:
                 f"Likelihood '{self.pyinla_config.likelihood.type}' not implemented."
             )
 
-        # --- print MPI information
-        print_mpi(f"MPI rank: {comm_rank}, MPI size: {comm_size}", flush=True)
-
-        num_threads = os.getenv("OMP_NUM_THREADS")
-        print_mpi(f"OMP_NUM_THREADS: {num_threads}")
-
-        # Get the number of available devices (GPUs)
-        num_gpus = cp.cuda.runtime.getDeviceCount()
-        print_mpi(f"Number of available GPUs: {num_gpus}")
-
-        # List all GPU devices
-        for i in range(num_gpus):
-            # device = cp.cuda.Device(i)
-            print_mpi(f"Device {i}: {cp.cuda.runtime.getDeviceProperties(i)['name']}")
-
-        node_id = os.getenv("HOSTNAME", os.getenv("COMPUTERNAME"))
-
-        # gpu_rank = comm_rank % 5
-        cp.cuda.Device(comm_rank).use()
-
-        current_device = cp.cuda.Device()
-        print(
-            f"MPI rank: {comm_rank}. Hostname: {node_id}. GPU Device: {current_device.id}"
-        )
-
         # --- Initialize solver
-        # RangePush("InitializeSolver")
         if self.pyinla_config.solver.type == "scipy":
             self.solver = ScipySolver(
                 pyinla_config, self.model.ns, self.model.nb, self.model.nt
@@ -171,7 +125,6 @@ class INLA:
             raise ValueError(
                 f"Solver '{self.pyinla_config.solver.type}' not implemented."
             )
-        # RangePop()
 
         # --- Initialize theta
         self.theta_initial: ArrayLike = theta_dict2array(
@@ -181,13 +134,13 @@ class INLA:
 
         self.theta = self.theta_initial
         self.f_value = 1e10
-        self.gradient_f = np.zeros(self.dim_theta)
+        self.gradient_f = xp.zeros(self.dim_theta)
 
         self.counter = 0
         self.min_f = 1e10
 
         # --- Set up recurrent variables
-        self.Q_conditional: sparray = None
+        self.Q_conditional: sparse.sparray = None
 
         print_mpi("INLA initialized.", flush=True)
         print_mpi("Model:", self.pyinla_config.model.type, flush=True)
@@ -217,7 +170,7 @@ class INLA:
             print_mpi("   Initial theta:", self.theta_initial, flush=True)
         print_mpi("   Likelihood:", self.pyinla_config.likelihood.type, flush=True)
 
-    def run(self) -> np.ndarray:
+    def run(self) -> ArrayLike:
         """Fit the model using INLA."""
 
         # maxiter = 3
@@ -298,21 +251,20 @@ class INLA:
         assert self.y.shape[0] == self.a.shape[0], "Dimensions of y and A do not match."
         assert self.x.shape[0] == self.a.shape[1], "Dimensions of x and A do not match."
 
-    @time_range()
-    def _objective_function(self, theta_i: np.ndarray) -> float:
+    def _objective_function(self, theta_i: ArrayLike) -> float:
         """Objective function for optimization."""
 
         t_objective_function = time.perf_counter()
         # generate theta matrix with different theta's to evaluate
         # currently central difference scheme is used for gradient
         number_f_evaluations = 2 * self.dim_theta + 1
-        f_values_local = np.zeros(number_f_evaluations)
+        f_values_local = xp.zeros(number_f_evaluations)
 
-        main_eval_list = np.zeros(number_f_evaluations, dtype=bool)
+        main_eval_list = xp.zeros(number_f_evaluations, dtype=bool)
         main_eval_list[0] = True
 
         # task to rank assignment
-        task_to_rank = np.zeros(number_f_evaluations, dtype=int)
+        task_to_rank = xp.zeros(number_f_evaluations, dtype=int)
 
         for i in range(number_f_evaluations):
             task_to_rank[i] = i % comm_size
@@ -320,8 +272,8 @@ class INLA:
         # print_mpi("task_to_rank: ", task_to_rank, flush=True)
 
         # TODO: eps mat constant, can live outside. size of theta_mat also constant, preallocate before?
-        epsMat = self.eps_gradient_f * np.eye(self.dim_theta)
-        theta_mat = np.repeat(theta_i.reshape(-1, 1), number_f_evaluations, axis=1)
+        epsMat = self.eps_gradient_f * xp.eye(self.dim_theta)
+        theta_mat = xp.repeat(theta_i.reshape(-1, 1), number_f_evaluations, axis=1)
         # store f_theta_i, f_theta_plus, f_theta_minus
         theta_mat[:, 1 : 1 + self.dim_theta] += epsMat
         theta_mat[:, self.dim_theta + 1 : number_f_evaluations] -= epsMat
@@ -343,7 +295,7 @@ class INLA:
         MPI.COMM_WORLD.Barrier()
 
         # gather f_values from all ranks using MPI_Allreduce with MPI_SUM
-        f_values = np.zeros(number_f_evaluations)
+        f_values = xp.zeros(number_f_evaluations)
         MPI.COMM_WORLD.Allreduce(f_values_local, f_values, op=MPI.SUM)
 
         # print_mpi("f_values: ", f_values, flush=True)
@@ -351,14 +303,14 @@ class INLA:
         f_theta = f_values[0]
 
         # compute gradient using central difference scheme
-        gradient_f_theta = np.zeros(self.dim_theta)
+        gradient_f_theta = xp.zeros(self.dim_theta)
         for i in range(self.dim_theta):
             gradient_f_theta[i] = (
                 f_values[i + 1] - f_values[i + self.dim_theta + 1]
             ) / (2 * self.eps_gradient_f)
 
         # tic = time.perf_counter()
-        # gradient_f_theta_old = np.zeros(self.dim_theta)
+        # gradient_f_theta_old = xp.zeros(self.dim_theta)
 
         # # TODO: Theses evaluations are independant and can be performed
         # # in parallel.
@@ -405,8 +357,7 @@ class INLA:
         )
         return (f_theta, gradient_f_theta)
 
-    @time_range()
-    def _evaluate_f(self, theta_i: np.ndarray, main_eval: bool = True) -> float:
+    def _evaluate_f(self, theta_i: ArrayLike, main_eval: bool = True) -> float:
         """evaluate the objective function f(theta) = log(p(theta|y)).
 
         Notes
@@ -450,7 +401,7 @@ class INLA:
         # print_mpi("   (2/6) construct_Q_prior time:", toc - tic, flush=True)
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
-        x_local = np.copy(self.x)
+        x_local = xp.copy(self.x)
         # tic = time.perf_counter()
         self.Q_conditional, x_local, logdet_Q_conditional = self._inner_iteration(
             Q_prior, x_local, theta_likelihood
@@ -513,7 +464,7 @@ class INLA:
 
         return f_theta
 
-    def _evaluate_gradient_f(self, theta_i: np.ndarray) -> np.ndarray:
+    def _evaluate_gradient_f(self, theta_i: ArrayLike) -> ArrayLike:
         """evaluate the gradient of the objective function f(theta) = log(p(theta|y)).
 
         Notes
@@ -523,7 +474,7 @@ class INLA:
 
         Returns
         -------
-        grad_f : np.ndarray
+        grad_f : ArrayLike
             Gradient of the objective function f(theta) evaluated at theta_i.
 
         """
@@ -532,7 +483,7 @@ class INLA:
 
         tic = time.perf_counter()
         dim_theta = theta_i.shape[0]
-        grad_f = np.zeros(dim_theta)
+        grad_f = xp.zeros(dim_theta)
 
         # TODO: Theses evaluations are independant and can be performed
         # in parallel.
@@ -554,11 +505,10 @@ class INLA:
 
         return grad_f
 
-    @time_range()
     def _inner_iteration(
-        self, Q_prior: sparray, x_i: ArrayLike, theta_likelihood: dict
+        self, Q_prior: sparse.sparray, x_i: ArrayLike, theta_likelihood: dict
     ):
-        x_update = np.zeros_like(x_i)
+        x_update = xp.zeros_like(x_i)
         x_i_norm = 1
 
         # print_mpi("   Starting inner iteration", flush=True)
@@ -631,7 +581,7 @@ class INLA:
             # print_mpi("         solve Q_conditional time:", toc - tic, flush=True)
 
             # with time_range('computeNorm', color_id=0):
-            x_i_norm = np.linalg.norm(x_update)
+            x_i_norm = xp.linalg.norm(x_update)
 
             counter += 1
             # print_mpi(f"Inner iteration {counter} norm: {x_i_norm}")
@@ -641,8 +591,7 @@ class INLA:
         # print_mpi("Inner iteration converged after", counter, "iterations.")
         return Q_conditional, x_i, logdet
 
-    @time_range()
-    def _evaluate_prior_latent_parameters(self, Q_prior: sparray, x: ArrayLike):
+    def _evaluate_prior_latent_parameters(self, Q_prior: sparse.sparray, x: ArrayLike):
         """Evaluation of the prior of the latent parameters at x using the prior precision
         matrix Q_prior and assuming mean zero.
 
@@ -678,14 +627,13 @@ class INLA:
 
         # with time_range('compute_xtQx', color_id=0):
         log_prior_latent_parameters = (
-            -n / 2 * np.log(2 * math.pi)
+            -n / 2 * xp.log(2 * math.pi)
             + 0.5 * logdet_Q_prior
             - 0.5 * x.T @ Q_prior @ x
         )
 
         return log_prior_latent_parameters
 
-    @time_range()
     def _evaluate_conditional_latent_parameters(
         self, Q_conditional, x, x_mean, logdet_Q_conditional
     ):
@@ -724,7 +672,7 @@ class INLA:
 
         # TODO: evaluate it at the mean -> this becomes zero ...
         # log_conditional_latent_parameters = (
-        #     -n / 2 * np.log(2 * math.pi)
+        #     -n / 2 * xp.log(2 * math.pi)
         #     + 0.5 * logdet_Q_conditional
         #     - 0.5 * (x - x_mean).T @ Q_conditional @ (x - x_mean)
         # )
@@ -756,7 +704,7 @@ class INLA:
         # min_size = min(self.n_latent_parameters, 6)
         # print_mpi(f"Q_inverse_selected[:{min_size}, :{min_size}]: \n", Q_inverse_selected[:min_size, :min_size].toarray())
 
-        latent_parameters_marginal_sd = np.sqrt(Q_inverse_selected.diagonal())
+        latent_parameters_marginal_sd = xp.sqrt(Q_inverse_selected.diagonal())
         print_mpi(
             f"standard deviation fixed effects: {latent_parameters_marginal_sd[-self.pyinla_config.model.n_fixed_effects:]}"
         )
