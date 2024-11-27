@@ -7,20 +7,15 @@ from scipy.optimize import minimize
 
 from pyinla import ArrayLike, comm_rank, comm_size, sparse, xp
 from pyinla.core.pyinla_config import PyinlaConfig
-from pyinla.likelihoods.binomial import BinomialLikelihood
-from pyinla.likelihoods.gaussian import GaussianLikelihood
-from pyinla.likelihoods.poisson import PoissonLikelihood
-from pyinla.models.regression import RegressionModel
-from pyinla.models.spatio_temporal import SpatioTemporalModel
-from pyinla.prior_hyperparameters.gaussian import GaussianPriorHyperparameters
-from pyinla.prior_hyperparameters.penalized_complexity import (
-    PenalizedComplexityPriorHyperparameters,
-)
+
+from pyinla.core.model import Model
+
+
 from pyinla.solvers.scipy_solver import ScipySolver
-from pyinla.solvers.serinv_solver import SerinvSolverCPU, SerinvSolverGPU
+from pyinla.solvers.serinv_solver import SerinvSolver
 from pyinla.utils.gpu import set_device
 from pyinla.utils.multiprocessing import allreduce, bcast, print_msg, synchronize
-from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
+from pyinla.utils.mapping import theta_array2dict, theta_dict2array
 
 
 class INLA:
@@ -38,17 +33,12 @@ class INLA:
     ) -> None:
         self.pyinla_config = pyinla_config
 
-        self.minimize_max_iter = self.pyinla_config.minimize_max_iter
         self.inner_iteration_max_iter = self.pyinla_config.inner_iteration_max_iter
         self.eps_inner_iteration = self.pyinla_config.eps_inner_iteration
         self.eps_gradient_f = self.pyinla_config.eps_gradient_f
 
         # --- Configure HPC
         set_device(comm_rank)
-
-        # --- Load observation vector
-        self.y = xp.load(pyinla_config.input_dir / "y.npy")
-        self.n_observations = self.y.shape[0]
 
         # --- Load design matrix
         self.a = sparse.load_npz(pyinla_config.input_dir / "a.npz")
@@ -66,40 +56,15 @@ class INLA:
         self.sparsity_Q_prior = "bt"
 
         # --- Initialize model
-        if self.pyinla_config.model.type == "regression":
-            self.model = RegressionModel(pyinla_config, self.n_latent_parameters)
-            self.sparsity_Q_conditional = "d"
-            self.sparsity_Q_prior = "d"
-        elif self.pyinla_config.model.type == "spatio-temporal":
-            self.model = SpatioTemporalModel(pyinla_config, self.n_latent_parameters)
-
-        # --- Initialize prior hyperparameters
-        if self.pyinla_config.prior_hyperparameters.type == "gaussian":
-            self.prior_hyperparameters = GaussianPriorHyperparameters(pyinla_config)
-        elif self.pyinla_config.prior_hyperparameters.type == "penalized_complexity":
-            self.prior_hyperparameters = PenalizedComplexityPriorHyperparameters(
-                pyinla_config
-            )
-
-        # --- Initialize likelihood
-        if self.pyinla_config.likelihood.type == "gaussian":
-            self.likelihood = GaussianLikelihood(pyinla_config, self.n_observations)
-        elif self.pyinla_config.likelihood.type == "poisson":
-            self.likelihood = PoissonLikelihood(pyinla_config, self.n_observations)
-        elif self.pyinla_config.likelihood.type == "binomial":
-            self.likelihood = BinomialLikelihood(pyinla_config, self.n_observations)
+        self.model = Model(pyinla_config=self.pyinla_config)
 
         # --- Initialize solver
         if self.pyinla_config.solver.type == "scipy":
             self.solver = ScipySolver(
                 pyinla_config, self.model.ns, self.model.nb, self.model.nt
             )
-        elif self.pyinla_config.solver.type == "serinv_cpu":
-            self.solver = SerinvSolverCPU(
-                pyinla_config, self.model.ns, self.model.nb, self.model.nt
-            )
-        elif self.pyinla_config.solver.type == "serinv_gpu":
-            self.solver = SerinvSolverGPU(
+        elif self.pyinla_config.solver.type == "serinv":
+            self.solver = SerinvSolver(
                 pyinla_config, self.model.ns, self.model.nb, self.model.nt
             )
 
@@ -108,13 +73,12 @@ class INLA:
             self.model.get_theta(), self.likelihood.get_theta()
         )
         self.dim_theta = len(self.theta_initial)
-
         self.theta = self.theta_initial
-        self.f_value = 1e10
         self.gradient_f = xp.zeros(self.dim_theta)
 
-        self.counter = 0
-        self.min_f = 1e10
+        # --- Metrics
+        self.f_values: list[float] = []
+        self.theta_values: list[ArrayLike] = []
 
         # --- Set up recurrent variables
         self.Q_conditional: sparse.sparray = None
@@ -170,12 +134,13 @@ class INLA:
                 self._objective_function,
                 self.theta_initial,
                 method="BFGS",
-                jac=True,
+                jac=self.pyinla_config.minimize.jac,
                 options={
-                    "maxiter": self.minimize_max_iter,
-                    # "maxiter": 1,
-                    "gtol": 1e-1,
-                    "disp": False,
+                    "maxiter": self.pyinla_config.minimize.max_iter,
+                    "gtol": self.pyinla_config.minimize.gtol,
+                    "c1": self.pyinla_config.minimize.c1,
+                    "c2": self.pyinla_config.minimize.c2,
+                    "disp": self.pyinla_config.minimize.disp,
                 },
             )
             toc = time.perf_counter()

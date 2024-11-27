@@ -6,49 +6,65 @@ import numpy as np
 from scipy.sparse import csc_matrix, kron, load_npz, sparray
 from scipy.special import gamma
 
-from pyinla.core.model import Model
-from pyinla.core.pyinla_config import PyinlaConfig
+from pyinla.core.submodel import SubModel
+from pyinla.core.pyinla_config import SubModelConfig
+from pathlib import Path
 
 
-class SpatioTemporalModel(Model):
+class SpatioTemporalModel(SubModel):
     """Fit a spatio-temporal model."""
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
-        n_latent_parameters: int,
+        submodel_config: SubModelConfig,
+        simulation_path: Path,
         **kwargs,
     ) -> None:
         """Initializes the model."""
-        super().__init__(pyinla_config, n_latent_parameters)
+        super().__init__(submodel_config, simulation_path)
 
         # Load spatial_matrices
-        self.c0 = load_npz(pyinla_config.input_dir / "c0.npz")
-        self.g1 = load_npz(pyinla_config.input_dir / "g1.npz")
-        self.g2 = load_npz(pyinla_config.input_dir / "g2.npz")
-        self.g3 = load_npz(pyinla_config.input_dir / "g3.npz")
+        self.c0 = load_npz(
+            Path.joinpath(simulation_path, submodel_config.inputs, "c0.npz")
+        )
+        self.g1 = load_npz(
+            Path.joinpath(simulation_path, submodel_config.inputs, "g1.npz")
+        )
+        self.g2 = load_npz(
+            Path.joinpath(simulation_path, submodel_config.inputs, "g2.npz")
+        )
+        self.g3 = load_npz(
+            Path.joinpath(simulation_path, submodel_config.inputs, "g3.npz")
+        )
 
-        self.ns = self.c0.shape[0]
         self._check_dimensions_spatial_matrices()
 
         # Load temporal_matrices
-        self.m0 = load_npz(pyinla_config.input_dir / "m0.npz")
-        self.m1 = load_npz(pyinla_config.input_dir / "m1.npz")
-        self.m2 = load_npz(pyinla_config.input_dir / "m2.npz")
+        self.m0 = load_npz(
+            Path.joinpath(simulation_path, submodel_config.inputs, "m0.npz")
+        )
+        self.m1 = load_npz(
+            Path.joinpath(simulation_path, submodel_config.inputs, "m1.npz")
+        )
+        self.m2 = load_npz(
+            Path.joinpath(simulation_path, submodel_config.inputs, "m2.npz")
+        )
 
-        self.nt = self.m0.shape[0]
         self._check_dimensions_temporal_matrices()
+
+        self.ns = self.c0.shape[0]  # Number of spatial nodes in the mesh
+        self.nt = self.m0.shape[0]  # Number of temporal nodes in the mesh
 
         # Check that design_matrix shape match spatio-temporal fields
         assert (
-            self.n_latent_parameters == self.nb + self.ns * self.nt
-        ), f"Design matrix has incorrect number of columns. \n    n_latent_parameters: {self.n_latent_parameters}\n    nb: {self.nb} + ns: {self.ns} * nt: {self.nt} = {self.nb + self.ns * self.nt}"
+            self.n_latent_parameters == self.ns * self.nt
+        ), f"Design matrix has incorrect number of columns. \n    n_latent_parameters: {self.n_latent_parameters}\n    ns: {self.ns} * nt: {self.nt} = {self.ns * self.nt}"
 
         # Load model hyperparameters
-        self.theta = {
-            "spatial_range": pyinla_config.model.theta_spatial_range,
-            "temporal_range": pyinla_config.model.theta_temporal_range,
-            "spatio_temporal_variation": pyinla_config.model.theta_spatio_temporal_variation,
+        self.theta_initial = {
+            "r_s": submodel_config.r_s,
+            "r_t": submodel_config.r_t,
+            "sigma_st": submodel_config.sigma_st,
         }
 
     def _check_dimensions_spatial_matrices(self) -> None:
@@ -71,18 +87,6 @@ class SpatioTemporalModel(Model):
         assert (
             self.m0.shape == self.m1.shape == self.m2.shape
         ), "Dimensions of temporal matrices do not match."
-
-    def get_theta(self) -> dict:
-        """Get the initial theta of the model. This dictionary is constructed
-        at instanciation of the model. It has to be stored in the model as
-        theta is specific to the model.
-
-        Returns
-        -------
-        theta_inital_model : dict
-            Dictionary of hyperparameters. Theta gets when calling construct_Q_prior.
-        """
-        return self.theta
 
     def convert_theta_from_interpret2model(
         self, theta_interpret: dict, dim_spatial_domain=2, manifold="plane"

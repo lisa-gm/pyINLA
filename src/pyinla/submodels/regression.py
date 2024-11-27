@@ -3,47 +3,35 @@
 # from pyinla import ArrayLike
 from scipy.sparse import eye, sparray
 
-from pyinla.core.model import Model
-from pyinla.core.pyinla_config import PyinlaConfig
+from pyinla.core.submodel import SubModel
+from pyinla.core.pyinla_config import SubModelConfig
+from pathlib import Path
 
 
-class RegressionModel(Model):
+class RegressionModel(SubModel):
     """Fit a regression model."""
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
-        n_latent_parameters: int,
+        submodel_config: SubModelConfig,
+        simulation_path: Path,
         **kwargs,
     ) -> None:
         """Initializes the model."""
-        super().__init__(pyinla_config, n_latent_parameters)
+        super().__init__(submodel_config, simulation_path)
 
-        self.ns = 0
-        self.nt = 0
+        self.n_fixed_effects = submodel_config.n_fixed_effects
 
         # Check that design_matrix shape match number of fixed effects
         assert (
-            self.nb == self.n_latent_parameters
+            self.n_fixed_effects == self.n_latent_parameters
         ), "Design matrix has incorrect number of columns."
-
-    def get_theta(self) -> dict:
-        """Get the initial theta of the model. This dictionary is constructed
-        at instanciation of the model. It has to be stored in the model as
-        theta is specific to the model.
-
-        Returns
-        -------
-        theta_inital_model : dict
-            Dictionary of initial hyperparameters.
-        """
-        return {}
 
     def construct_Q_prior(self, theta_model: dict = None) -> sparray:
         """Construct the prior precision matrix."""
 
         # Construct the prior precision matrix
-        Q_prior = self.fixed_effects_prior_precision * eye(self.nb)
+        Q_prior = self.fixed_effects_prior_precision * eye(self.n_fixed_effects)
 
         return Q_prior
 

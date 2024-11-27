@@ -9,8 +9,8 @@ from pyinla.core.likelihood import Likelihood
 from pyinla.core.model import Model
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.likelihoods.gaussian import GaussianLikelihood
-from pyinla.models.regression import RegressionModel
-from pyinla.models.spatio_temporal import SpatioTemporalModel
+from pyinla.submodels.regression import RegressionModel
+from pyinla.submodels.spatio_temporal import SpatioTemporalModel
 from pyinla.utils import sigmoid
 
 

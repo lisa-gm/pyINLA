@@ -12,8 +12,8 @@ from scipy import sparse
 from scipy.sparse import triu  # csc_matrix,
 
 # from pyinla.core.pyinla_config import PyinlaConfig
-from pyinla.models.spatio_temporal import SpatioTemporalModel
-from pyinla.utils.theta_utils import read_sym_CSC, theta_array2dict  # theta_dict2array
+from pyinla.submodels.spatio_temporal import SpatioTemporalModel
+from pyinla.utils.mapping import read_sym_CSC, theta_array2dict  # theta_dict2array
 
 # have 2 folders with theta vector, matrices & and expected output
 

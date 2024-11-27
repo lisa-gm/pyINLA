@@ -8,7 +8,7 @@ from pyinla.utils.finite_difference_stencils import (
 )
 from pyinla.utils.link_functions import sigmoid
 from pyinla.utils.multiprocessing import print_msg
-from pyinla.utils.theta_utils import theta_array2dict, theta_dict2array
+from pyinla.utils.mapping import theta_array2dict, theta_dict2array
 
 __all__ = [
     "print_msg",
