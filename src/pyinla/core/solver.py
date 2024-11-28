@@ -2,8 +2,6 @@
 
 from abc import ABC, abstractmethod
 
-from scipy.sparse import sparray
-
 from pyinla import ArrayLike
 from pyinla.core.pyinla_config import PyinlaConfig
 
@@ -20,7 +18,7 @@ class Solver(ABC):
         self.pyinla_config = pyinla_config
 
     @abstractmethod
-    def cholesky(self, A: sparray, **kwargs) -> None:
+    def cholesky(self, A: ArrayLike, **kwargs) -> None:
         """Compute Cholesky factor of input matrix."""
         pass
 
@@ -32,19 +30,4 @@ class Solver(ABC):
     @abstractmethod
     def logdet(self, **kwargs) -> float:
         """Compute logdet of input matrix using Cholesky factor."""
-        pass
-
-    @abstractmethod
-    def full_inverse(self, **kwargs) -> ArrayLike:
-        """Compute inverse of input matrix using Cholesky factor."""
-        pass
-
-    @abstractmethod
-    def selected_inverse(self, **kwargs) -> ArrayLike:
-        """Compute inverse of selected rows of input matrix using Cholesky factor."""
-        pass
-
-    @abstractmethod
-    def get_L(self, **kwargs) -> ArrayLike:
-        """Get L as a dense array."""
         pass

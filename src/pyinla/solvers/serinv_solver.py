@@ -264,9 +264,9 @@ class SerinvSolverCPU(Solver):
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 ] = self.A_arrow_bottom_blocks[i, :, :]
 
-        L[
-            -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
-        ] = self.A_arrow_tip_block[:, :]
+        L[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :] = (
+            self.A_arrow_tip_block[:, :]
+        )
 
         return L
 
@@ -587,8 +587,8 @@ class SerinvSolverGPU(Solver):
                 ] = self.A_arrow_bottom_blocks[i, :, :]
 
         # Copy the arrow tip block
-        L[
-            -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
-        ] = self.A_arrow_tip_block[:, :]
+        L[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :] = (
+            self.A_arrow_tip_block[:, :]
+        )
 
         return L
