@@ -101,6 +101,8 @@ class SpatioTemporalSubModelConfig(SubModelConfig):
     ph_t: PriorHyperparametersConfig = None
     ph_st: PriorHyperparametersConfig = None
 
+    manifold: Literal["plane", "sphere"] = "plane"
+
     def read_hyperparameters(self):
         theta = xp.array([self.r_s, self.r_t, self.sigma_st])
         theta_keys = ["r_s", "r_t", "sigma_st"]

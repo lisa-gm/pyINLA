@@ -37,18 +37,6 @@ class SubModel(ABC):
             self.x_initial = xp.zeros((self.a.shape[1]), dtype=float)
 
     @abstractmethod
-    def construct_Q_prior(self, theta_model: dict = None) -> sparray:
+    def construct_Q_prior(self, **kwargs) -> sparray:
         """Construct the prior precision matrix."""
-        pass
-
-    @abstractmethod
-    def construct_Q_conditional(
-        self,
-        Q_prior: sparray,
-        a: sparray,
-        hessian_likelihood: sparray,
-    ) -> sparray:
-        """Construct the conditional precision matrix.
-        #TODO: hessian_likelihood always diagonal (for all models). How to pass this best?
-        """
-        pass
+        ...

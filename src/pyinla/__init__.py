@@ -12,12 +12,12 @@ ARRAY_MODULE = os.environ.get("ARRAY_MODULE")
 if ARRAY_MODULE is not None:
     if ARRAY_MODULE == "numpy":
         import numpy as xp
-        from scipy import sparse
+        import scipy as sp
 
     elif ARRAY_MODULE == "cupy":
         try:
             import cupy as xp
-            from cupyx.scipy import sparse
+            import cupyx.scipy as sp
 
             # Check if cupy is actually working. This could still raise
             # a cudaErrorInsufficientDriver error or something.
@@ -26,20 +26,20 @@ if ARRAY_MODULE is not None:
         except ImportError as e:
             warn(f"'CuPy' is unavailable, defaulting to 'NumPy'. ({e})")
             import numpy as xp
-            from scipy import sparse
+            import scipy as sp
     else:
         raise ValueError(f"Unrecognized ARRAY_MODULE '{ARRAY_MODULE}'")
 else:
     # If the user does not specify the array module, prioritize numpy.
     warn("No `ARRAY_MODULE` specified, pyINLA.core defaulting to 'NumPy'.")
     import numpy as xp
-    from scipy import sparse
+    import scipy as sp
 
 # In any case, check if CuPy is available.
 CUPY_AVAILABLE = False
 try:
     import cupy as xp
-    from cupyx.scipy import sparse
+    import cupyx.scipy as sp
 
     # Check if cupy is actually working. This could still raise
     # a cudaErrorInsufficientDriver error or something.
@@ -70,7 +70,7 @@ except ImportError as e:
 __all__ = [
     "__version__",
     "xp",
-    "sparse",
+    "sp",
     "ArrayLike",
     "comm_rank",
     "comm_size",

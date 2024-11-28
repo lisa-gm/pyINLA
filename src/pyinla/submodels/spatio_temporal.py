@@ -2,13 +2,14 @@
 
 import math
 
-import numpy as np
+import numpy as xp
 from scipy.sparse import csc_matrix, kron, load_npz, sparray
-from scipy.special import gamma
 
 from pyinla.core.submodel import SubModel
 from pyinla.core.pyinla_config import SubModelConfig
 from pathlib import Path
+
+from pyinla import ArrayLike, xp, sp
 
 
 class SpatioTemporalModel(SubModel):
@@ -24,30 +25,30 @@ class SpatioTemporalModel(SubModel):
         super().__init__(submodel_config, simulation_path)
 
         # Load spatial_matrices
-        self.c0: sparray = load_npz(
-            Path.joinpath(simulation_path, submodel_config.inputs, "c0.npz")
+        self.c0: sparray = csc_matrix(
+            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "c0.npz"))
         )
-        self.g1: sparray = load_npz(
-            Path.joinpath(simulation_path, submodel_config.inputs, "g1.npz")
+        self.g1: sparray = csc_matrix(
+            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g1.npz"))
         )
-        self.g2: sparray = load_npz(
-            Path.joinpath(simulation_path, submodel_config.inputs, "g2.npz")
+        self.g2: sparray = csc_matrix(
+            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g2.npz"))
         )
-        self.g3: sparray = load_npz(
-            Path.joinpath(simulation_path, submodel_config.inputs, "g3.npz")
+        self.g3: sparray = csc_matrix(
+            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g3.npz"))
         )
 
         self._check_dimensions_spatial_matrices()
 
         # Load temporal_matrices
-        self.m0: sparray = load_npz(
-            Path.joinpath(simulation_path, submodel_config.inputs, "m0.npz")
+        self.m0: sparray = csc_matrix(
+            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m0.npz"))
         )
-        self.m1: sparray = load_npz(
-            Path.joinpath(simulation_path, submodel_config.inputs, "m1.npz")
+        self.m1: sparray = csc_matrix(
+            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m1.npz"))
         )
-        self.m2: sparray = load_npz(
-            Path.joinpath(simulation_path, submodel_config.inputs, "m2.npz")
+        self.m2: sparray = csc_matrix(
+            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m2.npz"))
         )
 
         self._check_dimensions_temporal_matrices()
@@ -59,6 +60,8 @@ class SpatioTemporalModel(SubModel):
         assert (
             self.n_latent_parameters == self.ns * self.nt
         ), f"Design matrix has incorrect number of columns. \n    n_latent_parameters: {self.n_latent_parameters}\n    ns: {self.ns} * nt: {self.nt} = {self.ns * self.nt}"
+
+        self.manifold = submodel_config.manifold
 
     def _check_dimensions_spatial_matrices(self) -> None:
         """Check the dimensions of the model."""
@@ -81,15 +84,52 @@ class SpatioTemporalModel(SubModel):
             self.m0.shape == self.m1.shape == self.m2.shape
         ), "Dimensions of temporal matrices do not match."
 
-    def convert_theta_from_interpret2model(
-        self, theta_interpret: dict, dim_spatial_domain=2, manifold="plane"
-    ) -> dict:
-        """Convert theta from interpretable scale to model scale."""
+    def construct_Q_prior(self, **kwargs) -> sparray:
+        """Construct the prior precision matrix."""
 
+        theta: ArrayLike = kwargs.get("theta", None)
+        theta_keys: list = kwargs.get("theta_keys", None)
+
+        r_s = theta[theta_keys == "r_s"]
+        r_t = theta[theta_keys == "r_t"]
+        sigma_st = theta[theta_keys == "sigma_st"]
+
+        gamma_s, gamma_t, gamma_st = self._interpretable2compute(
+            r_s, r_t, sigma_st, dim_spatial_domain=2
+        )
+
+        exp_gamma_s = xp.exp(gamma_s)
+        exp_gamma_t = xp.exp(gamma_t)
+        exp_gamma_st = xp.exp(gamma_st)
+
+        q1s = pow(exp_gamma_s, 2) * self.c0 + self.g1
+        q2s = (
+            pow(exp_gamma_s, 4) * self.c0 + 2 * pow(exp_gamma_s, 2) * self.g1 + self.g2
+        )
+        q3s = (
+            pow(exp_gamma_s, 6) * self.c0
+            + 3 * pow(exp_gamma_s, 4) * self.g1
+            + 3 * pow(exp_gamma_s, 2) * self.g2
+            + self.g3
+        )
+
+        # withsparseKroneckerProduct", color_id=0):
+        Q_prior = csc_matrix(
+            pow(exp_gamma_st, 2)
+            * (
+                kron(self.m0, q3s)
+                + exp_gamma_t * kron(self.m1, q2s)
+                + pow(exp_gamma_t, 2) * kron(self.m2, q1s)
+            )
+        )
+
+        return Q_prior
+
+    def _interpretable2compute(self, r_s, r_t, sigma_st, dim_spatial_domain=2) -> tuple:
         if dim_spatial_domain != 2:
             raise ValueError("Only 2D spatial domain is supported for now.")
 
-        # assumes alphas as fixed for now
+        # Assumes alphas as fixed for now
         alpha_s = 2
         alpha_t = 1
         alpha_e = 1
@@ -100,57 +140,40 @@ class SpatioTemporalModel(SubModel):
         nu_s = alpha - 1
         nu_t = alpha_t - 0.5
 
-        log_gamma_s = 0.5 * np.log(8 * nu_s) - theta_interpret["spatial_range"]
-        log_gamma_t = (
-            theta_interpret["temporal_range"]
-            - 0.5 * np.log(8 * nu_t)
-            + alpha_s * log_gamma_s
-        )
+        gamma_s = 0.5 * xp.log(8 * nu_s) - r_s
+        gamma_t = r_t - 0.5 * xp.log(8 * nu_t) + alpha_s * gamma_s
 
-        if manifold == "sphere":
-            cR_t = gamma(nu_t) / (gamma(alpha_t) * pow(4 * math.pi, 0.5))
-            cS = 0.0
-            for k in range(50):
-                cS += (2.0 * k + 1.0) / (
-                    4.0
-                    * math.pi
-                    * pow(pow(np.exp(log_gamma_s), 2) + k * (k + 1), alpha)
-                )
-            log_gamma_e = (
-                0.5 * np.log(cR_t)
-                + 0.5 * np.log(cS)
-                - 0.5 * log_gamma_t
-                - theta_interpret["spatio_temporal_variation"]
+        if self.manifold == "sphere":
+            cR_t = sp.special.gamma(nu_t) / (
+                sp.special.gamma(alpha_t) * pow(4 * math.pi, 0.5)
             )
+            c_s = 0.0
+            for k in range(50):
+                c_s += (2.0 * k + 1.0) / (
+                    4.0 * math.pi * pow(pow(xp.exp(gamma_s), 2) + k * (k + 1), alpha)
+                )
+            gamma_st = 0.5 * xp.log(cR_t) + 0.5 * xp.log(c_s) - 0.5 * gamma_t - sigma_st
 
-        elif manifold == "plane":
-            #  pow(4*M_PI, dim_spatial_domain/2.0) * pow(4*M_PI, dim_temporal_domain/2.0);
+        elif self.manifold == "plane":
             c1_scaling_constant = pow(4 * math.pi, 1.5)
             c1 = (
-                gamma(nu_t)
-                * gamma(nu_s)
-                / (gamma(alpha_t) * gamma(alpha) * c1_scaling_constant)
+                sp.special.gamma(nu_t)
+                * sp.special.gamma(nu_s)
+                / (
+                    sp.special.gamma(alpha_t)
+                    * sp.special.gamma(alpha)
+                    * c1_scaling_constant
+                )
             )
-            log_gamma_e = (
-                0.5 * np.log(c1)
-                - 0.5 * log_gamma_t
-                - nu_s * log_gamma_s
-                - theta_interpret["spatio_temporal_variation"]
-            )
+            gamma_st = 0.5 * xp.log(c1) - 0.5 * gamma_t - nu_s * gamma_s - sigma_st
         else:
-            raise ValueError("Manifold not supported: ", manifold)
+            raise ValueError("Manifold not supported: ", self.manifold)
 
-        theta_model = {
-            "spatial_range": log_gamma_s,
-            "temporal_range": log_gamma_t,
-            "spatio_temporal_variation": log_gamma_e,
-        }
-
-        return theta_model
+        return gamma_s, gamma_t, gamma_st
 
     def convert_theta_from_model2interpret(
-        self, theta_model: dict, dim_spatial_domain=2, manifold="plane"
-    ) -> dict:
+        self, gamma_s, gamma_t, gamma_st, dim_spatial_domain=2
+    ) -> tuple:
         """Convert theta from model scale to interpretable scale."""
 
         if dim_spatial_domain != 2:
@@ -164,138 +187,48 @@ class SpatioTemporalModel(SubModel):
         nu_s = alpha - 1
         nu_t = alpha_t - 0.5
 
-        gamma_s = np.exp(theta_model["spatial_range"])
-        gamma_t = np.exp(theta_model["temporal_range"])
-        gamma_e = np.exp(theta_model["spatio_temporal_variation"])
+        exp_gamma_s = xp.exp(gamma_s)
+        exp_gamma_t = xp.exp(gamma_t)
+        exp_gamma_st = xp.exp(gamma_st)
 
-        theta_interpret = {}
-        theta_interpret["spatial_range"] = np.log(np.sqrt(8 * nu_s) / gamma_s)
-        theta_interpret["temporal_range"] = np.log(
-            gamma_t * np.sqrt(8 * nu_t) / (pow(gamma_s, alpha_s))
-        )
+        r_s = xp.log(xp.sqrt(8 * nu_s) / exp_gamma_s)
+        r_t = xp.log(exp_gamma_t * xp.sqrt(8 * nu_t) / (pow(exp_gamma_s, alpha_s)))
 
-        if manifold == "sphere":
-            cR_t = gamma(alpha_t - 0.5) / (gamma(alpha_t) * pow(4 * math.pi, 0.5))
-            cS = 0.0
-            for k in range(50):  # compute 1st 50 terms of infinite sum
-                cS += (2.0 * k + 1) / (
-                    4 * math.pi * pow(pow(gamma_s, 2) + k * (k + 1), alpha)
+        if self.manifold == "sphere":
+            c_r_t = sp.special.gamma(alpha_t - 0.5) / (
+                sp.special.gamma(alpha_t) * pow(4 * math.pi, 0.5)
+            )
+            c_s = 0.0
+            for k in range(50):
+                c_s += (2.0 * k + 1) / (
+                    4 * math.pi * pow(pow(exp_gamma_s, 2) + k * (k + 1), alpha)
                 )
-            # print(f"cS : {cS}")
-            theta_interpret["spatio_temporal_variation"] = np.log(
-                np.sqrt(cR_t * cS) / (gamma_e * np.sqrt(gamma_t))
+            sigma_st = xp.log(
+                xp.sqrt(c_r_t * c_s) / (exp_gamma_st * xp.sqrt(exp_gamma_t))
             )
 
-        elif manifold == "plane":
+        elif self.manifold == "plane":
             c1_scaling_const = pow(4 * math.pi, dim_spatial_domain / 2.0) * pow(
                 4 * math.pi, 0.5
             )
             c1 = (
-                gamma(nu_t)
-                * gamma(nu_s)
-                / (gamma(alpha_t) * gamma(alpha) * c1_scaling_const)
-            )
-            theta_interpret["spatio_temporal_variation"] = np.log(
-                np.sqrt(c1)
+                sp.special.gamma(nu_t)
+                * sp.special.gamma(nu_s)
                 / (
-                    (gamma_e * np.sqrt(gamma_t))
-                    * pow(gamma_s, alpha - dim_spatial_domain / 2)
+                    sp.special.gamma(alpha_t)
+                    * sp.special.gamma(alpha)
+                    * c1_scaling_const
+                )
+            )
+            sigma_st = xp.log(
+                xp.sqrt(c1)
+                / (
+                    (exp_gamma_st * xp.sqrt(exp_gamma_t))
+                    * pow(exp_gamma_s, alpha - dim_spatial_domain / 2)
                 )
             )
 
         else:
-            raise ValueError("Manifold not supported: ", manifold)
+            raise ValueError("Manifold not supported: ", self.manifold)
 
-        return theta_interpret
-
-    def construct_Q_prior(self, theta_model: dict = None) -> sparray:
-        """Construct the prior precision matrix."""
-
-        self.theta = theta_model
-
-        if theta_model is None:
-            raise ValueError("theta_model must be provided.")
-
-        theta_spatial_range = np.exp(theta_model["spatial_range"])
-        theta_temporal_range = np.exp(theta_model["temporal_range"])
-        theta_spatio_temporal_variation = np.exp(
-            theta_model["spatio_temporal_variation"]
-        )
-
-        q1s = pow(theta_spatial_range, 2) * self.c0 + self.g1
-        q2s = (
-            pow(theta_spatial_range, 4) * self.c0
-            + 2 * pow(theta_spatial_range, 2) * self.g1
-            + self.g2
-        )
-        q3s = (
-            pow(theta_spatial_range, 6) * self.c0
-            + 3 * pow(theta_spatial_range, 4) * self.g1
-            + 3 * pow(theta_spatial_range, 2) * self.g2
-            + self.g3
-        )
-
-        # withsparseKroneckerProduct", color_id=0):
-        Q_spatio_temporal = pow(theta_spatio_temporal_variation, 2) * (
-            kron(self.m0, q3s)
-            + theta_temporal_range * kron(self.m1, q2s)
-            + pow(theta_temporal_range, 2) * kron(self.m2, q1s)
-        )
-
-        if Q_spatio_temporal is not csc_matrix:
-            Q_spatio_temporal = csc_matrix(Q_spatio_temporal)
-
-        # Construct block diagonal matrix Q fixed effects
-        Q_fixed_effects_data = np.full(self.nb, self.fixed_effects_prior_precision)
-        Q_fixed_effects_indices = np.arange(self.nb)
-        Q_fixed_effects_indptr = np.arange(self.nb + 1)
-
-        # Extract data, indices, and indptr from Q_spatio_temporal
-        Q_spatio_temporal_data = Q_spatio_temporal.data
-        Q_spatio_temporal_indices = Q_spatio_temporal.indices
-        Q_spatio_temporal_indptr = Q_spatio_temporal.indptr
-        Q_spatio_temporal_shape = Q_spatio_temporal.shape
-
-        # Concatenate data, indices, and indptr to form the block diagonal matrix Q
-        data = np.concatenate([Q_spatio_temporal_data, Q_fixed_effects_data])
-        indices = np.concatenate(
-            [
-                Q_spatio_temporal_indices,
-                Q_fixed_effects_indices + Q_spatio_temporal_shape[1],
-            ]
-        )
-        indptr = np.concatenate(
-            [
-                Q_spatio_temporal_indptr,
-                Q_spatio_temporal_indptr[-1] + Q_fixed_effects_indptr[1:],
-            ]
-        )
-
-        Q_prior = csc_matrix(
-            (data, indices, indptr),
-            shape=(
-                Q_spatio_temporal.shape[0] + self.nb,
-                Q_spatio_temporal.shape[1] + self.nb,
-            ),
-        )
-
-        return Q_prior
-
-    def construct_Q_conditional(
-        self,
-        Q_prior: sparray,
-        a: sparray,
-        hessian_likelihood: sparray,
-    ) -> float:
-        """Construct the conditional precision matrix.
-
-        Note
-        ----
-        Input of the hessian of the likelihood is a diagonal matrix.
-        The negative hessian is required, therefore the minus in front.
-
-        """
-
-        Q_conditional = Q_prior - a.T @ hessian_likelihood @ a
-
-        return Q_conditional
+        return r_s, r_t, sigma_st

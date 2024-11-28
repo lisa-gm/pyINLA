@@ -119,3 +119,50 @@ class Model(ABC):
             self.likelihood = PoissonLikelihood(pyinla_config, self.n_observations)
         elif self.pyinla_config.model.likelihood.type == "binomial":
             self.likelihood = BinomialLikelihood(pyinla_config, self.n_observations)
+
+    def construct_Q_prior(self) -> sparray:
+
+        # Concatenate data, indices, and indptr to form the block diagonal matrix Q
+        data = np.concatenate([Q_spatio_temporal_data, Q_fixed_effects_data])
+        indices = np.concatenate(
+            [
+                Q_spatio_temporal_indices,
+                Q_fixed_effects_indices + Q_spatio_temporal_shape[1],
+            ]
+        )
+        indptr = np.concatenate(
+            [
+                Q_spatio_temporal_indptr,
+                Q_spatio_temporal_indptr[-1] + Q_fixed_effects_indptr[1:],
+            ]
+        )
+
+        Q_prior = csc_matrix(
+            (data, indices, indptr),
+            shape=(
+                Q_spatio_temporal.shape[0] + self.nb,
+                Q_spatio_temporal.shape[1] + self.nb,
+            ),
+        )
+
+        self.Q_prior = ...
+
+        return self.Q_prior
+
+    def construct_Q_conditional(
+        self,
+        Q_prior: sparray,
+        hessian_likelihood: sparray,
+    ) -> float:
+        """Construct the conditional precision matrix.
+
+        Note
+        ----
+        Input of the hessian of the likelihood is a diagonal matrix.
+        The negative hessian is required, therefore the minus in front.
+
+        """
+
+        Q_conditional = self.Q_prior - self.a.T @ hessian_likelihood @ self.a
+
+        return Q_conditional

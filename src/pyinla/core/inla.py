@@ -109,9 +109,7 @@ class INLA:
 
         # maxiter = 3
         # for i in range(maxiter):
-        #     tic = time.perf_counter()
         #     self.f_value, self.gradient_f = self._objective_function(self.model.theta)
-        #     toc = time.perf_counter()
         #     print_msg(
         #         f"i: {i}. MPI size: {comm_size}. Time objective function call: {toc - tic} s. f value: {self.f_value}",
         #         flush=True,
@@ -122,7 +120,6 @@ class INLA:
             # grad_f_init = self._evaluate_gradient_f(self.model.theta)
             # print_msg(f"Initial gradient: {grad_f_init}", flush=True)
 
-            tic = time.perf_counter()
             result = minimize(
                 self._objective_function,
                 self.model.theta,
@@ -136,7 +133,6 @@ class INLA:
                     "disp": self.pyinla_config.minimize.disp,
                 },
             )
-            toc = time.perf_counter()
             print_msg(f"Total time minimize: {toc - tic} s", flush=True)
 
             if result.success:
@@ -246,7 +242,6 @@ class INLA:
                 f_values[i + 1] - f_values[i + self.model.n_hyperparameters + 1]
             ) / (2 * self.eps_gradient_f)
 
-        # tic = time.perf_counter()
         # gradient_f_theta_old = xp.zeros(self.model.n_hyperparameters)
 
         # # TODO: Theses evaluations are independant and can be performed
@@ -269,7 +264,6 @@ class INLA:
         #     print("diff backward: ", f_values[i + self.model.n_hyperparameters + 1] - f_minus)
 
         #     gradient_f_theta_old[i] = (f_plus - f_minus) / (2 * self.eps_gradient_f)
-        # toc = time.perf_counter()
         # print_msg("   evaluate_gradient_f time:", toc - tic, flush=True)
 
         # print_msg(f"Gradient: {gradient_f_theta}", flush=True)
@@ -323,27 +317,21 @@ class INLA:
         )
 
         # --- Evaluate the log prior of the hyperparameters
-        # tic = time.perf_counter()
         log_prior_hyperparameters = self.prior_hyperparameters.evaluate_log_prior(
             theta_model, theta_likelihood
         )
-        # toc = time.perf_counter()
         # print_msg("log prior hyperparameters: ", log_prior_hyperparameters)
         # print_msg("   (1/6) evaluate_log_prior time:", toc - tic, flush=True)
 
         # --- Construct the prior precision matrix of the latent parameters
-        # tic = time.perf_counter()
         Q_prior = self.model.construct_Q_prior(theta_model)
-        # toc = time.perf_counter()
         # print_msg("   (2/6) construct_Q_prior time:", toc - tic, flush=True)
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
         x_local = xp.copy(self.x)
-        # tic = time.perf_counter()
         self.Q_conditional, x_local, logdet_Q_conditional = self._inner_iteration(
             Q_prior, x_local, theta_likelihood
         )
-        # toc = time.perf_counter()
         # print_msg("   (3/6) inner_iteration time:", toc - tic, flush=True)
         # print(f"rank: {comm_rank}. after inner iteration x: ", self.x[:10])
 
@@ -353,19 +341,15 @@ class INLA:
             self.x = x_local
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
-        # tic = time.perf_counter()
         eta = self.a @ x_local
         likelihood = self.likelihood.evaluate_likelihood(eta, self.y, theta_likelihood)
-        # toc = time.perf_counter()
         # print_msg("   (4/6) evaluate_likelihood time:", toc - tic, flush=True)
         # print_msg("likelihood: ", likelihood)
 
         # --- Evaluate the conditional of the latent parameters at x_star
-        # tic = time.perf_counter()
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
             self.Q_conditional, x_local, x_local, logdet_Q_conditional
         )
-        # toc = time.perf_counter()
         # print_msg(
         #     "   (6/6) evaluate_conditional_latent_parameters time:",
         #     toc - tic,
@@ -374,11 +358,9 @@ class INLA:
         # print_msg("conditional latent parameters: ", conditional_latent_parameters)
 
         # --- Evaluate the prior of the latent parameters at x_star
-        # tic = time.perf_counter()
         prior_latent_parameters = self._evaluate_prior_latent_parameters(
             Q_prior, x_local
         )
-        # toc = time.perf_counter()
         # print_msg(
         #     "   (5/6) evaluate_prior_latent_parameters time:", toc - tic, flush=True
         # )
@@ -418,7 +400,6 @@ class INLA:
 
         print_msg("Evaluate gradient_f()", flush=True)
 
-        tic = time.perf_counter()
         dim_theta = theta_i.shape[0]
         grad_f = xp.zeros(dim_theta)
 
@@ -435,7 +416,6 @@ class INLA:
             f_minus = self._evaluate_f(theta_minus)
 
             grad_f[i] = (f_plus - f_minus) / (2 * self.eps_gradient_f)
-        toc = time.perf_counter()
         print_msg("   evaluate_gradient_f time:", toc - tic, flush=True)
 
         print_msg(f"Gradient: {grad_f}", flush=True)
@@ -460,7 +440,6 @@ class INLA:
                 )
             # print_msg(f"      inner iteration {counter} norm: {x_i_norm}", flush=True)
 
-            # tic = time.perf_counter()
             x_i[:] += x_update[:]
             eta = self.a @ x_i
             # print_msg("eta: ", eta[:6])
@@ -474,10 +453,8 @@ class INLA:
                 eta, self.y, theta_likelihood
             )
             # print_msg("gradient_likelihood: ", gradient_likelihood[:6])
-            # toc = time.perf_counter()
             # print_msg("         evaluate_likelihood time:", toc - tic, flush=True)
 
-            # tic = time.perf_counter()
             # with time_range('constructRhs', color_id=0):
             rhs = -1 * Q_prior @ x_i + self.a.T @ gradient_likelihood
 
@@ -491,30 +468,23 @@ class INLA:
                 eta, self.y, theta_likelihood
             )
             # print("hessian_likelihood: ", hessian_likelihood.diagonal()[:6])
-            # toc = time.perf_counter()
             # print_msg(
             #     "         hessian_diag_finite_difference_5pt time:",
             #     toc - tic,
             #     flush=True,
             # )
 
-            # tic = time.perf_counter()
             Q_conditional = self.model.construct_Q_conditional(
                 Q_prior,
                 self.a,
                 hessian_likelihood,
             )
-            # toc = time.perf_counter()
             # print_msg("         construct_Q_conditional time:", toc - tic, flush=True)
 
-            # tic = time.perf_counter()
             self.solver.cholesky(Q_conditional, sparsity=self.sparsity_Q_conditional)
-            # toc = time.perf_counter()
             # print_msg("         Solver Call Q_conditional time:", toc - tic, flush=True)
 
-            # tic = time.perf_counter()
             x_update[:] = self.solver.solve(rhs, sparsity=self.sparsity_Q_conditional)
-            # toc = time.perf_counter()
             # print_msg("         solve Q_conditional time:", toc - tic, flush=True)
 
             # with time_range('computeNorm', color_id=0):
