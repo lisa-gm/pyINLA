@@ -96,7 +96,7 @@ class Model(ABC):
             rows.append(submodel.a.row)
             cols.append(
                 submodel.a.col
-                + xp.oneslike(submodel.a.col.size[0]) * self.latent_parameters_idx[i]
+                + self.latent_parameters_idx[i] * xp.ones(submodel.a.col.size[0])
             )
 
             self.x[
@@ -120,32 +120,114 @@ class Model(ABC):
         elif self.pyinla_config.model.likelihood.type == "binomial":
             self.likelihood = BinomialLikelihood(pyinla_config, self.n_observations)
 
+        self.Q_prior = None
+        self.Q_conditional = None
+
     def construct_Q_prior(self) -> sparray:
 
-        # Concatenate data, indices, and indptr to form the block diagonal matrix Q
-        data = np.concatenate([Q_spatio_temporal_data, Q_fixed_effects_data])
-        indices = np.concatenate(
-            [
-                Q_spatio_temporal_indices,
-                Q_fixed_effects_indices + Q_spatio_temporal_shape[1],
-            ]
-        )
-        indptr = np.concatenate(
-            [
-                Q_spatio_temporal_indptr,
-                Q_spatio_temporal_indptr[-1] + Q_fixed_effects_indptr[1:],
-            ]
-        )
+        if self.Q_prior is None:
+            rows = []
+            cols = []
+            data = []
 
-        Q_prior = csc_matrix(
-            (data, indices, indptr),
-            shape=(
-                Q_spatio_temporal.shape[0] + self.nb,
-                Q_spatio_temporal.shape[1] + self.nb,
-            ),
-        )
+            for i, submodel in enumerate(self.submodels):
 
-        self.Q_prior = ...
+                kwargs = {}
+                if isinstance(submodel, RegressionModel):
+                    ...
+                elif isinstance(submodel, SpatioTemporalModel):
+                    kwargs = {
+                        "theta": self.theta[
+                            self.hyperparameters_idx[i] : self.hyperparameters_idx[
+                                i + 1
+                            ]
+                        ],
+                        "theta_keys": self.theta_keys[
+                            self.hyperparameters_idx[i] : self.hyperparameters_idx[
+                                i + 1
+                            ]
+                        ],
+                    }
+                submodel_Q_prior = submodel.construct_Q_prior(kwargs=kwargs)
+
+                rows.append(
+                    submodel_Q_prior.row
+                    + self.latent_parameters_idx[i]
+                    * xp.ones(submodel_Q_prior.row.size[0])
+                )
+                cols.append(
+                    submodel_Q_prior.col
+                    + self.latent_parameters_idx[i]
+                    * xp.ones(submodel_Q_prior.col.size[0])
+                )
+                data.append(submodel_Q_prior.data)
+                
+                # submodel_nnz_idx = 
+
+            self.Q_prior = coo_matrix(
+                (xp.concatenate(data), (xp.concatenate(rows), xp.concatenate(cols))),
+                shape=(self.n_latent_parameters, self.n_latent_parameters),
+            )
+
+        else:
+
+            for i, submodel in enumerate(self.submodels):
+
+                kwargs = {}
+                if isinstance(submodel, RegressionModel):
+                    ...
+                elif isinstance(submodel, SpatioTemporalModel):
+                    kwargs = {
+                        "theta": self.theta[
+                            self.hyperparameters_idx[i] : self.hyperparameters_idx[
+                                i + 1
+                            ]
+                        ],
+                        "theta_keys": self.theta_keys[
+                            self.hyperparameters_idx[i] : self.hyperparameters_idx[
+                                i + 1
+                            ]
+                        ],
+                    }
+                submodel_Q_prior = submodel.construct_Q_prior(kwargs=kwargs)
+                
+
+                self.Q_prior.data[
+                    
+                ] = submodel_Q_prior.data
+
+        self.Q_prior = coo_matrix((self.n_latent_parameters, self.n_latent_parameters))
+
+        for i, submodel in enumerate(self.submodels):
+            self.Q_prior[
+                self.latent_parameters_idx[i] : self.latent_parameters_idx[i + 1],
+                self.latent_parameters_idx[i] : self.latent_parameters_idx[i + 1],
+            ] = submodel.construct_Q_prior()
+
+        # # Concatenate data, indices, and indptr to form the block diagonal matrix Q
+        # data = np.concatenate([Q_spatio_temporal_data, Q_fixed_effects_data])
+        # indices = np.concatenate(
+        #     [
+        #         Q_spatio_temporal_indices,
+        #         Q_fixed_effects_indices + Q_spatio_temporal_shape[1],
+        #     ]
+        # )
+        # indptr = np.concatenate(
+        #     [
+        #         Q_spatio_temporal_indptr,
+        #         Q_spatio_temporal_indptr[-1] + Q_fixed_effects_indptr[1:],
+        #     ]
+        # )
+
+        # Q_prior = csc_matrix(
+        #     (data, indices, indptr),
+        #     shape=(
+        #         Q_spatio_temporal.shape[0] + self.nb,
+        #         Q_spatio_temporal.shape[1] + self.nb,
+        #     ),
+        # )
+
+        # self.Q_prior = ...
 
         return self.Q_prior
 
