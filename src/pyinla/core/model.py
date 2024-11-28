@@ -32,14 +32,21 @@ class Model(ABC):
 
         # --- Initialize the submodels
         self.submodels: list[SubModel] = []
-        for submodel_config in self.pyinla_config.model.submodels:
-            if isinstance(submodel_config, RegressionSubModelConfig):
-                submodel.append(
-                    RegressionModel(submodel_config, pyinla_config.input_dir)
-                )
-            elif isinstance(submodel_config, SpatioTemporalSubModelConfig):
-                submodel.append(
+        submodel_to_instanciate = [xp.arrange(len(pyinla_config.model.submodels))]
+        for i, submodel_config in enumerate(self.pyinla_config.model.submodels):
+            if isinstance(submodel_config, SpatioTemporalSubModelConfig):
+                self.submodels.append(
                     SpatioTemporalModel(submodel_config, pyinla_config.input_dir)
+                )
+
+                submodel_to_instanciate = submodel_to_instanciate[
+                    submodel_to_instanciate != i
+                ]
+
+        for i in submodel_to_instanciate:
+            if isinstance(submodel_config[i], RegressionSubModelConfig):
+                self.submodels.append(
+                    RegressionModel(submodel_config, pyinla_config.input_dir)
                 )
             else:
                 raise ValueError("Unknown submodel type.")
