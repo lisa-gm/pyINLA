@@ -30,24 +30,11 @@ class SubModel(ABC):
 
         # --- Load latent parameters vector
         try:
-            self.x = xp.load(
+            self.x_initial = xp.load(
                 Path.joinpath(simulation_path, submodel_config.inputs, "x.npy")
             )
         except FileNotFoundError:
-            self.x = xp.zeros((self.a.shape[1]), dtype=float)
-
-    @abstractmethod
-    def get_hyperparameters(self) -> dict:
-        """Get the initial hyperparameters of the model. This dictionary is constructed
-        at instanciation of the model. It has to be stored in the model as
-        hyperparameters is specific to the model.
-
-        Returns
-        -------
-        hyperparameters_inital_model : dict
-            Dictionary of initial hyperparameters.
-        """
-        ...
+            self.x_initial = xp.zeros((self.a.shape[1]), dtype=float)
 
     @abstractmethod
     def construct_Q_prior(self, theta_model: dict = None) -> sparray:

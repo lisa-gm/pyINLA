@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Literal
 from typing_extensions import Annotated
 
+from abc import ABC, abstractmethod
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -13,6 +15,8 @@ from pydantic import (
     Field,
 )
 from typing_extensions import Self
+
+from pyinla.__init__ import ArrayLike, xp
 
 
 # --- PRIOR HYPERPARAMETERS ----------------------------------------------------
@@ -31,10 +35,13 @@ class PenalizedComplexityPriorHyperparametersConfig(PriorHyperparametersConfig):
 
 
 # --- LIKELIHOODS --------------------------------------------------------------
-class LikelihoodConfig(BaseModel):
+class LikelihoodConfig(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["gaussian", "poisson", "binomial"]
+
+    @abstractmethod
+    def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
 
 
 class GaussianLikelihoodConfig(LikelihoodConfig):
@@ -42,26 +49,44 @@ class GaussianLikelihoodConfig(LikelihoodConfig):
 
     type: str = "gaussian"
 
+    def read_hyperparameters(self):
+        theta = xp.array([self.prec_o])
+        theta_keys = ["prec_o"]
+
+        return theta, theta_keys
+
 
 class PoissonLikelihoodConfig(LikelihoodConfig):
     type: str = "poisson"
+
+    def read_hyperparameters(self):
+        return [], []
 
 
 class BinomialLikelihoodConfig(LikelihoodConfig):
     type: str = "binomial"
     link_function: Literal["sigmoid"] = "sigmoid"
 
+    def read_hyperparameters(self):
+        return [], []
+
 
 # --- SUBMODELS ----------------------------------------------------------------
-class SubModelConfig(BaseModel):
+class SubModelConfig(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid")
 
     inputs: str = None
+
+    @abstractmethod
+    def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
 
 
 class RegressionSubModelConfig(SubModelConfig):
     n_fixed_effects: Annotated[int, Field(strict=True, ge=1)] = 1
     fixed_effects_prior_precision: float = 0.001
+
+    def read_hyperparameters(self):
+        return [], []
 
 
 class SpatioTemporalSubModelConfig(SubModelConfig):
@@ -76,6 +101,12 @@ class SpatioTemporalSubModelConfig(SubModelConfig):
     ph_t: PriorHyperparametersConfig = None
     ph_st: PriorHyperparametersConfig = None
 
+    def read_hyperparameters(self):
+        theta = xp.array([self.r_s, self.r_t, self.sigma_st])
+        theta_keys = ["r_s", "r_t", "sigma_st"]
+
+        return theta, theta_keys
+
 
 class SpatialSubModelConfig(SubModelConfig): ...
 
@@ -88,7 +119,7 @@ class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     submodels: list[SubModelConfig] = None
-    lh: LikelihoodConfig = None
+    likelihood: LikelihoodConfig = None
 
     @model_validator(mode="after")
     def check_submodels(self) -> Self:

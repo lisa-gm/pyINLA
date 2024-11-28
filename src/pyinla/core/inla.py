@@ -68,24 +68,17 @@ class INLA:
                 pyinla_config, self.model.ns, self.model.nb, self.model.nt
             )
 
-        # --- Initialize theta
-        self.theta_initial: ArrayLike = theta_dict2array(
-            self.model.get_theta(), self.likelihood.get_theta()
-        )
-        self.dim_theta = len(self.theta_initial)
-        self.theta = self.theta_initial
-        self.gradient_f = xp.zeros(self.dim_theta)
+        # --- Set up recurrent variables
+        self.gradient_f = xp.zeros(self.model.n_hyperparameters)
+        self.Q_conditional: sparse.sparray = None
 
         # --- Metrics
         self.f_values: list[float] = []
         self.theta_values: list[ArrayLike] = []
 
-        # --- Set up recurrent variables
-        self.Q_conditional: sparse.sparray = None
-
         print_msg("INLA initialized.", flush=True)
         print_msg("Model:", self.pyinla_config.model.type, flush=True)
-        if len(self.model.get_theta()) > 0:
+        if len(self.model.theta) > 0:
             print_msg(
                 "Prior hyperparameters model:",
                 self.pyinla_config.prior_hyperparameters.type,
@@ -108,7 +101,7 @@ class INLA:
                 f"  Prior theta likelihood. Mean : {self.prior_hyperparameters.mean_theta_observations}, precision : {self.prior_hyperparameters.precision_theta_observations}\n",
                 flush=True,
             )
-            print_msg("   Initial theta:", self.theta_initial, flush=True)
+            print_msg("   Initial theta:", self.model.theta, flush=True)
         print_msg("   Likelihood:", self.pyinla_config.likelihood.type, flush=True)
 
     def run(self) -> ArrayLike:
@@ -117,22 +110,22 @@ class INLA:
         # maxiter = 3
         # for i in range(maxiter):
         #     tic = time.perf_counter()
-        #     self.f_value, self.gradient_f = self._objective_function(self.theta_initial)
+        #     self.f_value, self.gradient_f = self._objective_function(self.model.theta)
         #     toc = time.perf_counter()
         #     print_msg(
         #         f"i: {i}. MPI size: {comm_size}. Time objective function call: {toc - tic} s. f value: {self.f_value}",
         #         flush=True,
         #     )
-        #     self.theta_initial = self.theta_initial + 0.1
+        #     self.model.theta = self.model.theta + 0.1
 
-        if len(self.theta) > 0:
-            # grad_f_init = self._evaluate_gradient_f(self.theta_initial)
+        if len(self.model.theta) > 0:
+            # grad_f_init = self._evaluate_gradient_f(self.model.theta)
             # print_msg(f"Initial gradient: {grad_f_init}", flush=True)
 
             tic = time.perf_counter()
             result = minimize(
                 self._objective_function,
-                self.theta_initial,
+                self.model.theta,
                 method="BFGS",
                 jac=self.pyinla_config.minimize.jac,
                 options={
@@ -153,9 +146,11 @@ class INLA:
                     "iterations.",
                     flush=True,
                 )
-                self.theta = result.x
+                self.model.theta = result.x
                 theta_model, theta_likelihood = theta_array2dict(
-                    self.theta, self.model.get_theta(), self.likelihood.get_theta()
+                    self.model.theta,
+                    self.model.theta,
+                    self.likelihood.get_theta(),
                 )
                 # print_msg("Optimal theta:", self.theta_star)
                 # print_msg("Latent parameters:", self.x)
@@ -166,7 +161,7 @@ class INLA:
         # only run inner iteration
         else:
             print("in evaluate f.")
-            self.f_value = self._evaluate_f(self.theta_initial)
+            self.f_value = self._evaluate_f(self.model.theta)
 
         # print_msg("counter:", self.counter, flush=True)
 
@@ -183,8 +178,8 @@ class INLA:
     def get_theta_star(self) -> dict:
         """Get the optimal theta."""
         return theta_array2dict(
-            self.theta,
-            self.model.get_theta(),
+            self.model.theta,
+            self.model.theta,
             self.likelihood.get_theta(),
         )
 
@@ -199,7 +194,7 @@ class INLA:
         t_objective_function = time.perf_counter()
         # generate theta matrix with different theta's to evaluate
         # currently central difference scheme is used for gradient
-        number_f_evaluations = 2 * self.dim_theta + 1
+        number_f_evaluations = 2 * self.model.n_hyperparameters + 1
         f_values_local = xp.zeros(number_f_evaluations)
 
         main_eval_list = xp.zeros(number_f_evaluations, dtype=bool)
@@ -214,11 +209,11 @@ class INLA:
         # print_msg("task_to_rank: ", task_to_rank, flush=True)
 
         # TODO: eps mat constant, can live outside. size of theta_mat also constant, preallocate before?
-        epsMat = self.eps_gradient_f * xp.eye(self.dim_theta)
+        epsMat = self.eps_gradient_f * xp.eye(self.model.n_hyperparameters)
         theta_mat = xp.repeat(theta_i.reshape(-1, 1), number_f_evaluations, axis=1)
         # store f_theta_i, f_theta_plus, f_theta_minus
-        theta_mat[:, 1 : 1 + self.dim_theta] += epsMat
-        theta_mat[:, self.dim_theta + 1 : number_f_evaluations] -= epsMat
+        theta_mat[:, 1 : 1 + self.model.n_hyperparameters] += epsMat
+        theta_mat[:, self.model.n_hyperparameters + 1 : number_f_evaluations] -= epsMat
         # print_msg("theta_mat: \n", theta_mat)
 
         for i in range(number_f_evaluations):
@@ -245,18 +240,18 @@ class INLA:
         f_theta = f_values[0]
 
         # compute gradient using central difference scheme
-        gradient_f_theta = xp.zeros(self.dim_theta)
-        for i in range(self.dim_theta):
+        gradient_f_theta = xp.zeros(self.model.n_hyperparameters)
+        for i in range(self.model.n_hyperparameters):
             gradient_f_theta[i] = (
-                f_values[i + 1] - f_values[i + self.dim_theta + 1]
+                f_values[i + 1] - f_values[i + self.model.n_hyperparameters + 1]
             ) / (2 * self.eps_gradient_f)
 
         # tic = time.perf_counter()
-        # gradient_f_theta_old = xp.zeros(self.dim_theta)
+        # gradient_f_theta_old = xp.zeros(self.model.n_hyperparameters)
 
         # # TODO: Theses evaluations are independant and can be performed
         # # in parallel.
-        # for i in range(self.dim_theta):
+        # for i in range(self.model.n_hyperparameters):
         #     theta_plus = theta_i.copy()
         #     theta_minus = theta_i.copy()
 
@@ -267,11 +262,11 @@ class INLA:
         #     f_minus = self._evaluate_f(theta_minus)
 
         #     print_msg(
-        #         f"NEW:: i: {i}, f_forward: {f_values[i + 1]}, f_backward: {f_values[i + self.dim_theta + 1]}"
+        #         f"NEW:: i: {i}, f_forward: {f_values[i + 1]}, f_backward: {f_values[i + self.model.n_hyperparameters + 1]}"
         #     )
         #     print_msg(f"OLD:: i: {i}, f_forward: {f_plus}, f_backward: {f_minus}")
         #     print("diff forward: ", f_values[i + 1] - f_plus)
-        #     print("diff backward: ", f_values[i + self.dim_theta + 1] - f_minus)
+        #     print("diff backward: ", f_values[i + self.model.n_hyperparameters + 1] - f_minus)
 
         #     gradient_f_theta_old[i] = (f_plus - f_minus) / (2 * self.eps_gradient_f)
         # toc = time.perf_counter()
@@ -321,10 +316,10 @@ class INLA:
 
         # print_msg("Evaluate f()", flush=True)
 
-        self.theta = theta_i
+        self.model.theta = theta_i
 
         theta_model, theta_likelihood = theta_array2dict(
-            theta_i, self.model.get_theta(), self.likelihood.get_theta()
+            theta_i, self.model.theta, self.likelihood.get_theta()
         )
 
         # --- Evaluate the log prior of the hyperparameters
@@ -459,7 +454,7 @@ class INLA:
         counter = 0
         while x_i_norm >= self.eps_inner_iteration:
             if counter > self.inner_iteration_max_iter:
-                print_msg("current theta value: ", self.theta)
+                print_msg("current theta value: ", self.model.theta)
                 raise ValueError(
                     f"Inner iteration did not converge after {counter} iterations."
                 )
@@ -634,9 +629,9 @@ class INLA:
         # self.solver_Q_conditional.cholesky(Q_conditional)
         # TODO: add proper check that current theta & theta of Q_conditional match
         theta_model, _ = theta_array2dict(
-            self.theta, self.model.get_theta(), self.likelihood.get_theta()
+            self.model.theta, self.model.theta, self.likelihood.get_theta()
         )
-        if self.model.get_theta() != theta_model:
+        if self.model.theta != theta_model:
             print_msg("theta of Q_conditional does not match current theta")
             # raise ValueError
 

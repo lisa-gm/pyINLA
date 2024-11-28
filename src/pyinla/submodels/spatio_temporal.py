@@ -24,29 +24,29 @@ class SpatioTemporalModel(SubModel):
         super().__init__(submodel_config, simulation_path)
 
         # Load spatial_matrices
-        self.c0 = load_npz(
+        self.c0: sparray = load_npz(
             Path.joinpath(simulation_path, submodel_config.inputs, "c0.npz")
         )
-        self.g1 = load_npz(
+        self.g1: sparray = load_npz(
             Path.joinpath(simulation_path, submodel_config.inputs, "g1.npz")
         )
-        self.g2 = load_npz(
+        self.g2: sparray = load_npz(
             Path.joinpath(simulation_path, submodel_config.inputs, "g2.npz")
         )
-        self.g3 = load_npz(
+        self.g3: sparray = load_npz(
             Path.joinpath(simulation_path, submodel_config.inputs, "g3.npz")
         )
 
         self._check_dimensions_spatial_matrices()
 
         # Load temporal_matrices
-        self.m0 = load_npz(
+        self.m0: sparray = load_npz(
             Path.joinpath(simulation_path, submodel_config.inputs, "m0.npz")
         )
-        self.m1 = load_npz(
+        self.m1: sparray = load_npz(
             Path.joinpath(simulation_path, submodel_config.inputs, "m1.npz")
         )
-        self.m2 = load_npz(
+        self.m2: sparray = load_npz(
             Path.joinpath(simulation_path, submodel_config.inputs, "m2.npz")
         )
 
@@ -59,13 +59,6 @@ class SpatioTemporalModel(SubModel):
         assert (
             self.n_latent_parameters == self.ns * self.nt
         ), f"Design matrix has incorrect number of columns. \n    n_latent_parameters: {self.n_latent_parameters}\n    ns: {self.ns} * nt: {self.nt} = {self.ns * self.nt}"
-
-        # Load model hyperparameters
-        self.theta_initial = {
-            "r_s": submodel_config.r_s,
-            "r_t": submodel_config.r_t,
-            "sigma_st": submodel_config.sigma_st,
-        }
 
     def _check_dimensions_spatial_matrices(self) -> None:
         """Check the dimensions of the model."""
