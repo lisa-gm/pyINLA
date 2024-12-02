@@ -6,11 +6,11 @@ import numpy as np
 import pytest
 
 from pyinla.core.pyinla_config import PyinlaConfig
-from pyinla.solvers.scipy_solver import ScipySolver
-from pyinla.solvers.serinv_solver import SerinvSolverCPU, SerinvSolverGPU
+from pyinla.solvers.sparse_solver import SparseSolver
+from pyinla.solvers.structured_solver import SerinvSolver
 
 environ["OMP_NUM_THREADS"] = "1"
-SOLVER = [ScipySolver, SerinvSolverCPU, SerinvSolverGPU]
+SOLVER = [SparseSolver, SerinvSolver]
 
 
 @pytest.fixture(params=SOLVER, autouse=True)

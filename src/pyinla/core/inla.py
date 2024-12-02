@@ -11,11 +11,10 @@ from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 
 
-from pyinla.solvers.scipy_solver import ScipySolver
-from pyinla.solvers.serinv_solver import SerinvSolver
+from pyinla.solvers.sparse_solver import SparseSolver
+from pyinla.solvers.structured_solver import SerinvSolver
 from pyinla.utils.gpu import set_device
 from pyinla.utils.multiprocessing import allreduce, bcast, print_msg, synchronize
-from pyinla.utils.mapping import theta_array2dict, theta_dict2array
 
 
 class INLA:
