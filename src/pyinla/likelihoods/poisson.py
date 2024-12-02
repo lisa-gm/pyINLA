@@ -34,7 +34,7 @@ class PoissonLikelihood(Likelihood):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> float:
         likelihood = np.dot(eta, y) - np.sum(self.e * np.exp(eta))
 
@@ -54,7 +54,7 @@ class PoissonLikelihood(Likelihood):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> ArrayLike:
         gradient_likelihood = y - self.e * np.exp(eta)
 
@@ -64,7 +64,7 @@ class PoissonLikelihood(Likelihood):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> ArrayLike:
         hessian_likelihood = -diags(self.e * np.exp(eta))
 

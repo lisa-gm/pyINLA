@@ -24,7 +24,7 @@ class Likelihood(ABC):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> float:
         """Evaluate the likelihood.
 
@@ -34,6 +34,9 @@ class Likelihood(ABC):
             Vector of the linear predictor.
         y : ArrayLike
             Vector of the observations.
+        **kwargs : optional
+            Hyperparameters for likelihood.
+
 
         Returns
         -------
@@ -47,7 +50,7 @@ class Likelihood(ABC):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> ArrayLike:
         """Evaluate the gradient of the likelihood wrt to eta = Ax.
 
@@ -57,7 +60,8 @@ class Likelihood(ABC):
             Vector of the observations.
         eta : ArrayLike
             Vector of the linear predictor.
-
+        **kwargs : optional
+            Hyperparameters for likelihood.
 
         Returns
         -------
@@ -71,7 +75,7 @@ class Likelihood(ABC):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> ArrayLike:
         """Evaluate the Hessian of the likelihood wrt to eta = Ax.
 
@@ -81,6 +85,8 @@ class Likelihood(ABC):
             Vector of the linear predictor.
         y : ArrayLike
             Vector of the observations.
+        **kwargs : optional
+            Hyperparameters for likelihood.
 
 
         Returns
@@ -88,9 +94,4 @@ class Likelihood(ABC):
         hessian_likelihood : ArrayLike
             Hessian of the likelihood.
         """
-        pass
-
-    @abstractmethod
-    def get_theta(self) -> dict:
-        """Get the likelihood initial hyperparameters."""
         pass

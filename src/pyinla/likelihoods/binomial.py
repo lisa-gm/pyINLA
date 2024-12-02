@@ -44,7 +44,7 @@ class BinomialLikelihood(Likelihood):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        theta: ArrayLike = None,
     ) -> float:
         """Evalutate the a binomial likelihood.
 
@@ -76,7 +76,7 @@ class BinomialLikelihood(Likelihood):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        theta: ArrayLike = None,
     ) -> float:
         """Evalutate the a binomial likelihood. VERSION FOR AUTOGRAD PACKAGE.
 
@@ -106,7 +106,7 @@ class BinomialLikelihood(Likelihood):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> ArrayLike:
         """
         Evaluate the gradient of the binomial likelihood with respect to eta.
@@ -117,8 +117,6 @@ class BinomialLikelihood(Likelihood):
             Linear predictor.
         y : ArrayLike
             Observed data.
-        theta_likelihood : dict, optional
-            Dictionary of likelihood hyperparameters.
 
         Returns
         -------
@@ -135,7 +133,7 @@ class BinomialLikelihood(Likelihood):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> ArrayLike:
         """
         Evaluate the Hessian of the binomial likelihood with respect to eta.
@@ -146,8 +144,7 @@ class BinomialLikelihood(Likelihood):
             Linear predictor.
         y : ArrayLike
             Observed data.
-        theta_likelihood : dict, optional
-            Dictionary of likelihood hyperparameters.
+
 
         Returns
         -------

@@ -202,8 +202,7 @@ class Model(ABC):
 
     def construct_Q_conditional(
         self,
-        Q_prior: sparray,
-        hessian_likelihood: sparray,
+        eta: ArrayLike,
     ) -> float:
         """Construct the conditional precision matrix.
 
@@ -214,6 +213,34 @@ class Model(ABC):
 
         """
 
-        Q_conditional = self.Q_prior - self.a.T @ hessian_likelihood @ self.a
+        # TODO: need to vectorize
+        # hessian_likelihood_diag = hessian_diag_finite_difference_5pt(
+        #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
+        # )
+        # hessian_likelihood = diags(hessian_likelihood_diag)
+        hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(
+            eta, self.y, self.theta[self.hyperparameters_idx[-1] :]
+        )
 
-        return Q_conditional
+        self.Q_conditional = self.Q_prior - self.a.T @ hessian_likelihood @ self.a
+
+        return self.Q_conditional
+
+    def construct_information_vector(
+        self,
+        eta: ArrayLike,
+        x_i: ArrayLike,
+    ) -> ArrayLike:
+        """Construct the information vector."""
+
+        # TODO: need to vectorize !!
+        # gradient_likelihood = gradient_finite_difference_5pt(
+        #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
+        # )
+        gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
+            eta, self.y, self.theta[self.hyperparameters_idx[-1] :]
+        )
+
+        information_vector = -1 * self.Q_prior @ x_i + self.a.T @ gradient_likelihood
+
+        return information_vector

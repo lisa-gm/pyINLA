@@ -29,7 +29,7 @@ class GaussianLikelihood(Likelihood):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> float:
         """Evaluate a Gaussian likelihood.
 
@@ -47,9 +47,8 @@ class GaussianLikelihood(Likelihood):
             Vector of the linear predictor.
         y : ArrayLike
             Vector of the observations.
-        kwargs : dict
-            Extra arguments.
-            theta_likelihood : float
+        kwargs :
+            theta : float
                 Specific parameter for the likelihood calculation.
 
         Returns
@@ -57,18 +56,15 @@ class GaussianLikelihood(Likelihood):
         likelihood : float
             Likelihood.
         """
-        if theta_likelihood is None:
-            raise ValueError(
-                "theta_likelihood must be provided to evaluate gaussian likelihood."
-            )
 
-        theta_observations = theta_likelihood["theta_observations"]
+        theta: ArrayLike = kwargs.get("theta", None)
+        if theta is None:
+            raise ValueError("theta must be provided to evaluate gaussian likelihood.")
 
         yEta = eta - y
 
         likelihood = (
-            0.5 * theta_observations * self.n_observations
-            - 0.5 * np.exp(theta_observations) * yEta.T @ yEta
+            0.5 * theta * self.n_observations - 0.5 * np.exp(theta) * yEta.T @ yEta
         )
 
         return likelihood
@@ -77,7 +73,7 @@ class GaussianLikelihood(Likelihood):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> ArrayLike:
         """Evaluate the gradient of the likelihood wrt to eta = Ax.
 
@@ -87,9 +83,8 @@ class GaussianLikelihood(Likelihood):
             Vector of the linear predictor.
         y : ArrayLike
             Vector of the observations.
-        kwargs : dict
-            Extra arguments.
-            theta_likelihood : float
+        kwargs :
+            theta : float
                 Specific parameter for the likelihood calculation.
 
         Returns
@@ -97,13 +92,14 @@ class GaussianLikelihood(Likelihood):
         gradient_likelihood : ArrayLike
             Gradient of the likelihood.
         """
-        if theta_likelihood is None:
+
+        theta: ArrayLike = kwargs.get("theta", None)
+        if theta is None:
             raise ValueError(
-                "theta_likelihood must be provided to evaluate gaussian likelihood."
+                "theta must be provided to evaluate gradient of gaussian likelihood."
             )
 
-        theta_observations = theta_likelihood["theta_observations"]
-        gradient_likelihood = -np.exp(theta_observations) * (eta - y)
+        gradient_likelihood = -np.exp(theta) * (eta - y)
 
         return gradient_likelihood
 
@@ -111,7 +107,7 @@ class GaussianLikelihood(Likelihood):
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> ArrayLike:
         """Evaluate the Hessian of the likelihood wrt to eta = Ax.
 
@@ -121,9 +117,8 @@ class GaussianLikelihood(Likelihood):
             Vector of the linear predictor.
         y : ArrayLike
             Vector of the observations.
-        kwargs : dict
-            Extra arguments.
-            theta_likelihood : float
+        kwargs :
+            theta : float
                 Specific parameter for the likelihood calculation.
 
         Returns
@@ -131,13 +126,12 @@ class GaussianLikelihood(Likelihood):
         hessian_likelihood : ArrayLike
             Hessian of the likelihood.
         """
-        if theta_likelihood is None:
+        theta: ArrayLike = kwargs.get("theta", None)
+        if theta is None:
             raise ValueError(
-                "theta_likelihood must be provided to evaluate gaussian likelihood."
+                "theta must be provided to evaluate gradient of gaussian likelihood."
             )
 
-        theta_observations = theta_likelihood["theta_observations"]
-
-        hessian_likelihood = -np.exp(theta_observations) * eye(self.n_observations)
+        hessian_likelihood = -np.exp(theta) * eye(self.n_observations)
 
         return hessian_likelihood

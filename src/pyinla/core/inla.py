@@ -39,18 +39,6 @@ class INLA:
         # --- Configure HPC
         set_device(comm_rank)
 
-        # --- Load design matrix
-        self.a = sparse.load_npz(pyinla_config.input_dir / "a.npz")
-        self.n_latent_parameters = self.a.shape[1]
-
-        # --- Load latent parameters vector
-        try:
-            self.x = xp.load(pyinla_config.input_dir / "x.npy")
-        except FileNotFoundError:
-            self.x = xp.ones((self.a.shape[1]), dtype=float)
-
-        self._check_dimensions()
-
         self.sparsity_Q_conditional = "bta"
         self.sparsity_Q_prior = "bt"
 
@@ -59,7 +47,7 @@ class INLA:
 
         # --- Initialize solver
         if self.pyinla_config.solver.type == "scipy":
-            self.solver = ScipySolver(
+            self.solver = SparseSolver(
                 pyinla_config, self.model.ns, self.model.nb, self.model.nt
             )
         elif self.pyinla_config.solver.type == "serinv":
@@ -69,55 +57,24 @@ class INLA:
 
         # --- Set up recurrent variables
         self.gradient_f = xp.zeros(self.model.n_hyperparameters)
-        self.Q_conditional: sparse.sparray = None
+        self.f_values_i = xp.zeros(2 * self.model.n_hyperparameters + 1)
+        self.x_central = xp.zeros_like(self.model.x)
+        self.x_local = xp.zeros_like(self.model.x)
 
         # --- Metrics
         self.f_values: list[float] = []
         self.theta_values: list[ArrayLike] = []
 
         print_msg("INLA initialized.", flush=True)
-        print_msg("Model:", self.pyinla_config.model.type, flush=True)
-        if len(self.model.theta) > 0:
-            print_msg(
-                "Prior hyperparameters model:",
-                self.pyinla_config.prior_hyperparameters.type,
-                flush=True,
-            )
-            print_msg(
-                f"  Prior theta model - spatial range. mean : {self.prior_hyperparameters.mean_theta_spatial_range}, precision : {self.prior_hyperparameters.precision_theta_spatial_range}\n"
-                f"  Prior theta model - temporal range. mean : {self.prior_hyperparameters.mean_theta_temporal_range}, precision : {self.prior_hyperparameters.precision_theta_temporal_range}\n"
-                f"  Prior theta model - spatio-temporal variation. mean : {self.prior_hyperparameters.mean_theta_spatio_temporal_variation}, precision : {self.prior_hyperparameters.precision_theta_spatio_temporal_variation}",
-                flush=True,
-            )
-
-        if len(self.likelihood.get_theta()) > 0:
-            print_msg(
-                "   Prior hyperparameters likelihood:",
-                self.pyinla_config.prior_hyperparameters.type,
-                flush=True,
-            )
-            print_msg(
-                f"  Prior theta likelihood. Mean : {self.prior_hyperparameters.mean_theta_observations}, precision : {self.prior_hyperparameters.precision_theta_observations}\n",
-                flush=True,
-            )
-            print_msg("   Initial theta:", self.model.theta, flush=True)
-        print_msg("   Likelihood:", self.pyinla_config.likelihood.type, flush=True)
 
     def run(self) -> ArrayLike:
         """Fit the model using INLA."""
 
-        # maxiter = 3
-        # for i in range(maxiter):
-        #     self.f_value, self.gradient_f = self._objective_function(self.model.theta)
-        #     print_msg(
-        #         f"i: {i}. MPI size: {comm_size}. Time objective function call: {toc - tic} s. f value: {self.f_value}",
-        #         flush=True,
-        #     )
-        #     self.model.theta = self.model.theta + 0.1
-
         if len(self.model.theta) > 0:
-            # grad_f_init = self._evaluate_gradient_f(self.model.theta)
-            # print_msg(f"Initial gradient: {grad_f_init}", flush=True)
+
+            def callback(xk):
+                self.theta_values.append(xk.x.copy())
+                self.f_values.append(self.fun.copy())
 
             result = minimize(
                 self._objective_function,
@@ -131,8 +88,8 @@ class INLA:
                     "c2": self.pyinla_config.minimize.c2,
                     "disp": self.pyinla_config.minimize.disp,
                 },
+                callback=callback,
             )
-            print_msg(f"Total time minimize: {toc - tic} s", flush=True)
 
             if result.success:
                 print_msg(
@@ -141,14 +98,6 @@ class INLA:
                     "iterations.",
                     flush=True,
                 )
-                self.model.theta = result.x
-                theta_model, theta_likelihood = theta_array2dict(
-                    self.model.theta,
-                    self.model.theta,
-                    self.likelihood.get_theta(),
-                )
-                # print_msg("Optimal theta:", self.theta_star)
-                # print_msg("Latent parameters:", self.x)
             else:
                 print_msg("Optimization did not converge.", flush=True)
                 return False
@@ -158,42 +107,15 @@ class INLA:
             print("in evaluate f.")
             self.f_value = self._evaluate_f(self.model.theta)
 
-        # print_msg("counter:", self.counter, flush=True)
-
-        # TODO: check that Q_conditional was constructed using the right theta
-        # if comm_rank == 0:
-        #     if self.Q_conditional is not None:
-        #         self._placeholder_marginals_latent_parameters(self.Q_conditional)
-        #     else:
-        #         print_msg("Q_conditional not defined.", flush=True)
-        #         raise ValueError
-
         return True
-
-    def get_theta_star(self) -> dict:
-        """Get the optimal theta."""
-        return theta_array2dict(
-            self.model.theta,
-            self.model.theta,
-            self.likelihood.get_theta(),
-        )
-
-    def _check_dimensions(self) -> None:
-        """Check the dimensions of the model."""
-        assert self.y.shape[0] == self.a.shape[0], "Dimensions of y and A do not match."
-        assert self.x.shape[0] == self.a.shape[1], "Dimensions of x and A do not match."
 
     def _objective_function(self, theta_i: ArrayLike) -> float:
         """Objective function for optimization."""
 
-        t_objective_function = time.perf_counter()
         # generate theta matrix with different theta's to evaluate
         # currently central difference scheme is used for gradient
         number_f_evaluations = 2 * self.model.n_hyperparameters + 1
         f_values_local = xp.zeros(number_f_evaluations)
-
-        main_eval_list = xp.zeros(number_f_evaluations, dtype=bool)
-        main_eval_list[0] = True
 
         # task to rank assignment
         task_to_rank = xp.zeros(number_f_evaluations, dtype=int)
@@ -201,93 +123,44 @@ class INLA:
         for i in range(number_f_evaluations):
             task_to_rank[i] = i % comm_size
 
-        # print_msg("task_to_rank: ", task_to_rank, flush=True)
-
         # TODO: eps mat constant, can live outside. size of theta_mat also constant, preallocate before?
         epsMat = self.eps_gradient_f * xp.eye(self.model.n_hyperparameters)
         theta_mat = xp.repeat(theta_i.reshape(-1, 1), number_f_evaluations, axis=1)
         # store f_theta_i, f_theta_plus, f_theta_minus
         theta_mat[:, 1 : 1 + self.model.n_hyperparameters] += epsMat
         theta_mat[:, self.model.n_hyperparameters + 1 : number_f_evaluations] -= epsMat
-        # print_msg("theta_mat: \n", theta_mat)
 
         for i in range(number_f_evaluations):
             if task_to_rank[i] == comm_rank:
-                # print("Rank: ", comm_rank, "i: ", i, "main_eval: ", main_eval_list[i])
-                t_f_eval = time.perf_counter()
-                f_values_local[i] = self._evaluate_f(
-                    theta_mat[:, i], main_eval=main_eval_list[i]
-                )
-                t_f_eval = time.perf_counter() - t_f_eval
-                # print(
-                #     f"Rank: {comm_rank}, i: {i}, f_value: {f_values_local[i]}, time: {t_f_eval}",
-                #     flush=True,
-                # )
+                f_values_local[i], x_i = self._evaluate_f(theta_mat[:, i])
+
+                if i == 0:
+                    self.x_central[:] = x_i
 
         synchronize()
+        bcast(self.x_central, root=0)
 
         # gather f_values from all ranks using MPI_Allreduce with MPI_SUM
-        f_values = xp.zeros(number_f_evaluations)
-        allreduce(f_values_local, f_values, op="sum")
-
-        # print_msg("f_values: ", f_values, flush=True)
-
-        f_theta = f_values[0]
+        self.f_values_i[:] = 0.0
+        allreduce(f_values_local, self.f_values_i, op="sum")
 
         # compute gradient using central difference scheme
-        gradient_f_theta = xp.zeros(self.model.n_hyperparameters)
         for i in range(self.model.n_hyperparameters):
-            gradient_f_theta[i] = (
-                f_values[i + 1] - f_values[i + self.model.n_hyperparameters + 1]
+            self.gradient_f[i] = (
+                self.f_values_i[i + 1]
+                - self.f_values_i[i + self.model.n_hyperparameters + 1]
             ) / (2 * self.eps_gradient_f)
 
-        # gradient_f_theta_old = xp.zeros(self.model.n_hyperparameters)
-
-        # # TODO: Theses evaluations are independant and can be performed
-        # # in parallel.
-        # for i in range(self.model.n_hyperparameters):
-        #     theta_plus = theta_i.copy()
-        #     theta_minus = theta_i.copy()
-
-        #     theta_plus[i] += self.eps_gradient_f
-        #     theta_minus[i] -= self.eps_gradient_f
-
-        #     f_plus = self._evaluate_f(theta_plus)
-        #     f_minus = self._evaluate_f(theta_minus)
-
-        #     print_msg(
-        #         f"NEW:: i: {i}, f_forward: {f_values[i + 1]}, f_backward: {f_values[i + self.model.n_hyperparameters + 1]}"
-        #     )
-        #     print_msg(f"OLD:: i: {i}, f_forward: {f_plus}, f_backward: {f_minus}")
-        #     print("diff forward: ", f_values[i + 1] - f_plus)
-        #     print("diff backward: ", f_values[i + self.model.n_hyperparameters + 1] - f_minus)
-
-        #     gradient_f_theta_old[i] = (f_plus - f_minus) / (2 * self.eps_gradient_f)
-        # print_msg("   evaluate_gradient_f time:", toc - tic, flush=True)
-
-        # print_msg(f"Gradient: {gradient_f_theta}", flush=True)
-        # print_msg(f"Gradient old: {gradient_f_theta_old}", flush=True)
-
-        # broadcast self.x from current theta from rank 0 to all other ranks for next iteration
-
-        t_mpi_bcast = time.perf_counter()
-        synchronize()
-        bcast(self.x, root=0)
-
         synchronize()
 
-        t_mpi_bcast = time.perf_counter() - t_mpi_bcast
-        # print_msg(f"MPI_Bcast time: {t_mpi_bcast}", flush=True)
-
-        t_objective_function = time.perf_counter() - t_objective_function
         theta_i_str = ", ".join([f"{theta:.3f}" for theta in theta_i])
         print_msg(
-            f"theta: [{theta_i_str}], Function value: {f_theta:.3f}, time: {t_objective_function:.3f}",
+            f"theta: [{theta_i_str}], Function value: {self.f_values_i[0]:.3f}",
             flush=True,
         )
-        return (f_theta, gradient_f_theta)
+        return (self.f_values_i[0], self.gradient_f)
 
-    def _evaluate_f(self, theta_i: ArrayLike, main_eval: bool = True) -> float:
+    def _evaluate_f(self, theta_i: ArrayLike) -> float:
         """evaluate the objective function f(theta) = log(p(theta|y)).
 
         Notes
@@ -307,63 +180,33 @@ class INLA:
             Function value f(theta) evaluated at theta_i.
         """
 
-        # print_msg("Evaluate f()", flush=True)
-
         self.model.theta = theta_i
-
-        theta_model, theta_likelihood = theta_array2dict(
-            theta_i, self.model.theta, self.likelihood.get_theta()
-        )
 
         # --- Evaluate the log prior of the hyperparameters
         log_prior_hyperparameters = self.prior_hyperparameters.evaluate_log_prior(
             theta_model, theta_likelihood
         )
-        # print_msg("log prior hyperparameters: ", log_prior_hyperparameters)
-        # print_msg("   (1/6) evaluate_log_prior time:", toc - tic, flush=True)
 
         # --- Construct the prior precision matrix of the latent parameters
         Q_prior = self.model.construct_Q_prior(theta_model)
-        # print_msg("   (2/6) construct_Q_prior time:", toc - tic, flush=True)
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
-        x_local = xp.copy(self.x)
-        self.Q_conditional, x_local, logdet_Q_conditional = self._inner_iteration(
-            Q_prior, x_local, theta_likelihood
-        )
-        # print_msg("   (3/6) inner_iteration time:", toc - tic, flush=True)
-        # print(f"rank: {comm_rank}. after inner iteration x: ", self.x[:10])
-
-        # assign initial guess for x for next iteration
-        if main_eval:
-            # print(f"rank: {comm_rank}. Assigning x_local to x")
-            self.x = x_local
+        self.x_local[:] = xp.copy(self.x)
+        logdet_Q_conditional = self._inner_iteration(self.x_local)
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
-        eta = self.a @ x_local
+        eta = self.a @ self.x_local
         likelihood = self.likelihood.evaluate_likelihood(eta, self.y, theta_likelihood)
-        # print_msg("   (4/6) evaluate_likelihood time:", toc - tic, flush=True)
-        # print_msg("likelihood: ", likelihood)
 
         # --- Evaluate the conditional of the latent parameters at x_star
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
-            self.Q_conditional, x_local, x_local, logdet_Q_conditional
+            self.Q_conditional, self.x_local, self.x_local, logdet_Q_conditional
         )
-        # print_msg(
-        #     "   (6/6) evaluate_conditional_latent_parameters time:",
-        #     toc - tic,
-        #     flush=True,
-        # )
-        # print_msg("conditional latent parameters: ", conditional_latent_parameters)
 
         # --- Evaluate the prior of the latent parameters at x_star
         prior_latent_parameters = self._evaluate_prior_latent_parameters(
-            Q_prior, x_local
+            Q_prior, self.x_local
         )
-        # print_msg(
-        #     "   (5/6) evaluate_prior_latent_parameters time:", toc - tic, flush=True
-        # )
-        # print_msg("prior latent parameters: ", prior_latent_parameters)
 
         f_theta = -1 * (
             log_prior_hyperparameters
@@ -372,15 +215,11 @@ class INLA:
             - conditional_latent_parameters
         )
 
-        # print_msg(f"theta: {theta_i},      Function value: {f_theta}")
-
         if f_theta < self.min_f:
             self.min_f = f_theta
             self.counter += 1
-            # print(f"theta: {theta_i},      Function value: {f_theta}", flush=True)
-            # print_msg(f"Minimum function value: {self.min_f}. Counter: {self.counter}")
 
-        return f_theta
+        return f_theta, self.x_local
 
     def _evaluate_gradient_f(self, theta_i: ArrayLike) -> ArrayLike:
         """evaluate the gradient of the objective function f(theta) = log(p(theta|y)).
@@ -422,13 +261,11 @@ class INLA:
         return grad_f
 
     def _inner_iteration(
-        self, Q_prior: sparse.sparray, x_i: ArrayLike, theta_likelihood: dict
+        self,
+        x_i: ArrayLike,
     ):
         x_update = xp.zeros_like(x_i)
         x_i_norm = 1
-
-        # print_msg("   Starting inner iteration", flush=True)
-        # print(f"In inner iteration: Rank {comm_rank} x: {x_i[:10]}")
 
         counter = 0
         while x_i_norm >= self.eps_inner_iteration:
@@ -437,65 +274,25 @@ class INLA:
                 raise ValueError(
                     f"Inner iteration did not converge after {counter} iterations."
                 )
-            # print_msg(f"      inner iteration {counter} norm: {x_i_norm}", flush=True)
 
             x_i[:] += x_update[:]
-            eta = self.a @ x_i
-            # print_msg("eta: ", eta[:6])
-
-            # TODO: need to vectorize !!
-            # gradient_likelihood = gradient_finite_difference_5pt(
-            #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
-            # )
-            # with time_range('computeGradientLik', color_id=0):
-            gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
-                eta, self.y, theta_likelihood
-            )
-            # print_msg("gradient_likelihood: ", gradient_likelihood[:6])
-            # print_msg("         evaluate_likelihood time:", toc - tic, flush=True)
-
-            # with time_range('constructRhs', color_id=0):
-            rhs = -1 * Q_prior @ x_i + self.a.T @ gradient_likelihood
-
-            # TODO: need to vectorize
-            # hessian_likelihood_diag = hessian_diag_finite_difference_5pt(
-            #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
-            # )
-            # hessian_likelihood = diags(hessian_likelihood_diag)
-            # with time_range('computeHessianLik', color_id=0):
-            hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(
-                eta, self.y, theta_likelihood
-            )
-            # print("hessian_likelihood: ", hessian_likelihood.diagonal()[:6])
-            # print_msg(
-            #     "         hessian_diag_finite_difference_5pt time:",
-            #     toc - tic,
-            #     flush=True,
-            # )
+            eta = self.model.a @ x_i
 
             Q_conditional = self.model.construct_Q_conditional(
-                Q_prior,
-                self.a,
-                hessian_likelihood,
+                eta,
             )
-            # print_msg("         construct_Q_conditional time:", toc - tic, flush=True)
-
             self.solver.cholesky(Q_conditional, sparsity=self.sparsity_Q_conditional)
-            # print_msg("         Solver Call Q_conditional time:", toc - tic, flush=True)
 
+            rhs = self.model.construct_information_vector(eta, x_i)
             x_update[:] = self.solver.solve(rhs, sparsity=self.sparsity_Q_conditional)
-            # print_msg("         solve Q_conditional time:", toc - tic, flush=True)
 
-            # with time_range('computeNorm', color_id=0):
             x_i_norm = xp.linalg.norm(x_update)
-
             counter += 1
-            # print_msg(f"Inner iteration {counter} norm: {x_i_norm}")
 
         logdet = self.solver.logdet()
 
         # print_msg("Inner iteration converged after", counter, "iterations.")
-        return Q_conditional, x_i, logdet
+        return logdet
 
     def _evaluate_prior_latent_parameters(self, Q_prior: sparse.sparray, x: ArrayLike):
         """Evaluation of the prior of the latent parameters at x using the prior precision
