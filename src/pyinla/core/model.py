@@ -121,7 +121,9 @@ class Model(ABC):
             self.likelihood = BinomialLikelihood(pyinla_config, self.n_observations)
 
         self.Q_prior = None
+        self.Q_prior_data_mapping = [0]
         self.Q_conditional = None
+        self.Q_conditional_data_mapping = [0]
 
     def construct_Q_prior(self) -> sparray:
 
@@ -161,8 +163,10 @@ class Model(ABC):
                     * xp.ones(submodel_Q_prior.col.size[0])
                 )
                 data.append(submodel_Q_prior.data)
-                
-                # submodel_nnz_idx = 
+
+                self.Q_prior_data_mapping.append(
+                    self.Q_prior_data_mapping[i] + len(submodel_Q_prior.data)
+                )
 
             self.Q_prior = coo_matrix(
                 (xp.concatenate(data), (xp.concatenate(rows), xp.concatenate(cols))),
@@ -172,7 +176,6 @@ class Model(ABC):
         else:
 
             for i, submodel in enumerate(self.submodels):
-
                 kwargs = {}
                 if isinstance(submodel, RegressionModel):
                     ...
@@ -190,44 +193,10 @@ class Model(ABC):
                         ],
                     }
                 submodel_Q_prior = submodel.construct_Q_prior(kwargs=kwargs)
-                
 
                 self.Q_prior.data[
-                    
+                    self.Q_prior_data_mapping[i] : self.Q_prior_data_mapping[i + 1]
                 ] = submodel_Q_prior.data
-
-        self.Q_prior = coo_matrix((self.n_latent_parameters, self.n_latent_parameters))
-
-        for i, submodel in enumerate(self.submodels):
-            self.Q_prior[
-                self.latent_parameters_idx[i] : self.latent_parameters_idx[i + 1],
-                self.latent_parameters_idx[i] : self.latent_parameters_idx[i + 1],
-            ] = submodel.construct_Q_prior()
-
-        # # Concatenate data, indices, and indptr to form the block diagonal matrix Q
-        # data = np.concatenate([Q_spatio_temporal_data, Q_fixed_effects_data])
-        # indices = np.concatenate(
-        #     [
-        #         Q_spatio_temporal_indices,
-        #         Q_fixed_effects_indices + Q_spatio_temporal_shape[1],
-        #     ]
-        # )
-        # indptr = np.concatenate(
-        #     [
-        #         Q_spatio_temporal_indptr,
-        #         Q_spatio_temporal_indptr[-1] + Q_fixed_effects_indptr[1:],
-        #     ]
-        # )
-
-        # Q_prior = csc_matrix(
-        #     (data, indices, indptr),
-        #     shape=(
-        #         Q_spatio_temporal.shape[0] + self.nb,
-        #         Q_spatio_temporal.shape[1] + self.nb,
-        #     ),
-        # )
-
-        # self.Q_prior = ...
 
         return self.Q_prior
 
