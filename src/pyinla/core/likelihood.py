@@ -73,8 +73,6 @@ class Likelihood(ABC):
     @abstractmethod
     def evaluate_hessian_likelihood(
         self,
-        eta: ArrayLike,
-        y: ArrayLike,
         **kwargs,
     ) -> ArrayLike:
         """Evaluate the Hessian of the likelihood wrt to eta = Ax.

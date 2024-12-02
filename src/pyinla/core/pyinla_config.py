@@ -33,12 +33,22 @@ class PenalizedComplexityPriorHyperparametersConfig(PriorHyperparametersConfig):
     alpha: float = None
     u: float = None
 
+    # Generalized formula:
+    # lambda = - log(alpha) * pow(u, c_l)
+    #
+    # log_prior = a + b + c
+    # a = log(lambda)
+    # b = -lambda * exp(c_b * r)
+    # c = c_c * r
+
 
 # --- LIKELIHOODS --------------------------------------------------------------
 class LikelihoodConfig(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["gaussian", "poisson", "binomial"]
+
+    prior_hyperparameters: PriorHyperparametersConfig = None
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
@@ -75,6 +85,7 @@ class BinomialLikelihoodConfig(LikelihoodConfig):
 class SubModelConfig(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid")
 
+    # Input folder for this specific submodel
     inputs: str = None
 
     @abstractmethod

@@ -1,10 +1,8 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import numpy as np
-from autograd.numpy import dot, log
-from scipy.sparse import diags
 
-from pyinla import ArrayLike
+from pyinla import ArrayLike, xp, sp
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.utils.link_functions import sigmoid
@@ -25,9 +23,13 @@ class BinomialLikelihood(Likelihood):
 
         # load the extra coeficients for Binomial likelihood
         try:
-            self.n_trials = np.load(pyinla_config.input_dir / "n_trials.npy")
+            n_trials = np.load(pyinla_config.input_dir / "n_trials.npy")
+            if xp == np:
+                self.n_trials = n_trials
+            else:
+                self.n_trials = xp.asarray(n_trials)
         except FileNotFoundError:
-            self.n_trials = np.ones((n_observations), dtype=int)
+            self.n_trials = xp.ones((n_observations), dtype=int)
 
         if pyinla_config.likelihood.link_function == "sigmoid":
             self.link_function = sigmoid
@@ -36,15 +38,11 @@ class BinomialLikelihood(Likelihood):
                 f"Link function {pyinla_config.likelihood.link_function} not implemented."
             )
 
-    def get_theta(self) -> dict:
-        """Get the likelihood initial hyperparameters."""
-        return {}
-
     def evaluate_likelihood(
         self,
         eta: ArrayLike,
         y: ArrayLike,
-        theta: ArrayLike = None,
+        **kwargs,
     ) -> float:
         """Evalutate the a binomial likelihood.
 
@@ -66,39 +64,9 @@ class BinomialLikelihood(Likelihood):
         """
         linkEta = self.link_function(eta)
 
-        likelihood = np.dot(y, np.log(linkEta)) + np.dot(
-            self.n_trials - y, np.log(1 - linkEta)
+        likelihood = xp.dot(y, xp.log(linkEta)) + xp.dot(
+            self.n_trials - y, xp.log(1 - linkEta)
         )
-
-        return likelihood
-
-    def evaluate_likelihood_autodiff(
-        self,
-        eta: ArrayLike,
-        y: ArrayLike,
-        theta: ArrayLike = None,
-    ) -> float:
-        """Evalutate the a binomial likelihood. VERSION FOR AUTOGRAD PACKAGE.
-
-        Parameters
-        ----------
-        eta : ArrayLike
-            Vector of the linear predictor.
-        y : ArrayLike
-            Vector of the observations.
-
-        Notes
-        -----
-        For now only a sigmoid link-function is implemented.
-
-        Returns
-        -------
-        likelihood : float
-            Likelihood.
-        """
-        linkEta = self.link_function(eta)
-
-        likelihood = dot(y, log(linkEta)) + dot(self.n_trials - y, log(1 - linkEta))
 
         return likelihood
 
@@ -131,8 +99,6 @@ class BinomialLikelihood(Likelihood):
 
     def evaluate_hessian_likelihood(
         self,
-        eta: ArrayLike,
-        y: ArrayLike,
         **kwargs,
     ) -> ArrayLike:
         """
@@ -151,8 +117,9 @@ class BinomialLikelihood(Likelihood):
         hess_likelihood : ArrayLike
             Hessian of the likelihood with respect to eta.
         """
+        eta = kwargs.get("eta", None)
 
         linkEta = self.link_function(eta)
         hess_likelihood = -self.n_trials * linkEta * (1 - linkEta)
 
-        return diags(hess_likelihood)
+        return sp.sparse.diags(hess_likelihood)

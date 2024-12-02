@@ -1,10 +1,9 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-import autograd.numpy as anp
 import numpy as np
 from scipy.sparse import diags
 
-from pyinla import ArrayLike
+from pyinla import ArrayLike, xp
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
 
@@ -22,13 +21,14 @@ class PoissonLikelihood(Likelihood):
 
         # Load the extra coeficients for Poisson likelihood
         try:
-            self.e = np.load(pyinla_config.input_dir / "e.npy")
+            e = np.load(pyinla_config.input_dir / "e.npy")
         except FileNotFoundError:
-            self.e = np.ones((n_observations), dtype=int)
+            e = np.ones((n_observations), dtype=int)
 
-    def get_theta(self) -> dict:
-        """Get the likelihood initial hyperparameters."""
-        return {}
+        if xp == np:
+            self.e = e
+        else:
+            self.e = xp.asarray(e)
 
     def evaluate_likelihood(
         self,
@@ -36,17 +36,7 @@ class PoissonLikelihood(Likelihood):
         y: ArrayLike,
         **kwargs,
     ) -> float:
-        likelihood = np.dot(eta, y) - np.sum(self.e * np.exp(eta))
-
-        return likelihood
-
-    def evaluate_likelihood_autodiff(
-        self,
-        eta: ArrayLike,
-        y: ArrayLike,
-        theta_likelihood: dict = None,
-    ) -> float:
-        likelihood = anp.dot(eta, y) - anp.sum(self.e * anp.exp(eta))
+        likelihood = xp.dot(eta, y) - xp.sum(self.e * xp.exp(eta))
 
         return likelihood
 
@@ -56,16 +46,16 @@ class PoissonLikelihood(Likelihood):
         y: ArrayLike,
         **kwargs,
     ) -> ArrayLike:
-        gradient_likelihood = y - self.e * np.exp(eta)
+        gradient_likelihood = y - self.e * xp.exp(eta)
 
         return gradient_likelihood
 
     def evaluate_hessian_likelihood(
         self,
-        eta: ArrayLike,
-        y: ArrayLike,
         **kwargs,
     ) -> ArrayLike:
-        hessian_likelihood = -diags(self.e * np.exp(eta))
+        eta = kwargs.get("eta", None)
+
+        hessian_likelihood = -diags(self.e * xp.exp(eta))
 
         return hessian_likelihood

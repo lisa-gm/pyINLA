@@ -3,8 +3,9 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from scipy.sparse import sparray, coo_matrix
-from pyinla import ArrayLike, comm_rank, comm_size, sparse, xp
+import numpy as np
+from scipy.sparse import sparray, csc_matrix, load_npz
+from pyinla import ArrayLike, comm_rank, comm_size, sp, xp
 
 from pyinla.core.pyinla_config import SubModelConfig
 
@@ -21,18 +22,24 @@ class SubModel(ABC):
         self.submodel_config = submodel_config
 
         # --- Load design matrix
-        self.a = coo_matrix(
-            sparse.load_npz(
-                Path.joinpath(simulation_path, submodel_config.inputs, "a.npz")
-            )
+        a: sparray = csc_matrix(
+            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "a.npz"))
         )
+        if xp == np:
+            self.a = a
+        else:
+            self.a = sp.sparse.csc_matrix(a)
         self.n_latent_parameters = self.a.shape[1]
 
         # --- Load latent parameters vector
         try:
-            self.x_initial = xp.load(
+            x_initial = np.load(
                 Path.joinpath(simulation_path, submodel_config.inputs, "x.npy")
             )
+            if xp == np:
+                self.x_initial = x_initial
+            else:
+                self.x_initial = xp.array(x_initial)
         except FileNotFoundError:
             self.x_initial = xp.zeros((self.a.shape[1]), dtype=float)
 

@@ -1,13 +1,14 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import math
+from pathlib import Path
 
-import numpy as xp
-from scipy.sparse import csc_matrix, kron, load_npz, sparray
+import numpy as np
+from scipy.sparse import csc_matrix, load_npz, sparray
 
 from pyinla.core.submodel import SubModel
 from pyinla.core.pyinla_config import SubModelConfig
-from pathlib import Path
+
 
 from pyinla import ArrayLike, xp, sp
 
@@ -25,33 +26,50 @@ class SpatioTemporalModel(SubModel):
         super().__init__(submodel_config, simulation_path)
 
         # Load spatial_matrices
-        self.c0: sparray = csc_matrix(
+        c0: sparray = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "c0.npz"))
         )
-        self.g1: sparray = csc_matrix(
+        g1: sparray = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g1.npz"))
         )
-        self.g2: sparray = csc_matrix(
+        g2: sparray = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g2.npz"))
         )
-        self.g3: sparray = csc_matrix(
+        g3: sparray = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g3.npz"))
         )
-
         self._check_dimensions_spatial_matrices()
 
         # Load temporal_matrices
-        self.m0: sparray = csc_matrix(
+        m0: sparray = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m0.npz"))
         )
-        self.m1: sparray = csc_matrix(
+        m1: sparray = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m1.npz"))
         )
-        self.m2: sparray = csc_matrix(
+        m2: sparray = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m2.npz"))
         )
-
         self._check_dimensions_temporal_matrices()
+
+        if xp == np:
+            self.c0 = c0
+            self.g1 = g1
+            self.g2 = g2
+            self.g3 = g3
+
+            self.m0 = m0
+            self.m1 = m1
+            self.m2 = m2
+        else:
+            self.c0 = sp.sparse.csc_matrix(c0)
+            self.g1 = sp.sparse.csc_matrix(g1)
+            self.g2 = sp.sparse.csc_matrix(g2)
+            self.g3 = sp.sparse.csc_matrix(g3)
+
+            self.m0 = sp.sparse.csc_matrix(m0)
+            self.m1 = sp.sparse.csc_matrix(m1)
+            self.m2 = sp.sparse.csc_matrix(m2)
 
         self.ns = self.c0.shape[0]  # Number of spatial nodes in the mesh
         self.nt = self.m0.shape[0]  # Number of temporal nodes in the mesh
@@ -114,12 +132,12 @@ class SpatioTemporalModel(SubModel):
         )
 
         # withsparseKroneckerProduct", color_id=0):
-        Q_prior = csc_matrix(
+        Q_prior: sparray = csc_matrix(
             pow(exp_gamma_st, 2)
             * (
-                kron(self.m0, q3s)
-                + exp_gamma_t * kron(self.m1, q2s)
-                + pow(exp_gamma_t, 2) * kron(self.m2, q1s)
+                sp.sparse.kron(self.m0, q3s)
+                + exp_gamma_t * sp.sparse.kron(self.m1, q2s)
+                + pow(exp_gamma_t, 2) * sp.sparse.kron(self.m2, q1s)
             )
         )
 

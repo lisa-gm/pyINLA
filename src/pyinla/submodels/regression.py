@@ -1,8 +1,7 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-# from pyinla import ArrayLike
-from pyinla import sparse
 from scipy.sparse import sparray
+from pyinla import xp, sp
 
 from pyinla.core.submodel import SubModel
 from pyinla.core.pyinla_config import SubModelConfig
@@ -32,7 +31,7 @@ class RegressionModel(SubModel):
         ), "Design matrix has incorrect number of columns."
 
         # --- Construct the prior precision matrix
-        self.Q_prior = self.fixed_effects_prior_precision * sparse.eye(
+        self.Q_prior: sparray = self.fixed_effects_prior_precision * sp.sparse.eye(
             self.n_fixed_effects
         )
 
@@ -40,16 +39,3 @@ class RegressionModel(SubModel):
         """Construct the prior precision matrix."""
 
         return self.Q_prior
-
-    def construct_Q_conditional(
-        self,
-        Q_prior: sparray,
-        a: sparray,
-        hessian_likelihood: sparray,
-    ) -> sparray:
-        """Construct the conditional precision matrix."""
-
-        # TODO: think about where the negative comes in ...
-        Q_conditional = Q_prior - a.T @ hessian_likelihood @ a
-
-        return Q_conditional

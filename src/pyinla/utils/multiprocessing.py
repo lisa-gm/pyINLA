@@ -37,7 +37,6 @@ def synchronize(comm=None):
 
 
 def allreduce(
-    sendbuf: ArrayLike,
     recvbuf: ArrayLike,
     op: str = "sum",
     comm=None,
@@ -60,7 +59,7 @@ def allreduce(
         if comm is None:
             comm = MPI.COMM_WORLD
         if op == "sum":
-            comm.Allreduce(sendbuf, recvbuf, op=MPI.SUM)
+            comm.Allreduce(MPI.IN_PLACE, recvbuf, op=MPI.SUM)
 
 
 def bcast(
