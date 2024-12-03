@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 from pyinla import ArrayLike
-from pyinla.core.pyinla_config import PyinlaConfig
+from pyinla.core.pyinla_config import SolverConfig
 
 
 class Solver(ABC):
@@ -11,11 +11,11 @@ class Solver(ABC):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
+        solver_config: SolverConfig,
         **kwargs,
     ) -> None:
         """Initializes the solver."""
-        self.pyinla_config = pyinla_config
+        self.solver_config = solver_config
 
     @abstractmethod
     def cholesky(self, A: ArrayLike, **kwargs) -> None:

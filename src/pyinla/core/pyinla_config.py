@@ -144,6 +144,16 @@ class ModelConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def check_single_spatio_temporal_submodel(self) -> Self:
+        n_spatio_temporal_submodels = sum(
+            isinstance(submodel, SpatioTemporalSubModelConfig)
+            for submodel in self.submodels
+        )
+        assert (
+            n_spatio_temporal_submodels == 1
+        ), "Only one SpatioTemporalSubModel is allowed."
+
+    @model_validator(mode="after")
     def check_submodels_parameters(self) -> Self:
         for submodel in self.submodels:
             assert submodel.inputs is not None, "Submodel input folder is required."
@@ -217,7 +227,7 @@ class ModelConfig(BaseModel):
 class SolverConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["scipy", "serinv"] = "scipy"
+    type: Literal["dense", "scipy", "serinv"] = "scipy"
 
 
 class MinimizeConfig(BaseModel):

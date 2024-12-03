@@ -39,19 +39,22 @@ class Model(ABC):
         """Initializes the model."""
         self.pyinla_config: PyinlaConfig = pyinla_config
 
-        # --- Initialize the submodels
-        # Initialization order priviledges the spatio-temporal submodels (first)
+        # --- Initialize the submodels and their prior hyperparameters
+        # Initialization order priviledges the spatio-temporal submodel (first)
         # and all others (second).
         self.submodels: list[SubModel] = []
         self.prior_hyperparameters: list[PriorHyperparameters] = []
         submodel_to_instanciate = [xp.arrange(len(pyinla_config.model.submodels))]
         for i, submodel_config in enumerate(self.pyinla_config.model.submodels):
             if isinstance(submodel_config, SpatioTemporalSubModelConfig):
+                # Instancitate the SpatialTemporalModel
                 self.submodels.append(
                     SpatioTemporalModel(submodel_config, pyinla_config.input_dir)
                 )
+                submodel_to_instanciate.pop(i)
 
                 # Instantiate the prior hyperparameters
+                # ... for the spatial range
                 if isinstance(submodel_config.ph_s, GaussianPriorHyperparametersConfig):
                     self.prior_hyperparameters.append(
                         GaussianPriorHyperparameters(
@@ -67,6 +70,7 @@ class Model(ABC):
                         )
                     )
 
+                # ... for the temporal range
                 if isinstance(submodel_config.ph_t, GaussianPriorHyperparametersConfig):
                     self.prior_hyperparameters.append(
                         GaussianPriorHyperparameters(
@@ -82,6 +86,7 @@ class Model(ABC):
                         )
                     )
 
+                # ... for the spatio-temporal variation
                 if isinstance(
                     submodel_config.ph_st, GaussianPriorHyperparametersConfig
                 ):
@@ -100,10 +105,6 @@ class Model(ABC):
                             hyperparameter_type="sigma_st",
                         )
                     )
-
-                submodel_to_instanciate = submodel_to_instanciate[
-                    submodel_to_instanciate != i
-                ]
 
         for i in submodel_to_instanciate:
             if isinstance(submodel_config[i], RegressionSubModelConfig):

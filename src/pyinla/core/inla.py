@@ -1,8 +1,7 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import math
-import time
-
+from warnings import warn
 from scipy.optimize import minimize
 
 from pyinla import ArrayLike, comm_rank, comm_size, sp, xp
@@ -10,9 +9,13 @@ from pyinla.core.pyinla_config import PyinlaConfig
 
 from pyinla.core.model import Model
 
+from pyinla.submodels.spatio_temporal import SpatioTemporalModel
+from pyinla.submodels.regression import RegressionModel
 
+from pyinla.solvers.dense_solver import DenseSolver
 from pyinla.solvers.sparse_solver import SparseSolver
 from pyinla.solvers.structured_solver import SerinvSolver
+
 from pyinla.utils.gpu import set_device
 from pyinla.utils.multiprocessing import allreduce, print_msg
 
@@ -39,22 +42,55 @@ class INLA:
         # --- Configure HPC
         set_device(comm_rank)
 
-        self.sparsity_Q_conditional = "bta"
-        self.sparsity_Q_prior = "bt"
-
         # --- Initialize model
         self.model = Model(pyinla_config=self.pyinla_config)
 
-        # --- Initialize solver
-        if self.pyinla_config.solver.type == "scipy":
-            self.solver = SparseSolver(
-                pyinla_config, self.model.ns, self.model.nb, self.model.nt
-            )
-        elif self.pyinla_config.solver.type == "serinv":
-            self.solver = SerinvSolver(
-                pyinla_config, self.model.ns, self.model.nb, self.model.nt
-            )
+        # get the solver parameter for the sparsity pattern
+        diagonal_blocksize = 0
+        arrowhead_size = 0
+        n_diag_blocks = 0
 
+        # check the first submodel - if ST, get diagonal_blocksize and n_diag_blocks (bt or bta)
+        if isinstance(self.model.submodels[0], SpatioTemporalModel):
+            diagonal_blocksize = self.model.submodels[0].ns
+            n_diag_blocks = self.model.submodels[0].nt
+
+        for i in range(1, len(self.model.submodels)):
+            if isinstance(self.model.submodels[i], RegressionModel):
+                arrowhead_size += self.model.submodels[i].n_latent_parameters
+
+        # --- Initialize solver
+        if diagonal_blocksize == 0 or n_diag_blocks == 0:
+            if self.pyinla_config.solver.type == "scipy":
+                self.solver = SparseSolver(
+                    solver_config=self.pyinla_config.solver,
+                )
+            else:
+                if self.pyinla_config.solver.type == "serinv":
+                    warn(
+                        "SerinvSolver doesn't support non-ST models. Defaulting to DenseSolver."
+                    )
+                self.solver = DenseSolver(
+                    solver_config=self.pyinla_config.solver,
+                    kwargs={"n": self.model.n_latent_parameters},
+                )
+        else:
+            if self.pyinla_config.solver.type == "dense":
+                warn(
+                    "DenseSolver is being instanciated to solve ST models (not-optimal)."
+                )
+                self.solver = DenseSolver(
+                    solver_config=self.pyinla_config.solver,
+                    kwargs={"n": self.model.n_latent_parameters},
+                )
+            elif self.pyinla_config.solver.type == "scipy":
+                self.solver = SparseSolver(
+                    solver_config=self.pyinla_config.solver,
+                )
+            elif self.pyinla_config.solver.type == "serinv":
+                self.solver = SerinvSolver()
+
+        # ...
         self.n_f_evaluations = 2 * self.model.n_hyperparameters + 1
 
         # --- Set up recurrent variables
@@ -186,21 +222,22 @@ class INLA:
         log_prior_hyperparameters = self.model.evaluate_log_prior_hyperparameters()
 
         # --- Construct the prior precision matrix of the latent parameters
-        Q_prior = self.model.construct_Q_prior()
+        self.model.construct_Q_prior()
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
         logdet_Q_conditional = self._inner_iteration()
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
-        self.eta = self.model.a @ self.model.x
         likelihood = self.model.likelihood.evaluate_likelihood(
-            self.eta,
-            self.y,
+            eta=self.eta,
+            y=self.y,
             kwargs={"theta": self.model.theta[self.model.hyperparameters_idx[-1] :]},
         )
 
         # --- Evaluate the prior of the latent parameters at x_star
-        prior_latent_parameters = self._evaluate_prior_latent_parameters()
+        prior_latent_parameters = self._evaluate_prior_latent_parameters(
+            x_star=self.model.x
+        )
 
         # --- Evaluate the conditional of the latent parameters at x_star
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
@@ -231,7 +268,7 @@ class INLA:
                 )
 
             self.model.x[:] += self.x_update[:]
-            self.eta = self.model.a @ self.model.x
+            self.eta[:] = self.model.a @ self.model.x
 
             Q_conditional = self.model.construct_Q_conditional(self.eta)
             self.solver.cholesky(Q_conditional, sparsity=self.sparsity_Q_conditional)
@@ -248,7 +285,7 @@ class INLA:
 
         return logdet
 
-    def _evaluate_prior_latent_parameters(self):
+    def _evaluate_prior_latent_parameters(self, x_star: ArrayLike) -> float:
         """Evaluation of the prior of the latent parameters at x using the prior precision
         matrix Q_prior and assuming mean zero.
 
@@ -274,9 +311,8 @@ class INLA:
             Log prior of the latent parameters evaluated at x
         """
 
-        n = self.model.x.shape[0]
+        n = x_star.shape[0]
 
-        # with time_range('callCholesky', color_id=0):
         self.solver.cholesky(self.model.Q_prior, sparsity=self.sparsity_Q_prior)
 
         # with time_range('getLogDet', color_id=0):
@@ -286,7 +322,7 @@ class INLA:
         log_prior_latent_parameters = (
             -n / 2 * xp.log(2 * math.pi)
             + 0.5 * logdet_Q_prior
-            - 0.5 * self.model.x.T @ self.model.Q_prior @ self.model.x
+            - 0.5 * x_star.T @ self.model.Q_prior @ x_star
         )
 
         return log_prior_latent_parameters
