@@ -134,28 +134,63 @@ class ModelConfig(BaseModel):
     submodels: list[SubModelConfig] = None
     likelihood: LikelihoodConfig = None
 
+
+class SolverConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["dense", "scipy", "serinv"] = "scipy"
+
+
+class MinimizeConfig(BaseModel, ABC):
+    model_config = ConfigDict(extra="forbid")
+
+    max_iter: PositiveInt = 100
+    jac: bool = True
+
+
+class BFGSConfig(MinimizeConfig):
+    gtol: float = 1e-1
+    c1: float = None
+    c2: float = None
+    disp: bool = False
+
+
+class PyinlaConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # --- Model parameters -----------------------------------------------------
+    model: ModelConfig = ModelConfig()
+
     @model_validator(mode="after")
     def check_submodels(self) -> Self:
-        assert self.submodels is not None, "At least one Submodels is required."
+        assert self.model.submodels is not None, "At least one Submodels is required."
         assert all(
-            isinstance(submodel, SubModelConfig) for submodel in self.submodels
+            isinstance(submodel, SubModelConfig) for submodel in self.model.submodels
         ), "All submodels must be instances of SubModelConfig."
+        return self
 
+    @model_validator(mode="after")
+    def check_likelihood(self) -> Self:
+        assert self.model.likelihood is not None, "Likelihood is required."
+        assert isinstance(
+            self.model.likelihood, LikelihoodConfig
+        ), "Likelihood must be an instance of LikelihoodConfig."
         return self
 
     @model_validator(mode="after")
     def check_single_spatio_temporal_submodel(self) -> Self:
         n_spatio_temporal_submodels = sum(
             isinstance(submodel, SpatioTemporalSubModelConfig)
-            for submodel in self.submodels
+            for submodel in self.model.submodels
         )
         assert (
             n_spatio_temporal_submodels == 1
         ), "Only one SpatioTemporalSubModel is allowed."
+        return self
 
     @model_validator(mode="after")
     def check_submodels_parameters(self) -> Self:
-        for submodel in self.submodels:
+        for submodel in self.model.submodels:
             assert submodel.inputs is not None, "Submodel input folder is required."
 
             # Submodel specific checks
@@ -172,12 +207,11 @@ class ModelConfig(BaseModel):
                 assert (
                     submodel.sigma_st is not None
                 ), "Spatio-temporal variation is required for SpatioTemporalSubModel."
-
         return self
 
     @model_validator(mode="after")
     def check_priorhyperparameters(self) -> Self:
-        for submodel in self.submodels:
+        for submodel in self.model.submodels:
             if isinstance(submodel, RegressionSubModelConfig):
                 # Regression model does not have prior hyperparameters
                 ...
@@ -220,35 +254,7 @@ class ModelConfig(BaseModel):
                     assert (
                         submodel.ph_st.u is not None
                     ), "U is required for PenalizedComplexityPriorHyperparametersConfig."
-
         return self
-
-
-class SolverConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    type: Literal["dense", "scipy", "serinv"] = "scipy"
-
-
-class MinimizeConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    max_iter: PositiveInt = 100
-    jac: bool = True
-
-
-class BFGSConfig(MinimizeConfig):
-    gtol: float = 1e-1
-    c1: float = None
-    c2: float = None
-    disp: bool = False
-
-
-class PyinlaConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    # --- Model parameters -----------------------------------------------------
-    model: ModelConfig = ModelConfig()
 
     # --- Simulation parameters ------------------------------------------------
     solver: SolverConfig = SolverConfig()

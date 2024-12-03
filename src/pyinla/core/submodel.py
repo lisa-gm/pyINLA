@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 import numpy as np
-from scipy.sparse import sparray, csc_matrix, load_npz
+from scipy.sparse import spmatrix, csc_matrix, load_npz
 from pyinla import ArrayLike, comm_rank, comm_size, sp, xp
 
 from pyinla.core.pyinla_config import SubModelConfig
@@ -22,7 +22,7 @@ class SubModel(ABC):
         self.submodel_config = submodel_config
 
         # --- Load design matrix
-        a: sparray = csc_matrix(
+        a: spmatrix = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "a.npz"))
         )
         if xp == np:
@@ -44,6 +44,6 @@ class SubModel(ABC):
             self.x_initial = xp.zeros((self.a.shape[1]), dtype=float)
 
     @abstractmethod
-    def construct_Q_prior(self, **kwargs) -> sparray:
+    def construct_Q_prior(self, **kwargs) -> spmatrix:
         """Construct the prior precision matrix."""
         ...

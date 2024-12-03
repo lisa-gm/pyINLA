@@ -4,7 +4,7 @@ import math
 from pathlib import Path
 
 import numpy as np
-from scipy.sparse import csc_matrix, load_npz, sparray
+from scipy.sparse import csc_matrix, load_npz, spmatrix
 
 from pyinla.core.submodel import SubModel
 from pyinla.core.pyinla_config import SubModelConfig
@@ -26,28 +26,28 @@ class SpatioTemporalModel(SubModel):
         super().__init__(submodel_config, simulation_path)
 
         # Load spatial_matrices
-        c0: sparray = csc_matrix(
+        c0: spmatrix = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "c0.npz"))
         )
-        g1: sparray = csc_matrix(
+        g1: spmatrix = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g1.npz"))
         )
-        g2: sparray = csc_matrix(
+        g2: spmatrix = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g2.npz"))
         )
-        g3: sparray = csc_matrix(
+        g3: spmatrix = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g3.npz"))
         )
         self._check_dimensions_spatial_matrices()
 
         # Load temporal_matrices
-        m0: sparray = csc_matrix(
+        m0: spmatrix = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m0.npz"))
         )
-        m1: sparray = csc_matrix(
+        m1: spmatrix = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m1.npz"))
         )
-        m2: sparray = csc_matrix(
+        m2: spmatrix = csc_matrix(
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m2.npz"))
         )
         self._check_dimensions_temporal_matrices()
@@ -102,7 +102,7 @@ class SpatioTemporalModel(SubModel):
             self.m0.shape == self.m1.shape == self.m2.shape
         ), "Dimensions of temporal matrices do not match."
 
-    def construct_Q_prior(self, **kwargs) -> sparray:
+    def construct_Q_prior(self, **kwargs) -> spmatrix:
         """Construct the prior precision matrix."""
 
         theta: ArrayLike = kwargs.get("theta", None)
@@ -132,7 +132,7 @@ class SpatioTemporalModel(SubModel):
         )
 
         # withsparseKroneckerProduct", color_id=0):
-        Q_prior: sparray = csc_matrix(
+        Q_prior: spmatrix = csc_matrix(
             pow(exp_gamma_st, 2)
             * (
                 sp.sparse.kron(self.m0, q3s)

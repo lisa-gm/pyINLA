@@ -4,20 +4,14 @@ import math
 from warnings import warn
 from scipy.optimize import minimize
 
-from pyinla import ArrayLike, comm_rank, comm_size, sp, xp
+from pyinla import ArrayLike, comm_rank, comm_size, xp
 from pyinla.core.pyinla_config import PyinlaConfig
 
 from pyinla.core.model import Model
+from pyinla.submodels import SpatioTemporalModel, RegressionModel
+from pyinla.solvers import DenseSolver, SparseSolver, SerinvSolver
 
-from pyinla.submodels.spatio_temporal import SpatioTemporalModel
-from pyinla.submodels.regression import RegressionModel
-
-from pyinla.solvers.dense_solver import DenseSolver
-from pyinla.solvers.sparse_solver import SparseSolver
-from pyinla.solvers.structured_solver import SerinvSolver
-
-from pyinla.utils.gpu import set_device
-from pyinla.utils.multiprocessing import allreduce, print_msg
+from pyinla.utils import set_device, allreduce, print_msg
 
 
 class INLA:

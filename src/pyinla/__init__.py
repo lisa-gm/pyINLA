@@ -7,6 +7,7 @@ from numpy.typing import ArrayLike
 
 from pyinla.__about__ import __version__
 
+
 # Allows user to specify the array module via an environment variable.
 ARRAY_MODULE = os.environ.get("ARRAY_MODULE")
 if ARRAY_MODULE is not None:

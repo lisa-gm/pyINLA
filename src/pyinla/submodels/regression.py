@@ -1,6 +1,6 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from scipy.sparse import sparray
+from scipy.sparse import spmatrix
 from pyinla import xp, sp
 
 from pyinla.core.submodel import SubModel
@@ -31,11 +31,11 @@ class RegressionModel(SubModel):
         ), "Design matrix has incorrect number of columns."
 
         # --- Construct the prior precision matrix
-        self.Q_prior: sparray = self.fixed_effects_prior_precision * sp.sparse.eye(
+        self.Q_prior: spmatrix = self.fixed_effects_prior_precision * sp.sparse.eye(
             self.n_fixed_effects
         )
 
-    def construct_Q_prior(self, **kwargs) -> sparray:
+    def construct_Q_prior(self, **kwargs) -> spmatrix:
         """Construct the prior precision matrix."""
 
         return self.Q_prior

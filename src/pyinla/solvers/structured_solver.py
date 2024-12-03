@@ -71,10 +71,10 @@ class SerinvSolver(Solver):
         total_gb = total_bytes / (1024**3)
         print_msg(f"Allocated memory for SerinvSolver: {total_gb:.2f} GB", flush=True)
 
-    def cholesky(self, A: sp.sparray) -> None:
+    def cholesky(self, A: sp.spmatrix) -> None:
         """Compute Cholesky factor of input matrix."""
 
-        self._sparray_to_structured(A)
+        self._spmatrix_to_structured(A)
 
         if self.A_arrow_bottom_blocks is not None:
             pobtaf(
@@ -119,8 +119,8 @@ class SerinvSolver(Solver):
 
         return 2 * logdet
 
-    def _sparray_to_structured(self, A: sp.sparray) -> None:
-        """Map sp.sparray to BT or BTA."""
+    def _spmatrix_to_structured(self, A: sp.spmatrix) -> None:
+        """Map sp.spmatrix to BT or BTA."""
 
         A_csc = sp.csc_matrix(A)
 

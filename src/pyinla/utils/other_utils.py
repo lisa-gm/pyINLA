@@ -1,8 +1,8 @@
 import numpy as np
-from scipy.sparse import csc_matrix, sparray
+from scipy.sparse import csc_matrix, spmatrix
 
 
-def read_sym_CSC(filename: str) -> sparray:
+def read_sym_CSC(filename: str) -> spmatrix:
     """Read in lower triangular part of symmetric matrix that is stored in CSC format.
 
     Input
@@ -12,7 +12,7 @@ def read_sym_CSC(filename: str) -> sparray:
 
     Return
     ------
-    A : sparray. returns sparse lower triangular matrix
+    A : spmatrix. returns sparse lower triangular matrix
 
     """
 

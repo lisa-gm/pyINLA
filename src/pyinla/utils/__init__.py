@@ -1,22 +1,17 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from pyinla.utils.finite_difference_stencils import (
-    gradient_finite_difference_3pt,
-    gradient_finite_difference_5pt,
-    hessian_diag_finite_difference_3pt,
-    hessian_diag_finite_difference_5pt,
-)
+from pyinla.utils.gpu import get_available_devices, set_device
+from pyinla.utils.host import get_host_configuration
 from pyinla.utils.link_functions import sigmoid
-from pyinla.utils.multiprocessing import print_msg
-from pyinla.utils.mapping import theta_array2dict, theta_dict2array
+from pyinla.utils.multiprocessing import print_msg, synchronize, allreduce, bcast
 
 __all__ = [
-    "print_msg",
-    "theta_dict2array",
-    "theta_array2dict",
+    "get_available_devices",
+    "set_device",
+    "get_host_configuration",
     "sigmoid",
-    "gradient_finite_difference_3pt",
-    "gradient_finite_difference_5pt",
-    "hessian_diag_finite_difference_3pt",
-    "hessian_diag_finite_difference_5pt",
+    "print_msg",
+    "synchronize",
+    "allreduce",
+    "bcast",
 ]

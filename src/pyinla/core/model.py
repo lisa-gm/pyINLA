@@ -3,7 +3,7 @@
 from abc import ABC
 
 import numpy as np
-from scipy.sparse import sparray, coo_matrix
+from scipy.sparse import spmatrix, coo_matrix
 from pyinla import ArrayLike, xp, sp
 
 from pyinla.core.pyinla_config import PyinlaConfig
@@ -11,13 +11,11 @@ from pyinla.core.submodel import SubModel
 from pyinla.submodels.regression import RegressionModel
 from pyinla.submodels.spatio_temporal import SpatioTemporalModel
 
-from pyinla.likelihoods.binomial import BinomialLikelihood
-from pyinla.likelihoods.gaussian import GaussianLikelihood
-from pyinla.likelihoods.poisson import PoissonLikelihood
+from pyinla.likelihoods import BinomialLikelihood, GaussianLikelihood, PoissonLikelihood
 
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
-from pyinla.prior_hyperparameters.gaussian import GaussianPriorHyperparameters
-from pyinla.prior_hyperparameters.penalized_complexity import (
+from pyinla.prior_hyperparameters import (
+    GaussianPriorHyperparameters,
     PenalizedComplexityPriorHyperparameters,
 )
 
@@ -65,7 +63,7 @@ class Model(ABC):
                     submodel_config.ph_s, PenalizedComplexityPriorHyperparametersConfig
                 ):
                     self.prior_hyperparameters.append(
-                        PenalizedComplexityPriorHyperparametersConfig(
+                        PenalizedComplexityPriorHyperparameters(
                             ph_config=submodel_config.ph_s, hyperparameter_type="r_s"
                         )
                     )
@@ -81,7 +79,7 @@ class Model(ABC):
                     submodel_config.ph_t, PenalizedComplexityPriorHyperparametersConfig
                 ):
                     self.prior_hyperparameters.append(
-                        PenalizedComplexityPriorHyperparametersConfig(
+                        PenalizedComplexityPriorHyperparameters(
                             ph_config=submodel_config.ph_t, hyperparameter_type="r_t"
                         )
                     )
@@ -100,7 +98,7 @@ class Model(ABC):
                     submodel_config.ph_st, PenalizedComplexityPriorHyperparametersConfig
                 ):
                     self.prior_hyperparameters.append(
-                        PenalizedComplexityPriorHyperparametersConfig(
+                        PenalizedComplexityPriorHyperparameters(
                             ph_config=submodel_config.ph_st,
                             hyperparameter_type="sigma_st",
                         )
@@ -166,7 +164,7 @@ class Model(ABC):
                 self.latent_parameters_idx[i] : self.latent_parameters_idx[i + 1]
             ] = submodel.x_initial
 
-        self.a: sparray = sp.sparse.coo_matrix(
+        self.a: spmatrix = sp.sparse.coo_matrix(
             (xp.concatenate(data), (xp.concatenate(rows), xp.concatenate(cols))),
             shape=(submodel.a.shape[0], self.n_latent_parameters),
         )
@@ -216,7 +214,7 @@ class Model(ABC):
         self.Q_conditional = None
         self.Q_conditional_data_mapping = [0]
 
-    def construct_Q_prior(self) -> sparray:
+    def construct_Q_prior(self) -> spmatrix:
 
         if self.Q_prior is None:
             rows = []
@@ -259,7 +257,7 @@ class Model(ABC):
                     self.Q_prior_data_mapping[i] + len(submodel_Q_prior.data)
                 )
 
-            self.Q_prior: sparray = coo_matrix(
+            self.Q_prior: spmatrix = coo_matrix(
                 (xp.concatenate(data), (xp.concatenate(rows), xp.concatenate(cols))),
                 shape=(self.n_latent_parameters, self.n_latent_parameters),
             )

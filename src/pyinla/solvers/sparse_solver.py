@@ -17,9 +17,9 @@ class SparseSolver(Solver):
         """Initializes the solver."""
         super().__init__(solver_config)
 
-        self.L: sp.sparse.sparray = None
+        self.L: sp.sparse.spmatrix = None
 
-    def cholesky(self, A: sp.sparse.sparray, **kwargs) -> None:
+    def cholesky(self, A: sp.sparse.spmatrix, **kwargs) -> None:
         """Compute Cholesky factor of input matrix."""
 
         A = sp.csc_matrix(A)

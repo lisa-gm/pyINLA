@@ -7,8 +7,6 @@ from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.utils.link_functions import sigmoid
 
-# from scipy.sparse import sparray
-
 
 class BinomialLikelihood(Likelihood):
     """Binomial likelihood."""
