@@ -4,13 +4,14 @@ from abc import ABC
 
 import numpy as np
 from scipy.sparse import spmatrix, coo_matrix
-from pyinla import ArrayLike, xp, sp
+from pyinla import xp, sp, ArrayLike, NDArray
 
 from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.core.submodel import SubModel
 from pyinla.submodels.regression import RegressionModel
 from pyinla.submodels.spatio_temporal import SpatioTemporalModel
 
+from pyinla.core.likelihood import Likelihood
 from pyinla.likelihoods import BinomialLikelihood, GaussianLikelihood, PoissonLikelihood
 
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
@@ -42,7 +43,9 @@ class Model(ABC):
         # and all others (second).
         self.submodels: list[SubModel] = []
         self.prior_hyperparameters: list[PriorHyperparameters] = []
-        submodel_to_instanciate = [xp.arrange(len(pyinla_config.model.submodels))]
+        submodel_to_instanciate: ArrayLike = [
+            xp.arrange(len(pyinla_config.model.submodels))
+        ]
         for i, submodel_config in enumerate(self.pyinla_config.model.submodels):
             if isinstance(submodel_config, SpatioTemporalSubModelConfig):
                 # Instancitate the SpatialTemporalModel
@@ -113,9 +116,9 @@ class Model(ABC):
                 raise ValueError("Unknown submodel type.")
 
         # --- Initialize the hyperparameters array
-        theta = []
-        theta_keys = []
-        self.hyperparameters_idx = [0]
+        theta: ArrayLike = []
+        theta_keys: ArrayLike = []
+        self.hyperparameters_idx: ArrayLike = [0]
 
         for submodel_config in self.pyinla_config.model.submodels:
             theta_submodel, theta_keys_submodel = submodel_config.read_hyperparameters()
@@ -134,20 +137,20 @@ class Model(ABC):
         theta.append(lh_hyperparameters)
         theta_keys.append(lh_hyperparameters_keys)
 
-        self.theta = xp.concatenate(theta)
-        self.theta_keys = xp.concatenate(theta_keys)
+        self.theta: NDArray = xp.concatenate(theta)
+        self.theta_keys: NDArray = xp.concatenate(theta_keys)
 
-        self.n_hyperparameters = len(self.theta)
+        self.n_hyperparameters: int = len(self.theta)
 
         # --- Initialize the latent parameters and the design matrix
-        self.n_latent_parameters = 0
-        self.latent_parameters_idx = [0]
+        self.n_latent_parameters: int = 0
+        self.latent_parameters_idx: int = [0]
 
         for submodel in self.submodels:
             self.n_latent_parameters += submodel.n_latent_parameters
             self.latent_parameters_idx.append(self.n_latent_parameters)
 
-        self.x: ArrayLike = xp.zeros(self.n_latent_parameters)
+        self.x: NDArray = xp.zeros(self.n_latent_parameters)
 
         data = []
         rows = []
@@ -170,17 +173,19 @@ class Model(ABC):
         )
 
         # --- Load observation vector
-        y = np.load(pyinla_config.input_dir / "y.npy")
+        y: NDArray = np.load(pyinla_config.input_dir / "y.npy")
         if xp == np:
-            self.y = y
+            self.y: NDArray = y
         else:
-            self.y = xp.asarray(y)
+            self.y: NDArray = xp.asarray(y)
 
-        self.n_observations = self.y.shape[0]
+        self.n_observations: int = self.y.shape[0]
 
         # --- Initialize likelihood
         if self.pyinla_config.model.likelihood.type == "gaussian":
-            self.likelihood = GaussianLikelihood(pyinla_config, self.n_observations)
+            self.likelihood: Likelihood = GaussianLikelihood(
+                pyinla_config, self.n_observations
+            )
 
             # Instantiate the prior hyperparameters for the likelihood
             if isinstance(
@@ -204,9 +209,13 @@ class Model(ABC):
                     )
                 )
         elif self.pyinla_config.model.likelihood.type == "poisson":
-            self.likelihood = PoissonLikelihood(pyinla_config, self.n_observations)
+            self.likelihood: Likelihood = PoissonLikelihood(
+                pyinla_config, self.n_observations
+            )
         elif self.pyinla_config.model.likelihood.type == "binomial":
-            self.likelihood = BinomialLikelihood(pyinla_config, self.n_observations)
+            self.likelihood: Likelihood = BinomialLikelihood(
+                pyinla_config, self.n_observations
+            )
 
         # --- Recurrent variables
         self.Q_prior = None
@@ -291,7 +300,7 @@ class Model(ABC):
 
     def construct_Q_conditional(
         self,
-        eta: ArrayLike,
+        eta: NDArray,
     ) -> float:
         """Construct the conditional precision matrix.
 
@@ -320,9 +329,9 @@ class Model(ABC):
 
     def construct_information_vector(
         self,
-        eta: ArrayLike,
-        x_i: ArrayLike,
-    ) -> ArrayLike:
+        eta: NDArray,
+        x_i: NDArray,
+    ) -> NDArray:
         """Construct the information vector."""
 
         # TODO: need to vectorize !!
@@ -333,7 +342,9 @@ class Model(ABC):
             eta, self.y, kwargs={"theta": self.theta[self.hyperparameters_idx[-1] :]}
         )
 
-        information_vector = -1 * self.Q_prior @ x_i + self.a.T @ gradient_likelihood
+        information_vector: NDArray = (
+            -1 * self.Q_prior @ x_i + self.a.T @ gradient_likelihood
+        )
 
         return information_vector
 

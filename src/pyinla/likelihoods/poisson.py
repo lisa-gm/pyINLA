@@ -1,9 +1,9 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import numpy as np
-from scipy.sparse import diags
+from pathlib import Path
 
-from pyinla import ArrayLike, xp
+from pyinla import xp, sp, ArrayLike, NDArray
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
 
@@ -21,32 +21,32 @@ class PoissonLikelihood(Likelihood):
 
         # Load the extra coeficients for Poisson likelihood
         try:
-            e = np.load(pyinla_config.input_dir / "e.npy")
+            e: NDArray = np.load(Path.joinpath(pyinla_config.input_dir, "e.npy"))
         except FileNotFoundError:
-            e = np.ones((n_observations), dtype=int)
+            e: NDArray = np.ones((n_observations), dtype=int)
 
         if xp == np:
-            self.e = e
+            self.e: NDArray = e
         else:
-            self.e = xp.asarray(e)
+            self.e: NDArray = xp.asarray(e)
 
     def evaluate_likelihood(
         self,
-        eta: ArrayLike,
-        y: ArrayLike,
+        eta: NDArray,
+        y: NDArray,
         **kwargs,
     ) -> float:
-        likelihood = xp.dot(eta, y) - xp.sum(self.e * xp.exp(eta))
+        likelihood: float = xp.dot(eta, y) - xp.sum(self.e * xp.exp(eta))
 
         return likelihood
 
     def evaluate_gradient_likelihood(
         self,
-        eta: ArrayLike,
-        y: ArrayLike,
+        eta: NDArray,
+        y: NDArray,
         **kwargs,
-    ) -> ArrayLike:
-        gradient_likelihood = y - self.e * xp.exp(eta)
+    ) -> NDArray:
+        gradient_likelihood: NDArray = y - self.e * xp.exp(eta)
 
         return gradient_likelihood
 
@@ -54,8 +54,8 @@ class PoissonLikelihood(Likelihood):
         self,
         **kwargs,
     ) -> ArrayLike:
-        eta = kwargs.get("eta", None)
+        eta: NDArray = kwargs.get("eta", None)
 
-        hessian_likelihood = -diags(self.e * xp.exp(eta))
+        hessian_likelihood: ArrayLike = -1.0 * sp.sparse.diags(self.e * xp.exp(eta))
 
         return hessian_likelihood

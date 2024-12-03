@@ -4,7 +4,7 @@ import math
 from warnings import warn
 from scipy.optimize import minimize
 
-from pyinla import ArrayLike, comm_rank, comm_size, xp
+from pyinla import xp, ArrayLike, NDArray, comm_rank, comm_size
 from pyinla.core.pyinla_config import PyinlaConfig
 
 from pyinla.core.model import Model
@@ -94,12 +94,12 @@ class INLA:
         self.x_update = xp.empty_like(self.model.x)
 
         # --- Metrics
-        self.f_values: list[float] = []
-        self.theta_values: list[ArrayLike] = []
+        self.f_values: ArrayLike = []
+        self.theta_values: ArrayLike = []
 
         print_msg("INLA initialized.", flush=True)
 
-    def run(self) -> ArrayLike:
+    def run(self) -> bool:
         """Fit the model using INLA."""
 
         if len(self.model.theta) > 0:
@@ -156,7 +156,7 @@ class INLA:
 
         return True
 
-    def _objective_function(self, theta_i: ArrayLike) -> float:
+    def _objective_function(self, theta_i: NDArray) -> float:
         """Objective function for optimization."""
 
         # generate theta matrix with different theta's to evaluate
@@ -191,7 +191,7 @@ class INLA:
 
         return (self.f_values_i[0], self.gradient_f)
 
-    def _evaluate_f(self, theta_i: ArrayLike) -> float:
+    def _evaluate_f(self, theta_i: NDArray) -> float:
         """evaluate the objective function f(theta) = log(p(theta|y)).
 
         Notes
@@ -202,7 +202,7 @@ class INLA:
 
         Parameters
         ----------
-        theta_i : ArrayLike
+        theta_i : NDArray
             Hyperparameters theta.
 
         Returns
@@ -213,23 +213,25 @@ class INLA:
         self.model.theta[:] = theta_i
 
         # --- Evaluate the log prior of the hyperparameters
-        log_prior_hyperparameters = self.model.evaluate_log_prior_hyperparameters()
+        log_prior_hyperparameters: float = (
+            self.model.evaluate_log_prior_hyperparameters()
+        )
 
         # --- Construct the prior precision matrix of the latent parameters
         self.model.construct_Q_prior()
 
         # --- Optimize x (latent parameters) and construct conditional precision matrix
-        logdet_Q_conditional = self._inner_iteration()
+        logdet_Q_conditional: float = self._inner_iteration()
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
-        likelihood = self.model.likelihood.evaluate_likelihood(
+        likelihood: float = self.model.likelihood.evaluate_likelihood(
             eta=self.eta,
             y=self.y,
             kwargs={"theta": self.model.theta[self.model.hyperparameters_idx[-1] :]},
         )
 
         # --- Evaluate the prior of the latent parameters at x_star
-        prior_latent_parameters = self._evaluate_prior_latent_parameters(
+        prior_latent_parameters: float = self._evaluate_prior_latent_parameters(
             x_star=self.model.x
         )
 
@@ -238,7 +240,7 @@ class INLA:
             logdet_Q_conditional
         )
 
-        f_theta = -1 * (
+        f_theta: float = -1.0 * (
             log_prior_hyperparameters
             + likelihood
             + prior_latent_parameters
@@ -251,9 +253,9 @@ class INLA:
         self,
     ):
         self.x_update[:] = 0.0
-        x_i_norm = 1.0
+        x_i_norm: float = 1.0
 
-        counter = 0
+        counter: int = 0
         while x_i_norm >= self.eps_inner_iteration:
             if counter > self.inner_iteration_max_iter:
                 print_msg("current theta value: ", self.model.theta)
@@ -267,7 +269,9 @@ class INLA:
             Q_conditional = self.model.construct_Q_conditional(self.eta)
             self.solver.cholesky(Q_conditional, sparsity=self.sparsity_Q_conditional)
 
-            rhs = self.model.construct_information_vector(self.eta, self.model.x)
+            rhs: NDArray = self.model.construct_information_vector(
+                self.eta, self.model.x
+            )
             self.x_update[:] = self.solver.solve(
                 rhs, sparsity=self.sparsity_Q_conditional
             )
@@ -275,19 +279,17 @@ class INLA:
             x_i_norm = xp.linalg.norm(self.x_update)
             counter += 1
 
-        logdet = self.solver.logdet()
+        logdet: float = self.solver.logdet()
 
         return logdet
 
-    def _evaluate_prior_latent_parameters(self, x_star: ArrayLike) -> float:
+    def _evaluate_prior_latent_parameters(self, x_star: NDArray) -> float:
         """Evaluation of the prior of the latent parameters at x using the prior precision
         matrix Q_prior and assuming mean zero.
 
         Parameters
         ----------
-        Q_prior : ArrayLike
-            Prior precision matrix.
-        x : ArrayLike
+        x : NDArray
             Latent parameters.
 
         Notes
@@ -305,15 +307,15 @@ class INLA:
             Log prior of the latent parameters evaluated at x
         """
 
-        n = x_star.shape[0]
+        n: int = x_star.shape[0]
 
         self.solver.cholesky(self.model.Q_prior, sparsity=self.sparsity_Q_prior)
 
         # with time_range('getLogDet', color_id=0):
-        logdet_Q_prior = self.solver.logdet()
+        logdet_Q_prior: float = self.solver.logdet()
 
         # with time_range('compute_xtQx', color_id=0):
-        log_prior_latent_parameters = (
+        log_prior_latent_parameters: float = (
             -n / 2 * xp.log(2 * math.pi)
             + 0.5 * logdet_Q_prior
             - 0.5 * x_star.T @ self.model.Q_prior @ x_star

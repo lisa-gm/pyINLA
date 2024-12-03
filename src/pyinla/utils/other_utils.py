@@ -1,3 +1,5 @@
+# Copyright 2024 pyINLA authors. All rights reserved.
+
 import numpy as np
 from scipy.sparse import csc_matrix, spmatrix
 

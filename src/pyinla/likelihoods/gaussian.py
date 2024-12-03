@@ -1,6 +1,6 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from pyinla import ArrayLike, xp, sp
+from pyinla import xp, sp, ArrayLike, NDArray
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.pyinla_config import PyinlaConfig
 
@@ -16,12 +16,10 @@ class GaussianLikelihood(Likelihood):
         """Initializes the Gaussian likelihood."""
         super().__init__(pyinla_config, n_observations)
 
-        self.theta = {"theta_observations": pyinla_config.likelihood.theta_observations}
-
     def evaluate_likelihood(
         self,
-        eta: ArrayLike,
-        y: ArrayLike,
+        eta: NDArray,
+        y: NDArray,
         **kwargs,
     ) -> float:
         """Evaluate a Gaussian likelihood.
@@ -36,9 +34,9 @@ class GaussianLikelihood(Likelihood):
 
         Parameters
         ----------
-        eta : ArrayLike
+        eta : NDArray
             Vector of the linear predictor.
-        y : ArrayLike
+        y : NDArray
             Vector of the observations.
         kwargs :
             theta : float
@@ -50,13 +48,13 @@ class GaussianLikelihood(Likelihood):
             Likelihood.
         """
 
-        theta: ArrayLike = kwargs.get("theta", None)
+        theta: NDArray = kwargs.get("theta", None)
         if theta is None:
             raise ValueError("theta must be provided to evaluate gaussian likelihood.")
 
         yEta = eta - y
 
-        likelihood = (
+        likelihood: float = (
             0.5 * theta * self.n_observations - 0.5 * xp.exp(theta) * yEta.T @ yEta
         )
 
@@ -64,17 +62,17 @@ class GaussianLikelihood(Likelihood):
 
     def evaluate_gradient_likelihood(
         self,
-        eta: ArrayLike,
-        y: ArrayLike,
+        eta: NDArray,
+        y: NDArray,
         **kwargs,
-    ) -> ArrayLike:
+    ) -> NDArray:
         """Evaluate the gradient of the likelihood wrt to eta = Ax.
 
         Parameters
         ----------
-        eta : ArrayLike
+        eta : NDArray
             Vector of the linear predictor.
-        y : ArrayLike
+        y : NDArray
             Vector of the observations.
         kwargs :
             theta : float
@@ -82,17 +80,17 @@ class GaussianLikelihood(Likelihood):
 
         Returns
         -------
-        gradient_likelihood : ArrayLike
+        gradient_likelihood : NDArray
             Gradient of the likelihood.
         """
 
-        theta: ArrayLike = kwargs.get("theta", None)
+        theta: NDArray = kwargs.get("theta", None)
         if theta is None:
             raise ValueError(
                 "theta must be provided to evaluate gradient of gaussian likelihood."
             )
 
-        gradient_likelihood = -xp.exp(theta) * (eta - y)
+        gradient_likelihood: NDArray = -xp.exp(theta) * (eta - y)
 
         return gradient_likelihood
 
@@ -104,9 +102,9 @@ class GaussianLikelihood(Likelihood):
 
         Parameters
         ----------
-        eta : ArrayLike
+        eta : NDArray
             Vector of the linear predictor.
-        y : ArrayLike
+        y : NDArray
             Vector of the observations.
         kwargs :
             theta : float
@@ -117,12 +115,14 @@ class GaussianLikelihood(Likelihood):
         hessian_likelihood : ArrayLike
             Hessian of the likelihood.
         """
-        theta: ArrayLike = kwargs.get("theta", None)
+        theta: NDArray = kwargs.get("theta", None)
         if theta is None:
             raise ValueError(
                 "theta must be provided to evaluate gradient of gaussian likelihood."
             )
 
-        hessian_likelihood = -xp.exp(theta) * sp.sparse.eye(self.n_observations)
+        hessian_likelihood: ArrayLike = -xp.exp(theta) * sp.sparse.eye(
+            self.n_observations
+        )
 
         return hessian_likelihood

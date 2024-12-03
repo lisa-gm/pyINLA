@@ -1,10 +1,9 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-import numpy as np
-
 from pyinla import xp
+
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
-from pyinla.core.pyinla_config import PriorHyperparametersConfig
+from pyinla.core.pyinla_config import PenalizedComplexityPriorHyperparametersConfig
 
 
 class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
@@ -12,20 +11,20 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
 
     def __init__(
         self,
-        ph_config: PriorHyperparametersConfig,
+        ph_config: PenalizedComplexityPriorHyperparametersConfig,
         hyperparameter_type: str,
         **kwargs,
     ) -> None:
         """Initializes the Penalized Complexity prior hyperparameters."""
         super().__init__(ph_config, hyperparameter_type)
 
-        self.alpha = ph_config.alpha
-        self.u = ph_config.u
+        self.alpha: float = ph_config.alpha
+        self.u: float = ph_config.u
 
-        self.lambda_theta = 0.0
+        self.lambda_theta: float = 0.0
 
         if self.hyperparameter_type == "r_s":
-            spatial_dim = kwargs["spatial_dim", 2]
+            spatial_dim: int = kwargs["spatial_dim", 2]
 
             self.lambda_theta = -xp.log(self.alpha) * pow(
                 self.u,
@@ -40,10 +39,10 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
 
     def evaluate_log_prior(self, theta: float, **kwargs) -> float:
         """Evaluate the prior hyperparameters."""
-        log_prior = 0.0
+        log_prior: float = 0.0
 
         if self.hyperparameter_type == "r_s":
-            spatial_dim = kwargs["spatial_dim", 2]
+            spatial_dim: int = kwargs["spatial_dim", 2]
 
             if spatial_dim == 2:
                 log_prior = (

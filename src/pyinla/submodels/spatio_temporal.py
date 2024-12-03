@@ -4,13 +4,11 @@ import math
 from pathlib import Path
 
 import numpy as np
-from scipy.sparse import csc_matrix, load_npz, spmatrix
+from scipy.sparse import load_npz, csc_matrix, spmatrix
 
+from pyinla import xp, sp, NDArray
 from pyinla.core.submodel import SubModel
-from pyinla.core.pyinla_config import SubModelConfig
-
-
-from pyinla import ArrayLike, xp, sp
+from pyinla.core.pyinla_config import SpatioTemporalSubModelConfig
 
 
 class SpatioTemporalModel(SubModel):
@@ -18,7 +16,7 @@ class SpatioTemporalModel(SubModel):
 
     def __init__(
         self,
-        submodel_config: SubModelConfig,
+        submodel_config: SpatioTemporalSubModelConfig,
         simulation_path: Path,
         **kwargs,
     ) -> None:
@@ -53,33 +51,33 @@ class SpatioTemporalModel(SubModel):
         self._check_dimensions_temporal_matrices()
 
         if xp == np:
-            self.c0 = c0
-            self.g1 = g1
-            self.g2 = g2
-            self.g3 = g3
+            self.c0: spmatrix = c0
+            self.g1: spmatrix = g1
+            self.g2: spmatrix = g2
+            self.g3: spmatrix = g3
 
-            self.m0 = m0
-            self.m1 = m1
-            self.m2 = m2
+            self.m0: spmatrix = m0
+            self.m1: spmatrix = m1
+            self.m2: spmatrix = m2
         else:
-            self.c0 = sp.sparse.csc_matrix(c0)
-            self.g1 = sp.sparse.csc_matrix(g1)
-            self.g2 = sp.sparse.csc_matrix(g2)
-            self.g3 = sp.sparse.csc_matrix(g3)
+            self.c0: sp.sparse.spmatrix = sp.sparse.csc_matrix(c0)
+            self.g1: sp.sparse.spmatrix = sp.sparse.csc_matrix(g1)
+            self.g2: sp.sparse.spmatrix = sp.sparse.csc_matrix(g2)
+            self.g3: sp.sparse.spmatrix = sp.sparse.csc_matrix(g3)
 
-            self.m0 = sp.sparse.csc_matrix(m0)
-            self.m1 = sp.sparse.csc_matrix(m1)
-            self.m2 = sp.sparse.csc_matrix(m2)
+            self.m0: sp.sparse.spmatrix = sp.sparse.csc_matrix(m0)
+            self.m1: sp.sparse.spmatrix = sp.sparse.csc_matrix(m1)
+            self.m2: sp.sparse.spmatrix = sp.sparse.csc_matrix(m2)
 
-        self.ns = self.c0.shape[0]  # Number of spatial nodes in the mesh
-        self.nt = self.m0.shape[0]  # Number of temporal nodes in the mesh
+        self.ns: int = self.c0.shape[0]  # Number of spatial nodes in the mesh
+        self.nt: int = self.m0.shape[0]  # Number of temporal nodes in the mesh
 
         # Check that design_matrix shape match spatio-temporal fields
         assert (
             self.n_latent_parameters == self.ns * self.nt
         ), f"Design matrix has incorrect number of columns. \n    n_latent_parameters: {self.n_latent_parameters}\n    ns: {self.ns} * nt: {self.nt} = {self.ns * self.nt}"
 
-        self.manifold = submodel_config.manifold
+        self.manifold: str = submodel_config.manifold
 
     def _check_dimensions_spatial_matrices(self) -> None:
         """Check the dimensions of the model."""
@@ -102,15 +100,15 @@ class SpatioTemporalModel(SubModel):
             self.m0.shape == self.m1.shape == self.m2.shape
         ), "Dimensions of temporal matrices do not match."
 
-    def construct_Q_prior(self, **kwargs) -> spmatrix:
+    def construct_Q_prior(self, **kwargs) -> sp.sparse.spmatrix:
         """Construct the prior precision matrix."""
 
-        theta: ArrayLike = kwargs.get("theta", None)
-        theta_keys: list = kwargs.get("theta_keys", None)
+        theta: NDArray = kwargs.get("theta", None)
+        theta_keys: NDArray = kwargs.get("theta_keys", None)
 
-        r_s = theta[theta_keys == "r_s"]
-        r_t = theta[theta_keys == "r_t"]
-        sigma_st = theta[theta_keys == "sigma_st"]
+        r_s: float = theta[theta_keys == "r_s"]
+        r_t: float = theta[theta_keys == "r_t"]
+        sigma_st: float = theta[theta_keys == "sigma_st"]
 
         gamma_s, gamma_t, gamma_st = self._interpretable2compute(
             r_s, r_t, sigma_st, dim_spatial_domain=2
@@ -132,7 +130,7 @@ class SpatioTemporalModel(SubModel):
         )
 
         # withsparseKroneckerProduct", color_id=0):
-        Q_prior: spmatrix = csc_matrix(
+        Q_prior: sp.sparse.spmatrix = csc_matrix(
             pow(exp_gamma_st, 2)
             * (
                 sp.sparse.kron(self.m0, q3s)
@@ -143,7 +141,9 @@ class SpatioTemporalModel(SubModel):
 
         return Q_prior
 
-    def _interpretable2compute(self, r_s, r_t, sigma_st, dim_spatial_domain=2) -> tuple:
+    def _interpretable2compute(
+        self, r_s: float, r_t: float, sigma_st: float, dim_spatial_domain: int = 2
+    ) -> tuple:
         if dim_spatial_domain != 2:
             raise ValueError("Only 2D spatial domain is supported for now.")
 
@@ -152,7 +152,7 @@ class SpatioTemporalModel(SubModel):
         alpha_t = 1
         alpha_e = 1
 
-        # implicit assumption that spatial domain is 2D
+        # Implicit assumption that spatial domain is 2D
         alpha = alpha_e + alpha_s * (alpha_t - 0.5)
 
         nu_s = alpha - 1
@@ -190,7 +190,11 @@ class SpatioTemporalModel(SubModel):
         return gamma_s, gamma_t, gamma_st
 
     def convert_theta_from_model2interpret(
-        self, gamma_s, gamma_t, gamma_st, dim_spatial_domain=2
+        self,
+        gamma_s: float,
+        gamma_t: float,
+        gamma_st: float,
+        dim_spatial_domain: int = 2,
     ) -> tuple:
         """Convert theta from model scale to interpretable scale."""
 

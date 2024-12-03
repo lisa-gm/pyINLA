@@ -1,6 +1,6 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from pyinla import MPI_AVAILABLE, ArrayLike, comm_rank
+from pyinla import ArrayLike, MPI_AVAILABLE, comm_rank
 
 if MPI_AVAILABLE:
     from mpi4py import MPI

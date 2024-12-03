@@ -1,8 +1,6 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from pyinla import xp, sp, ArrayLike
-
-from pyinla import ArrayLike
+from pyinla import xp, sp, NDArray
 from pyinla.core.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 
@@ -33,9 +31,9 @@ class SparseSolver(Solver):
 
     def solve(
         self,
-        rhs: ArrayLike,
+        rhs: NDArray,
         **kwargs,
-    ) -> ArrayLike:
+    ) -> NDArray:
         """Solve linear system using Cholesky factor."""
 
         if self.L is None:

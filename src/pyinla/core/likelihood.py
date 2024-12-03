@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from pyinla import ArrayLike
+from pyinla import ArrayLike, NDArray
 from pyinla.core.pyinla_config import PyinlaConfig
 
 
@@ -22,17 +22,17 @@ class Likelihood(ABC):
     @abstractmethod
     def evaluate_likelihood(
         self,
-        eta: ArrayLike,
-        y: ArrayLike,
+        eta: NDArray,
+        y: NDArray,
         **kwargs,
     ) -> float:
         """Evaluate the likelihood.
 
         Parameters
         ----------
-        eta : ArrayLike
+        eta : NDArray
             Vector of the linear predictor.
-        y : ArrayLike
+        y : NDArray
             Vector of the observations.
         **kwargs : optional
             Hyperparameters for likelihood.
@@ -48,24 +48,24 @@ class Likelihood(ABC):
     @abstractmethod
     def evaluate_gradient_likelihood(
         self,
-        eta: ArrayLike,
-        y: ArrayLike,
+        eta: NDArray,
+        y: NDArray,
         **kwargs,
-    ) -> ArrayLike:
+    ) -> NDArray:
         """Evaluate the gradient of the likelihood wrt to eta = Ax.
 
         Parameters
         ----------
-        y : ArrayLike
+        y : NDArray
             Vector of the observations.
-        eta : ArrayLike
+        eta : NDArray
             Vector of the linear predictor.
         **kwargs : optional
             Hyperparameters for likelihood.
 
         Returns
         -------
-        gradient_likelihood : ArrayLike
+        gradient_likelihood : NDArray
             Gradient of the likelihood.
         """
         pass
@@ -79,9 +79,9 @@ class Likelihood(ABC):
 
         Parameters
         ----------
-        eta : ArrayLike
+        eta : NDArray
             Vector of the linear predictor.
-        y : ArrayLike
+        y : NDArray
             Vector of the observations.
         **kwargs : optional
             Hyperparameters for likelihood.

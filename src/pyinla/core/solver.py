@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from pyinla import ArrayLike
+from pyinla import ArrayLike, NDArray
 from pyinla.core.pyinla_config import SolverConfig
 
 
@@ -23,7 +23,7 @@ class Solver(ABC):
         pass
 
     @abstractmethod
-    def solve(self, rhs: ArrayLike, **kwargs) -> ArrayLike:
+    def solve(self, rhs: NDArray, **kwargs) -> NDArray:
         """Solve linear system using Cholesky factor."""
         pass
 

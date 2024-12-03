@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 from scipy.sparse import spmatrix, csc_matrix, load_npz
-from pyinla import ArrayLike, comm_rank, comm_size, sp, xp
+from pyinla import xp, sp, NDArray
 
 from pyinla.core.pyinla_config import SubModelConfig
 
@@ -26,22 +26,22 @@ class SubModel(ABC):
             load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "a.npz"))
         )
         if xp == np:
-            self.a = a
+            self.a: sp.sparse.spmatrix = a
         else:
-            self.a = sp.sparse.csc_matrix(a)
-        self.n_latent_parameters = self.a.shape[1]
+            self.a: sp.sparse.spmatrix = sp.sparse.csc_matrix(a)
+        self.n_latent_parameters: int = self.a.shape[1]
 
         # --- Load latent parameters vector
         try:
-            x_initial = np.load(
+            x_initial: NDArray = np.load(
                 Path.joinpath(simulation_path, submodel_config.inputs, "x.npy")
             )
             if xp == np:
-                self.x_initial = x_initial
+                self.x_initial: NDArray = x_initial
             else:
-                self.x_initial = xp.array(x_initial)
+                self.x_initial: NDArray = xp.array(x_initial)
         except FileNotFoundError:
-            self.x_initial = xp.zeros((self.a.shape[1]), dtype=float)
+            self.x_initial: NDArray = xp.zeros((self.a.shape[1]), dtype=float)
 
     @abstractmethod
     def construct_Q_prior(self, **kwargs) -> spmatrix:

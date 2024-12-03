@@ -16,7 +16,7 @@ from pydantic import (
 )
 from typing_extensions import Self
 
-from pyinla.__init__ import ArrayLike, xp
+from pyinla.__init__ import xp, ArrayLike
 
 
 # --- PRIOR HYPERPARAMETERS ----------------------------------------------------

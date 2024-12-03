@@ -2,7 +2,7 @@
 
 import os
 from warnings import warn
-
+from typing import Any, TypeAlias, TypeVar
 from numpy.typing import ArrayLike
 
 from pyinla.__about__ import __version__
@@ -59,8 +59,6 @@ try:
     comm_size = MPI.COMM_WORLD.Get_size()
 
     MPI_AVAILABLE = True
-
-
 except ImportError as e:
     warn(f"No 'MPI' backend detected. ({e})")
 
@@ -68,11 +66,17 @@ except ImportError as e:
     comm_size = 1
 
 
+# Some type aliases for the array module.
+_ScalarType = TypeVar("ScalarType", bound=xp.generic, covariant=True)
+_DType = xp.dtype[_ScalarType]
+NDArray: TypeAlias = xp.ndarray[Any, _DType]
+
 __all__ = [
     "__version__",
     "xp",
     "sp",
     "ArrayLike",
+    "NDArray",
     "comm_rank",
     "comm_size",
     "CUPY_AVAILABLE",
