@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 from pyinla import ArrayLike, NDArray
-from pyinla.core.pyinla_config import PyinlaConfig
+from pyinla.configs.likelihood_config import LikelihoodConfig
 
 
 class Likelihood(ABC):
@@ -11,12 +11,12 @@ class Likelihood(ABC):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
         n_observations: int,
+        config: LikelihoodConfig,
     ) -> None:
         """Initializes the likelihood."""
 
-        self.pyinla_config = pyinla_config
+        self.config = config
         self.n_observations = n_observations
 
     @abstractmethod

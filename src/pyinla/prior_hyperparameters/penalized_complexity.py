@@ -1,9 +1,10 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 from pyinla import xp
-
+from pyinla.configs.priorhyperparameters_config import (
+    PenalizedComplexityPriorHyperparametersConfig,
+)
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
-from pyinla.core.pyinla_config import PenalizedComplexityPriorHyperparametersConfig
 
 
 class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
@@ -11,15 +12,15 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
 
     def __init__(
         self,
-        ph_config: PenalizedComplexityPriorHyperparametersConfig,
         hyperparameter_type: str,
+        config: PenalizedComplexityPriorHyperparametersConfig,
         **kwargs,
     ) -> None:
         """Initializes the Penalized Complexity prior hyperparameters."""
-        super().__init__(ph_config, hyperparameter_type)
+        super().__init__(config, hyperparameter_type)
 
-        self.alpha: float = ph_config.alpha
-        self.u: float = ph_config.u
+        self.alpha: float = config.alpha
+        self.u: float = config.u
 
         self.lambda_theta: float = 0.0
 

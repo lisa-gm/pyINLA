@@ -3,29 +3,25 @@
 from abc import ABC
 
 import numpy as np
-from scipy.sparse import spmatrix, coo_matrix
-from pyinla import xp, sp, ArrayLike, NDArray
+from scipy.sparse import coo_matrix, spmatrix
 
-from pyinla.core.pyinla_config import PyinlaConfig
-from pyinla.core.submodel import SubModel
-from pyinla.submodels.regression import RegressionModel
-from pyinla.submodels.spatio_temporal import SpatioTemporalModel
-
+from pyinla import ArrayLike, NDArray, sp, xp
+from pyinla.configs.likelihood_config import LikelihoodConfig
+from pyinla.configs.priorhyperparameters_config import (
+    GaussianPriorHyperparametersConfig,
+    PenalizedComplexityPriorHyperparametersConfig,
+)
 from pyinla.core.likelihood import Likelihood
-from pyinla.likelihoods import BinomialLikelihood, GaussianLikelihood, PoissonLikelihood
-
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
+from pyinla.core.submodel import SubModel
+from pyinla.likelihoods import BinomialLikelihood, GaussianLikelihood, PoissonLikelihood
 from pyinla.prior_hyperparameters import (
     GaussianPriorHyperparameters,
     PenalizedComplexityPriorHyperparameters,
 )
+from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
 
-from pyinla.core.pyinla_config import (
-    RegressionSubModelConfig,
-    SpatioTemporalSubModelConfig,
-    GaussianPriorHyperparametersConfig,
-    PenalizedComplexityPriorHyperparametersConfig,
-)
+pyinla_config = None
 
 
 class Model(ABC):
@@ -33,87 +29,28 @@ class Model(ABC):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
+        submodels: list[SubModel],
+        likelihood_config: LikelihoodConfig,
     ) -> None:
         """Initializes the model."""
-        self.pyinla_config: PyinlaConfig = pyinla_config
+
+        # Check the order of the submodels, we want the SpatioTemporalSubModel first
+        # as this will decide the sparsity pattern of the precision matrix.
+        for i, submodel in enumerate(submodels):
+            if isinstance(submodel, SpatioTemporalSubModel):
+                submodels.insert(0, submodels.pop(i))
+
+        self.submodels: list[SubModel] = submodels
+
+        print("I'm here", flush=True)
+        exit()  # TODO: Continue here!
 
         # --- Initialize the submodels and their prior hyperparameters
         # Initialization order priviledges the spatio-temporal submodel (first)
         # and all others (second).
-        self.submodels: list[SubModel] = []
         self.prior_hyperparameters: list[PriorHyperparameters] = []
-        submodel_to_instanciate: ArrayLike = [
-            xp.arrange(len(pyinla_config.model.submodels))
-        ]
-        for i, submodel_config in enumerate(self.pyinla_config.model.submodels):
-            if isinstance(submodel_config, SpatioTemporalSubModelConfig):
-                # Instancitate the SpatialTemporalModel
-                self.submodels.append(
-                    SpatioTemporalModel(submodel_config, pyinla_config.input_dir)
-                )
-                submodel_to_instanciate.pop(i)
 
-                # Instantiate the prior hyperparameters
-                # ... for the spatial range
-                if isinstance(submodel_config.ph_s, GaussianPriorHyperparametersConfig):
-                    self.prior_hyperparameters.append(
-                        GaussianPriorHyperparameters(
-                            ph_config=submodel_config.ph_s, hyperparameter_type="r_s"
-                        )
-                    )
-                elif isinstance(
-                    submodel_config.ph_s, PenalizedComplexityPriorHyperparametersConfig
-                ):
-                    self.prior_hyperparameters.append(
-                        PenalizedComplexityPriorHyperparameters(
-                            ph_config=submodel_config.ph_s, hyperparameter_type="r_s"
-                        )
-                    )
-
-                # ... for the temporal range
-                if isinstance(submodel_config.ph_t, GaussianPriorHyperparametersConfig):
-                    self.prior_hyperparameters.append(
-                        GaussianPriorHyperparameters(
-                            ph_config=submodel_config.ph_t, hyperparameter_type="r_t"
-                        )
-                    )
-                elif isinstance(
-                    submodel_config.ph_t, PenalizedComplexityPriorHyperparametersConfig
-                ):
-                    self.prior_hyperparameters.append(
-                        PenalizedComplexityPriorHyperparameters(
-                            ph_config=submodel_config.ph_t, hyperparameter_type="r_t"
-                        )
-                    )
-
-                # ... for the spatio-temporal variation
-                if isinstance(
-                    submodel_config.ph_st, GaussianPriorHyperparametersConfig
-                ):
-                    self.prior_hyperparameters.append(
-                        GaussianPriorHyperparameters(
-                            ph_config=submodel_config.ph_st,
-                            hyperparameter_type="sigma_st",
-                        )
-                    )
-                elif isinstance(
-                    submodel_config.ph_st, PenalizedComplexityPriorHyperparametersConfig
-                ):
-                    self.prior_hyperparameters.append(
-                        PenalizedComplexityPriorHyperparameters(
-                            ph_config=submodel_config.ph_st,
-                            hyperparameter_type="sigma_st",
-                        )
-                    )
-
-        for i in submodel_to_instanciate:
-            if isinstance(submodel_config[i], RegressionSubModelConfig):
-                self.submodels.append(
-                    RegressionModel(submodel_config, pyinla_config.input_dir)
-                )
-            else:
-                raise ValueError("Unknown submodel type.")
+        # HERE need to initialize the list of prior hyperparameters
 
         # --- Initialize the hyperparameters array
         theta: ArrayLike = []
@@ -130,9 +67,10 @@ class Model(ABC):
                 self.hyperparameters_idx[-1] + len(theta_submodel)
             )
 
-        lh_hyperparameters, lh_hyperparameters_keys = (
-            self.pyinla_config.model.likelihood.read_hyperparameters()
-        )
+        (
+            lh_hyperparameters,
+            lh_hyperparameters_keys,
+        ) = self.pyinla_config.model.likelihood.read_hyperparameters()
 
         theta.append(lh_hyperparameters)
         theta_keys.append(lh_hyperparameters_keys)
@@ -203,7 +141,7 @@ class Model(ABC):
                 PenalizedComplexityPriorHyperparametersConfig,
             ):
                 self.prior_hyperparameters.append(
-                    PenalizedComplexityPriorHyperparametersConfig(
+                    PenalizedComplexityPriorHyperparameters(
                         ph_config=self.pyinla_config.model.likelihood.prior_hyperparameters,
                         hyperparameter_type="prec_o",
                     )
@@ -224,18 +162,16 @@ class Model(ABC):
         self.Q_conditional_data_mapping = [0]
 
     def construct_Q_prior(self) -> spmatrix:
-
         if self.Q_prior is None:
             rows = []
             cols = []
             data = []
 
             for i, submodel in enumerate(self.submodels):
-
                 kwargs = {}
-                if isinstance(submodel, RegressionModel):
+                if isinstance(submodel, RegressionSubModel):
                     ...
-                elif isinstance(submodel, SpatioTemporalModel):
+                elif isinstance(submodel, SpatioTemporalSubModel):
                     kwargs = {
                         "theta": self.theta[
                             self.hyperparameters_idx[i] : self.hyperparameters_idx[
@@ -272,12 +208,11 @@ class Model(ABC):
             )
 
         else:
-
             for i, submodel in enumerate(self.submodels):
                 kwargs = {}
-                if isinstance(submodel, RegressionModel):
+                if isinstance(submodel, RegressionSubModel):
                     ...
-                elif isinstance(submodel, SpatioTemporalModel):
+                elif isinstance(submodel, SpatioTemporalSubModel):
                     kwargs = {
                         "theta": self.theta[
                             self.hyperparameters_idx[i] : self.hyperparameters_idx[

@@ -1,8 +1,8 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from pyinla import xp, sp, ArrayLike, NDArray
+from pyinla import ArrayLike, NDArray, sp, xp
+from pyinla.configs.likelihood_config import GaussianLikelihoodConfig
 from pyinla.core.likelihood import Likelihood
-from pyinla.core.pyinla_config import PyinlaConfig
 
 
 class GaussianLikelihood(Likelihood):
@@ -10,11 +10,11 @@ class GaussianLikelihood(Likelihood):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
         n_observations: int,
+        config: GaussianLikelihoodConfig,
     ) -> None:
         """Initializes the Gaussian likelihood."""
-        super().__init__(pyinla_config, n_observations)
+        super().__init__(config, n_observations)
 
     def evaluate_likelihood(
         self,

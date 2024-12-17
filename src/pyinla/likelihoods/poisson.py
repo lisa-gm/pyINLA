@@ -1,11 +1,12 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-import numpy as np
 from pathlib import Path
 
-from pyinla import xp, sp, ArrayLike, NDArray
+import numpy as np
+
+from pyinla import ArrayLike, NDArray, sp, xp
+from pyinla.configs.likelihood_config import PoissonLikelihoodConfig
 from pyinla.core.likelihood import Likelihood
-from pyinla.core.pyinla_config import PyinlaConfig
 
 
 class PoissonLikelihood(Likelihood):
@@ -13,15 +14,15 @@ class PoissonLikelihood(Likelihood):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
         n_observations: int,
+        config: PoissonLikelihoodConfig,
     ) -> None:
         """Initializes the Poisson likelihood."""
-        super().__init__(pyinla_config, n_observations)
+        super().__init__(config, n_observations)
 
         # Load the extra coeficients for Poisson likelihood
         try:
-            e: NDArray = np.load(Path.joinpath(pyinla_config.input_dir, "e.npy"))
+            e: NDArray = np.load(Path.joinpath(config.input_dir, "e.npy"))
         except FileNotFoundError:
             e: NDArray = np.ones((n_observations), dtype=int)
 

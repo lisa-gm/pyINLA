@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 import numpy as np
-from scipy.sparse import spmatrix, csc_matrix, load_npz
-from pyinla import xp, sp, NDArray
+from scipy.sparse import csc_matrix, load_npz, spmatrix
 
-from pyinla.core.pyinla_config import SubModelConfig
+from pyinla import NDArray, sp, xp
+from pyinla.configs.submodels_config import SubModelConfig
 
 
 class SubModel(ABC):
@@ -15,16 +15,14 @@ class SubModel(ABC):
 
     def __init__(
         self,
-        submodel_config: SubModelConfig,
-        simulation_path: Path,
+        config: SubModelConfig,
     ) -> None:
         """Initializes the model."""
-        self.submodel_config = submodel_config
+        self.config = config
+        self.input_path = Path(config.input_dir)
 
         # --- Load design matrix
-        a: spmatrix = csc_matrix(
-            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "a.npz"))
-        )
+        a: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("a.npz")))
         if xp == np:
             self.a: sp.sparse.spmatrix = a
         else:
@@ -33,9 +31,7 @@ class SubModel(ABC):
 
         # --- Load latent parameters vector
         try:
-            x_initial: NDArray = np.load(
-                Path.joinpath(simulation_path, submodel_config.inputs, "x.npy")
-            )
+            x_initial: NDArray = np.load(self.input_path.joinpath("x.npy"))
             if xp == np:
                 self.x_initial: NDArray = x_initial
             else:

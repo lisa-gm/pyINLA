@@ -22,7 +22,6 @@ dependencies = [
     "numpy>=1.23.2",
     "scipy",
     "matplotlib",
-    "autograd",
     "pydantic",
     "pytest",
     "pytest-cov",

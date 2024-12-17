@@ -1,11 +1,12 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-import numpy as np
 from pathlib import Path
 
-from pyinla import xp, sp, ArrayLike, NDArray
+import numpy as np
+
+from pyinla import ArrayLike, NDArray, sp, xp
+from pyinla.configs.likelihood_config import BinomialLikelihoodConfig
 from pyinla.core.likelihood import Likelihood
-from pyinla.core.pyinla_config import PyinlaConfig
 from pyinla.utils import sigmoid
 
 
@@ -14,17 +15,15 @@ class BinomialLikelihood(Likelihood):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
         n_observations: int,
+        config: BinomialLikelihoodConfig,
     ) -> None:
         """Initializes the Binomial likelihood."""
-        super().__init__(pyinla_config, n_observations)
+        super().__init__(config, n_observations)
 
         # Load the extra coeficients for Binomial likelihood
         try:
-            n_trials: NDArray = np.load(
-                Path.joinpath(pyinla_config.input_dir, "n_trials.npy")
-            )
+            n_trials: NDArray = np.load(Path.joinpath(config.input_dir, "n_trials.npy"))
             if xp == np:
                 self.n_trials: NDArray = n_trials
             else:
@@ -32,11 +31,11 @@ class BinomialLikelihood(Likelihood):
         except FileNotFoundError:
             self.n_trials: NDArray = xp.ones((n_observations), dtype=int)
 
-        if pyinla_config.model.likelihood.link_function == "sigmoid":
+        if config.model.likelihood.link_function == "sigmoid":
             self.link_function = sigmoid
         else:
             raise NotImplementedError(
-                f"Link function {pyinla_config.model.likelihood.link_function} not implemented."
+                f"Link function {config.model.likelihood.link_function} not implemented."
             )
 
     def evaluate_likelihood(

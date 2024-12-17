@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from pyinla.core.pyinla_config import PriorHyperparametersConfig
+from pyinla.configs.priorhyperparameters_config import PriorHyperparametersConfig
 
 
 class PriorHyperparameters(ABC):
@@ -10,12 +10,12 @@ class PriorHyperparameters(ABC):
 
     def __init__(
         self,
-        ph_config: PriorHyperparametersConfig,
         hyperparameter_type: str,
+        config: PriorHyperparametersConfig,
     ) -> None:
         """Initializes the prior hyperparameters."""
 
-        self.ph_config: PriorHyperparametersConfig = ph_config
+        self.config: PriorHyperparametersConfig = config
         self.hyperparameter_type: str = hyperparameter_type
 
     @abstractmethod

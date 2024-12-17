@@ -1,54 +1,35 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import math
-from pathlib import Path
 
 import numpy as np
-from scipy.sparse import load_npz, csc_matrix, spmatrix
+from scipy.sparse import csc_matrix, load_npz, spmatrix
 
-from pyinla import xp, sp, NDArray
+from pyinla import NDArray, sp, xp
+from pyinla.configs.submodels_config import SpatioTemporalSubModelConfig
 from pyinla.core.submodel import SubModel
-from pyinla.core.pyinla_config import SpatioTemporalSubModelConfig
 
 
-class SpatioTemporalModel(SubModel):
+class SpatioTemporalSubModel(SubModel):
     """Fit a spatio-temporal model."""
 
     def __init__(
         self,
-        submodel_config: SpatioTemporalSubModelConfig,
-        simulation_path: Path,
-        **kwargs,
+        config: SpatioTemporalSubModelConfig,
     ) -> None:
         """Initializes the model."""
-        super().__init__(submodel_config, simulation_path)
+        super().__init__(config)
 
         # Load spatial_matrices
-        c0: spmatrix = csc_matrix(
-            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "c0.npz"))
-        )
-        g1: spmatrix = csc_matrix(
-            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g1.npz"))
-        )
-        g2: spmatrix = csc_matrix(
-            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g2.npz"))
-        )
-        g3: spmatrix = csc_matrix(
-            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "g3.npz"))
-        )
-        self._check_dimensions_spatial_matrices()
+        c0: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("c0.npz")))
+        g1: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("g1.npz")))
+        g2: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("g2.npz")))
+        g3: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("g3.npz")))
 
         # Load temporal_matrices
-        m0: spmatrix = csc_matrix(
-            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m0.npz"))
-        )
-        m1: spmatrix = csc_matrix(
-            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m1.npz"))
-        )
-        m2: spmatrix = csc_matrix(
-            load_npz(Path.joinpath(simulation_path, submodel_config.inputs, "m2.npz"))
-        )
-        self._check_dimensions_temporal_matrices()
+        m0: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("m0.npz")))
+        m1: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("m1.npz")))
+        m2: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("m2.npz")))
 
         if xp == np:
             self.c0: spmatrix = c0
@@ -69,15 +50,18 @@ class SpatioTemporalModel(SubModel):
             self.m1: sp.sparse.spmatrix = sp.sparse.csc_matrix(m1)
             self.m2: sp.sparse.spmatrix = sp.sparse.csc_matrix(m2)
 
+        self._check_dimensions_spatial_matrices()
+        self._check_dimensions_temporal_matrices()
+
         self.ns: int = self.c0.shape[0]  # Number of spatial nodes in the mesh
         self.nt: int = self.m0.shape[0]  # Number of temporal nodes in the mesh
 
         # Check that design_matrix shape match spatio-temporal fields
         assert (
             self.n_latent_parameters == self.ns * self.nt
-        ), f"Design matrix has incorrect number of columns. \n    n_latent_parameters: {self.n_latent_parameters}\n    ns: {self.ns} * nt: {self.nt} = {self.ns * self.nt}"
+        ), f"Design matrix has incorrect number of columns. \n    n_latent_parameters: {self.n_latent_parameters}\n    ns:{self.ns} x nt:{self.nt} = {self.ns * self.nt}"
 
-        self.manifold: str = submodel_config.manifold
+        self.manifold: str = config.manifold
 
     def _check_dimensions_spatial_matrices(self) -> None:
         """Check the dimensions of the model."""
