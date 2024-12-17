@@ -10,13 +10,11 @@ class PriorHyperparameters(ABC):
 
     def __init__(
         self,
-        hyperparameter_type: str,
         config: PriorHyperparametersConfig,
     ) -> None:
         """Initializes the prior hyperparameters."""
 
         self.config: PriorHyperparametersConfig = config
-        self.hyperparameter_type: str = hyperparameter_type
 
     @abstractmethod
     def evaluate_log_prior(self, theta: float) -> float:

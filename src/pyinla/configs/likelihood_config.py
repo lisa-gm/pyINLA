@@ -41,7 +41,7 @@ class PoissonLikelihoodConfig(LikelihoodConfig):
     input_dir: str = None
 
     def read_hyperparameters(self):
-        return [], []
+        return xp.array([]), []
 
 
 class BinomialLikelihoodConfig(LikelihoodConfig):
@@ -49,7 +49,7 @@ class BinomialLikelihoodConfig(LikelihoodConfig):
     link_function: Literal["sigmoid"] = "sigmoid"
 
     def read_hyperparameters(self):
-        return [], []
+        return xp.array([]), []
 
 
 def parse_config(config_file: Path) -> LikelihoodConfig:

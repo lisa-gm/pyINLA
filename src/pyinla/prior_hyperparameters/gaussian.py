@@ -11,12 +11,10 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
 
     def __init__(
         self,
-        hyperparameter_type: str,
         config: GaussianPriorHyperparametersConfig,
-        **kwargs,
     ) -> None:
         """Initializes the Gaussian prior hyperparameters."""
-        super().__init__(config, hyperparameter_type)
+        super().__init__(config)
 
         self.mean: float = config.mean
         self.precision: float = config.precision

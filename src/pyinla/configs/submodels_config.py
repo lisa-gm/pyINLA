@@ -32,7 +32,7 @@ class RegressionSubModelConfig(SubModelConfig):
     fixed_effects_prior_precision: float = 0.001
 
     def read_hyperparameters(self):
-        return [], []
+        return xp.array([]), []
 
 
 class SpatioTemporalSubModelConfig(SubModelConfig):

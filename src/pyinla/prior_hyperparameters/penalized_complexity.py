@@ -12,12 +12,13 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
 
     def __init__(
         self,
-        hyperparameter_type: str,
         config: PenalizedComplexityPriorHyperparametersConfig,
         **kwargs,
     ) -> None:
         """Initializes the Penalized Complexity prior hyperparameters."""
-        super().__init__(config, hyperparameter_type)
+        super().__init__(config)
+
+        self.hyperparameter_type: str = kwargs.get("hyperparameter_type")
 
         self.alpha: float = config.alpha
         self.u: float = config.u

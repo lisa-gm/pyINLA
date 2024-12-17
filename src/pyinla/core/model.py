@@ -42,43 +42,102 @@ class Model(ABC):
 
         self.submodels: list[SubModel] = submodels
 
-        print("I'm here", flush=True)
-        exit()  # TODO: Continue here!
-
-        # --- Initialize the submodels and their prior hyperparameters
-        # Initialization order priviledges the spatio-temporal submodel (first)
-        # and all others (second).
-        self.prior_hyperparameters: list[PriorHyperparameters] = []
-
-        # HERE need to initialize the list of prior hyperparameters
-
-        # --- Initialize the hyperparameters array
+        # For each submodel...
         theta: ArrayLike = []
         theta_keys: ArrayLike = []
         self.hyperparameters_idx: ArrayLike = [0]
+        self.prior_hyperparameters: list[PriorHyperparameters] = []
 
-        for submodel_config in self.pyinla_config.model.submodels:
-            theta_submodel, theta_keys_submodel = submodel_config.read_hyperparameters()
+        for submodel in self.submodels:
+            # ...initialize their prior hyperparameters matching their hyperparameters
+            if isinstance(submodel, RegressionSubModel):
+                ...
+            elif isinstance(submodel, SpatioTemporalSubModel):
+                # Spatial hyperparameters
+                if isinstance(submodel.config.ph_s, GaussianPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_s,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_s, PenalizedComplexityPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_s,
+                            hyperparameter_type="r_s",
+                        )
+                    )
+
+                # Temporal hyperparameters
+                if isinstance(submodel.config.ph_t, GaussianPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_t,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_t, PenalizedComplexityPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_t,
+                            hyperparameter_type="r_t",
+                        )
+                    )
+
+                # Sigma spatio-temporal hyperparameters
+                if isinstance(
+                    submodel.config.ph_st, GaussianPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_st,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_st, PenalizedComplexityPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_st,
+                            hyperparameter_type="sigma_st",
+                        )
+                    )
+            else:
+                raise ValueError("Unknown submodel type")
+
+            # ...and read their hyperparameters
+            theta_submodel, theta_keys_submodel = submodel.config.read_hyperparameters()
 
             theta.append(theta_submodel)
-            theta_keys.append(theta_keys_submodel)
+            theta_keys += theta_keys_submodel
 
             self.hyperparameters_idx.append(
                 self.hyperparameters_idx[-1] + len(theta_submodel)
             )
 
+        # Add the likelihood hyperparameters
         (
             lh_hyperparameters,
             lh_hyperparameters_keys,
-        ) = self.pyinla_config.model.likelihood.read_hyperparameters()
+        ) = likelihood_config.read_hyperparameters()
 
         theta.append(lh_hyperparameters)
-        theta_keys.append(lh_hyperparameters_keys)
-
         self.theta: NDArray = xp.concatenate(theta)
-        self.theta_keys: NDArray = xp.concatenate(theta_keys)
+
+        theta_keys += lh_hyperparameters_keys
+        self.theta_keys: NDArray = theta_keys
 
         self.n_hyperparameters: int = len(self.theta)
+
+        # print all hyperparameters and their keys and their index
+        for i, (theta_i, theta_key_i) in enumerate(zip(self.theta, self.theta_keys)):
+            print(f"theta_{theta_key_i} = {theta_i} (index: {i})")
+
+        print("I'm here", flush=True)
+        exit()  # TODO: Continue here!
 
         # --- Initialize the latent parameters and the design matrix
         self.n_latent_parameters: int = 0
