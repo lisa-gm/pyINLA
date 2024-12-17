@@ -2,6 +2,7 @@
 
 from abc import ABC
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.sparse import coo_matrix, spmatrix
 
@@ -133,11 +134,9 @@ class Model(ABC):
         self.n_hyperparameters: int = len(self.theta)
 
         # print all hyperparameters and their keys and their index
+        # TODO: Remove this, it's debug code
         for i, (theta_i, theta_key_i) in enumerate(zip(self.theta, self.theta_keys)):
             print(f"theta_{theta_key_i} = {theta_i} (index: {i})")
-
-        print("I'm here", flush=True)
-        exit()  # TODO: Continue here!
 
         # --- Initialize the latent parameters and the design matrix
         self.n_latent_parameters: int = 0
@@ -153,11 +152,14 @@ class Model(ABC):
         rows = []
         cols = []
         for i, submodel in enumerate(self.submodels):
-            data.append(submodel.a.data)
-            rows.append(submodel.a.row)
+            # Convert csc_matrix to coo_matrix to allow slicing
+            coo_submodel_a = submodel.a.tocoo()
+            data.append(coo_submodel_a.data)
+            rows.append(coo_submodel_a.row)
             cols.append(
-                submodel.a.col
-                + self.latent_parameters_idx[i] * xp.ones(submodel.a.col.size[0])
+                coo_submodel_a.col
+                + self.latent_parameters_idx[i]
+                * xp.ones(coo_submodel_a.col.size, dtype=int)
             )
 
             self.x[
@@ -168,6 +170,14 @@ class Model(ABC):
             (xp.concatenate(data), (xp.concatenate(rows), xp.concatenate(cols))),
             shape=(submodel.a.shape[0], self.n_latent_parameters),
         )
+
+        # TODO: Remove this, it's debug code
+        # plot a spy of a
+        plt.spy(self.a.get(), markersize=0.1)
+        plt.show()
+
+        print("I'm here", flush=True)
+        exit()  # TODO: Continue here!
 
         # --- Load observation vector
         y: NDArray = np.load(pyinla_config.input_dir / "y.npy")
