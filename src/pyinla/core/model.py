@@ -1,6 +1,7 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
-
+import os
 from abc import ABC
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -32,6 +33,7 @@ class Model(ABC):
         self,
         submodels: list[SubModel],
         likelihood_config: LikelihoodConfig,
+        **kwargs,
     ) -> None:
         """Initializes the model."""
 
@@ -176,17 +178,21 @@ class Model(ABC):
         plt.spy(self.a.get(), markersize=0.1)
         plt.show()
 
-        print("I'm here", flush=True)
-        exit()  # TODO: Continue here!
-
         # --- Load observation vector
-        y: NDArray = np.load(pyinla_config.input_dir / "y.npy")
+        input_dir = Path(
+            kwargs.get("input_dir", os.path.dirname(submodels[0].config.input_dir))
+        )
+
+        y: NDArray = np.load(input_dir / "y.npy")
         if xp == np:
             self.y: NDArray = y
         else:
             self.y: NDArray = xp.asarray(y)
 
         self.n_observations: int = self.y.shape[0]
+
+        print("I'm here", flush=True)
+        exit()  # TODO: Continue here!
 
         # --- Initialize likelihood
         if self.pyinla_config.model.likelihood.type == "gaussian":
