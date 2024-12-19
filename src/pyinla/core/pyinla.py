@@ -2,86 +2,95 @@
 
 import math
 from warnings import warn
+
 from scipy.optimize import minimize
 
-from pyinla import xp, ArrayLike, NDArray, comm_rank, comm_size
-from pyinla.core.pyinla_config import PyinlaConfig
-
+from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp
+from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
-from pyinla.submodels import SpatioTemporalModel, RegressionModel
-from pyinla.solvers import DenseSolver, SparseSolver, SerinvSolver
+from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
+from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
+from pyinla.utils import allreduce, print_msg, set_device
 
-from pyinla.utils import set_device, allreduce, print_msg
 
-
-class INLA:
+class PyINLA:
     """Integrated Nested Laplace Approximation (INLA).
 
     Parameters
     ----------
-    pyinla_config : Path
+    config : Path
         pyinla configuration file.
     """
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
+        model: Model,
+        config: PyinlaConfig,
     ) -> None:
-        self.pyinla_config = pyinla_config
+        # --- Initialize model
+        self.model = model
 
-        self.inner_iteration_max_iter = self.pyinla_config.inner_iteration_max_iter
-        self.eps_inner_iteration = self.pyinla_config.eps_inner_iteration
-        self.eps_gradient_f = self.pyinla_config.eps_gradient_f
+        # --- Initialize PyINLA
+        self.config = config
+
+        self.inner_iteration_max_iter = self.config.inner_iteration_max_iter
+        self.eps_inner_iteration = self.config.eps_inner_iteration
+        self.eps_gradient_f = self.config.eps_gradient_f
 
         # --- Configure HPC
         set_device(comm_rank)
 
-        # --- Initialize model
-        self.model = Model(pyinla_config=self.pyinla_config)
+        print("END.")
+        exit()
 
-        # get the solver parameter for the sparsity pattern
+        # --- Initialize solver
+
+        # Get the solver parameter for the sparsity pattern
         diagonal_blocksize = 0
         arrowhead_size = 0
         n_diag_blocks = 0
 
-        # check the first submodel - if ST, get diagonal_blocksize and n_diag_blocks (bt or bta)
-        if isinstance(self.model.submodels[0], SpatioTemporalModel):
+        # Check the first submodel - if ST, get diagonal_blocksize and n_diag_blocks (bt or bta)
+        if isinstance(self.model.submodels[0], SpatioTemporalSubModel):
             diagonal_blocksize = self.model.submodels[0].ns
             n_diag_blocks = self.model.submodels[0].nt
 
         for i in range(1, len(self.model.submodels)):
-            if isinstance(self.model.submodels[i], RegressionModel):
+            if isinstance(self.model.submodels[i], RegressionSubModel):
                 arrowhead_size += self.model.submodels[i].n_latent_parameters
+            else:
+                warn(
+                    "Only regression submodels are supported for now in the arrowhead."
+                )
 
-        # --- Initialize solver
         if diagonal_blocksize == 0 or n_diag_blocks == 0:
-            if self.pyinla_config.solver.type == "scipy":
+            if self.config.solver.type == "scipy":
                 self.solver = SparseSolver(
-                    solver_config=self.pyinla_config.solver,
+                    solver_config=self.config.solver,
                 )
             else:
-                if self.pyinla_config.solver.type == "serinv":
+                if self.config.solver.type == "serinv":
                     warn(
                         "SerinvSolver doesn't support non-ST models. Defaulting to DenseSolver."
                     )
                 self.solver = DenseSolver(
-                    solver_config=self.pyinla_config.solver,
+                    solver_config=self.config.solver,
                     kwargs={"n": self.model.n_latent_parameters},
                 )
         else:
-            if self.pyinla_config.solver.type == "dense":
+            if self.config.solver.type == "dense":
                 warn(
                     "DenseSolver is being instanciated to solve ST models (not-optimal)."
                 )
                 self.solver = DenseSolver(
-                    solver_config=self.pyinla_config.solver,
+                    solver_config=self.config.solver,
                     kwargs={"n": self.model.n_latent_parameters},
                 )
-            elif self.pyinla_config.solver.type == "scipy":
+            elif self.config.solver.type == "scipy":
                 self.solver = SparseSolver(
-                    solver_config=self.pyinla_config.solver,
+                    solver_config=self.config.solver,
                 )
-            elif self.pyinla_config.solver.type == "serinv":
+            elif self.config.solver.type == "serinv":
                 self.solver = SerinvSolver()
 
         # ...
@@ -121,13 +130,13 @@ class INLA:
                 self._objective_function,
                 self.model.theta,
                 method="BFGS",
-                jac=self.pyinla_config.minimize.jac,
+                jac=self.config.minimize.jac,
                 options={
-                    "maxiter": self.pyinla_config.minimize.max_iter,
-                    "gtol": self.pyinla_config.minimize.gtol,
-                    "c1": self.pyinla_config.minimize.c1,
-                    "c2": self.pyinla_config.minimize.c2,
-                    "disp": self.pyinla_config.minimize.disp,
+                    "maxiter": self.config.minimize.max_iter,
+                    "gtol": self.config.minimize.gtol,
+                    "c1": self.config.minimize.c1,
+                    "c2": self.config.minimize.c2,
+                    "disp": self.config.minimize.disp,
                 },
                 callback=callback,
             )
