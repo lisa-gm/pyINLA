@@ -109,19 +109,6 @@ class SpatioTemporalSubModel(SubModel):
             + self.g3
         )
 
-        """ 
-        # TODO: Remove this (debug)
-        import matplotlib.pyplot as plt
-
-        plt.spy(q1s.get(), markersize=0.1)
-        plt.show()
-
-        plt.spy(q2s.get(), markersize=0.1)
-        plt.show()
-
-        plt.spy(q3s.get(), markersize=0.1)
-        plt.show() """
-
         # withsparseKroneckerProduct", color_id=0):
         Q_prior: sp.sparse.spmatrix = sp.sparse.csc_matrix(
             pow(exp_gamma_st, 2)

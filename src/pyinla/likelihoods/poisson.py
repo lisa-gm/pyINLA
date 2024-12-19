@@ -55,7 +55,7 @@ class PoissonLikelihood(Likelihood):
         self,
         **kwargs,
     ) -> ArrayLike:
-        eta: NDArray = kwargs.get("eta", None)
+        eta: NDArray = kwargs.get("eta")
 
         hessian_likelihood: ArrayLike = -1.0 * sp.sparse.diags(self.e * xp.exp(eta))
 

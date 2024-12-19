@@ -14,7 +14,7 @@ class GaussianLikelihood(Likelihood):
         config: GaussianLikelihoodConfig,
     ) -> None:
         """Initializes the Gaussian likelihood."""
-        super().__init__(config, n_observations)
+        super().__init__(n_observations, config)
 
     def evaluate_likelihood(
         self,
@@ -115,7 +115,7 @@ class GaussianLikelihood(Likelihood):
         hessian_likelihood : ArrayLike
             Hessian of the likelihood.
         """
-        theta: NDArray = kwargs.get("theta", None)
+        theta: float = kwargs.get("theta")
         if theta is None:
             raise ValueError(
                 "theta must be provided to evaluate gradient of gaussian likelihood."

@@ -117,7 +117,7 @@ class BinomialLikelihood(Likelihood):
         hess_likelihood : NDArray
             Hessian of the likelihood with respect to eta.
         """
-        eta: NDArray = kwargs.get("eta", None)
+        eta: NDArray = kwargs.get("eta")
 
         linkEta: NDArray = self.link_function(eta)
         hess_likelihood: ArrayLike = -self.n_trials * linkEta * (1 - linkEta)

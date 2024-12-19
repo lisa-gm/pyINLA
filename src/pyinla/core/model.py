@@ -22,8 +22,6 @@ from pyinla.prior_hyperparameters import (
 )
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
 
-pyinla_config = None
-
 
 class Model(ABC):
     """Core class for statistical models."""
@@ -243,12 +241,6 @@ class Model(ABC):
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
 
-                """ # TODO: Remove this (debug)
-                import matplotlib.pyplot as plt
-
-                plt.spy(submodel_Q_prior.get(), markersize=0.1)
-                plt.show() """
-
                 # TODO: Check that with LISA (I think it's correct)
                 rows.append(
                     submodel_Q_prior.row
@@ -305,12 +297,12 @@ class Model(ABC):
         #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
         # )
         # hessian_likelihood = diags(hessian_likelihood_diag)
-        hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(
-            kwargs={
-                "eta": eta,
-                "theta": self.theta[self.hyperparameters_idx[-1] :],
-            }
-        )
+
+        kwargs = {
+            "eta": eta,
+            "theta": float(self.theta[-1]),
+        }
+        hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(**kwargs)
 
         self.Q_conditional = self.Q_prior - self.a.T @ hessian_likelihood @ self.a
 
