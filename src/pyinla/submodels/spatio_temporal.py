@@ -5,7 +5,7 @@ import math
 import numpy as np
 from scipy.sparse import csc_matrix, load_npz, spmatrix
 
-from pyinla import NDArray, sp, xp
+from pyinla import sp, xp
 from pyinla.configs.submodels_config import SpatioTemporalSubModelConfig
 from pyinla.core.submodel import SubModel
 
@@ -84,18 +84,14 @@ class SpatioTemporalSubModel(SubModel):
             self.m0.shape == self.m1.shape == self.m2.shape
         ), "Dimensions of temporal matrices do not match."
 
-    def construct_Q_prior(self, **kwargs) -> sp.sparse.spmatrix:
+    def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
 
-        theta: NDArray = kwargs.get("theta", None)
-        theta_keys: NDArray = kwargs.get("theta_keys", None)
-
-        r_s: float = theta[theta_keys == "r_s"]
-        r_t: float = theta[theta_keys == "r_t"]
-        sigma_st: float = theta[theta_keys == "sigma_st"]
-
         gamma_s, gamma_t, gamma_st = self._interpretable2compute(
-            r_s, r_t, sigma_st, dim_spatial_domain=2
+            r_s=kwargs.get("r_s"),
+            r_t=kwargs.get("r_t"),
+            sigma_st=kwargs.get("sigma_st"),
+            dim_spatial_domain=2,
         )
 
         exp_gamma_s = xp.exp(gamma_s)
@@ -113,8 +109,21 @@ class SpatioTemporalSubModel(SubModel):
             + self.g3
         )
 
+        """ 
+        # TODO: Remove this (debug)
+        import matplotlib.pyplot as plt
+
+        plt.spy(q1s.get(), markersize=0.1)
+        plt.show()
+
+        plt.spy(q2s.get(), markersize=0.1)
+        plt.show()
+
+        plt.spy(q3s.get(), markersize=0.1)
+        plt.show() """
+
         # withsparseKroneckerProduct", color_id=0):
-        Q_prior: sp.sparse.spmatrix = csc_matrix(
+        Q_prior: sp.sparse.spmatrix = sp.sparse.csc_matrix(
             pow(exp_gamma_st, 2)
             * (
                 sp.sparse.kron(self.m0, q3s)
@@ -123,7 +132,7 @@ class SpatioTemporalSubModel(SubModel):
             )
         )
 
-        return Q_prior
+        return Q_prior.tocoo()
 
     def _interpretable2compute(
         self, r_s: float, r_t: float, sigma_st: float, dim_spatial_domain: int = 2

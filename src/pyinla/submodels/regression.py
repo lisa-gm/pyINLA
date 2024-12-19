@@ -24,11 +24,11 @@ class RegressionSubModel(SubModel):
         ), f"Design matrix has {self.n_latent_parameters} columns, but expected {self.n_fixed_effects} columns."
 
         # --- Construct the prior precision matrix
-        self.Q_prior: sp.sparse.spmatrix = (
+        self.Q_prior: sp.sparse.coo_matrix = sp.sparse.coo_matrix(
             self.fixed_effects_prior_precision * sp.sparse.eye(self.n_fixed_effects)
         )
 
-    def construct_Q_prior(self, **kwargs) -> sp.sparse.spmatrix:
+    def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
 
         return self.Q_prior

@@ -3,9 +3,8 @@ import os
 from abc import ABC
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
-from scipy.sparse import coo_matrix, spmatrix
+from scipy.sparse import spmatrix
 
 from pyinla import ArrayLike, NDArray, sp, xp
 from pyinla.configs.likelihood_config import LikelihoodConfig
@@ -135,11 +134,6 @@ class Model(ABC):
 
         self.n_hyperparameters: int = len(self.theta)
 
-        # print all hyperparameters and their keys and their index
-        # TODO: Remove this, it's debug code
-        for i, (theta_i, theta_key_i) in enumerate(zip(self.theta, self.theta_keys)):
-            print(f"theta_{theta_key_i} = {theta_i} (index: {i})")
-
         # --- Initialize the latent parameters and the design matrix
         self.n_latent_parameters: int = 0
         self.latent_parameters_idx: int = [0]
@@ -173,11 +167,6 @@ class Model(ABC):
             shape=(submodel.a.shape[0], self.n_latent_parameters),
         )
 
-        # TODO: Remove this, it's debug code
-        # plot a spy of a
-        plt.spy(self.a.get(), markersize=0.1)
-        plt.show()
-
         # --- Load observation vector
         input_dir = Path(
             kwargs.get("input_dir", os.path.dirname(submodels[0].config.input_dir))
@@ -191,43 +180,42 @@ class Model(ABC):
 
         self.n_observations: int = self.y.shape[0]
 
-        print("I'm here", flush=True)
-        exit()  # TODO: Continue here!
-
         # --- Initialize likelihood
-        if self.pyinla_config.model.likelihood.type == "gaussian":
+        if likelihood_config.type == "gaussian":
             self.likelihood: Likelihood = GaussianLikelihood(
-                pyinla_config, self.n_observations
+                n_observations=self.n_observations,
+                config=likelihood_config,
             )
 
             # Instantiate the prior hyperparameters for the likelihood
             if isinstance(
-                self.pyinla_config.model.likelihood.prior_hyperparameters,
+                likelihood_config.prior_hyperparameters,
                 GaussianPriorHyperparametersConfig,
             ):
                 self.prior_hyperparameters.append(
                     GaussianPriorHyperparameters(
-                        ph_config=self.pyinla_config.model.likelihood.prior_hyperparameters,
-                        hyperparameter_type="prec_o",
+                        config=likelihood_config.prior_hyperparameters,
                     )
                 )
             elif isinstance(
-                self.pyinla_config.model.likelihood.prior_hyperparameters,
+                likelihood_config.prior_hyperparameters,
                 PenalizedComplexityPriorHyperparametersConfig,
             ):
                 self.prior_hyperparameters.append(
                     PenalizedComplexityPriorHyperparameters(
-                        ph_config=self.pyinla_config.model.likelihood.prior_hyperparameters,
+                        config=likelihood_config.prior_hyperparameters,
                         hyperparameter_type="prec_o",
                     )
                 )
-        elif self.pyinla_config.model.likelihood.type == "poisson":
+        elif likelihood_config.type == "poisson":
             self.likelihood: Likelihood = PoissonLikelihood(
-                pyinla_config, self.n_observations
+                n_observations=self.n_observations,
+                config=likelihood_config,
             )
-        elif self.pyinla_config.model.likelihood.type == "binomial":
+        elif likelihood_config.type == "binomial":
             self.likelihood: Likelihood = BinomialLikelihood(
-                pyinla_config, self.n_observations
+                n_observations=self.n_observations,
+                config=likelihood_config,
             )
 
         # --- Recurrent variables
@@ -237,39 +225,38 @@ class Model(ABC):
         self.Q_conditional_data_mapping = [0]
 
     def construct_Q_prior(self) -> spmatrix:
+        kwargs = {}
+
         if self.Q_prior is None:
             rows = []
             cols = []
             data = []
 
             for i, submodel in enumerate(self.submodels):
-                kwargs = {}
                 if isinstance(submodel, RegressionSubModel):
                     ...
                 elif isinstance(submodel, SpatioTemporalSubModel):
-                    kwargs = {
-                        "theta": self.theta[
-                            self.hyperparameters_idx[i] : self.hyperparameters_idx[
-                                i + 1
-                            ]
-                        ],
-                        "theta_keys": self.theta_keys[
-                            self.hyperparameters_idx[i] : self.hyperparameters_idx[
-                                i + 1
-                            ]
-                        ],
-                    }
-                submodel_Q_prior = submodel.construct_Q_prior(kwargs=kwargs)
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
 
+                submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
+
+                """ # TODO: Remove this (debug)
+                import matplotlib.pyplot as plt
+
+                plt.spy(submodel_Q_prior.get(), markersize=0.1)
+                plt.show() """
+
+                # TODO: Check that with LISA (I think it's correct)
                 rows.append(
                     submodel_Q_prior.row
-                    + self.latent_parameters_idx[i]
-                    * xp.ones(submodel_Q_prior.row.size[0])
+                    + self.latent_parameters_idx[i] * xp.ones(len(submodel_Q_prior.row))
                 )
                 cols.append(
                     submodel_Q_prior.col
-                    + self.latent_parameters_idx[i]
-                    * xp.ones(submodel_Q_prior.col.size[0])
+                    + self.latent_parameters_idx[i] * xp.ones(len(submodel_Q_prior.col))
                 )
                 data.append(submodel_Q_prior.data)
 
@@ -277,30 +264,22 @@ class Model(ABC):
                     self.Q_prior_data_mapping[i] + len(submodel_Q_prior.data)
                 )
 
-            self.Q_prior: spmatrix = coo_matrix(
+            self.Q_prior: sp.sparse.csc_matrix = sp.sparse.csc_matrix(
                 (xp.concatenate(data), (xp.concatenate(rows), xp.concatenate(cols))),
                 shape=(self.n_latent_parameters, self.n_latent_parameters),
             )
 
         else:
             for i, submodel in enumerate(self.submodels):
-                kwargs = {}
                 if isinstance(submodel, RegressionSubModel):
                     ...
                 elif isinstance(submodel, SpatioTemporalSubModel):
-                    kwargs = {
-                        "theta": self.theta[
-                            self.hyperparameters_idx[i] : self.hyperparameters_idx[
-                                i + 1
-                            ]
-                        ],
-                        "theta_keys": self.theta_keys[
-                            self.hyperparameters_idx[i] : self.hyperparameters_idx[
-                                i + 1
-                            ]
-                        ],
-                    }
-                submodel_Q_prior = submodel.construct_Q_prior(kwargs=kwargs)
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+
+                submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
 
                 self.Q_prior.data[
                     self.Q_prior_data_mapping[i] : self.Q_prior_data_mapping[i + 1]
