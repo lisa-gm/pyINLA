@@ -1,13 +1,11 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from pyinla import xp, sp, NDArray
-
-from pyinla.core.pyinla_config import SolverConfig
+from pyinla import NDArray, sp, xp
+from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 
 
 class DenseSolver(Solver):
-
     def __init__(
         self,
         solver_config: SolverConfig,
@@ -31,7 +29,6 @@ class DenseSolver(Solver):
         rhs: NDArray,
         **kwargs,
     ) -> NDArray:
-
         sp.linalg.solve_triangular(self.L, rhs, lower=True, overwrite_b=True)
         sp.linalg.solve_triangular(self.L.T, rhs, lower=False, overwrite_b=True)
 
@@ -41,5 +38,4 @@ class DenseSolver(Solver):
         self,
         **kwargs,
     ) -> float:
-
         return 2 * xp.sum(xp.log(xp.diag(self.L)))

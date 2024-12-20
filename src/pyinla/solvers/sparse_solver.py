@@ -1,12 +1,11 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from pyinla import xp, sp, NDArray
-from pyinla.core.pyinla_config import SolverConfig
+from pyinla import NDArray, sp, xp
+from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 
 
 class SparseSolver(Solver):
-
     def __init__(
         self,
         solver_config: SolverConfig,

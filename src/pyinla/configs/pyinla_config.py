@@ -1,7 +1,6 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import tomllib
-from abc import ABC
 from pathlib import Path
 from typing import Literal
 
@@ -14,14 +13,12 @@ class SolverConfig(BaseModel):
     type: Literal["dense", "scipy", "serinv"] = "scipy"
 
 
-class MinimizeConfig(BaseModel, ABC):
+class BFGSConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_iter: PositiveInt = 100
     jac: bool = True
 
-
-class BFGSConfig(MinimizeConfig):
     gtol: float = 1e-1
     c1: float = None
     c2: float = None
@@ -33,7 +30,7 @@ class PyinlaConfig(BaseModel):
 
     # --- Simulation parameters ------------------------------------------------
     solver: SolverConfig = SolverConfig()
-    minimize: MinimizeConfig = BFGSConfig()
+    minimize: BFGSConfig = BFGSConfig()
 
     inner_iteration_max_iter: PositiveInt = 50
     eps_inner_iteration: float = 1e-3

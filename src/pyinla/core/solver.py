@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 from pyinla import ArrayLike, NDArray
-from pyinla.core.pyinla_config import SolverConfig
+from pyinla.configs.pyinla_config import SolverConfig
 
 
 class Solver(ABC):

@@ -1,16 +1,16 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
+from warnings import warn
 
-from pyinla import xp, sp, NDArray
-
+from pyinla import NDArray, sp, xp
+from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
-from pyinla.core.pyinla_config import SolverConfig
 from pyinla.utils import print_msg
 
 try:
     from serinv.algs import pobtaf, pobtas, pobtf, pobts
-except:
-    raise ImportError("The serinv package is required to use the SerinvSolver.")
+except ImportError as e:
+    warn(f"The serinv package is required to use the SerinvSolver: {e}")
 
 
 class SerinvSolver(Solver):
