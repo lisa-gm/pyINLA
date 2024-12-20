@@ -24,13 +24,13 @@ class SerinvSolver(Solver):
         """Initializes the SerinV solver."""
         super().__init__(solver_config)
 
-        self.diagonal_blocksize: int = kwargs.get("diagonal_blocksize")
+        self.diagonal_blocksize: int = kwargs.get("diagonal_blocksize", None)
         if self.diagonal_blocksize is None:
             raise KeyError("Missing required keyword argument: 'diagonal_blocksize'")
 
-        self.arrowhead_size: int = kwargs.get("arrowhead_size", 0)
+        self.arrowhead_blocksize: int = kwargs.get("arrowhead_blocksize", 0)
 
-        self.n_diag_blocks: int = kwargs.get("n_diag_blocks")
+        self.n_diag_blocks: int = kwargs.get("n_diag_blocks", None)
         if self.n_diag_blocks is None:
             raise KeyError("Missing required keyword argument: 'n_diag_blocks'")
 

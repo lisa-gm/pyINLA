@@ -11,11 +11,11 @@ class Solver(ABC):
 
     def __init__(
         self,
-        solver_config: SolverConfig,
+        config: SolverConfig,
         **kwargs,
     ) -> None:
         """Initializes the solver."""
-        self.solver_config = solver_config
+        self.config = config
 
     @abstractmethod
     def cholesky(self, A: ArrayLike, **kwargs) -> None:

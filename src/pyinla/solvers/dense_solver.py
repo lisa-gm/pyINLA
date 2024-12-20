@@ -8,11 +8,11 @@ from pyinla.core.solver import Solver
 class DenseSolver(Solver):
     def __init__(
         self,
-        solver_config: SolverConfig,
+        config: SolverConfig,
         **kwargs,
     ) -> None:
         """Initializes the solver."""
-        super().__init__(solver_config)
+        super().__init__(config)
 
         self.n: int = kwargs.get("n", None)
         assert self.n is not None, "The size of the matrix must be provided."

@@ -8,11 +8,11 @@ from pyinla.core.solver import Solver
 class SparseSolver(Solver):
     def __init__(
         self,
-        solver_config: SolverConfig,
+        config: SolverConfig,
         **kwargs,
     ) -> None:
         """Initializes the solver."""
-        super().__init__(solver_config)
+        super().__init__(config)
 
         self.L: sp.sparse.spmatrix = None
 

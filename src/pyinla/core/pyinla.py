@@ -1,7 +1,6 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
 import math
-from warnings import warn
 
 from scipy.optimize import minimize
 
@@ -40,58 +39,49 @@ class PyINLA:
         # --- Configure HPC
         set_device(comm_rank)
 
+        # --- Initialize solver
+        if self.config.solver.type == "dense":
+            self.solver = DenseSolver(
+                config=self.config.solver,
+                kwargs={"n": self.model.n_latent_parameters},
+            )
+        elif self.config.solver.type == "scipy":
+            self.solver = SparseSolver(
+                config=self.config.solver,
+            )
+        elif self.config.solver.type == "serinv":
+            diagonal_blocksize: int = 0
+            arrowhead_blocksize: int = 0
+            n_diag_blocks: int = 0
+
+            # Check the model compute parameters
+            if isinstance(self.model.submodels[0], SpatioTemporalSubModel):
+                diagonal_blocksize = self.model.submodels[0].ns
+                n_diag_blocks = self.model.submodels[0].nt
+            else:
+                raise ValueError(
+                    "Serinv solver is not made for non spatio-temporal models."
+                )
+
+            for i in range(1, len(self.model.submodels)):
+                if isinstance(self.model.submodels[i], RegressionSubModel):
+                    arrowhead_blocksize += self.model.submodels[i].n_latent_parameters
+                else:
+                    raise ValueError(
+                        "Only regression submodels are currently supported in the arrowhead shape of the Serinv solver."
+                    )
+
+            self.solver = SerinvSolver(
+                config=self.config.solver,
+                kwargs={
+                    "diagonal_blocksize": diagonal_blocksize,
+                    "arrowhead_blocksize": arrowhead_blocksize,
+                    "n_diag_blocks": n_diag_blocks,
+                },
+            )
+
         print("END.")
         exit()
-
-        # --- Initialize solver
-
-        # Get the solver parameter for the sparsity pattern
-        diagonal_blocksize = 0
-        arrowhead_size = 0
-        n_diag_blocks = 0
-
-        # Check the first submodel - if ST, get diagonal_blocksize and n_diag_blocks (bt or bta)
-        if isinstance(self.model.submodels[0], SpatioTemporalSubModel):
-            diagonal_blocksize = self.model.submodels[0].ns
-            n_diag_blocks = self.model.submodels[0].nt
-
-        for i in range(1, len(self.model.submodels)):
-            if isinstance(self.model.submodels[i], RegressionSubModel):
-                arrowhead_size += self.model.submodels[i].n_latent_parameters
-            else:
-                warn(
-                    "Only regression submodels are supported for now in the arrowhead."
-                )
-
-        if diagonal_blocksize == 0 or n_diag_blocks == 0:
-            if self.config.solver.type == "scipy":
-                self.solver = SparseSolver(
-                    solver_config=self.config.solver,
-                )
-            else:
-                if self.config.solver.type == "serinv":
-                    warn(
-                        "SerinvSolver doesn't support non-ST models. Defaulting to DenseSolver."
-                    )
-                self.solver = DenseSolver(
-                    solver_config=self.config.solver,
-                    kwargs={"n": self.model.n_latent_parameters},
-                )
-        else:
-            if self.config.solver.type == "dense":
-                warn(
-                    "DenseSolver is being instanciated to solve ST models (not-optimal)."
-                )
-                self.solver = DenseSolver(
-                    solver_config=self.config.solver,
-                    kwargs={"n": self.model.n_latent_parameters},
-                )
-            elif self.config.solver.type == "scipy":
-                self.solver = SparseSolver(
-                    solver_config=self.config.solver,
-                )
-            elif self.config.solver.type == "serinv":
-                self.solver = SerinvSolver()
 
         # ...
         self.n_f_evaluations = 2 * self.model.n_hyperparameters + 1
