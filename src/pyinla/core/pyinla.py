@@ -1,5 +1,6 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
+import logging
 import math
 
 from scipy.optimize import minimize
@@ -39,6 +40,8 @@ class PyINLA:
         # --- Configure HPC
         set_device(comm_rank)
 
+        self.n_f_evaluations = 2 * self.model.n_hyperparameters + 1
+
         # --- Initialize solver
         if self.config.solver.type == "dense":
             self.solver = DenseSolver(
@@ -59,6 +62,7 @@ class PyINLA:
                 diagonal_blocksize = self.model.submodels[0].ns
                 n_diag_blocks = self.model.submodels[0].nt
             else:
+                logging.critical("Trying to instanciate SerinvSolver on non-ST model.")
                 raise ValueError(
                     "Serinv solver is not made for non spatio-temporal models."
                 )
@@ -67,6 +71,9 @@ class PyINLA:
                 if isinstance(self.model.submodels[i], RegressionSubModel):
                     arrowhead_blocksize += self.model.submodels[i].n_latent_parameters
                 else:
+                    logging.critical(
+                        "While measuring the number of arrowhead elements, bumping into a non-supported submodel."
+                    )
                     raise ValueError(
                         "Only regression submodels are currently supported in the arrowhead shape of the Serinv solver."
                     )
@@ -80,12 +87,6 @@ class PyINLA:
                 },
             )
 
-        print("END.")
-        exit()
-
-        # ...
-        self.n_f_evaluations = 2 * self.model.n_hyperparameters + 1
-
         # --- Set up recurrent variables
         self.gradient_f = xp.zeros(self.model.n_hyperparameters)
         self.f_values_i = xp.zeros(self.n_f_evaluations)
@@ -96,7 +97,8 @@ class PyINLA:
         self.f_values: ArrayLike = []
         self.theta_values: ArrayLike = []
 
-        print_msg("INLA initialized.", flush=True)
+        logging.info("PyINLA initialized.")
+        print_msg("PyINLA initialized.", flush=True)
 
     def run(self) -> bool:
         """Fit the model using INLA."""
@@ -175,9 +177,22 @@ class PyINLA:
         theta_mat[:, 1 : 1 + self.model.n_hyperparameters] += epsMat
         theta_mat[:, self.model.n_hyperparameters + 1 : self.n_f_evaluations] -= epsMat
 
+        """ print("task_to_rank:", task_to_rank)
+
+        import matplotlib.pyplot as plt
+
+        plt.matshow(theta_mat.get())
+        plt.show()
+
+        for i in range(self.n_f_evaluations - 1, -1, -1):
+            print(theta_mat[:, i]) """
+
         for i in range(self.n_f_evaluations - 1, -1, -1):
             if task_to_rank[i] == comm_rank:
                 self.f_values_i[i] = self._evaluate_f(theta_i=theta_mat[:, i])
+
+        print("END.")
+        exit()
 
         allreduce(self.f_values_i, op="sum")
 
@@ -266,13 +281,13 @@ class PyINLA:
             self.eta[:] = self.model.a @ self.model.x
 
             Q_conditional = self.model.construct_Q_conditional(self.eta)
-            self.solver.cholesky(Q_conditional, sparsity=self.sparsity_Q_conditional)
+            self.solver.cholesky(A=Q_conditional)
 
             rhs: NDArray = self.model.construct_information_vector(
                 self.eta, self.model.x
             )
             self.x_update[:] = self.solver.solve(
-                rhs, sparsity=self.sparsity_Q_conditional
+                rhs=rhs,
             )
 
             x_i_norm = xp.linalg.norm(self.x_update)

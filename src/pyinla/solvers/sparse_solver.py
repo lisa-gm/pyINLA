@@ -19,7 +19,7 @@ class SparseSolver(Solver):
     def cholesky(self, A: sp.sparse.spmatrix, **kwargs) -> None:
         """Compute Cholesky factor of input matrix."""
 
-        A = sp.csc_matrix(A)
+        A = sp.sparse.csc_matrix(A)
 
         LU = sp.sparse.linalg.splu(A, diag_pivot_thresh=0, permc_spec="NATURAL")
 
