@@ -1,8 +1,8 @@
 # Copyright 2024 pyINLA authors. All rights reserved.
 
-from pyinla import ArrayLike, MPI_AVAILABLE, comm_rank
+from pyinla import ArrayLike, backend_flags, comm_rank
 
-if MPI_AVAILABLE:
+if backend_flags["mpi_avail"]:
     from mpi4py import MPI
 
 
@@ -30,7 +30,7 @@ def synchronize(comm=None):
     comm, optional:
         The communication group to synchronize. Default is MPI.COMM_WORLD.
     """
-    if MPI_AVAILABLE:
+    if backend_flags["mpi_avail"]:
         if comm is None:
             comm = MPI.COMM_WORLD
         comm.Barrier()
@@ -55,7 +55,7 @@ def allreduce(
     comm (MPI.Comm), optional:
         The communication group. Default is MPI.COMM_WORLD.
     """
-    if MPI_AVAILABLE:
+    if backend_flags["mpi_avail"]:
         if comm is None:
             comm = MPI.COMM_WORLD
         if op == "sum":
@@ -79,7 +79,7 @@ def bcast(
     comm (MPI.Comm), optional:
         The communication group. Default is MPI.COMM_WORLD.
     """
-    if MPI_AVAILABLE:
+    if backend_flags["mpi_avail"]:
         if comm is None:
             comm = MPI.COMM_WORLD
         comm.Bcast(data, root=root)

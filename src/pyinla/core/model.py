@@ -130,7 +130,7 @@ class Model(ABC):
         theta_keys += lh_hyperparameters_keys
         self.theta_keys: NDArray = theta_keys
 
-        self.n_hyperparameters: int = len(self.theta)
+        self.n_hyperparameters = self.theta.size
 
         # --- Initialize the latent parameters and the design matrix
         self.n_latent_parameters: int = 0
@@ -320,7 +320,9 @@ class Model(ABC):
         #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
         # )
         gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
-            eta, self.y, kwargs={"theta": self.theta[self.hyperparameters_idx[-1] :]}
+            eta=eta, 
+            y=self.y, 
+            theta=self.theta[self.hyperparameters_idx[-1] :],
         )
 
         information_vector: NDArray = (

@@ -14,20 +14,36 @@ class Solver(ABC):
         config: SolverConfig,
         **kwargs,
     ) -> None:
-        """Initializes the solver."""
+        """Initializes the solver.
+        
+        Parameters
+        ----------
+        config : SolverConfig
+            Configuration object for the solver.
+        """
         self.config = config
 
     @abstractmethod
     def cholesky(self, A: ArrayLike, **kwargs) -> None:
-        """Compute Cholesky factor of input matrix."""
-        pass
+        """ Compute Cholesky factor of input matrix. 
+        
+        Parameters
+        ----------
+        A : ArrayLike
+            Input matrix.
+
+        Returns
+        -------
+        None
+        """
+        ...
 
     @abstractmethod
     def solve(self, rhs: NDArray, **kwargs) -> NDArray:
         """Solve linear system using Cholesky factor."""
-        pass
+        ...
 
     @abstractmethod
     def logdet(self, **kwargs) -> float:
         """Compute logdet of input matrix using Cholesky factor."""
-        pass
+        ...

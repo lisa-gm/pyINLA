@@ -64,11 +64,12 @@ class TemporalSubModelConfig(SubModelConfig):
     ...
 
 
-def parse_config(config_file: Path) -> SubModelConfig:
-    """Reads the TOML config file."""
-    with open(config_file, "rb") as f:
-        config = tomllib.load(f)
 
+def parse_config(config: dict | str) -> SubModelConfig:
+    if isinstance(config, str):
+        with open(config, "rb") as f:
+            config = tomllib.load(f)
+        
     type = config.get("type")
     if type == "spatio_temporal":
         config["ph_s"] = parse_priorhyperparameters_config(config["ph_s"])
@@ -80,3 +81,4 @@ def parse_config(config_file: Path) -> SubModelConfig:
     # Add more elif branches for other submodel types
     else:
         raise ValueError(f"Unknown submodel type: {type}")
+

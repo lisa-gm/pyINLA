@@ -7,15 +7,20 @@ from numpy.typing import ArrayLike
 
 from pyinla.__about__ import __version__
 
+backend_flags = {
+    "array_module": None,
+    "cupy_avail": False,
+    "mpi_avail": False,
+}
 
 # Allows user to specify the array module via an environment variable.
-ARRAY_MODULE = os.environ.get("ARRAY_MODULE")
-if ARRAY_MODULE is not None:
-    if ARRAY_MODULE == "numpy":
+backend_flags["array_module"] = os.environ.get("ARRAY_MODULE")
+if backend_flags["array_module"] is not None:
+    if backend_flags["array_module"] == "numpy":
         import numpy as xp
         import scipy as sp
 
-    elif ARRAY_MODULE == "cupy":
+    elif backend_flags["array_module"] == "cupy":
         try:
             import cupy as xp
             import cupyx.scipy as sp
@@ -24,12 +29,12 @@ if ARRAY_MODULE is not None:
             # a cudaErrorInsufficientDriver error or something.
             xp.abs(1)
 
-        except ImportError as e:
+        except (ImportError, ImportWarning, ModuleNotFoundError) as e:
             warn(f"'CuPy' is unavailable, defaulting to 'NumPy'. ({e})")
             import numpy as xp
             import scipy as sp
     else:
-        raise ValueError(f"Unrecognized ARRAY_MODULE '{ARRAY_MODULE}'")
+        raise ValueError(f"Unrecognized ARRAY_MODULE '{backend_flags["array_module"]}'")
 else:
     # If the user does not specify the array module, prioritize numpy.
     warn("No `ARRAY_MODULE` specified, pyINLA.core defaulting to 'NumPy'.")
@@ -37,29 +42,26 @@ else:
     import scipy as sp
 
 # In any case, check if CuPy is available.
-CUPY_AVAILABLE = False
 try:
-    import cupy as xp
-    import cupyx.scipy as sp
+    import cupy
 
     # Check if cupy is actually working. This could still raise
     # a cudaErrorInsufficientDriver error or something.
-    xp.abs(1)
+    cupy.abs(1)
 
-    CUPY_AVAILABLE = True
-except ImportError as e:
+    backend_flags["cupy_avail"] = True
+except (ImportError, ImportWarning, ModuleNotFoundError) as e:
     warn(f"No 'CuPy' backend detected. ({e})")
 
 
-MPI_AVAILABLE = False
 try:
     from mpi4py import MPI
 
     comm_rank = MPI.COMM_WORLD.Get_rank()
     comm_size = MPI.COMM_WORLD.Get_size()
 
-    MPI_AVAILABLE = True
-except ImportError as e:
+    backend_flags["mpi_avail"] = True
+except (ImportError, ImportWarning, ModuleNotFoundError) as e:
     warn(f"No 'MPI' backend detected. ({e})")
 
     comm_rank = 0
@@ -71,6 +73,7 @@ _ScalarType = TypeVar("ScalarType", bound=xp.generic, covariant=True)
 _DType = xp.dtype[_ScalarType]
 NDArray: TypeAlias = xp.ndarray[Any, _DType]
 
+
 __all__ = [
     "__version__",
     "xp",
@@ -79,6 +82,5 @@ __all__ = [
     "NDArray",
     "comm_rank",
     "comm_size",
-    "CUPY_AVAILABLE",
-    "MPI_AVAILABLE",
+    "backend_flags",
 ]

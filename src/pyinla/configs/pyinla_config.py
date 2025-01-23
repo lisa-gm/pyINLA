@@ -41,9 +41,9 @@ class PyinlaConfig(BaseModel):
     output_dir: Path = Path.joinpath(simulation_dir, "output/")
 
 
-def parse_config(config_file: Path) -> PyinlaConfig:
-    """Reads the TOML config file."""
-    with open(config_file, "rb") as f:
-        config = tomllib.load(f)
+def parse_config(config: dict | str) -> PyinlaConfig:
+    if isinstance(config, str):
+        with open(config, "rb") as f:
+            config = tomllib.load(f)
 
     return PyinlaConfig(**config)

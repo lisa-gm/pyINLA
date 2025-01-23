@@ -11,7 +11,19 @@ class DenseSolver(Solver):
         config: SolverConfig,
         **kwargs,
     ) -> None:
-        """Initializes the solver."""
+        """ Initializes the DenseSolver class.
+        
+        Parameters
+        ----------
+        config : SolverConfig
+            Configuration object for the solver.
+        n : int
+            Size of the matrix.
+
+        Returns
+        -------
+        None
+        """
         super().__init__(config)
 
         self.n: int = kwargs.get("n", None)

@@ -52,10 +52,11 @@ class BinomialLikelihoodConfig(LikelihoodConfig):
         return xp.array([]), []
 
 
-def parse_config(config_file: Path) -> LikelihoodConfig:
-    """Reads the TOML config file."""
-    with open(config_file, "rb") as f:
-        config = tomllib.load(f)
+
+def parse_config(config: dict | str) -> LikelihoodConfig:
+    if isinstance(config, str):
+        with open(config, "rb") as f:
+            config = tomllib.load(f)
 
     likelihood_type = config.get("type")
     if "prior_hyperparameters" in config:
@@ -71,3 +72,4 @@ def parse_config(config_file: Path) -> LikelihoodConfig:
         return BinomialLikelihoodConfig(**config)
     else:
         raise ValueError(f"Unknown likelihood config type: {likelihood_type}")
+

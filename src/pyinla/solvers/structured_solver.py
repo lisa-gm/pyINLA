@@ -18,11 +18,11 @@ class SerinvSolver(Solver):
 
     def __init__(
         self,
-        solver_config: SolverConfig,
+        config: SolverConfig,
         **kwargs,
     ) -> None:
         """Initializes the SerinV solver."""
-        super().__init__(solver_config)
+        super().__init__(config)
 
         self.diagonal_blocksize: int = kwargs.get("diagonal_blocksize", None)
         if self.diagonal_blocksize is None:
@@ -51,13 +51,13 @@ class SerinvSolver(Solver):
         self.A_arrow_bottom_blocks: NDArray = None
         self.A_arrow_tip_block: NDArray = None
 
-        if self.arrowhead_size > 0:
+        if self.arrowhead_blocksize > 0:
             self.A_arrow_bottom_blocks = xp.empty(
-                (self.n_diag_blocks, self.arrowhead_size, self.diagonal_blocksize),
+                (self.n_diag_blocks, self.arrowhead_blocksize, self.diagonal_blocksize),
                 dtype=xp.float64,
             )
             self.A_arrow_tip_block = xp.empty(
-                (self.arrowhead_size, self.arrowhead_size),
+                (self.arrowhead_blocksize, self.arrowhead_blocksize),
                 dtype=xp.float64,
             )
 
@@ -93,19 +93,21 @@ class SerinvSolver(Solver):
         """Solve linear system using Cholesky factor."""
 
         if self.A_arrow_bottom_blocks is not None:
-            return pobtas(
-                self.L_diagonal_blocks,
-                self.L_lower_diagonal_blocks,
-                self.L_arrow_bottom_blocks,
-                self.L_arrow_tip_block,
+            pobtas(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                self.A_arrow_bottom_blocks,
+                self.A_arrow_tip_block,
                 rhs,
             )
         else:
             pobts(
-                self.L_diagonal_blocks,
-                self.L_lower_diagonal_blocks,
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
                 rhs,
             )
+
+        return rhs
 
     def logdet(self) -> float:
         """Compute logdet of input matrix using Cholesky factor."""
@@ -113,9 +115,9 @@ class SerinvSolver(Solver):
         logdet: float = 0.0
 
         for i in range(self.n_diag_blocks):
-            logdet += xp.sum(xp.log(self.L_diagonal_blocks[i].diagonal()))
+            logdet += xp.sum(xp.log(self.A_diagonal_blocks[i].diagonal()))
 
-        logdet += xp.sum(xp.log(self.L_arrow_tip_block.diagonal()))
+        logdet += xp.sum(xp.log(self.A_arrow_tip_block.diagonal()))
 
         return 2 * logdet
 
@@ -142,14 +144,14 @@ class SerinvSolver(Solver):
 
                 self.A_lower_diagonal_blocks[i, :, :] = csc_slice.todense()
 
-            if self.arrowhead_size is not None:
+            if self.arrowhead_blocksize is not None:
                 csc_slice = A_csc[
-                    -self.arrowhead_size :,
+                    -self.arrowhead_blocksize :,
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 ]
 
                 self.A_arrow_bottom_blocks[i, :, :] = csc_slice.todense()
 
-        if self.arrowhead_size is not None:
-            csc_slice = A_csc[-self.arrowhead_size :, -self.arrowhead_size :]
+        if self.arrowhead_blocksize is not None:
+            csc_slice = A_csc[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :]
             self.A_arrow_tip_block[:, :] = csc_slice.todense()
