@@ -54,7 +54,7 @@ class PyINLA:
         if self.config.solver.type == "dense":
             self.solver = DenseSolver(
                 config=self.config.solver,
-                kwargs={"n": self.model.n_latent_parameters},
+                n=self.model.n_latent_parameters,
             )
         elif self.config.solver.type == "scipy":
             self.solver = SparseSolver(
