@@ -20,8 +20,8 @@ class BFGSConfig(BaseModel):
     jac: bool = True
 
     gtol: float = 1e-1
-    c1: float = None
-    c2: float = None
+    c1: float = 1e-4 # Default value from the scipy documentation
+    c2: float = 0.9 # Default value from the scipy documentation
     disp: bool = False
 
 

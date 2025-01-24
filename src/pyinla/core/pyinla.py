@@ -136,7 +136,7 @@ class PyINLA:
                 self.iter += 1
 
                 print_msg(
-                    f"iter: {self.iter}: theta: {theta_i}, f: {fun_i}",
+                    f"iter: {self.iter}: theta: {theta_i}, f: {fun_i}, gradient_f_i: {get_host(self.gradient_f)}",
                     flush=True,
                 )
 
@@ -292,7 +292,7 @@ class PyINLA:
         Parameters
         ----------
         None
-
+ 
         Returns
         -------
         logdet : float
@@ -394,8 +394,8 @@ class PyINLA:
 
         Notes
         -----
-        The conditional of the latent parameters is by definition a multivariate normal distribution with mean x_mean and precision matrix Q_conditional
-        which is evaluated at x in log-scale.
+        The conditional of the latent parameters is by definition a multivariate normal distribution with mean 
+        x_mean and precision matrix Q_conditional which is evaluated at x in log-scale.
         The evaluation requires the computation of the log determinant of Q_conditional.
         log normal: 0.5*log(1/(2*pi)^n * |Q_conditional|)) - 0.5 * (x - x_mean).T @ Q_conditional @ (x - x_mean)
 

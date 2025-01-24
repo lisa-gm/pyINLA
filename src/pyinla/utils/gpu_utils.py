@@ -39,7 +39,8 @@ def set_device(comm_rank: int, comm_size: int) -> None:
         available_devices = get_available_devices()
         device_id = comm_rank % len(available_devices)
         cp.cuda.Device(device_id).use()
-        # TOLOG print(f"Rank {comm_rank} is using device {device_id}.")
+        # TOLOG: COMPUTE INFOS
+        print(f"Rank {comm_rank} is using device {device_id}.")
 
 
 def get_array_module_name(arr: NDArray) -> str:
