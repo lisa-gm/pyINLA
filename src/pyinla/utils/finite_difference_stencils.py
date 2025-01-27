@@ -9,28 +9,19 @@ def gradient_finite_difference_3pt(f, x0: ArrayLike, *args, h: float = 1e-3):
     """
     Compute gradient using 3-point stencil finite differences wrt to x0
 
-    Notes
-    -----
-
     Parameters
     ----------
-
     f: function
         function to be evaluated
-
     x0: ArrayLike
         evaluation point
-
     *args: tuple
         additional arguments to be passed to f
-
     h: float. default 1e-3
         stepsize.
 
-
     Returns
     -------
-
     gradient: ArrayLike
         array with 1D derivatives.
     """
@@ -94,13 +85,10 @@ def hessian_diag_finite_difference_3pt(f, x0, *args, h=1e-3):
     ----------
     f : function
         The function whose Hessian diagonal we want to compute. Should take a numpy array as input.
-
     x0 : np.ndarray
         The point at which to evaluate the diagonal of the Hessian.
-
     *args : tuple
         Additional arguments to be passed to the function `f`.
-
     h : float, optional
         The step size for the finite difference approximation. Defaults to 1e-3.
 
@@ -137,7 +125,6 @@ def hessian_diag_finite_difference_5pt(f, x0, *args, h=1e-3):
 
     Parameters
     ----------
-
     f:  function
         The function whose Hessian diagonal we want to compute. Should take a numpy array as input.
     x0: np.ndarray:
@@ -149,10 +136,8 @@ def hessian_diag_finite_difference_5pt(f, x0, *args, h=1e-3):
 
     Returns
     -------
-
     hessian_diag: np.ndarray
         The diagonal elements of the Hessian matrix of f evaluated at x0.
-
     """
     # Number of dimensions
     n = len(x0)

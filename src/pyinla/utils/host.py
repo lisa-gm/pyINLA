@@ -2,7 +2,6 @@
 
 import os
 
-
 def get_host_configuration() -> dict:
     """
     Get host configuration.

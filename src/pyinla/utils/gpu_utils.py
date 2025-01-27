@@ -14,7 +14,8 @@ def get_available_devices() -> list:
 
     Returns
     -------
-    device_properties: list. A list of available GPU devices. Returns None if CuPy is not available.
+    device_properties : list
+        A list of available GPU devices. Returns None if CuPy is not available.
     """
     device_properties = None
 
@@ -33,7 +34,8 @@ def set_device(comm_rank: int, comm_size: int) -> None:
 
     Parameters
     ----------
-    device_id: int. The device id to use.
+    device_id : int
+        The device id to use.
     """
     if backend_flags["cupy_avail"]:
         available_devices = get_available_devices()
@@ -45,7 +47,6 @@ def set_device(comm_rank: int, comm_size: int) -> None:
 
 def get_array_module_name(arr: NDArray) -> str:
     """Given an array, returns the array's module name.
-
     This works for `numpy` even when `cupy` is not available.
 
     Parameters
@@ -55,7 +56,7 @@ def get_array_module_name(arr: NDArray) -> str:
 
     Returns
     -------
-    str
+    submodule_name : str
         The array module name used by the array.
 
     """
@@ -73,9 +74,8 @@ def get_host(arr: NDArray) -> NDArray:
 
     Returns
     -------
-    np.ndarray
+    host_arr : np.ndarray
         The equivalent numpy array.
-
     """
     if get_array_module_name(arr) == "numpy":
         return arr
@@ -92,9 +92,8 @@ def get_device(arr: NDArray) -> NDArray:
 
     Returns
     -------
-    NDArray
+    device_arr : NDArray
         The equivalent cupy array.
-
     """
     if get_array_module_name(arr) == "cupy":
         return arr
