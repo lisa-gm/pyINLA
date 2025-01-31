@@ -15,6 +15,7 @@ backend_flags = {
 
 # Allows user to specify the array module via an environment variable.
 backend_flags["array_module"] = os.environ.get("ARRAY_MODULE")
+
 if backend_flags["array_module"] is not None:
     if backend_flags["array_module"] == "numpy":
         import numpy as xp
@@ -34,7 +35,7 @@ if backend_flags["array_module"] is not None:
             import numpy as xp
             import scipy as sp
     else:
-        raise ValueError(f"Unrecognized ARRAY_MODULE '{backend_flags["array_module"]}'")
+        raise ValueError(f"Unrecognized ARRAY_MODULE '{backend_flags['array_module']}'")
 else:
     # If the user does not specify the array module, prioritize numpy.
     warn("No `ARRAY_MODULE` specified, pyINLA.core defaulting to 'NumPy'.")
