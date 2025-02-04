@@ -1,11 +1,9 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from abc import ABC, abstractmethod
 
-from numpy.typing import ArrayLike
-from scipy.sparse import sparray
-
-from pyinla.core.pyinla_config import PyinlaConfig
+from pyinla import ArrayLike, NDArray
+from pyinla.configs.likelihood_config import LikelihoodConfig
 
 
 class Likelihood(ABC):
@@ -13,32 +11,32 @@ class Likelihood(ABC):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
         n_observations: int,
+        config: LikelihoodConfig,
     ) -> None:
         """Initializes the likelihood."""
 
-        self.pyinla_config = pyinla_config
+        self.config = config
         self.n_observations = n_observations
 
     @abstractmethod
     def evaluate_likelihood(
         self,
-        y: ArrayLike,
-        a: sparray,
-        x: ArrayLike,
-        theta_likelihood: dict = None,
+        eta: NDArray,
+        y: NDArray,
+        **kwargs,
     ) -> float:
         """Evaluate the likelihood.
 
         Parameters
         ----------
-        y : ArrayLike
+        eta : NDArray
+            Vector of the linear predictor.
+        y : NDArray
             Vector of the observations.
-        a : sparray
-            Design matrix.
-        x : ArrayLike
-            Vector of the latent parameters.
+        **kwargs : optional
+            Hyperparameters for likelihood.
+
 
         Returns
         -------
@@ -50,23 +48,24 @@ class Likelihood(ABC):
     @abstractmethod
     def evaluate_gradient_likelihood(
         self,
-        y: ArrayLike,
-        eta: ArrayLike,
-        theta_likelihood: dict = None,
-    ) -> ArrayLike:
+        eta: NDArray,
+        y: NDArray,
+        **kwargs,
+    ) -> NDArray:
         """Evaluate the gradient of the likelihood wrt to eta = Ax.
 
         Parameters
         ----------
-        y : ArrayLike
+        y : NDArray
             Vector of the observations.
-        eta : ArrayLike
+        eta : NDArray
             Vector of the linear predictor.
-
+        **kwargs : optional
+            Hyperparameters for likelihood.
 
         Returns
         -------
-        gradient_likelihood : ArrayLike
+        gradient_likelihood : NDArray
             Gradient of the likelihood.
         """
         pass
@@ -74,18 +73,18 @@ class Likelihood(ABC):
     @abstractmethod
     def evaluate_hessian_likelihood(
         self,
-        y: ArrayLike,
-        eta: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> ArrayLike:
         """Evaluate the Hessian of the likelihood wrt to eta = Ax.
 
         Parameters
         ----------
-        y : ArrayLike
-            Vector of the observations.
-        eta : ArrayLike
+        eta : NDArray
             Vector of the linear predictor.
+        y : NDArray
+            Vector of the observations.
+        **kwargs : optional
+            Hyperparameters for likelihood.
 
 
         Returns
@@ -93,9 +92,4 @@ class Likelihood(ABC):
         hessian_likelihood : ArrayLike
             Hessian of the likelihood.
         """
-        pass
-
-    @abstractmethod
-    def get_theta_initial(self) -> dict:
-        """Get the likelihood initial hyperparameters."""
         pass

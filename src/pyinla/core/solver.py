@@ -1,11 +1,9 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from abc import ABC, abstractmethod
 
-from numpy.typing import ArrayLike
-from scipy.sparse import sparray
-
-from pyinla.core.pyinla_config import PyinlaConfig
+from pyinla import ArrayLike, NDArray
+from pyinla.configs.pyinla_config import SolverConfig
 
 
 class Solver(ABC):
@@ -13,22 +11,39 @@ class Solver(ABC):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
+        config: SolverConfig,
+        **kwargs,
     ) -> None:
-        """Initializes the solver."""
-        self.pyinla_config = pyinla_config
+        """Initializes the solver.
+
+        Parameters
+        ----------
+        config : SolverConfig
+            Configuration object for the solver.
+        """
+        self.config = config
 
     @abstractmethod
-    def cholesky(self, A: sparray) -> None:
-        """Compute Cholesky factor of input matrix."""
-        pass
+    def cholesky(self, A: ArrayLike, **kwargs) -> None:
+        """Compute Cholesky factor of input matrix.
+
+        Parameters
+        ----------
+        A : ArrayLike
+            Input matrix.
+
+        Returns
+        -------
+        None
+        """
+        ...
 
     @abstractmethod
-    def solve(self, rhs: ArrayLike) -> ArrayLike:
+    def solve(self, rhs: NDArray, **kwargs) -> NDArray:
         """Solve linear system using Cholesky factor."""
-        pass
+        ...
 
     @abstractmethod
-    def logdet(self) -> float:
+    def logdet(self, **kwargs) -> float:
         """Compute logdet of input matrix using Cholesky factor."""
-        pass
+        ...

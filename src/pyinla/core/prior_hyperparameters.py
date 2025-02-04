@@ -1,8 +1,8 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from abc import ABC, abstractmethod
 
-from pyinla.core.pyinla_config import PyinlaConfig
+from pyinla.configs.priorhyperparameters_config import PriorHyperparametersConfig
 
 
 class PriorHyperparameters(ABC):
@@ -10,13 +10,13 @@ class PriorHyperparameters(ABC):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
+        config: PriorHyperparametersConfig,
     ) -> None:
         """Initializes the prior hyperparameters."""
 
-        self.pyinla_config = pyinla_config
+        self.config: PriorHyperparametersConfig = config
 
     @abstractmethod
-    def evaluate_log_prior(self, theta_model: dict, theta_likelihood: dict) -> float:
+    def evaluate_log_prior(self, theta: float) -> float:
         """Evaluate the log prior hyperparameters."""
         pass

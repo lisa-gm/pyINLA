@@ -1,9 +1,10 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
-import numpy as np
-
+from pyinla import xp
+from pyinla.configs.priorhyperparameters_config import (
+    PenalizedComplexityPriorHyperparametersConfig,
+)
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
-from pyinla.core.pyinla_config import PyinlaConfig
 
 
 class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
@@ -11,102 +12,62 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
+        config: PenalizedComplexityPriorHyperparametersConfig,
         **kwargs,
     ) -> None:
         """Initializes the Penalized Complexity prior hyperparameters."""
-        super().__init__(pyinla_config)
+        super().__init__(config)
 
-        if pyinla_config.model_type == "spatio-temporal":
-            self.alpha_theta_spatial_range = (
-                pyinla_config.prior_hyperparameters.alpha_theta_spatial_range
-            )
-            self.alpha_theta_temporal_range = (
-                pyinla_config.prior_hyperparameters.alpha_theta_temporal_range
-            )
-            self.alpha_theta_sd_spatio_temporal = (
-                pyinla_config.prior_hyperparameters.alpha_theta_sd_spatio_temporal
-            )
+        self.hyperparameter_type: str = kwargs.get("hyperparameter_type")
 
-            self.u_theta_spatial_range = (
-                pyinla_config.prior_hyperparameters.u_theta_spatial_range
-            )
-            self.u_theta_temporal_range = (
-                pyinla_config.prior_hyperparameters.u_theta_temporal_range
-            )
-            self.u_theta_sd_spatio_temporal = (
-                pyinla_config.prior_hyperparameters.u_theta_sd_spatio_temporal
-            )
+        self.alpha: float = config.alpha
+        self.u: float = config.u
 
-            self.lambda_theta_spatial_range = -np.log(
-                self.alpha_theta_spatial_range
-            ) * pow(
-                self.u_theta_spatial_range,
-                0.5 * pyinla_config.model.spatial_domain_dimension,
-            )
-            self.lambda_theta_temporal_range = -np.log(
-                self.alpha_theta_temporal_range
-            ) * pow(self.u_theta_temporal_range, 0.5)
-            self.lambda_theta_sd_spatio_temporal = (
-                -np.log(self.alpha_theta_sd_spatio_temporal)
-                / self.u_theta_sd_spatio_temporal
-            )
+        self.lambda_theta: float = 0.0
 
-        if pyinla_config.likelihood.type == "gaussian":
-            self.theta_observations = pyinla_config.likelihood.theta_observations
+        if self.hyperparameter_type == "r_s":
+            spatial_dim: int = kwargs["spatial_dim", 2]
 
-            self.lambda_theta_observations = (
-                -np.log(pyinla_config.prior_hyperparameters.alpha_theta_observations)
-                / pyinla_config.prior_hyperparameters.u_theta_observations
+            self.lambda_theta = -xp.log(self.alpha) * pow(
+                self.u,
+                0.5 * spatial_dim,
             )
+        elif self.hyperparameter_type == "r_t":
+            self.lambda_theta = -xp.log(self.alpha) * pow(self.u, 0.5)
+        elif self.hyperparameter_type == "sigma_st":
+            self.lambda_theta = -xp.log(self.alpha) / self.u
+        elif self.hyperparameter_type == "prec_o":
+            self.lambda_theta = -xp.log(self.alpha) / self.u
 
-    def evaluate_log_prior(
-        self, theta_model: dict, theta_likelihood: dict
-    ) -> np.ndarray:
+    def evaluate_log_prior(self, theta: float, **kwargs) -> float:
         """Evaluate the prior hyperparameters."""
-        log_prior = 0.0
+        log_prior: float = 0.0
 
-        # --- Log prior from model ---------------------------------------------
-        if self.pyinla_config.model.type == "regression":
-            pass
-        elif self.pyinla_config.model_type == "spatio-temporal":
-            if self.pyinla_config.model.spatial_domain_dimension == 2:
-                # 2-D... should be correct
-                log_prior += (
-                    np.log(self.lambda_theta_spatial_range)
-                    - self.lambda_theta_spatial_range
-                    * np.exp(theta_model["spatial_range"])
-                    - theta_model["spatial_range"]
-                )
+        if self.hyperparameter_type == "r_s":
+            spatial_dim: int = kwargs["spatial_dim", 2]
 
-                log_prior += (
-                    np.log(self.lambda_theta_temporal_range)
-                    - self.lambda_theta_temporal_range
-                    * np.exp(0.5 * theta_model["temporal_range"])
-                    + np.log(0.5)
-                    - theta_model["temporal_range"]
-                )
-
-                log_prior += (
-                    np.log(self.lambda_theta_sd_spatio_temporal)
-                    - self.lambda_theta_sd_spatio_temporal
-                    * np.exp(theta_model["sd_spatio_temporal"])
-                    + theta_model["sd_spatio_temporal"]
+            if spatial_dim == 2:
+                log_prior = (
+                    xp.log(self.lambda_theta)
+                    - self.lambda_theta * xp.exp(theta)
+                    - theta
                 )
             else:
-                raise ValueError("Not implemented for other than 2D cases")
-
-        # --- Log prior from likelihood ----------------------------------------
-        if self.pyinla_config.likelihood.type == "gaussian":
-            log_prior += (
-                np.log(self.lambda_theta_observations)
-                - self.lambda_theta_observations
-                * np.exp(theta_likelihood["observations"])
-                - theta_likelihood["observations"]
+                raise ValueError("Not implemented for other than 2D spatial domains")
+        elif self.hyperparameter_type == "r_t":
+            log_prior = (
+                xp.log(self.lambda_theta)
+                - self.lambda_theta * xp.exp(0.5 * theta)
+                + xp.log(0.5)
+                - theta
             )
-        elif self.pyinla_config.likelihood.type == "poisson":
-            pass
-        elif self.pyinla_config.likelihood.type == "binomial":
-            pass
+        elif self.hyperparameter_type == "sigma_st":
+            log_prior = (
+                xp.log(self.lambda_theta) - self.lambda_theta * xp.exp(theta) + theta
+            )
+        elif self.hyperparameter_type == "prec_o":
+            log_prior = (
+                xp.log(self.lambda_theta) - self.lambda_theta * xp.exp(theta) - theta
+            )
 
         return log_prior

@@ -1,12 +1,13 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
+
+from pathlib import Path
 
 import numpy as np
-from numpy.typing import ArrayLike
-from scipy.sparse import sparray
 
+from pyinla import ArrayLike, NDArray, sp, xp
+from pyinla.configs.likelihood_config import BinomialLikelihoodConfig
 from pyinla.core.likelihood import Likelihood
-from pyinla.core.pyinla_config import PyinlaConfig
-from pyinla.utils.link_functions import sigmoid
+from pyinla.utils import sigmoid
 
 
 class BinomialLikelihood(Likelihood):
@@ -14,39 +15,111 @@ class BinomialLikelihood(Likelihood):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
         n_observations: int,
-        **kwargs,
+        config: BinomialLikelihoodConfig,
     ) -> None:
         """Initializes the Binomial likelihood."""
-        super().__init__(pyinla_config, n_observations)
+        super().__init__(config, n_observations)
 
-        # load the extra coeficients for Binomial likelihood
+        # Load the extra coeficients for Binomial likelihood
         try:
-            self.n_trials = np.load(pyinla_config.input_dir / "n_trials.npy")
+            n_trials: NDArray = np.load(Path(config.input_dir).joinpath("n_trials.npy"))
+            if xp == np:
+                self.n_trials: NDArray = n_trials
+            else:
+                self.n_trials: NDArray = xp.asarray(n_trials)
         except FileNotFoundError:
-            self.n_trials = np.ones((n_observations), dtype=int)
+            self.n_trials: NDArray = xp.ones((n_observations), dtype=int)
 
-        if pyinla_config.likelihood.link_function == "sigmoid":
+        if config.model.likelihood.link_function == "sigmoid":
             self.link_function = sigmoid
-
-    def get_theta_initial(self) -> dict:
-        """Get the likelihood initial hyperparameters."""
-        return {}
+        else:
+            raise NotImplementedError(
+                f"Link function {config.model.likelihood.link_function} not implemented."
+            )
 
     def evaluate_likelihood(
         self,
-        y: ArrayLike,
-        a: sparray,
-        x: ArrayLike,
-        theta_likelihood: dict = None,
+        eta: NDArray,
+        y: NDArray,
+        **kwargs,
     ) -> float:
-        raise NotImplementedError
+        """Evalutate the a binomial likelihood.
+
+        Parameters
+        ----------
+        eta : NDArray
+            Vector of the linear predictor.
+        y : NDArray
+            Vector of the observations.
+
+        Notes
+        -----
+        For now only a sigmoid link-function is implemented.
+
+        Returns
+        -------
+        likelihood : float
+            Likelihood.
+        """
+        linkEta: NDArray = self.link_function(eta)
+
+        likelihood: float = xp.dot(y, xp.log(linkEta)) + xp.dot(
+            self.n_trials - y, xp.log(1 - linkEta)
+        )
+
+        return likelihood
 
     def evaluate_gradient_likelihood(
         self,
-        y: ArrayLike,
-        eta: ArrayLike,
-        theta_likelihood: dict = None,
+        eta: NDArray,
+        y: NDArray,
+        **kwargs,
+    ) -> NDArray:
+        """
+        Evaluate the gradient of the binomial likelihood with respect to eta.
+
+        Parameters
+        ----------
+        eta : NDArray
+            Linear predictor.
+        y : NDArray
+            Observed data.
+
+        Returns
+        -------
+        grad_likelihood : NDArray
+            Gradient of the likelihood with respect to eta.
+        """
+
+        linkEta: NDArray = self.link_function(eta)
+        grad_likelihood: NDArray = y - self.n_trials * linkEta
+
+        return grad_likelihood
+
+    def evaluate_hessian_likelihood(
+        self,
+        **kwargs,
     ) -> ArrayLike:
-        raise NotImplementedError
+        """
+        Evaluate the Hessian of the binomial likelihood with respect to eta.
+
+        Parameters
+        ----------
+        eta : NDArray
+            Linear predictor.
+        y : NDArray
+            Observed data.
+
+
+        Returns
+        -------
+        hess_likelihood : NDArray
+            Hessian of the likelihood with respect to eta.
+        """
+        eta: NDArray = kwargs.get("eta")
+
+        linkEta: NDArray = self.link_function(eta)
+        hess_likelihood: ArrayLike = -self.n_trials * linkEta * (1 - linkEta)
+
+        return sp.sparse.diags(hess_likelihood)

@@ -1,7 +1,7 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
-import numpy as np
+from pyinla import NDArray, xp
 
 
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
+def sigmoid(x: NDArray) -> NDArray:
+    return 1 / (1 + xp.exp(-x))

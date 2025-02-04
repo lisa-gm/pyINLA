@@ -3,40 +3,90 @@
 # pyINLA
 Python implementation of the methodology of integrated nested Laplace approximations (INLA)
 
-
-## How to install
-```
-1. Create a conda environment from the environment.yml file
-    $ conda env create -f environment.yml
-    $ conda activate pyinla
-
-2. Install mpi4py : (Optional)
-    $ python -m pip cache remove mpi4py
-    $ python -m pip install --no-cache-dir mpi4py
-
-    Please refere to https://mpi4py.readthedocs.io/en/stable/install.html for more details.
-
-3. Install CuPy : (Optional)
-    # conda install -c conda-forge cupy cuda-version=xx.x cupy-version=xx.x
-
-    Please refere to https://docs.cupy.dev/en/stable/install.html for more details.
-
-4. Install SerinV : (Optional)
-    $ cd path/to/install/folder
-    $ git clone https://github.com/vincent-maillou/serinv
-    $ cd serinv
-    $ pip install --no-dependencies -e .
-
-5. Install pyINLA
-    $ cd path/to/pyinla
-    $ pip install --no-dependencies -e .
+## Examples
+The examples are being tracked using `git-lfs`, to download the examples, run the following commands:
+```bash
+git lfs pull
+git lfs checkout
 ```
 
-If by any chances you run on a weird Apple Mac with arm64 architecture, ```conda-forge``` packages might not be available. In this case, you can install the dependencies manually using ```pip```:
+## Dev-note
+Here are some installation guidelines to install the project on the Fau; Alex and Fritz clusters.
+We recommend to test any development in 3 separated environments:
+- Bare: The environment without any MPI or GPU support
+- Fritz: The environment with MPI support, CPU backend
+- Alex: The environment with MPI support, GPU backend (optional: NCCL)
+
+This ensure compatibility no matter the available backend.
+
+```bash
+# --- Alex-env ---
+module load python
+module load openmpi/4.1.6-nvhpc23.7-cuda
+module load cuda/12.6.1
+
+conda create -n alex
+conda activate alex
+
+CFLAGS=-noswitcherror MPICC=$(which mpicc) pip install --no-cache-dir mpi4py
+
+salloc --partition=a40 --nodes=1 --gres=gpu:a40:1 --time 01:00:00
+conda activate alex
+
+conda install -c conda-forge cupy-core
+conda install blas=*=*mkl
+conda install libblas=*=*mkl
+conda install numpy scipy
+conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib numba -y
+
+cd /path/to/serinv/
+python -m pip install -e .
+
+cd /path/to/pyinla/
+python -m pip install -e .
 ```
-$ conda create -n pyinla python=3.11
-$ conda activate pyinla
-$ pip install numpy scipy matplotlib pydantic pytest pytest-cov pytest-mpi coverage black isort ruff pre-commit
-$ cd path/to/pyinla
-$ pip install --no-dependencies -e .
+
+```bash
+# --- Fritz-env ---
+module load python
+module load openmpi/4.1.2-gcc11.2.0
+
+conda create -n fritz
+conda activate fritz
+
+MPICC=$(which mpicc) pip install --no-cache-dir mpi4py
+
+salloc -N 4 --time 01:00:00
+conda activate fritz
+
+conda install blas=*=*mkl
+conda install libblas=*=*mkl
+conda install numpy scipy
+conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib numba -y
+
+cd /path/to/serinv/
+python -m pip install -e .
+
+cd /path/to/pyinla/
+python -m pip install -e .
+```
+
+```bash
+# --- Bare-env ---
+module load python
+conda create -n bare
+
+salloc -N 4 --time 01:00:00
+conda activate bare
+
+conda install blas=*=*mkl
+conda install libblas=*=*mkl
+conda install numpy scipy
+conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib numba -y
+
+cd /path/to/serinv/
+python -m pip install -e .
+
+cd /path/to/pyinla/
+python -m pip install -e .
 ```

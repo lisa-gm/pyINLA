@@ -1,11 +1,12 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
+
+from pathlib import Path
 
 import numpy as np
-from numpy.typing import ArrayLike
-from scipy.sparse import diags, sparray
 
+from pyinla import ArrayLike, NDArray, sp, xp
+from pyinla.configs.likelihood_config import PoissonLikelihoodConfig
 from pyinla.core.likelihood import Likelihood
-from pyinla.core.pyinla_config import PyinlaConfig
 
 
 class PoissonLikelihood(Likelihood):
@@ -13,51 +14,49 @@ class PoissonLikelihood(Likelihood):
 
     def __init__(
         self,
-        pyinla_config: PyinlaConfig,
         n_observations: int,
-        **kwargs,
+        config: PoissonLikelihoodConfig,
     ) -> None:
         """Initializes the Poisson likelihood."""
-        super().__init__(pyinla_config, n_observations)
+        super().__init__(config, n_observations)
 
         # Load the extra coeficients for Poisson likelihood
         try:
-            self.e = np.load(pyinla_config.input_dir / "e.npy")
+            e: NDArray = np.load(Path(config.input_dir).joinpath("e.npy"))
         except FileNotFoundError:
-            self.e = np.ones((n_observations), dtype=int)
+            e: NDArray = np.ones((n_observations), dtype=int)
 
-    def get_theta_initial(self) -> dict:
-        """Get the likelihood initial hyperparameters."""
-        return {}
+        if xp == np:
+            self.e: NDArray = e
+        else:
+            self.e: NDArray = xp.asarray(e)
 
     def evaluate_likelihood(
         self,
-        y: ArrayLike,
-        a: sparray,
-        x: ArrayLike,
-        theta_likelihood: dict = None,
+        eta: NDArray,
+        y: NDArray,
+        **kwargs,
     ) -> float:
-        Ax = a @ x
-        likelihood = np.dot(Ax, y) - np.sum(self.e * np.exp(Ax))
+        likelihood: float = xp.dot(eta, y) - xp.sum(self.e * xp.exp(eta))
 
         return likelihood
 
     def evaluate_gradient_likelihood(
         self,
-        y: ArrayLike,
-        eta: ArrayLike,
-        theta_likelihood: dict = None,
-    ) -> ArrayLike:
-        gradient_likelihood = y - self.e * np.exp(eta)
+        eta: NDArray,
+        y: NDArray,
+        **kwargs,
+    ) -> NDArray:
+        gradient_likelihood: NDArray = y - self.e * xp.exp(eta)
 
         return gradient_likelihood
 
     def evaluate_hessian_likelihood(
         self,
-        y: ArrayLike,
-        eta: ArrayLike,
-        theta_likelihood: dict = None,
+        **kwargs,
     ) -> ArrayLike:
-        hessian_likelihood = -diags(self.e * np.exp(eta))
+        eta: NDArray = kwargs.get("eta")
+
+        hessian_likelihood: ArrayLike = -1.0 * sp.sparse.diags(self.e * xp.exp(eta))
 
         return hessian_likelihood

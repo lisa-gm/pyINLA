@@ -1,4 +1,4 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from pyinla.prior_hyperparameters.gaussian import GaussianPriorHyperparameters
 from pyinla.prior_hyperparameters.penalized_complexity import (
