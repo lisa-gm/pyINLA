@@ -236,3 +236,12 @@ class SpatioTemporalSubModel(SubModel):
             raise ValueError("Manifold not supported: ", self.manifold)
 
         return r_s, r_t, sigma_st
+
+    def __str__(self) -> str:
+        """String representation of the submodel."""
+        return (
+            " --- SpatioTemporalSubModel ---\n"
+            f"  ns: {self.ns}\n"
+            f"  nt: {self.nt}\n"
+            f"  manifold: {self.manifold}"
+        )

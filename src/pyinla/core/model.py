@@ -347,3 +347,21 @@ class Model(ABC):
             log_prior += prior_hyperparameter.evaluate_log_prior(self.theta[i])
 
         return log_prior
+
+    def __str__(self) -> str:
+        """String representation of the model."""
+        # Collect general information about the model
+        # Collect general information about the model
+        model_info = [
+            f" --- Model ---",
+            f"n_hyperparameters: {self.n_hyperparameters}",
+            f"n_latent_parameters: {self.n_latent_parameters}",
+            f"n_observations: {self.n_observations}",
+            f"likelihood: {self.likelihood_config.type}",
+        ]
+
+        # Collect each submodel's information
+        submodel_info = [str(submodel) for submodel in self.submodels]
+
+        # Combine model information and submodel information
+        return "\n".join(model_info + submodel_info)

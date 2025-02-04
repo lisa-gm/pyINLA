@@ -32,3 +32,11 @@ class RegressionSubModel(SubModel):
         """Construct the prior precision matrix."""
 
         return self.Q_prior
+
+    def __str__(self) -> str:
+        """String representation of the submodel."""
+        return (
+            " --- RegressionSubModel ---\n"
+            f"  n_fixed_effects: {self.n_fixed_effects}\n"
+            f"  fixed_effects_prior_precision: {self.fixed_effects_prior_precision}"
+        )
