@@ -1,6 +1,6 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
-from pyinla import xp, NDArray
+from pyinla import NDArray, xp
 
 
 def sigmoid(x: NDArray) -> NDArray:

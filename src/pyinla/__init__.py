@@ -1,8 +1,9 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import os
-from warnings import warn
 from typing import Any, TypeAlias, TypeVar
+from warnings import warn
+
 from numpy.typing import ArrayLike
 
 from pyinla.__about__ import __version__

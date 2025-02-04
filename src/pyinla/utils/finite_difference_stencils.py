@@ -1,3 +1,4 @@
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 # compute 1-dimensional, i.e. element-wise finite differences of vector inputs
 
 import numpy as np

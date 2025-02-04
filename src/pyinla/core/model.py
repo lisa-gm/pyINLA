@@ -1,4 +1,5 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
+
 import os
 from abc import ABC
 from pathlib import Path
@@ -328,8 +329,8 @@ class Model(ABC):
         #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
         # )
         gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
-            eta=eta, 
-            y=self.y, 
+            eta=eta,
+            y=self.y,
             theta=self.theta[self.hyperparameters_idx[-1] :],
         )
 
@@ -353,7 +354,7 @@ class Model(ABC):
         # Collect general information about the model
         # Collect general information about the model
         model_info = [
-            f" --- Model ---",
+            " --- Model ---",
             f"n_hyperparameters: {self.n_hyperparameters}",
             f"n_latent_parameters: {self.n_latent_parameters}",
             f"n_observations: {self.n_observations}",

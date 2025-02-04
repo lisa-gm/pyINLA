@@ -1,4 +1,4 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from pyinla import ArrayLike, NDArray, sp, xp
 from pyinla.configs.likelihood_config import GaussianLikelihoodConfig
@@ -122,7 +122,7 @@ class GaussianLikelihood(Likelihood):
             raise ValueError(
                 "theta must be provided to evaluate gradient of gaussian likelihood."
             )
-        
+
         # print("hessian lh: xp.exp(theta)", xp.exp(theta))
 
         hessian_likelihood: ArrayLike = -xp.exp(theta) * sp.sparse.eye(

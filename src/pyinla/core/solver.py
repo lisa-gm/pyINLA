@@ -1,4 +1,4 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from abc import ABC, abstractmethod
 
@@ -15,7 +15,7 @@ class Solver(ABC):
         **kwargs,
     ) -> None:
         """Initializes the solver.
-        
+
         Parameters
         ----------
         config : SolverConfig
@@ -25,8 +25,8 @@ class Solver(ABC):
 
     @abstractmethod
     def cholesky(self, A: ArrayLike, **kwargs) -> None:
-        """ Compute Cholesky factor of input matrix. 
-        
+        """Compute Cholesky factor of input matrix.
+
         Parameters
         ----------
         A : ArrayLike

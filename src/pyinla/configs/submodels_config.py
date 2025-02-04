@@ -1,8 +1,7 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import tomllib
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt
@@ -23,8 +22,7 @@ class SubModelConfig(BaseModel, ABC):
     type: Literal["spatio_temporal", "regression"] = None
 
     @abstractmethod
-    def read_hyperparameters(self) -> tuple[ArrayLike, list]:
-        ...
+    def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
 
 
 class RegressionSubModelConfig(SubModelConfig):
@@ -56,20 +54,17 @@ class SpatioTemporalSubModelConfig(SubModelConfig):
         return theta, theta_keys
 
 
-class SpatialSubModelConfig(SubModelConfig):
-    ...
+class SpatialSubModelConfig(SubModelConfig): ...
 
 
-class TemporalSubModelConfig(SubModelConfig):
-    ...
-
+class TemporalSubModelConfig(SubModelConfig): ...
 
 
 def parse_config(config: dict | str) -> SubModelConfig:
     if isinstance(config, str):
         with open(config, "rb") as f:
             config = tomllib.load(f)
-        
+
     type = config.get("type")
     if type == "spatio_temporal":
         config["ph_s"] = parse_priorhyperparameters_config(config["ph_s"])
@@ -81,4 +76,3 @@ def parse_config(config: dict | str) -> SubModelConfig:
     # Add more elif branches for other submodel types
     else:
         raise ValueError(f"Unknown submodel type: {type}")
-

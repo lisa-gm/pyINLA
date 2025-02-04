@@ -1,8 +1,7 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import tomllib
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -23,8 +22,7 @@ class LikelihoodConfig(BaseModel, ABC):
     prior_hyperparameters: PriorHyperparametersConfig = None
 
     @abstractmethod
-    def read_hyperparameters(self) -> tuple[ArrayLike, list]:
-        ...
+    def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
 
 
 class GaussianLikelihoodConfig(LikelihoodConfig):
@@ -52,7 +50,6 @@ class BinomialLikelihoodConfig(LikelihoodConfig):
         return xp.array([]), []
 
 
-
 def parse_config(config: dict | str) -> LikelihoodConfig:
     if isinstance(config, str):
         with open(config, "rb") as f:
@@ -72,4 +69,3 @@ def parse_config(config: dict | str) -> LikelihoodConfig:
         return BinomialLikelihoodConfig(**config)
     else:
         raise ValueError(f"Unknown likelihood config type: {likelihood_type}")
-

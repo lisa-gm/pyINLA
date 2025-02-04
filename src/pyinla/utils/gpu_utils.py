@@ -1,8 +1,8 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import inspect
 
-from pyinla import backend_flags, NDArray, xp
+from pyinla import NDArray, backend_flags, xp
 
 if backend_flags["cupy_avail"]:
     import cupy as cp
@@ -98,4 +98,3 @@ def get_device(arr: NDArray) -> NDArray:
     if get_array_module_name(arr) == "cupy":
         return arr
     return xp.asarray(arr)
-

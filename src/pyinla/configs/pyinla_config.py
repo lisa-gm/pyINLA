@@ -1,4 +1,4 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import tomllib
 from pathlib import Path
@@ -20,8 +20,8 @@ class BFGSConfig(BaseModel):
     jac: bool = True
 
     gtol: float = 1e-1
-    c1: float = 1e-4 # Default value from the scipy documentation
-    c2: float = 0.9 # Default value from the scipy documentation
+    c1: float = 1e-4  # Default value from the scipy documentation
+    c2: float = 0.9  # Default value from the scipy documentation
     disp: bool = False
 
 

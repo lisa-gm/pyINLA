@@ -1,4 +1,4 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from pyinla import ArrayLike, backend_flags, comm_rank
 

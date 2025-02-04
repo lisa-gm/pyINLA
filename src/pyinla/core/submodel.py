@@ -1,4 +1,4 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from abc import ABC, abstractmethod
 from pathlib import Path

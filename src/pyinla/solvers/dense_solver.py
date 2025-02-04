@@ -1,4 +1,4 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from pyinla import NDArray, sp, xp
 from pyinla.configs.pyinla_config import SolverConfig
@@ -11,8 +11,8 @@ class DenseSolver(Solver):
         config: SolverConfig,
         **kwargs,
     ) -> None:
-        """ Initializes the DenseSolver class.
-        
+        """Initializes the DenseSolver class.
+
         Parameters
         ----------
         config : SolverConfig

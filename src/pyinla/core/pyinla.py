@@ -1,4 +1,4 @@
-# Copyright 2024 pyINLA authors. All rights reserved.
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import logging
 import math
@@ -10,22 +10,23 @@ from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
-from pyinla.utils import allreduce, print_msg, set_device, get_host, get_device
+from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
-import matplotlib.pyplot as plt
+
 
 class PyINLA:
-    """ PyINLA is a Python implementation of the Integrated Nested 
+    """PyINLA is a Python implementation of the Integrated Nested
     Laplace Approximation (INLA) method.
     """
+
     def __init__(
         self,
         model: Model,
         config: PyinlaConfig,
     ) -> None:
         """Initializes the PyINLA object.
-        
+
         Parameters
         ----------
         model : Model
@@ -100,21 +101,26 @@ class PyINLA:
         self.f_values_i = xp.zeros(self.n_f_evaluations, dtype=xp.float64)
         self.eta = xp.zeros_like(self.model.y, dtype=xp.float64)
         self.x_update = xp.zeros_like(self.model.x, dtype=xp.float64)
-        self.eps_mat = xp.zeros((self.model.n_hyperparameters, self.model.n_hyperparameters), dtype=xp.float64)
-        self.theta_mat = xp.zeros((self.model.theta.size, self.n_f_evaluations), dtype=xp.float64)
+        self.eps_mat = xp.zeros(
+            (self.model.n_hyperparameters, self.model.n_hyperparameters),
+            dtype=xp.float64,
+        )
+        self.theta_mat = xp.zeros(
+            (self.model.theta.size, self.n_f_evaluations), dtype=xp.float64
+        )
 
         # --- Metrics
         self.f_values: ArrayLike = []
         self.theta_values: ArrayLike = []
 
-        print("Initial theta:", self.model.theta)
+        print_msg("Initial theta:", self.model.theta)
 
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
 
     def run(self) -> optimize.OptimizeResult:
         """Fit the model using INLA.
-        
+
         Parameters
         ----------
         None
@@ -127,7 +133,7 @@ class PyINLA:
 
         if len(self.model.theta) == 0:
             # Only run the inner iteration
-            print("No hyperparameters, just running inner iteration.")
+            print_msg("No hyperparameters, just running inner iteration.")
             self.f_value = self._evaluate_f(self.model.theta)
 
             minimization_result: dict = {
@@ -136,7 +142,7 @@ class PyINLA:
                 "f": self.f_value,
             }
         else:
-            print("Starting optimization.")
+            print_msg("Starting optimization.")
             self.iter = 0
 
             # Start the minimization procedure
@@ -147,7 +153,9 @@ class PyINLA:
 
                 # Format the output
                 theta_str = ", ".join(f"{theta: .6f}" for theta in theta_i)
-                gradient_str = ", ".join(f"{grad: .6f}" for grad in get_host(self.gradient_f))
+                gradient_str = ", ".join(
+                    f"{grad: .6f}" for grad in get_host(self.gradient_f)
+                )
 
                 print_msg(
                     f"Iteration: {self.iter:2d} | "
@@ -201,10 +209,10 @@ class PyINLA:
         return minimization_result
 
     def _objective_function(
-            self, 
-            theta_i: NDArray,
-        ) -> tuple:
-        """ Objective function to optimize.
+        self,
+        theta_i: NDArray,
+    ) -> tuple:
+        """Objective function to optimize.
 
         Parameters
         ----------
@@ -228,9 +236,13 @@ class PyINLA:
 
         # Initialize central difference scheme matrix
         self.eps_mat[:] = self.eps_gradient_f * xp.eye(self.model.n_hyperparameters)
-        self.theta_mat[:] = xp.repeat(get_device(theta_i).reshape(-1, 1), self.n_f_evaluations, axis=1)
+        self.theta_mat[:] = xp.repeat(
+            get_device(theta_i).reshape(-1, 1), self.n_f_evaluations, axis=1
+        )
         self.theta_mat[:, 1 : 1 + self.model.n_hyperparameters] += self.eps_mat
-        self.theta_mat[:, self.model.n_hyperparameters + 1 : self.n_f_evaluations] -= self.eps_mat
+        self.theta_mat[
+            :, self.model.n_hyperparameters + 1 : self.n_f_evaluations
+        ] -= self.eps_mat
 
         for i in range(self.n_f_evaluations - 1, -1, -1):
             if task_to_rank[i] == comm_rank:
@@ -248,10 +260,10 @@ class PyINLA:
         return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
 
     def _evaluate_f(
-            self, 
-            theta_i: NDArray,
-        ) -> float:
-        """ Evaluate the objective function f(theta) = log(p(theta|y)).
+        self,
+        theta_i: NDArray,
+    ) -> float:
+        """Evaluate the objective function f(theta) = log(p(theta|y)).
 
         Parameters
         ----------
@@ -265,10 +277,10 @@ class PyINLA:
 
         Notes
         -----
-        The objective function f(theta) is an approximation of the 
-        log posterior of the hyperparameters theta evaluated at theta_i 
-        in log-scale. Consisting of the following 4 terms: log prior 
-        hyperparameters, log likelihood, log prior of the latent parameters, 
+        The objective function f(theta) is an approximation of the
+        log posterior of the hyperparameters theta evaluated at theta_i
+        in log-scale. Consisting of the following 4 terms: log prior
+        hyperparameters, log likelihood, log prior of the latent parameters,
         and log conditional of the latent parameters.
         """
         self.model.theta[:] = theta_i
@@ -310,16 +322,15 @@ class PyINLA:
 
         return f_theta
 
-
     def _inner_iteration(
         self,
     ) -> float:
-        """ Inner iteration to optimize the latent parameters x.
+        """Inner iteration to optimize the latent parameters x.
 
         Parameters
         ----------
         None
- 
+
         Returns
         -------
         logdet : float
@@ -357,10 +368,10 @@ class PyINLA:
         return logdet
 
     def _evaluate_prior_latent_parameters(
-            self, 
-            x_star: NDArray,
-        ) -> float:
-        """ Evaluation of the prior of the latent parameters at x using 
+        self,
+        x_star: NDArray,
+    ) -> float:
+        """Evaluation of the prior of the latent parameters at x using
         the prior precision matrix Q_prior and assuming mean zero.
 
         Parameters
@@ -399,10 +410,10 @@ class PyINLA:
         return log_prior_latent_parameters
 
     def _evaluate_conditional_latent_parameters(
-            self, 
-            logdet_Q_conditional: float,
-        ) -> float:
-        """ Evaluation of the conditional of the latent parameters at x using 
+        self,
+        logdet_Q_conditional: float,
+    ) -> float:
+        """Evaluation of the conditional of the latent parameters at x using
         the conditional precision matrix Q_conditional and the mean x_mean.
 
         Parameters
@@ -421,7 +432,7 @@ class PyINLA:
 
         Notes
         -----
-        The conditional of the latent parameters is by definition a multivariate normal distribution with mean 
+        The conditional of the latent parameters is by definition a multivariate normal distribution with mean
         x_mean and precision matrix Q_conditional which is evaluated at x in log-scale.
         The evaluation requires the computation of the log determinant of Q_conditional.
         log normal: 0.5*log(1/(2*pi)^n * |Q_conditional|)) - 0.5 * (x - x_mean).T @ Q_conditional @ (x - x_mean)
