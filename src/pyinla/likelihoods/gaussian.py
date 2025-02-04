@@ -54,6 +54,8 @@ class GaussianLikelihood(Likelihood):
 
         yEta = eta - y
 
+        # print("xp.exp(theta) in lh:", xp.exp(theta))
+
         likelihood: float = (
             0.5 * theta * self.n_observations - 0.5 * xp.exp(theta) * yEta.T @ yEta
         )
@@ -120,6 +122,8 @@ class GaussianLikelihood(Likelihood):
             raise ValueError(
                 "theta must be provided to evaluate gradient of gaussian likelihood."
             )
+        
+        # print("hessian lh: xp.exp(theta)", xp.exp(theta))
 
         hessian_likelihood: ArrayLike = -xp.exp(theta) * sp.sparse.eye(
             self.n_observations

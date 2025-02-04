@@ -12,6 +12,8 @@ from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
 from pyinla.utils import allreduce, print_msg, set_device, get_host, get_device
 
+xp.set_printoptions(precision=8, suppress=True, linewidth=150)
+import matplotlib.pyplot as plt
 
 class PyINLA:
     """ PyINLA is a Python implementation of the Integrated Nested 
@@ -105,6 +107,8 @@ class PyINLA:
         self.f_values: ArrayLike = []
         self.theta_values: ArrayLike = []
 
+        print("Initial theta:", self.model.theta)
+
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
 
@@ -123,8 +127,14 @@ class PyINLA:
 
         if len(self.model.theta) == 0:
             # Only run the inner iteration
-            print("in evaluate f.")
+            print("No hyperparameters, just running inner iteration.")
             self.f_value = self._evaluate_f(self.model.theta)
+
+            minimization_result: dict = {
+                "theta": self.model.theta,
+                "x": self.model.x,
+                "f": self.f_value,
+            }
         else:
             print("Starting optimization.")
             self.iter = 0
@@ -135,18 +145,25 @@ class PyINLA:
                 fun_i = intermediate_result.fun
                 self.iter += 1
 
+                # Format the output
+                theta_str = ", ".join(f"{theta: .6f}" for theta in theta_i)
+                gradient_str = ", ".join(f"{grad: .6f}" for grad in get_host(self.gradient_f))
+
                 print_msg(
-                    f"iter: {self.iter}: theta: {theta_i}, f: {fun_i}, gradient_f_i: {get_host(self.gradient_f)}",
+                    f"Iteration: {self.iter:2d} | "
+                    f"Theta: [{theta_str}] | "
+                    f"Function Value: {fun_i: .6f} | "
+                    f"Gradient: [{gradient_str}]",
                     flush=True,
                 )
 
                 self.theta_values.append(theta_i)
                 self.f_values.append(fun_i)
 
-            minimization_result = optimize.minimize(
+            scipy_result = optimize.minimize(
                 fun=self._objective_function,
                 x0=get_host(self.model.theta),
-                method="BFGS",
+                method="L-BFGS-B",
                 jac=self.config.minimize.jac,
                 options={
                     "maxiter": self.config.minimize.max_iter,
@@ -162,15 +179,24 @@ class PyINLA:
             # From here rank 0 own the optimized theta_star and the
             # corresponding x_star. Other ranks own garbage thetas
             # ... Could be bcast or other things
-            if minimization_result.success:
+            if scipy_result.success:
                 print_msg(
                     "Optimization converged successfully after",
-                    minimization_result.nit,
+                    self.iter,
                     "iterations.",
                     flush=True,
                 )
             else:
                 print_msg("Optimization did not converge.", flush=True)
+
+            minimization_result: dict = {
+                "theta": scipy_result.x,
+                "x": self.model.x,
+                "f": scipy_result.fun,
+                "grad_f": self.gradient_f,
+                "f_values": self.f_values,
+                "theta_values": self.theta_values,
+            }
 
         return minimization_result
 
@@ -216,7 +242,7 @@ class PyINLA:
         for i in range(self.model.n_hyperparameters):
             self.gradient_f[i] = (
                 self.f_values_i[i + 1]
-                - self.f_values_i[i + self.model.n_hyperparameters + 1]
+                - self.f_values_i[self.model.n_hyperparameters + i + 1]
             ) / (2 * self.eps_gradient_f)
 
         return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
@@ -283,6 +309,7 @@ class PyINLA:
         )
 
         return f_theta
+
 
     def _inner_iteration(
         self,

@@ -216,6 +216,8 @@ class Model(ABC):
                 config=likelihood_config,
             )
 
+        self.likelihood_config: LikelihoodConfig = likelihood_config
+
         # --- Recurrent variables
         self.Q_prior = None
         self.Q_prior_data_mapping = [0]
@@ -226,6 +228,8 @@ class Model(ABC):
         kwargs = {}
 
         if self.Q_prior is None:
+            # During the first construction of Q_prior, we allocate the memory for
+            # the data and the mapping of each submodel's to the Q prior matrix.
             rows = []
             cols = []
             data = []
@@ -241,7 +245,6 @@ class Model(ABC):
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
 
-                # TODO: Check that with LISA (I think it's correct)
                 rows.append(
                     submodel_Q_prior.row
                     + self.latent_parameters_idx[i] * xp.ones(len(submodel_Q_prior.row))
@@ -298,10 +301,15 @@ class Model(ABC):
         # )
         # hessian_likelihood = diags(hessian_likelihood_diag)
 
-        kwargs = {
-            "eta": eta,
-            "theta": float(self.theta[-1]),
-        }
+        if self.likelihood_config.type == "gaussian":
+            kwargs = {
+                "eta": eta,
+                "theta": float(self.theta[-1]),
+            }
+        else:
+            kwargs = {
+                "eta": eta,
+            }
         hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(**kwargs)
 
         self.Q_conditional = self.Q_prior - self.a.T @ hessian_likelihood @ self.a

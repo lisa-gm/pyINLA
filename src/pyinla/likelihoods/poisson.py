@@ -22,7 +22,7 @@ class PoissonLikelihood(Likelihood):
 
         # Load the extra coeficients for Poisson likelihood
         try:
-            e: NDArray = np.load(Path.joinpath(config.input_dir, "e.npy"))
+            e: NDArray = np.load(Path(config.input_dir).joinpath("e.npy"))
         except FileNotFoundError:
             e: NDArray = np.ones((n_observations), dtype=int)
 

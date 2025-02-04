@@ -94,6 +94,8 @@ class SpatioTemporalSubModel(SubModel):
             dim_spatial_domain=2,
         )
 
+        # print(f"Thetas used in Qprior construction: gamma_s: {gamma_s}, gamma_t: {gamma_t}, gamma_st: {gamma_st}")
+
         exp_gamma_s = xp.exp(gamma_s)
         exp_gamma_t = xp.exp(gamma_t)
         exp_gamma_st = xp.exp(gamma_st)

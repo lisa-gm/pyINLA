@@ -23,7 +23,7 @@ class BinomialLikelihood(Likelihood):
 
         # Load the extra coeficients for Binomial likelihood
         try:
-            n_trials: NDArray = np.load(Path.joinpath(config.input_dir, "n_trials.npy"))
+            n_trials: NDArray = np.load(Path(config.input_dir).joinpath("n_trials.npy"))
             if xp == np:
                 self.n_trials: NDArray = n_trials
             else:
