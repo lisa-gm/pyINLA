@@ -1,6 +1,13 @@
 # pyINLA
 Python implementation of the methodology of integrated nested Laplace approximations (INLA)
 
+## Examples
+The examples are being tracked using `git-lfs`, to download the examples, run the following commands:
+```bash
+git lfs pull
+git lfs checkout
+```
+
 ## Dev-note
 Here are some installation guidelines to install the project on the Fau; Alex and Fritz clusters.
 We recommend to test any development in 3 separated environments:
