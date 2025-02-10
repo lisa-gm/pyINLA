@@ -19,7 +19,7 @@ class SubModelConfig(BaseModel, ABC):
 
     # Input folder for this specific submodel
     input_dir: str = None
-    type: Literal["spatio_temporal", "regression"] = None
+    type: Literal["spatio_temporal", "regression", "brainiac"] = None
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
@@ -58,6 +58,14 @@ class SpatialSubModelConfig(SubModelConfig): ...
 
 
 class TemporalSubModelConfig(SubModelConfig): ...
+
+
+class BrainSubModelConfig(SubModelConfig):
+
+    # this will get a beta prior
+    ph_h2: PriorHyperparametersConfig = None
+
+    # set mvn prior for alpha with zero mean and i.i.d variance sigma_alpha
 
 
 def parse_config(config: dict | str) -> SubModelConfig:

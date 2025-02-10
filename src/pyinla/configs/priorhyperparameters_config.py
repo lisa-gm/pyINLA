@@ -31,6 +31,11 @@ class PenalizedComplexityPriorHyperparametersConfig(PriorHyperparametersConfig):
     # c = c_c * r
 
 
+class BetaPriorHyperparametersConfig(PriorHyperparametersConfig):
+    alpha: float = None
+    beta: float = None
+
+
 def parse_config(config: dict) -> PriorHyperparametersConfig:
     prior_type = config.get("type")
     if prior_type == "gaussian":

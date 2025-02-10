@@ -9,7 +9,11 @@ from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
-from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
+from pyinla.submodels import (
+    RegressionSubModel,
+    SpatioTemporalSubModel,
+)
+
 from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
@@ -179,6 +183,7 @@ class PyINLA:
                     "c1": self.config.minimize.c1,
                     "c2": self.config.minimize.c2,
                     "disp": self.config.minimize.disp,
+                    # "ftol": 1e-12,  # default 1e7
                 },
                 callback=callback,
             )
@@ -256,6 +261,9 @@ class PyINLA:
                 self.f_values_i[i + 1]
                 - self.f_values_i[self.model.n_hyperparameters + i + 1]
             ) / (2 * self.eps_gradient_f)
+
+        # print f(theta)  = f_values_i[0]
+        print_msg("f(", theta_i, ") = ", self.f_values_i[0])
 
         return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
 

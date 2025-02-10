@@ -2,5 +2,6 @@
 
 from pyinla.submodels.regression import RegressionSubModel
 from pyinla.submodels.spatio_temporal import SpatioTemporalSubModel
+from pyinla.submodels.brainiac import BrainiacSubModel
 
-__all__ = ["RegressionSubModel", "SpatioTemporalSubModel"]
+__all__ = ["RegressionSubModel", "SpatioTemporalSubModel", "BrainiacSubModel"]
