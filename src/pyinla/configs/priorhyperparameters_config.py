@@ -5,17 +5,24 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Annotated
 
+from pyinla.__init__ import NDArray
+from scipy.sparse import spmatrix
 
 # --- PRIOR HYPERPARAMETERS ----------------------------------------------------
 class PriorHyperparametersConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["gaussian", "penalized_complexity"] = None
+    type: Literal["gaussian", "penalized_complexity", "beta", "gaussian_mvn"] = None
 
 
 class GaussianPriorHyperparametersConfig(PriorHyperparametersConfig):
     mean: float = 0.0
     precision: Annotated[float, Field(strict=True, gt=0)] = 0.5
+
+
+class GaussianMVNPriorHyperparametersConfig(PriorHyperparametersConfig):
+    mean: NDArray = None
+    precision: spmatrix = None
 
 
 class PenalizedComplexityPriorHyperparametersConfig(PriorHyperparametersConfig):
