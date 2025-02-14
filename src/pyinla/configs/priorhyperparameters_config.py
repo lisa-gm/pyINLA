@@ -10,7 +10,7 @@ from scipy.sparse import spmatrix
 
 # --- PRIOR HYPERPARAMETERS ----------------------------------------------------
 class PriorHyperparametersConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     type: Literal["gaussian", "penalized_complexity", "beta", "gaussian_mvn"] = None
 
@@ -47,7 +47,11 @@ def parse_config(config: dict) -> PriorHyperparametersConfig:
     prior_type = config.get("type")
     if prior_type == "gaussian":
         return GaussianPriorHyperparametersConfig(**config)
+    elif prior_type == "gaussian_mvn":
+        return GaussianMVNPriorHyperparametersConfig(**config)
     elif prior_type == "penalized_complexity":
         return PenalizedComplexityPriorHyperparametersConfig(**config)
+    elif prior_type == "beta":
+        return BetaPriorHyperparametersConfig(**config)
     else:
         raise ValueError(f"Unknown prior hyperparameters config type: {prior_type}")

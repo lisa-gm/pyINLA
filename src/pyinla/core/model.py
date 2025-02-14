@@ -11,7 +11,9 @@ from pyinla import ArrayLike, NDArray, sp, xp
 from pyinla.configs.likelihood_config import LikelihoodConfig
 from pyinla.configs.priorhyperparameters_config import (
     GaussianPriorHyperparametersConfig,
+    GaussianMVNPriorHyperparametersConfig,
     PenalizedComplexityPriorHyperparametersConfig,
+    BetaPriorHyperparametersConfig,
 )
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
@@ -19,9 +21,11 @@ from pyinla.core.submodel import SubModel
 from pyinla.likelihoods import BinomialLikelihood, GaussianLikelihood, PoissonLikelihood
 from pyinla.prior_hyperparameters import (
     GaussianPriorHyperparameters,
+    GaussianMVNPriorHyperparameters,
     PenalizedComplexityPriorHyperparameters,
+    BetaPriorHyperparameters,
 )
-from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
+from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel, BrainiacSubModel
 
 
 class Model(ABC):
@@ -104,6 +108,22 @@ class Model(ABC):
                         PenalizedComplexityPriorHyperparameters(
                             config=submodel.config.ph_st,
                             hyperparameter_type="sigma_st",
+                        )
+                    )
+            elif isinstance(submodel, BrainiacSubModel):
+                # h2 hyperparameters
+                if isinstance(submodel.config.ph_h2, BetaPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        BetaPriorHyperparameters(
+                            config=submodel.config.ph_h2,
+                        )
+                    )
+                
+                # alpha hyperparameters
+                if isinstance(submodel.config.ph_alpha, GaussianMVNPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GaussianMVNPriorHyperparameters(
+                            config=submodel.config.ph_alpha,
                         )
                     )
             else:

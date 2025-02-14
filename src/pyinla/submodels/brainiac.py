@@ -5,7 +5,6 @@ from pyinla.configs.submodels_config import BrainiacSubModelConfig
 from pyinla.core.submodel import SubModel
 
 import numpy as np
-from scipy.sparse import diags, spmatrix
 from pyinla import sp, xp
 
 
@@ -19,31 +18,35 @@ class BrainiacSubModel(SubModel):
         """Initializes the model."""
         super().__init__(config)
 
-        # Load spatial_matrices
-        # load covariates Z
-        z: NDArray = np.load(self.input_path.joinpath("z.npz"))
+        # Load covariates matrix "z"
+        z: NDArray = np.load(self.input_path.joinpath("z.npy"))
 
-        # load projection matrix A
-        a: NDArray = np.load(self.input_path.joinpath("a.npz"))
+        """ 
+        -> We already load the "design" matrix that is called "a" in the submodel.py
+        -> Is it the same? I assumed yes for now and so it gets loaded there.
+        Also:
+        If it's a numpy array -> it is stored as .npy
+        If it's a sparse matrix -> it gets stored as .npz
 
-        # TODO: check what if this can be simplified for GPU case
+        # Load projection matrix "a"
+        a: NDArray = np.load(self.input_path.joinpath("a.npy")) 
+        """
+
         if xp == np:
             self.z: NDArray = z
-            self.a: NDArray = a
+            # self.a: NDArray = a
         else:
-            self.z: NDArray = z
-            self.a: NDArray = a
+            self.z: NDArray = xp.asarray(z)
+            # self.a: NDArray = xp.asarray(a)
 
         self._check_dimensions_matrices()
 
     def _check_dimensions_matrices(self) -> None:
         """Check the dimensions of the model."""
 
-        # check that number of columns in Z matches length of alpha
-        # check that number of rows in Z matches number of columns in A
         assert (
             self.z.shape[0] == self.a.shape[1]
-        ), "numbers rows in Z must match number of columns in A."
+        ), f"Numbers rows in z ({self.z.shape[0]}) must match number of columns in a ({self.a.shape[1]})."
 
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
@@ -52,15 +55,23 @@ class BrainiacSubModel(SubModel):
         h = kwargs.get("h")
 
         # \Phi = 1 / \sum_k=1^B exp(Z^k \alpha) * diag(exp(Z_1 \alpha), exp(Z_2 \alpha), ... )
-        exp_Z_alpha = np.exp(self.a @ alpha)
+        exp_Z_alpha = xp.exp(self.a @ alpha)
         # print(exp_Z_alpha)
-        sum_exp_Z_alpha = np.sum(exp_Z_alpha)
+        sum_exp_Z_alpha = xp.sum(exp_Z_alpha)
         # print(sum_exp_Z_alpha)
 
         normalized_exp_Z_alpha = exp_Z_alpha / sum_exp_Z_alpha
         # print(normalized_exp_Z_alpha)
 
         h2_phi = h**2 * normalized_exp_Z_alpha.flatten()
-        Qprior = diags(1 / h2_phi)
+        Q_prior: sp.sparse.spmatrix = sp.sparse.diags(1 / h2_phi)
 
-        return self.Q_prior
+        return Q_prior
+
+    def __str__(self) -> str:
+        """String representation of the submodel."""
+        return (
+            " --- BrainiacSubModel ---\n"
+            f"  z shape: [{self.z.shape[0]}, {self.z.shape[1]}]\n"
+            f"  a shape: [{self.a.shape[0]}, {self.a.shape[1]}]\n"
+        )

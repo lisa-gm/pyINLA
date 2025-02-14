@@ -7,15 +7,15 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt
 from typing_extensions import Annotated
 
-from pyinla.__init__ import ArrayLike, xp
-from pyinla.configs.priorhyperparameters_config import PriorHyperparametersConfig
+from pyinla.__init__ import ArrayLike, NDArray, xp
+from pyinla.configs.priorhyperparameters_config import PriorHyperparametersConfig, BetaPriorHyperparametersConfig, GaussianMVNPriorHyperparametersConfig
 from pyinla.configs.priorhyperparameters_config import (
     parse_config as parse_priorhyperparameters_config,
 )
 
 
 class SubModelConfig(BaseModel, ABC):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     # Input folder for this specific submodel
     input_dir: str = None
@@ -60,13 +60,20 @@ class SpatialSubModelConfig(SubModelConfig): ...
 class TemporalSubModelConfig(SubModelConfig): ...
 
 
-class BrainSubModelConfig(SubModelConfig):
+class BrainiacSubModelConfig(SubModelConfig):
+    # --- Hyperparameters ---
+    h2: float = None
+    alpha: NDArray = None 
 
-    # this will get a beta prior
-    ph_h2: PriorHyperparametersConfig = None
+    # --- Prior hyperparameters ---
+    ph_h2: BetaPriorHyperparametersConfig = None
+    ph_alpha: GaussianMVNPriorHyperparametersConfig = None
 
-    # set mvn prior for alpha with zero mean and i.i.d variance sigma_alpha
+    def read_hyperparameters(self):
+        theta = xp.concatenate(([self.h2], self.alpha))
+        theta_keys = ["h2"] + [f"alpha_{i}" for i in range(len(self.alpha))]
 
+        return theta, theta_keys
 
 def parse_config(config: dict | str) -> SubModelConfig:
     if isinstance(config, str):
@@ -81,6 +88,10 @@ def parse_config(config: dict | str) -> SubModelConfig:
         return SpatioTemporalSubModelConfig(**config)
     elif type == "regression":
         return RegressionSubModelConfig(**config)
+    elif type == "brainiac":
+        config["ph_h2"] = parse_priorhyperparameters_config(config["ph_h2"])
+        config["ph_alpha"] = parse_priorhyperparameters_config(config["ph_alpha"])
+        return BrainiacSubModelConfig(**config)
     # Add more elif branches for other submodel types
     else:
         raise ValueError(f"Unknown submodel type: {type}")
