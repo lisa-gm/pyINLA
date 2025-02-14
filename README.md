@@ -169,3 +169,70 @@ pytest .
 cd /path/to/pyinla/
 python -m pip install -e .
 ```
+
+
+### CSCS @ Daint.alps cluster
+Here are some installation guidelines to install the project on the Daint.alps cluster.
+1. Pull and start the necessary `uenv`:
+```bash
+uenv image find
+uenv image pull prgenv-gnu/24.11:v1
+uenv start --view=modules prgenv-gnu/24.11:v1
+```
+2. Load the necessary modules:
+```bash
+module load cuda
+module load gcc
+module load meson
+module load ninja
+module load nccl
+module load cray-mpich
+module load cmake
+module load openblas
+module load aws-ofi-nccl
+```
+3. Export library PATH:
+```bash
+export NCCL_ROOT=/user-environment/linux-sles15-neoverse_v2/gcc-13.3.0/nccl-2.22.3-1-4j6h3ffzysukqpqbvriorrzk2lm762dd
+export NCCL_LIB_DIR=$NCCL_ROOT/lib
+export NCCL_INCLUDE_DIR=$NCCL_ROOT/include
+export CUDA_DIR=$CUDA_HOME
+export CUDA_PATH=$CUDA_HOME
+export CPATH=$CUDA_HOME/include:$CPATH
+export LIBRARY_PATH=$CUDA_HOME/lib64:$LIBRARY_PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+export CPATH=$NCCL_ROOT/include:$CPATH
+export LIBRARY_PATH=$NCCL_ROOT/lib:$LIBRARY_PATH
+export LD_LIBRARY_PATH=$NCCL_ROOT/lib:$LD_LIBRARY_PATH
+```
+4. Install miniconda:
+```bash
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh
+chmod u+x Miniconda3-latest-Linux-aarch64.sh
+./Miniconda3-latest-Linux-aarch64.sh
+```
+5. Create the conda environment and install the required libraries:
+```bash
+conda create -n myenv
+conda activate myenv
+conda install python=3.12
+conda install numpy scipy
+MPICC=$(which mpicc) python -m pip install --no-cache-dir mpi4py
+pip install cupy --no-dependencies --no-cache-dir
+conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib numba -y
+# Test the NCCL/CuPy installation
+python -c "from cupy.cuda.nccl import *"
+```
+6. (Optional) Install serinv and run the tests:
+```bash
+git clone https://github.com/vincent-maillou/serinv
+cd /path/to/serinv/
+python -m pip install -e .
+# Run the sequential tests.
+pytest .
+```
+7. Install pyinla
+```bash
+cd /path/to/pyinla/
+python -m pip install -e .
+```
