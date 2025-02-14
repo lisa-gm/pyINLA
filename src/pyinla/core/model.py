@@ -263,6 +263,11 @@ class Model(ABC):
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
                         kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, BrainiacSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
 
@@ -290,6 +295,11 @@ class Model(ABC):
                 if isinstance(submodel, RegressionSubModel):
                     ...
                 elif isinstance(submodel, SpatioTemporalSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, BrainiacSubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):

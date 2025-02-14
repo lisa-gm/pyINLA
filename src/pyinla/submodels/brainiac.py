@@ -50,9 +50,10 @@ class BrainiacSubModel(SubModel):
 
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
-
-        alpha = kwargs.get("alpha")
-        h = kwargs.get("h")
+        # Extract all alpha_x values and put them into an array
+        alpha_keys = sorted([key for key in kwargs if key.startswith("alpha_")])
+        alpha = xp.array([kwargs[key] for key in alpha_keys])
+        h2 = kwargs.get("h2")
 
         # \Phi = 1 / \sum_k=1^B exp(Z^k \alpha) * diag(exp(Z_1 \alpha), exp(Z_2 \alpha), ... )
         exp_Z_alpha = xp.exp(self.a @ alpha)
@@ -63,10 +64,10 @@ class BrainiacSubModel(SubModel):
         normalized_exp_Z_alpha = exp_Z_alpha / sum_exp_Z_alpha
         # print(normalized_exp_Z_alpha)
 
-        h2_phi = h**2 * normalized_exp_Z_alpha.flatten()
+        h2_phi = h2**2 * normalized_exp_Z_alpha.flatten()
         Q_prior: sp.sparse.spmatrix = sp.sparse.diags(1 / h2_phi)
 
-        return Q_prior
+        return Q_prior.tocoo()
 
     def __str__(self) -> str:
         """String representation of the submodel."""
