@@ -73,6 +73,10 @@ class BrainiacSubModelConfig(SubModelConfig):
         theta = xp.concatenate(([self.h2], self.alpha))
         theta_keys = ["h2"] + [f"alpha_{i}" for i in range(len(self.alpha))]
 
+        # TODO: Maybe the initial rescaling [0,1] to -/+ INF should be done here
+        """ for i, h in enumerate(theta):
+            theta[i] = utils.scale(h) """
+
         return theta, theta_keys
 
 def parse_config(config: dict | str) -> SubModelConfig:

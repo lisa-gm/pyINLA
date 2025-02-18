@@ -341,9 +341,17 @@ class Model(ABC):
             kwargs = {
                 "eta": eta,
             }
-        hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(**kwargs)
+        
+        if isinstance(self.submodels[0], BrainiacSubModel):
+            # Brainiac specific rule
+            for hp_idx in range(self.hyperparameters_idx[0], self.hyperparameters_idx[1]):
+                kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+            h_matrix = self.submodels[0].evaluate_h_matrix(kwargs)
+        else:
+            # General rules
+            h_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
 
-        self.Q_conditional = self.Q_prior - self.a.T @ hessian_likelihood @ self.a
+        self.Q_conditional = self.Q_prior - self.a.T @ h_matrix @ self.a
 
         return self.Q_conditional
 

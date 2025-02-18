@@ -55,6 +55,9 @@ class BrainiacSubModel(SubModel):
         alpha = xp.array([kwargs[key] for key in alpha_keys])
         h2 = kwargs.get("h2")
 
+        # TODO: Scale h (it's currently between -INF:+INF)
+        h2_scaled = utils.cloglog(h2, direction="forward")
+
         # \Phi = 1 / \sum_k=1^B exp(Z^k \alpha) * diag(exp(Z_1 \alpha), exp(Z_2 \alpha), ... )
         exp_Z_alpha = xp.exp(self.a @ alpha)
         # print(exp_Z_alpha)
@@ -64,10 +67,20 @@ class BrainiacSubModel(SubModel):
         normalized_exp_Z_alpha = exp_Z_alpha / sum_exp_Z_alpha
         # print(normalized_exp_Z_alpha)
 
-        h2_phi = h2**2 * normalized_exp_Z_alpha.flatten()
+        h2_phi = h2_scaled**2 * normalized_exp_Z_alpha.flatten()
         Q_prior: sp.sparse.spmatrix = sp.sparse.diags(1 / h2_phi)
 
         return Q_prior.tocoo()
+
+    def evaluate_h_matrix(self, **kwargs) -> NDArray:
+        h2 = kwargs.get("h2")
+
+        # TODO: Scale h (it's currently between -INF:+INF)
+        h2_scaled = utils.cloglog(h2, direction="forward")
+
+        h_matrix = None # To be constructed
+
+        return h_matrix
 
     def __str__(self) -> str:
         """String representation of the submodel."""
