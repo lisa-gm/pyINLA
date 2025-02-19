@@ -3,6 +3,7 @@
 from pyinla import sp, NDArray
 from pyinla.configs.submodels_config import BrainiacSubModelConfig
 from pyinla.core.submodel import SubModel
+from pyinla.utils import cloglog
 
 import numpy as np
 from pyinla import sp, xp
@@ -48,18 +49,29 @@ class BrainiacSubModel(SubModel):
             self.z.shape[0] == self.a.shape[1]
         ), f"Numbers rows in z ({self.z.shape[0]}) must match number of columns in a ({self.a.shape[1]})."
 
+    def rescale_hyperparameters_to_interpret(self, **kwargs) -> NDArray:
+
+        h2_scaled = kwargs.get("h2")
+        # rescale h2 to (0,1) as it's currently between -INF:+INF
+        h2 = cloglog(h2_scaled, direction="backward")
+
+        theta_interpret = np.array([h2, *kwargs["alpha"]])
+        print("theta_interpret: ", theta_interpret)
+        return theta_interpret
+
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
         # Extract all alpha_x values and put them into an array
         alpha_keys = sorted([key for key in kwargs if key.startswith("alpha_")])
         alpha = xp.array([kwargs[key] for key in alpha_keys])
-        h2 = kwargs.get("h2")
+        h2_scaled = kwargs.get("h2")
 
-        # TODO: Scale h (it's currently between -INF:+INF)
-        h2_scaled = utils.cloglog(h2, direction="forward")
+        # rescale h2 to (0,1) as it's currently between -INF:+INF
+        h2 = cloglog(h2_scaled, direction="backward")
+        print("h2: ", h2)
 
         # \Phi = 1 / \sum_k=1^B exp(Z^k \alpha) * diag(exp(Z_1 \alpha), exp(Z_2 \alpha), ... )
-        exp_Z_alpha = xp.exp(self.a @ alpha)
+        exp_Z_alpha = xp.exp(self.z @ alpha)
         # print(exp_Z_alpha)
         sum_exp_Z_alpha = xp.sum(exp_Z_alpha)
         # print(sum_exp_Z_alpha)
@@ -67,20 +79,20 @@ class BrainiacSubModel(SubModel):
         normalized_exp_Z_alpha = exp_Z_alpha / sum_exp_Z_alpha
         # print(normalized_exp_Z_alpha)
 
-        h2_phi = h2_scaled**2 * normalized_exp_Z_alpha.flatten()
+        h2_phi = h2**2 * normalized_exp_Z_alpha.flatten()
         Q_prior: sp.sparse.spmatrix = sp.sparse.diags(1 / h2_phi)
 
         return Q_prior.tocoo()
 
-    def evaluate_h_matrix(self, **kwargs) -> NDArray:
-        h2 = kwargs.get("h2")
+    def evaluate_d_matrix(self, **kwargs) -> NDArray:
+        h2_scaled = kwargs.get("h2")
 
-        # TODO: Scale h (it's currently between -INF:+INF)
-        h2_scaled = utils.cloglog(h2, direction="forward")
+        # rescale h2 to (0,1) as it's currently between -INF:+INF
+        h2 = cloglog(h2_scaled, direction="backward")
 
-        h_matrix = None # To be constructed
+        d_matrix = 1 / (1 - h2) * sp.sparse.eye(self.a.shape[0])
 
-        return h_matrix
+        return d_matrix
 
     def __str__(self) -> str:
         """String representation of the submodel."""

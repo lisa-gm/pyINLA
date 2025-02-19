@@ -26,7 +26,7 @@ from pyinla.prior_hyperparameters import (
     BetaPriorHyperparameters,
 )
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel, BrainiacSubModel
-
+from pyinla.utils import cloglog
 
 class Model(ABC):
     """Core class for statistical models."""
@@ -118,7 +118,7 @@ class Model(ABC):
                             config=submodel.config.ph_h2,
                         )
                     )
-                
+
                 # alpha hyperparameters
                 if isinstance(submodel.config.ph_alpha, GaussianMVNPriorHyperparametersConfig):
                     self.prior_hyperparameters.append(
@@ -200,14 +200,19 @@ class Model(ABC):
         self.n_observations: int = self.y.shape[0]
 
         # --- Initialize likelihood
+        # TODO: clean this -> so that for brainiac model we don't add additional hyperperameter
         if likelihood_config.type == "gaussian":
             self.likelihood: Likelihood = GaussianLikelihood(
                 n_observations=self.n_observations,
                 config=likelihood_config,
             )
 
+            print("here in gaussian")
+            if self.submodels[0] == BrainiacSubModel:
+                # skip setting prior as it's already set in the submodel
+                print("here in brainiac")
             # Instantiate the prior hyperparameters for the likelihood
-            if isinstance(
+            elif isinstance(
                 likelihood_config.prior_hyperparameters,
                 GaussianPriorHyperparametersConfig,
             ):
@@ -341,17 +346,19 @@ class Model(ABC):
             kwargs = {
                 "eta": eta,
             }
-        
+
         if isinstance(self.submodels[0], BrainiacSubModel):
             # Brainiac specific rule
             for hp_idx in range(self.hyperparameters_idx[0], self.hyperparameters_idx[1]):
                 kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
-            h_matrix = self.submodels[0].evaluate_h_matrix(kwargs)
+            d_matrix = -1 * self.submodels[0].evaluate_d_matrix(**kwargs)
         else:
             # General rules
-            h_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
+            d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
 
-        self.Q_conditional = self.Q_prior - self.a.T @ h_matrix @ self.a
+        print("dim d_matrix: ", d_matrix.shape)
+        print("dim a: ", self.a.shape)
+        self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 
         return self.Q_conditional
 
@@ -382,14 +389,21 @@ class Model(ABC):
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0
 
+        # if BFGS and model scale differ: rescale -- generalize
+        if self.submodels[0] == BrainiacSubModel:
+            #
+            theta_interpret = self.theta.copy()
+            theta_interpret[0] = cloglog(self.theta[0], direction="backward")
+        else:
+            theta_interpret = self.theta
+
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-            log_prior += prior_hyperparameter.evaluate_log_prior(self.theta[i])
+            log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
 
         return log_prior
 
     def __str__(self) -> str:
         """String representation of the model."""
-        # Collect general information about the model
         # Collect general information about the model
         model_info = [
             " --- Model ---",

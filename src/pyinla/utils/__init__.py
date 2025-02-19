@@ -8,7 +8,7 @@ from pyinla.utils.gpu_utils import (
     set_device,
 )
 from pyinla.utils.host import get_host_configuration
-from pyinla.utils.link_functions import sigmoid
+from pyinla.utils.link_functions import sigmoid, cloglog
 from pyinla.utils.multiprocessing import allreduce, bcast, print_msg, synchronize
 
 __all__ = [
@@ -19,6 +19,7 @@ __all__ = [
     "get_device",
     "get_host_configuration",
     "sigmoid",
+    "cloglog",
     "print_msg",
     "synchronize",
     "allreduce",

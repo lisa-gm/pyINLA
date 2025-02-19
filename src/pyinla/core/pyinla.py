@@ -345,6 +345,7 @@ class PyINLA:
             Log determinant of the conditional precision matrix Q_conditional.
         """
         self.x_update[:] = 0.0
+        print("shape(x_update): ", self.x_update.shape)
         x_i_norm: float = 1.0
 
         counter: int = 0
@@ -356,7 +357,10 @@ class PyINLA:
                 )
 
             self.model.x[:] += self.x_update[:]
-            self.eta[:] = self.model.a @ self.model.x
+            print("dim(a): ", self.model.a.shape)
+            print("dim(x): ", self.model.x.shape)
+            self.eta[:] = (self.model.a @ self.model.x).reshape(self.eta.shape)
+            print("dim(eta): ", self.eta.shape)
 
             Q_conditional = self.model.construct_Q_conditional(self.eta)
             self.solver.cholesky(A=Q_conditional)
@@ -367,6 +371,7 @@ class PyINLA:
             self.x_update[:] = self.solver.solve(
                 rhs=rhs,
             )
+            print("shape(x_update): ", self.x_update.shape)
 
             x_i_norm = xp.linalg.norm(self.x_update)
             counter += 1

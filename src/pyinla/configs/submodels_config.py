@@ -12,6 +12,7 @@ from pyinla.configs.priorhyperparameters_config import PriorHyperparametersConfi
 from pyinla.configs.priorhyperparameters_config import (
     parse_config as parse_priorhyperparameters_config,
 )
+from pyinla.utils import cloglog
 
 
 class SubModelConfig(BaseModel, ABC):
@@ -63,6 +64,7 @@ class TemporalSubModelConfig(SubModelConfig): ...
 class BrainiacSubModelConfig(SubModelConfig):
     # --- Hyperparameters ---
     h2: float = None
+    h2_scaled: float = None
     alpha: NDArray = None 
 
     # --- Prior hyperparameters ---
@@ -70,14 +72,14 @@ class BrainiacSubModelConfig(SubModelConfig):
     ph_alpha: GaussianMVNPriorHyperparametersConfig = None
 
     def read_hyperparameters(self):
-        theta = xp.concatenate(([self.h2], self.alpha))
+
+        # input of h2 is in (0,1), rescale to -/+ INF
+        self.h2_scaled = cloglog(self.h2, direction="forward")
+
+        theta = xp.concatenate(([self.h2_scaled], self.alpha))
         theta_keys = ["h2"] + [f"alpha_{i}" for i in range(len(self.alpha))]
-
-        # TODO: Maybe the initial rescaling [0,1] to -/+ INF should be done here
-        """ for i, h in enumerate(theta):
-            theta[i] = utils.scale(h) """
-
         return theta, theta_keys
+
 
 def parse_config(config: dict | str) -> SubModelConfig:
     if isinstance(config, str):
