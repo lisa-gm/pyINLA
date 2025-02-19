@@ -21,7 +21,11 @@ from pyinla.prior_hyperparameters import (
     GaussianPriorHyperparameters,
     PenalizedComplexityPriorHyperparameters,
 )
-from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
+from pyinla.submodels import (
+    RegressionSubModel,
+    SpatioTemporalSubModel,
+    SpatialSubModel,
+)
 
 
 class Model(ABC):
@@ -106,6 +110,41 @@ class Model(ABC):
                             hyperparameter_type="sigma_st",
                         )
                     )
+            elif isinstance(submodel, SpatialSubModel):
+                # spatial range
+                if isinstance(submodel.config.ph_s, GaussianPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_s,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_s, PenalizedComplexityPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_s,
+                            hyperparameter_type="r_s",
+                        )
+                    )
+
+                # spatial variation
+                if isinstance(submodel.config.ph_e, GaussianPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_e,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_e, PenalizedComplexityPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_e,
+                            hyperparameter_type="sigma_e",
+                        )
+                    )
+
             else:
                 raise ValueError("Unknown submodel type")
 
@@ -180,6 +219,7 @@ class Model(ABC):
         self.n_observations: int = self.y.shape[0]
 
         # --- Initialize likelihood
+        # TODO: clean this -> so that for brainiac model we don't add additional hyperperameter
         if likelihood_config.type == "gaussian":
             self.likelihood: Likelihood = GaussianLikelihood(
                 n_observations=self.n_observations,
@@ -243,6 +283,11 @@ class Model(ABC):
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
                         kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, SpatialSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
 
@@ -270,6 +315,11 @@ class Model(ABC):
                 if isinstance(submodel, RegressionSubModel):
                     ...
                 elif isinstance(submodel, SpatioTemporalSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, SpatialSubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
@@ -311,9 +361,10 @@ class Model(ABC):
             kwargs = {
                 "eta": eta,
             }
-        hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(**kwargs)
 
-        self.Q_conditional = self.Q_prior - self.a.T @ hessian_likelihood @ self.a
+        d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
+
+        self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 
         return self.Q_conditional
 
@@ -344,14 +395,15 @@ class Model(ABC):
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0
 
+        theta_interpret = self.theta
+
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-            log_prior += prior_hyperparameter.evaluate_log_prior(self.theta[i])
+            log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
 
         return log_prior
 
     def __str__(self) -> str:
         """String representation of the model."""
-        # Collect general information about the model
         # Collect general information about the model
         model_info = [
             " --- Model ---",

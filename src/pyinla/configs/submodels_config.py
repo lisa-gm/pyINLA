@@ -19,7 +19,7 @@ class SubModelConfig(BaseModel, ABC):
 
     # Input folder for this specific submodel
     input_dir: str = None
-    type: Literal["spatio_temporal", "regression"] = None
+    type: Literal["spatio_temporal", "spatial", "regression"] = None
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
@@ -54,7 +54,21 @@ class SpatioTemporalSubModelConfig(SubModelConfig):
         return theta, theta_keys
 
 
-class SpatialSubModelConfig(SubModelConfig): ...
+class SpatialSubModelConfig(SubModelConfig):
+    spatial_domain_dimension: PositiveInt = 2
+
+    # --- Model hyperparameters in the interpretable scale ---
+    r_s: float = None  # Spatial range
+    sigma_e: float = None  # Spatial variation
+
+    ph_s: PriorHyperparametersConfig = None
+    ph_e: PriorHyperparametersConfig = None
+
+    def read_hyperparameters(self):
+        theta = xp.array([self.r_s, self.sigma_e])
+        theta_keys = ["r_s", "sigma_e"]
+
+        return theta, theta_keys
 
 
 class TemporalSubModelConfig(SubModelConfig): ...
@@ -71,6 +85,10 @@ def parse_config(config: dict | str) -> SubModelConfig:
         config["ph_t"] = parse_priorhyperparameters_config(config["ph_t"])
         config["ph_st"] = parse_priorhyperparameters_config(config["ph_st"])
         return SpatioTemporalSubModelConfig(**config)
+    elif type == "spatial":
+        config["ph_s"] = parse_priorhyperparameters_config(config["ph_s"])
+        config["ph_e"] = parse_priorhyperparameters_config(config["ph_e"])
+        return SpatialSubModelConfig(**config)
     elif type == "regression":
         return RegressionSubModelConfig(**config)
     # Add more elif branches for other submodel types

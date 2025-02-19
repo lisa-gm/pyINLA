@@ -176,9 +176,10 @@ class PyINLA:
                 options={
                     "maxiter": self.config.minimize.max_iter,
                     "gtol": self.config.minimize.gtol,
-                    "c1": self.config.minimize.c1,
-                    "c2": self.config.minimize.c2,
+                    # "c1": self.config.minimize.c1,
+                    # "c2": self.config.minimize.c2,
                     "disp": self.config.minimize.disp,
+                    "ftol": 1e-18,
                 },
                 callback=callback,
             )

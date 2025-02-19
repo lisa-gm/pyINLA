@@ -26,7 +26,7 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
         self.lambda_theta: float = 0.0
 
         if self.hyperparameter_type == "r_s":
-            spatial_dim: int = kwargs["spatial_dim", 2]
+            spatial_dim: int = 2  # kwargs["spatial_dim", 2]
 
             self.lambda_theta = -xp.log(self.alpha) * pow(
                 self.u,
@@ -34,7 +34,10 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
             )
         elif self.hyperparameter_type == "r_t":
             self.lambda_theta = -xp.log(self.alpha) * pow(self.u, 0.5)
-        elif self.hyperparameter_type == "sigma_st":
+        elif (
+            self.hyperparameter_type == "sigma_st"
+            or self.hyperparameter_type == "sigma_e"
+        ):
             self.lambda_theta = -xp.log(self.alpha) / self.u
         elif self.hyperparameter_type == "prec_o":
             self.lambda_theta = -xp.log(self.alpha) / self.u
@@ -44,7 +47,7 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
         log_prior: float = 0.0
 
         if self.hyperparameter_type == "r_s":
-            spatial_dim: int = kwargs["spatial_dim", 2]
+            spatial_dim: int = 2  # kwargs["spatial_dim", 2]
 
             if spatial_dim == 2:
                 log_prior = (
