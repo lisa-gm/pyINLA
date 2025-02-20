@@ -42,6 +42,8 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
         elif self.hyperparameter_type == "prec_o":
             self.lambda_theta = -xp.log(self.alpha) / self.u
 
+        print("lambda_theta: ", self.lambda_theta)
+
     def evaluate_log_prior(self, theta: float, **kwargs) -> float:
         """Evaluate the prior hyperparameters."""
         log_prior: float = 0.0
