@@ -359,7 +359,8 @@ class PyINLA:
             self.model.x[:] += self.x_update[:]
             print("dim(a): ", self.model.a.shape)
             print("dim(x): ", self.model.x.shape)
-            self.eta[:] = (self.model.a @ self.model.x).reshape(self.eta.shape)
+            # self.eta[:] = (self.model.a @ self.model.x).reshape(self.eta.shape)
+            self.eta[:] = self.model.a @ self.model.x
             print("dim(eta): ", self.eta.shape)
 
             Q_conditional = self.model.construct_Q_conditional(self.eta)

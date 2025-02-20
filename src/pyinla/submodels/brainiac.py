@@ -84,13 +84,23 @@ class BrainiacSubModel(SubModel):
 
         return Q_prior.tocoo()
 
+    def evaluate_grad_vector(self, eta: NDArray, y: NDArray, **kwargs) -> NDArray:
+        h2_scaled = kwargs.get("h2")
+
+        # rescale h2 to (0,1) as it's currently between -INF:+INF
+        h2 = cloglog(h2_scaled, direction="backward")
+
+        gradient = -1 / (1 - h2) * (eta - y)
+
+        return gradient
+
     def evaluate_d_matrix(self, **kwargs) -> NDArray:
         h2_scaled = kwargs.get("h2")
 
         # rescale h2 to (0,1) as it's currently between -INF:+INF
         h2 = cloglog(h2_scaled, direction="backward")
 
-        d_matrix = 1 / (1 - h2) * sp.sparse.eye(self.a.shape[0])
+        d_matrix = -1 / (1 - h2) * sp.sparse.eye(self.a.shape[0])
 
         return d_matrix
 

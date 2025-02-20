@@ -337,6 +337,7 @@ class Model(ABC):
         # )
         # hessian_likelihood = diags(hessian_likelihood_diag)
 
+        # TODO: needs to be generalized somehow so that we can have multiple likelihoods
         if self.likelihood_config.type == "gaussian":
             kwargs = {
                 "eta": eta,
@@ -349,9 +350,8 @@ class Model(ABC):
 
         if isinstance(self.submodels[0], BrainiacSubModel):
             # Brainiac specific rule
-            for hp_idx in range(self.hyperparameters_idx[0], self.hyperparameters_idx[1]):
-                kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
-            d_matrix = -1 * self.submodels[0].evaluate_d_matrix(**kwargs)
+            kwargs["h2"] = float(self.theta[0])
+            d_matrix = self.submodels[0].evaluate_d_matrix(**kwargs)
         else:
             # General rules
             d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
@@ -373,11 +373,19 @@ class Model(ABC):
         # gradient_likelihood = gradient_finite_difference_5pt(
         #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
         # )
-        gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
-            eta=eta,
-            y=self.y,
-            theta=self.theta[self.hyperparameters_idx[-1] :],
-        )
+
+        if self.submodels[0] == BrainiacSubModel:
+            kwargs = {"h2": float(self.theta[0])}
+            gradient_likelihood = self.submodels[0].evaluate_grad_vector(
+                eta=eta, y=self.y, kwargs=kwargs
+            )
+
+        else:
+            gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
+                eta=eta,
+                y=self.y,
+                theta=self.theta[self.hyperparameters_idx[-1] :],
+            )
 
         information_vector: NDArray = (
             -1 * self.Q_prior @ x_i + self.a.T @ gradient_likelihood
