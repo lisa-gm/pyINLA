@@ -40,6 +40,8 @@ class SpatialSubModel(SubModel):
 
         self._check_dimensions_spatial_matrices()
 
+        self._check_matrix_symmetry()
+
         self.ns: int = self.c0.shape[0]  # Number of spatial nodes in the mesh
 
         # Check that design_matrix shape match spatio-temporal fields
@@ -58,6 +60,17 @@ class SpatialSubModel(SubModel):
             self.c0.shape == self.g1.shape == self.g2.shape  # == self.g3.shape
         ), "Dimensions of spatial matrices do not match."
 
+    def _check_matrix_symmetry(self) -> None:
+        """Check the symmetry of the matrices."""
+        diff = self.c0 - self.c0.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
+
+        diff = self.g1 - self.g1.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
+
+        diff = self.g2 - self.g2.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
+
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
 
@@ -67,7 +80,9 @@ class SpatialSubModel(SubModel):
             dim_spatial_domain=2,
         )
 
-        # print(f"Thetas used in Qprior construction: gamma_s: {gamma_s}, gamma_t: {gamma_e}")
+        print(
+            f"Thetas used in Qprior construction: gamma_s: {gamma_s}, gamma_e: {gamma_e}"
+        )
 
         exp_gamma_s = xp.exp(gamma_s)
         exp_gamma_e = xp.exp(gamma_e)

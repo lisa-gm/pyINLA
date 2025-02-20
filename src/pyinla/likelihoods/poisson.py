@@ -23,6 +23,7 @@ class PoissonLikelihood(Likelihood):
         # Load the extra coeficients for Poisson likelihood
         try:
             e: NDArray = np.load(Path(config.input_dir).joinpath("e.npy"))
+
         except FileNotFoundError:
             e: NDArray = np.ones((n_observations), dtype=int)
 
@@ -57,6 +58,7 @@ class PoissonLikelihood(Likelihood):
     ) -> ArrayLike:
         eta: NDArray = kwargs.get("eta")
 
+        print("max value of eta: ", xp.max(eta))
         hessian_likelihood: ArrayLike = -1.0 * sp.sparse.diags(self.e * xp.exp(eta))
 
         return hessian_likelihood

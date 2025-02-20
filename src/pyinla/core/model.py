@@ -55,9 +55,7 @@ class Model(ABC):
 
         for submodel in self.submodels:
             # ...initialize their prior hyperparameters matching their hyperparameters
-            if isinstance(submodel, RegressionSubModel):
-                ...
-            elif isinstance(submodel, SpatioTemporalSubModel):
+            if isinstance(submodel, SpatioTemporalSubModel):
                 # Spatial hyperparameters
                 if isinstance(submodel.config.ph_s, GaussianPriorHyperparametersConfig):
                     self.prior_hyperparameters.append(
@@ -144,6 +142,8 @@ class Model(ABC):
                             hyperparameter_type="sigma_e",
                         )
                     )
+            elif isinstance(submodel, RegressionSubModel):
+                ...
 
             else:
                 raise ValueError("Unknown submodel type")
@@ -276,9 +276,7 @@ class Model(ABC):
             data = []
 
             for i, submodel in enumerate(self.submodels):
-                if isinstance(submodel, RegressionSubModel):
-                    ...
-                elif isinstance(submodel, SpatioTemporalSubModel):
+                if isinstance(submodel, SpatioTemporalSubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
@@ -288,6 +286,8 @@ class Model(ABC):
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
                         kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, RegressionSubModel):
+                    ...
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
 
@@ -363,12 +363,12 @@ class Model(ABC):
             }
 
         d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
-        print("dim d_matrix: ", d_matrix.shape)
-        print("d_matrix: \n", d_matrix.toarray()[:5, :5])
-        print("dim(a): ", self.a.shape)
-        print("A: ", self.a.toarray()[:5, :5])
-        print("dim(Q_prior): ", self.Q_prior.shape)
-        print("Q_prior: ", self.Q_prior[:5, :5])
+        # print("dim d_matrix: ", d_matrix.shape)
+        # print("d_matrix: \n", d_matrix.toarray()[:5, :5])
+        # print("dim(a): ", self.a.shape)
+        # print("A: ", self.a.toarray()[:5, :5])
+        # print("dim(Q_prior): ", self.Q_prior.shape)
+        # print("Q_prior: ", self.Q_prior[:5, :5])
 
         self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 
@@ -404,7 +404,9 @@ class Model(ABC):
         theta_interpret = self.theta
 
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-            log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
+            tmp = prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
+            print("tmp: ", tmp)
+            log_prior += tmp
 
         return log_prior
 

@@ -290,6 +290,7 @@ class PyINLA:
         log_prior_hyperparameters: float = (
             self.model.evaluate_log_prior_hyperparameters()
         )
+        print("log_prior_hyperparameters: ", log_prior_hyperparameters)
 
         # --- Construct the prior precision matrix of the latent parameters
         self.model.construct_Q_prior()
@@ -303,16 +304,19 @@ class PyINLA:
             y=self.model.y,
             theta=self.model.theta[self.model.hyperparameters_idx[-1] :],
         )
+        print("likelihood: ", likelihood)
 
         # --- Evaluate the prior of the latent parameters at x_star
         prior_latent_parameters: float = self._evaluate_prior_latent_parameters(
             x_star=self.model.x
         )
+        print("prior_latent_parameters: ", prior_latent_parameters)
 
         # --- Evaluate the conditional of the latent parameters at x_star
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
             logdet_Q_conditional
         )
+        print("conditional_latent_parameters: ", conditional_latent_parameters)
 
         f_theta: float = -1.0 * (
             log_prior_hyperparameters

@@ -52,6 +52,7 @@ class SpatioTemporalSubModel(SubModel):
 
         self._check_dimensions_spatial_matrices()
         self._check_dimensions_temporal_matrices()
+        self._check_matrix_symmetry()
 
         self.ns: int = self.c0.shape[0]  # Number of spatial nodes in the mesh
         self.nt: int = self.m0.shape[0]  # Number of temporal nodes in the mesh
@@ -83,6 +84,29 @@ class SpatioTemporalSubModel(SubModel):
         assert (
             self.m0.shape == self.m1.shape == self.m2.shape
         ), "Dimensions of temporal matrices do not match."
+
+    def _check_matrix_symmetry(self) -> None:
+        """Check the symmetry of the matrices."""
+        diff = self.c0 - self.c0.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
+
+        diff = self.g1 - self.g1.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
+
+        diff = self.g2 - self.g2.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
+
+        diff = self.g3 - self.g3.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
+
+        diff = self.m0 - self.m0.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Temporal matrix m0 is not symmetric."
+
+        diff = self.m1 - self.m1.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Temporal matrix m1 is not symmetric."
+
+        diff = self.m2 - self.m2.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Temporal matrix m2 is not symmetric."
 
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""

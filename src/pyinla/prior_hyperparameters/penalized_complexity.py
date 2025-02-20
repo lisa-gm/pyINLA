@@ -54,25 +54,32 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
             if spatial_dim == 2:
                 log_prior = (
                     xp.log(self.lambda_theta)
-                    - self.lambda_theta * xp.exp(theta)
+                    - self.lambda_theta * xp.exp(-theta)
                     - theta
                 )
             else:
                 raise ValueError("Not implemented for other than 2D spatial domains")
+            print("log prior r s: ", log_prior)
         elif self.hyperparameter_type == "r_t":
             log_prior = (
                 xp.log(self.lambda_theta)
-                - self.lambda_theta * xp.exp(0.5 * theta)
+                - self.lambda_theta * xp.exp(-0.5 * theta)
                 + xp.log(0.5)
                 - theta
             )
-        elif self.hyperparameter_type == "sigma_st":
+            print("log prior r t: ", log_prior)
+        elif (
+            self.hyperparameter_type == "sigma_st"
+            or self.hyperparameter_type == "sigma_e"
+        ):
             log_prior = (
                 xp.log(self.lambda_theta) - self.lambda_theta * xp.exp(theta) + theta
             )
+            print("log prior sigma e: ", log_prior)
         elif self.hyperparameter_type == "prec_o":
             log_prior = (
-                xp.log(self.lambda_theta) - self.lambda_theta * xp.exp(theta) - theta
+                xp.log(self.lambda_theta) - self.lambda_theta * xp.exp(theta) + theta
             )
+            print("log prior prec o: ", log_prior)
 
         return log_prior
