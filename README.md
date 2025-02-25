@@ -176,6 +176,7 @@ Here are some installation guidelines to install the project on the Daint.alps c
 1. Pull and start the necessary `uenv`:
 ```bash
 uenv image find
+uenv repo create
 uenv image pull prgenv-gnu/24.11:v1
 uenv start --view=modules prgenv-gnu/24.11:v1
 ```
