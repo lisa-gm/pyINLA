@@ -4,13 +4,21 @@ import logging
 import math
 
 from scipy import optimize
+from numpy.linalg import cholesky
 
 from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
-from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device
+from pyinla.utils import (
+    allreduce,
+    synchronize,
+    get_device,
+    get_host,
+    print_msg,
+    set_device,
+)
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
 
@@ -321,6 +329,164 @@ class PyINLA:
         )
 
         return f_theta
+
+    def compute_covariance_hp(self, theta_i: NDArray) -> NDArray:
+        """compute the covariance matrix of the hyperparameters theta.
+
+        Parameters
+        ----------
+        theta_i : NDArray
+            Hyperparameters theta.
+
+        Returns
+        -------
+        cov_theta : NDArray[dim_theta, dim_theta]
+            Covariance matrix of the hyperparameters theta.
+        """
+        self.model.theta[:] = theta_i
+
+        hess_theta = self._evaluate_hessian_f(theta_i)
+        cov_theta = xp.linalg.inv(hess_theta)
+
+        return cov_theta
+
+    def _evaluate_hessian_f(
+        self,
+        theta_i: NDArray,
+    ) -> NDArray:
+        """Approximate the hessian of the function f(theta) = log(p(theta|y)).
+
+        Parameters
+        ----------
+        theta_i : NDArray
+            Hyperparameters theta.
+
+        Returns
+        -------
+        hessian_f : NDArray[dim_theta, dim_theta]
+
+        Notes
+        -----
+        Compute finite difference approximation of the hessian of f at theta_i.
+        """
+        self.model.theta[:] = theta_i
+        dim_theta = self.model.n_hyperparameters
+
+        # pre-allocate storage for the hessian & f_values
+        hess = xp.zeros((dim_theta, dim_theta), dtype=xp.float64)
+        # pre-allocate perturbation matrix
+        eps_mat = xp.eye(dim_theta, dtype=xp.float64)
+        # TODO: should be we have separate eps_hessian_f?
+        eps_mat *= self.eps_gradient_f
+
+        # store: theta+eps_i, theta, theta-eps_i
+        f_ii_loc = xp.zeros((3, dim_theta), dtype=xp.float64)
+        # store: theta+eps_i+eps_j, theta+eps_i-eps_j, theta-eps_i+eps_j, theta-eps_i-eps_j
+        f_ij_loc = xp.zeros((4, dim_theta, dim_theta), dtype=xp.float64)
+
+        # compute number of necessary function evaluations
+        # f(theta), 2*dim_theta for the diagonal, 4*dim_theta*(dim_theta-1)/2 for the off-diagonal
+        no_eval = 1 + 2 * dim_theta + 4 * dim_theta * (dim_theta - 1) // 2
+
+        task_to_rank = xp.ndarray(no_eval, dtype=xp.int64)
+        for i in range(no_eval):
+            task_to_rank[i] = i % comm_size
+
+        counter = 0
+        # compute f(theta)
+        if comm_rank == task_to_rank[0]:
+            f_theta = self._evaluate_f(theta_i)
+            f_ii_loc[1, :] = f_theta
+        counter += 1
+
+        loop_dim = dim_theta * dim_theta
+
+        for k in range(loop_dim):
+            i = k // dim_theta
+            j = k % dim_theta
+
+            # diagonal elements
+            if i == j:
+
+                if comm_rank == task_to_rank[counter]:
+                    # theta+eps_i
+                    f_ii_loc[0, :] = self._evaluate_f(theta_i + eps_mat[i, :])
+                counter += 1
+
+                if comm_rank == task_to_rank[counter]:
+                    # theta-eps_i
+                    f_ii_loc[2, :] = self._evaluate_f(theta_i - eps_mat[i, :])
+                counter += 1
+
+            # as hessian is symmetric we only have to compute the upper triangle
+            elif i < j:
+                # theta+eps_i+eps_j
+                if comm_rank == task_to_rank[counter]:
+                    f_ij_loc[0, k] = self._evaluate_f(
+                        theta_i + eps_mat[i, :] + eps_mat[j, :]
+                    )
+                counter += 1
+
+                # theta+eps_i-eps_j
+                if comm_rank == task_to_rank[counter]:
+                    f_ij_loc[1, k] = self._evaluate_f(
+                        theta_i + eps_mat[i, :] - eps_mat[j, :]
+                    )
+                counter += 1
+
+                # theta-eps_i+eps_j
+                if comm_rank == task_to_rank[counter]:
+                    f_ij_loc[2, k] = self._evaluate_f(
+                        theta_i - eps_mat[i, :] + eps_mat[j, :]
+                    )
+                counter += 1
+
+                # theta-eps_i-eps_j
+                if comm_rank == task_to_rank[counter]:
+                    f_ij_loc[3, k] = self._evaluate_f(
+                        theta_i - eps_mat[i, :] - eps_mat[j, :]
+                    )
+                counter += 1
+
+        # mpi barrier
+        synchronize()
+
+        # collect results
+        f_ii = xp.zeros((3, dim_theta), dtype=xp.float64)
+        f_ij = xp.zeros((4, dim_theta, dim_theta), dtype=xp.float64)
+
+        allreduce(f_ii_loc, op="sum")
+        allreduce(f_ij_loc, op="sum")
+
+        print("f_ii_loc")
+        print(f_ii_loc)
+        print("f_ij_loc")
+        print(f_ij_loc)
+
+        # compute hessian
+        for k in range(loop_dim):
+            i = k // dim_theta
+            j = k % dim_theta
+
+            # diagonal elements
+            if i == j:
+                hess[i, i] = (
+                    f_ii_loc[0, i] - 2 * f_ii_loc[1, i] + f_ii_loc[2, i]
+                ) / eps_mat[i, i] ** 2
+            # as hessian is symmetric we only have to compute the upper triangle
+            elif i < j:
+                hess[i, j] = (
+                    f_ij_loc[0, k] - f_ij_loc[1, k] - f_ij_loc[2, k] + f_ij_loc[3, k]
+                ) / (4 * eps_mat[i, i] * eps_mat[j, j])
+                hess[j, i] = hess[i, j]
+
+            print("hess")
+            print(hess)
+
+            # check that hessian is spd
+            cholesky(hess)
+
+            return hess
 
     def _inner_iteration(
         self,
