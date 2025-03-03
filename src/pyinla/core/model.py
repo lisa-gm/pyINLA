@@ -174,7 +174,7 @@ class Model(ABC):
 
         # --- Initialize the latent parameters and the design matrix
         self.n_latent_parameters: int = 0
-        self.latent_parameters_idx: int = [0]
+        self.latent_parameters_idx: list[int] = [0]
 
         for submodel in self.submodels:
             self.n_latent_parameters += submodel.n_latent_parameters

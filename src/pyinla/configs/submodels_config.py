@@ -74,7 +74,7 @@ class SpatialSubModelConfig(SubModelConfig):
 class TemporalSubModelConfig(SubModelConfig): ...
 
 
-class CoregionalizationSubModelConfig(SubModelConfig):
+""" class CoregionalizationSubModelConfig(SubModelConfig):
 
     submodel_type: Literal["spatial", "spatio-temporal"] = None
     num_vars: PositiveInt = 2
@@ -121,7 +121,7 @@ class CoregionalizationSubModelConfig(SubModelConfig):
         theta = xp.concatenate([theta_1, theta_2])
         theta_keys = theta_keys_1 + theta_keys_2
 
-        return theta, theta_keys
+        return theta, theta_keys """
 
 
 def parse_config(config: dict | str) -> SubModelConfig:
