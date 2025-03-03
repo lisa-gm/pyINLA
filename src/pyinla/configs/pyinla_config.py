@@ -35,6 +35,7 @@ class PyinlaConfig(BaseModel):
     inner_iteration_max_iter: PositiveInt = 50
     eps_inner_iteration: float = 1e-3
     eps_gradient_f: float = 1e-3
+    eps_hessian_f: float = 5 * 1e-3
 
     # --- Directory paths ------------------------------------------------------
     simulation_dir: Path = Path("./pyinla/")

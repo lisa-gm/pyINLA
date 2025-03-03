@@ -55,6 +55,7 @@ class PyINLA:
         self.inner_iteration_max_iter = self.config.inner_iteration_max_iter
         self.eps_inner_iteration = self.config.eps_inner_iteration
         self.eps_gradient_f = self.config.eps_gradient_f
+        self.eps_hessian_f = self.config.eps_hessian_f
 
         # --- Configure HPC
         set_device(comm_rank, comm_size)
@@ -377,12 +378,13 @@ class PyINLA:
         # pre-allocate perturbation matrix
         eps_mat = xp.eye(dim_theta, dtype=xp.float64)
         # TODO: should be we have separate eps_hessian_f?
-        eps_mat *= self.eps_gradient_f
+        eps_mat *= self.eps_hessian_f
 
+        loop_dim = dim_theta * dim_theta
         # store: theta+eps_i, theta, theta-eps_i
         f_ii_loc = xp.zeros((3, dim_theta), dtype=xp.float64)
         # store: theta+eps_i+eps_j, theta+eps_i-eps_j, theta-eps_i+eps_j, theta-eps_i-eps_j
-        f_ij_loc = xp.zeros((4, dim_theta, dim_theta), dtype=xp.float64)
+        f_ij_loc = xp.zeros((4, loop_dim), dtype=xp.float64)
 
         # compute number of necessary function evaluations
         # f(theta), 2*dim_theta for the diagonal, 4*dim_theta*(dim_theta-1)/2 for the off-diagonal
@@ -399,8 +401,6 @@ class PyINLA:
             f_ii_loc[1, :] = f_theta
         counter += 1
 
-        loop_dim = dim_theta * dim_theta
-
         for k in range(loop_dim):
             i = k // dim_theta
             j = k % dim_theta
@@ -410,12 +410,12 @@ class PyINLA:
 
                 if comm_rank == task_to_rank[counter]:
                     # theta+eps_i
-                    f_ii_loc[0, :] = self._evaluate_f(theta_i + eps_mat[i, :])
+                    f_ii_loc[0, i] = self._evaluate_f(theta_i + eps_mat[i, :])
                 counter += 1
 
                 if comm_rank == task_to_rank[counter]:
                     # theta-eps_i
-                    f_ii_loc[2, :] = self._evaluate_f(theta_i - eps_mat[i, :])
+                    f_ii_loc[2, i] = self._evaluate_f(theta_i - eps_mat[i, :])
                 counter += 1
 
             # as hessian is symmetric we only have to compute the upper triangle
@@ -451,17 +451,8 @@ class PyINLA:
         # mpi barrier
         synchronize()
 
-        # collect results
-        f_ii = xp.zeros((3, dim_theta), dtype=xp.float64)
-        f_ij = xp.zeros((4, dim_theta, dim_theta), dtype=xp.float64)
-
         allreduce(f_ii_loc, op="sum")
         allreduce(f_ij_loc, op="sum")
-
-        print("f_ii_loc")
-        print(f_ii_loc)
-        print("f_ij_loc")
-        print(f_ij_loc)
 
         # compute hessian
         for k in range(loop_dim):
@@ -480,13 +471,21 @@ class PyINLA:
                 ) / (4 * eps_mat[i, i] * eps_mat[j, j])
                 hess[j, i] = hess[i, j]
 
-            print("hess")
-            print(hess)
+        print("hess")
+        print(hess)
 
-            # check that hessian is spd
-            cholesky(hess)
+        # compute eigenvalues
+        eigvals = xp.linalg.eigvalsh(hess)
 
-            return hess
+        if xp.any(eigvals < 0):
+            print("Negative eigenvalues detected.")
+            print("eigvals")
+            print(eigvals)
+
+        print("eigvals")
+        print(eigvals)
+
+        return hess
 
     def _inner_iteration(
         self,
