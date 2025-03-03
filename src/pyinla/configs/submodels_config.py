@@ -87,6 +87,7 @@ def parse_config(config: dict | str) -> SubModelConfig:
             config = tomllib.load(f)
 
     type = config.get("type")
+    print("type: ", type)
     if type == "spatio_temporal":
         config["ph_s"] = parse_priorhyperparameters_config(config["ph_s"])
         config["ph_t"] = parse_priorhyperparameters_config(config["ph_t"])
@@ -95,6 +96,8 @@ def parse_config(config: dict | str) -> SubModelConfig:
     elif type == "regression":
         return RegressionSubModelConfig(**config)
     elif type == "brainiac":
+        print("in brainiac parse config")
+        print("config: ", config)
         config["ph_h2"] = parse_priorhyperparameters_config(config["ph_h2"])
         config["ph_alpha"] = parse_priorhyperparameters_config(config["ph_alpha"])
         return BrainiacSubModelConfig(**config)

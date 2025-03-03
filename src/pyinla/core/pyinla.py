@@ -305,10 +305,13 @@ class PyINLA:
         logdet_Q_conditional: float = self._inner_iteration()
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
+        # typically theta_likelihood is the last element of theta, but can be different
+        theta_likelihood = self.model.get_theta_likelihood()
+
         likelihood: float = self.model.likelihood.evaluate_likelihood(
             eta=self.eta,
             y=self.model.y,
-            theta=self.model.theta[self.model.hyperparameters_idx[-1] :],
+            theta=theta_likelihood,
         )
 
         # --- Evaluate the prior of the latent parameters at x_star
@@ -320,6 +323,11 @@ class PyINLA:
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
             logdet_Q_conditional
         )
+
+        print("log_prior_hyperparameters: ", log_prior_hyperparameters)
+        print("likelihood: ", likelihood)
+        print("prior_latent_parameters: ", prior_latent_parameters)
+        print("conditional_latent_parameters: ", conditional_latent_parameters)
 
         f_theta: float = -1.0 * (
             log_prior_hyperparameters
@@ -359,8 +367,8 @@ class PyINLA:
             self.model.x[:] += self.x_update[:]
             print("dim(a): ", self.model.a.shape)
             print("dim(x): ", self.model.x.shape)
-            # self.eta[:] = (self.model.a @ self.model.x).reshape(self.eta.shape)
             self.eta[:] = self.model.a @ self.model.x
+            # self.eta[:] = self.model.a @ self.model.x
             print("dim(eta): ", self.eta.shape)
 
             Q_conditional = self.model.construct_Q_conditional(self.eta)

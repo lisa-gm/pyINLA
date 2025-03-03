@@ -19,6 +19,8 @@ class BrainiacSubModel(SubModel):
         """Initializes the model."""
         super().__init__(config)
 
+        print("Calling BrainiacSubModel.__init__")
+
         # Load covariates matrix "z"
         z: NDArray = np.load(self.input_path.joinpath("z.npy"))
 
@@ -84,12 +86,15 @@ class BrainiacSubModel(SubModel):
 
         return Q_prior.tocoo()
 
-    def evaluate_grad_vector(self, eta: NDArray, y: NDArray, **kwargs) -> NDArray:
+    def evaluate_gradient_likelihood(
+        self, eta: NDArray, y: NDArray, **kwargs
+    ) -> NDArray:
+        print("kwargs: ", kwargs)
         h2_scaled = kwargs.get("h2")
 
         # rescale h2 to (0,1) as it's currently between -INF:+INF
         h2 = cloglog(h2_scaled, direction="backward")
-
+        print("h2: ", h2)
         gradient = -1 / (1 - h2) * (eta - y)
 
         return gradient
@@ -103,6 +108,12 @@ class BrainiacSubModel(SubModel):
         d_matrix = -1 / (1 - h2) * sp.sparse.eye(self.a.shape[0])
 
         return d_matrix
+
+    def get_theta_likelihood(self) -> NDArray:
+
+        # theta likelihood is 1-h2 (in correct scaling)
+
+        return
 
     def __str__(self) -> str:
         """String representation of the submodel."""

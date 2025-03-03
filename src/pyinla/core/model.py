@@ -197,6 +197,10 @@ class Model(ABC):
         else:
             self.y: NDArray = xp.asarray(y)
 
+        print("shape y: ", self.y.shape)
+        self.y = self.y.flatten()
+        print("shape y: ", self.y.shape)
+
         self.n_observations: int = self.y.shape[0]
 
         # --- Initialize likelihood
@@ -207,7 +211,6 @@ class Model(ABC):
                 config=likelihood_config,
             )
 
-            print("here in gaussian")
             if self.submodels[0] == BrainiacSubModel:
                 # skip setting prior as it's already set in the submodel
                 print("here in brainiac")
@@ -374,11 +377,17 @@ class Model(ABC):
         #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
         # )
 
-        if self.submodels[0] == BrainiacSubModel:
-            kwargs = {"h2": float(self.theta[0])}
-            gradient_likelihood = self.submodels[0].evaluate_grad_vector(
-                eta=eta, y=self.y, kwargs=kwargs
+        print("submodels.t: ", self.submodels[0])
+        if isinstance(self.submodels[0], BrainiacSubModel):
+            # if self.submodels[0] == BrainiacSubModel:
+            print("here in brainiac construct information vector")
+            kwargs = {"h2 scaled": float(self.theta[0])}
+            # kwargs = {}
+            # kwargs["h2"] = float(self.theta[0])
+            gradient_likelihood = self.submodels[0].evaluate_gradient_likelihood(
+                eta=eta, y=self.y, **kwargs
             )
+            print("shape gradient_likelihood: ", gradient_likelihood.shape)
 
         else:
             gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
@@ -390,6 +399,15 @@ class Model(ABC):
         information_vector: NDArray = (
             -1 * self.Q_prior @ x_i + self.a.T @ gradient_likelihood
         )
+        print("shape gradient_likelihood: ", gradient_likelihood.shape)
+        print("shape Q_prior: ", self.Q_prior.shape)
+        print("shape x_i: ", x_i.shape)
+        print("shape Q_prior @ x_i: ", (self.Q_prior @ x_i).shape)
+        print("shape a: ", self.a.shape)
+        print(
+            "shape a.T @ gradient_likelihood: ", (self.a.T @ gradient_likelihood).shape
+        )
+        print("shape information_vector: ", information_vector.shape)
 
         return information_vector
 
@@ -409,6 +427,17 @@ class Model(ABC):
             log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
 
         return log_prior
+
+    def get_theta_likelihood(self) -> NDArray:
+        """Return the likelihood hyperparameters."""
+
+        if isinstance(self.submodels[0], BrainiacSubModel):
+            theta_likelihood = 1 - cloglog(self.theta[0], direction="backward")
+            print("theta_likelihood: ", theta_likelihood)
+        else:
+            theta_likelihood = self.theta[self.hyperparameters_idx[-1] :]
+
+        return theta_likelihood
 
     def __str__(self) -> str:
         """String representation of the model."""
