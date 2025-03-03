@@ -36,6 +36,11 @@ class CoregionalModelConfig(ModelConfig):
     ph_lambdas: list[PriorHyperparametersConfig] = None
 
     @model_validator(mode='after')
+    def check_n_models(self):
+        assert self.n_models == 2 or self.n_models == 3, "n_models must be 2 or 3"
+        return self
+
+    @model_validator(mode='after')
     def check_hyperparameters_length(self):
         if self.n_models is not None:
             if self.sigmas is not None and len(self.sigmas) != self.n_models:

@@ -44,6 +44,47 @@ class CoregionalModel(Model):
 
         self.models: list[Model] = models
 
+        # Check the coregionalization type (Spacial or SpatioTemporal)
+        self.coregionalization_type: str
+        self.n_models: int = coregional_model_config.n_models
+        self.n_spatial_nodes: int = None
+        self.n_temporal_nodes: int = 1
+        for i, model in enumerate(self.models):
+            if i == 0:
+                if isinstance(model.submodels[0], SpatioTemporalSubModel):
+                    self.coregionalization_type = "spatio_temporal"
+                    self.n_spatial_nodes = model.submodels[0].ns
+                    self.n_temporal_nodes = model.submodels[0].nt
+                elif isinstance(model.submodels[0], SpatialSubModel):
+                    self.coregionalization_type = "spatial"
+                    self.n_spatial_nodes = model.submodels[0].ns
+                else:
+                    raise ValueError(
+                        "Invalid model type. Must be 'spatial' or 'spatio-temporal'."
+                    )
+            else:
+                # Check that all models are the same
+                if isinstance(model.submodels[0], SpatioTemporalSubModel):
+                    if self.coregionalization_type != "spatio_temporal":
+                        raise ValueError(
+                            f"Model {model} is not of the same type as the first model (SpatioTemporalModel)"
+                        )
+                    # Check that the size of the SpatioTemporal fields are the same
+                    if model.submodels[0].ns != self.n_spatial_nodes or model.submodels[0].nt != self.n_temporal_nodes:
+                        raise ValueError(
+                            f"Model {model} is not of the same size as the first model (SpatioTemporalModel)"
+                        )
+                elif isinstance(model.submodels[0], SpatialSubModel):
+                    if self.coregionalization_type != "spatial":
+                        raise ValueError(
+                            f"Model {model} is not of the same type as the first model (SpatialModel)"
+                        )
+                    # Check that the size of the Spatial fields are the same
+                    if model.submodels[0].ns != self.n_spatial_nodes:
+                        raise ValueError(
+                            f"Model {model} is not of the same size as the first model (SpatialModel)"
+                        )
+
         # Get Models() hyperparameters
         theta: ArrayLike = []
         theta_keys: ArrayLike = []
@@ -59,7 +100,7 @@ class CoregionalModel(Model):
             theta_keys_model = [key for i, key in enumerate(theta_keys_model) if i not in sigma_indices]
 
             theta.append(theta_model)
-            theta_keys.append(theta_keys_model)
+            theta_keys += theta_keys_model
 
             self.hyperparameters_idx.append(
                 self.hyperparameters_idx[-1] + len(theta_model)
@@ -68,7 +109,11 @@ class CoregionalModel(Model):
         # Initialize the Coregional Hyperparameters:
         theta_coregional_model, theta_keys_coregional_model = coregional_model_config.read_hyperparameters()
         theta.append(theta_coregional_model)
-        theta_keys.append(theta_keys_coregional_model)
+        theta_keys += theta_keys_coregional_model
+
+        self.hyperparameters_idx.append(
+            self.hyperparameters_idx[-1] + len(theta_coregional_model)
+        )
 
         # Finalize the hyperparameters
         self.theta: NDArray = xp.concatenate(theta)
@@ -166,10 +211,94 @@ class CoregionalModel(Model):
     def construct_Q_prior(self) -> spmatrix:
         
         # Construct Qprior from models
+        Q_list: list = []
+
+        for i, model in enumerate(self.models):
+
+            Q_list.append(model.construct_Q_prior())
+
+        # coregional_kwargs = {}
+        # for hp_idx in range(
+        #     self.hyperparameters_idx[-2], self.hyperparameters_idx[-1]
+        # ):
+        #     coregional_kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+
+        # print(f"coregional_kwargs: {coregional_kwargs}")
+
+        # print theta at the index of theta_keys["sigma_0"]
+        print(self.theta_keys.index("sigma_0"))
+        print(self.theta[self.theta_keys.index("sigma_0")])
+
+        sigma_0 = xp.exp(self.theta[self.theta_keys.index("sigma_0")])
+        sigma_1 = xp.exp(self.theta[self.theta_keys.index("sigma_1")])
+
+        lambda_0_1 = self.theta[self.theta_keys.index("lambda_0_1")]
+
+        if self.n_models == 2:
+            Q = sp.sparse.vstack(
+                [
+                    sp.sparse.hstack(
+                        [
+                            (1 / sigma_0**2) * Q_list[0]
+                            + (lambda_0_1**2 / sigma_1**2) * Q_list[1],
+                            (-lambda_0_1 / sigma_1**2) * Q_list[1],
+                        ]
+                    ),
+                    sp.sparse.hstack(
+                        [
+                            (-lambda_0_1 / sigma_1**2) * Q_list[1],
+                            (1 / sigma_1**2) * Q_list[1],
+                        ]
+                    ),
+                ]
+            )
+        elif self.n_models == 3:
+            sigma_2 = xp.exp(self.theta[self.theta_keys.index("sigma_2")])
+
+            lambda_0_2 = self.theta[self.theta_keys.index("lambda_0_2")]
+            lambda_1_2 = self.theta[self.theta_keys.index("lambda_1_2")]
+
+            Q = sp.sparse.vstack(
+                [
+                    sp.sparse.hstack(
+                        [
+                            (1 / sigma_0**2) * Q_list[0]
+                            + (lambda_0_1**2 / sigma_1**2) * Q_list[1]
+                            + (lambda_1_2**2 / sigma_2**2) * Q_list[2],
+                            (-lambda_0_1 / sigma_1**2) * Q_list[1]
+                            + (lambda_0_2 * lambda_1_2 / sigma_2**2) * Q_list[2],
+                            -lambda_1_2 / sigma_2**2 * Q_list[2],
+                        ]
+                    ),
+                    sp.sparse.hstack(
+                        [
+                            (-lambda_0_1 / sigma_1**2) * Q_list[1]
+                            + (lambda_0_2 * lambda_1_2 / sigma_2**2) * Q_list[2],
+                            (1 / sigma_1**2) * Q_list[1]
+                            + (lambda_0_2**2 / sigma_2**2) * Q_list[2],
+                            -lambda_0_2 / sigma_2**2 * Q_list[2],
+                        ]
+                    ),
+                    sp.sparse.hstack(
+                        [
+                            -lambda_1_2 / sigma_2**2 * Q_list[2],
+                            -lambda_0_2 / sigma_2**2 * Q_list[2],
+                            (1 / sigma_2**2) * Q_list[2],
+                        ]
+                    ),
+                ]
+            )
+
 
         # Apply the permutation
+        if self.coregionalization_type == "spatio_temporal":
+            # Permute matrix
+            p_vec = self._generate_permutation_indices(self.n_temporal_nodes, self.n_spatial_nodes, self.n_models)
 
-        return self.Q_prior
+            # permute Q
+            Qprior_perm1 = Q[p_vec, :][:, p_vec]
+
+        return Qprior_perm1
 
     def construct_Q_conditional(
         self,
@@ -240,3 +369,35 @@ class CoregionalModel(Model):
 
         # Combine model information and submodel information
         return "\n".join(model_info + submodel_info)
+
+    def _generate_permutation_indices(self, n_temporal_nodes: int, n_spatial_nodes: int, n_models: int):
+        """
+        Generate a permutation vector containing indices in the pattern:
+        [0:block_size, n*block_size:(n+1)*block_size, 1*block_size:(1+1)*block_size, (n+1)*block_size:(n+1+1)*block_size, ...]
+
+        Parameters
+        ----------
+        n_temporal_nodes : int
+            Number of blocks.
+        n_spatial_nodes : int
+            Size of each block.
+        n_models : int
+            Number of models.
+        
+        Returns
+        -------
+        np.ndarray
+            The generated permutation vector.
+        """
+        indices = np.arange(n_temporal_nodes * n_spatial_nodes)
+
+        first_idx = indices.reshape(n_temporal_nodes, n_spatial_nodes)
+        second_idx = first_idx + n_temporal_nodes * n_spatial_nodes
+
+        if n_models == 2:
+            perm_vectorized = np.hstack((first_idx, second_idx)).flatten()
+        if n_models == 3:
+            third_idx = second_idx + n_temporal_nodes * n_spatial_nodes
+            perm_vectorized = np.hstack((first_idx, second_idx, third_idx)).flatten()
+
+        return perm_vectorized
