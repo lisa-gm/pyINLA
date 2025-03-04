@@ -487,6 +487,31 @@ class PyINLA:
 
         return hess
 
+    def compute_marginals_latent_parameters(
+        self, theta_i: NDArray, x_star: NDArray
+    ) -> NDArray:
+        """Compute the marginal distribution of the latent parameters x.
+
+        Parameters
+        ----------
+        theta_i : NDArray
+            Hyperparameters theta.
+        x_star : NDArray
+            Latent parameters x(theta_i).
+
+        Returns
+        -------
+        marginal_latent_parameters : NDArray
+            Marginal distribution of the latent parameters x.
+        """
+        self.model.theta[:] = theta_i
+        self.model.x[:] = x_star
+
+        eta = self.model.a @ self.model.x
+
+        self.model.construct_Q_conditional(eta)
+        Q_selected_inverse = self.solver.get_selected_inverse()
+
     def _inner_iteration(
         self,
     ) -> float:

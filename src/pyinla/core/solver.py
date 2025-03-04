@@ -47,3 +47,8 @@ class Solver(ABC):
     def logdet(self, **kwargs) -> float:
         """Compute logdet of input matrix using Cholesky factor."""
         ...
+
+    @abstractmethod
+    def selected_inversion(self, **kwargs) -> NDArray:
+        """Compute selected inversion of input matrix using Cholesky factor."""
+        ...
