@@ -288,10 +288,8 @@ class PyINLA:
         logdet_Q_conditional: float = self._inner_iteration()
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
-        likelihood: float = self.model.likelihood.evaluate_likelihood(
+        likelihood: float = self.model.evaluate_likelihood(
             eta=self.eta,
-            y=self.model.y,
-            theta=self.model.theta[self.model.hyperparameters_idx[-1] :],
         )
         print("likelihood: ", likelihood)
 

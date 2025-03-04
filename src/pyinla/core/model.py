@@ -391,6 +391,18 @@ class Model(ABC):
 
         return information_vector
 
+    def evaluate_likelihood(self, 
+            eta: NDArray,
+        ) -> float:
+        
+        likelihood: float = self.likelihood.evaluate_likelihood(
+            eta=eta,
+            y=self.y,
+            theta=self.theta[self.hyperparameters_idx[-1] :],
+        )
+
+        return likelihood
+
     def evaluate_log_prior_hyperparameters(self) -> float:
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0

@@ -115,7 +115,7 @@ class CoregionalModel(Model):
             theta_model = [theta for i, theta in enumerate(theta_model) if i not in sigma_indices]
             theta_keys_model = [key for i, key in enumerate(theta_keys_model) if i not in sigma_indices]
 
-            theta.append(theta_model)
+            theta.append(xp.array(theta_model))
             theta_keys += theta_keys_model
 
             self.hyperparameters_idx.append(
@@ -127,7 +127,7 @@ class CoregionalModel(Model):
 
         # Initialize the Coregional Hyperparameters:
         theta_coregional_model, theta_keys_coregional_model = coregional_model_config.read_hyperparameters()
-        theta.append(theta_coregional_model)
+        theta.append(xp.array(theta_coregional_model))
         theta_keys += theta_keys_coregional_model
 
         self.hyperparameters_idx.append(
@@ -280,7 +280,7 @@ class CoregionalModel(Model):
                         ]
                     ),
                 ]
-            )
+            ).tocsc()
         elif self.n_models == 3:
             sigma_2 = xp.exp(self.theta[self.theta_keys.index("sigma_2")])
 
@@ -316,7 +316,7 @@ class CoregionalModel(Model):
                         ]
                     ),
                 ]
-            )
+            ).tocsc()
 
         # Apply the permutation to the Qprior_st
         if self.coregionalization_type == "spatio_temporal":
@@ -327,6 +327,10 @@ class CoregionalModel(Model):
             Qprior_st_perm = Qprior_st[p_vec, :][:, p_vec]
         
         if Q_r != []:
+        # if Q_r:
+            # Qprior_reg = sp.sparse.bmat([[Q] for Q in Q_r]).tocsc()
+            # self.Q_prior = sp.sparse.bmat([[Qprior_st_perm, None], [None, Qprior_reg]]).tocsc()
+
             Qprior_reg = sp.sparse.block_diag(Q_r).tocsc()
             self.Q_prior = sp.sparse.block_diag([Qprior_st_perm, Qprior_reg]).tocsc()
         else:
@@ -349,7 +353,6 @@ class CoregionalModel(Model):
 
         d_list = []
         for i, model in enumerate(self.models):
-
             if model.likelihood_config.type == "gaussian":
                 kwargs = {
                     "eta": eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
@@ -398,6 +401,21 @@ class CoregionalModel(Model):
         )
 
         return information_vector
+
+    def evaluate_likelihood(self, 
+            eta: NDArray,
+        ) -> float:
+        
+        likelihood: float = 0.
+        for i, model in enumerate(self.models):
+
+            likelihood += model.likelihood.evaluate_likelihood(
+                eta=eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
+                y=self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
+                theta=float(self.theta[self.hyperparameters_idx[i+1]-1]),
+            )
+
+        return likelihood
 
     def evaluate_log_prior_hyperparameters(self) -> float:
         """Evaluate the log prior hyperparameters."""
