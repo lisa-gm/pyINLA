@@ -346,12 +346,6 @@ class Model(ABC):
 
         """
 
-        # TODO: need to vectorize
-        # hessian_likelihood_diag = hessian_diag_finite_difference_5pt(
-        #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
-        # )
-        # hessian_likelihood = diags(hessian_likelihood_diag)
-
         if self.likelihood_config.type == "gaussian":
             kwargs = {
                 "eta": eta,
@@ -405,7 +399,7 @@ class Model(ABC):
 
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
             tmp = prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
-            print("tmp: ", tmp)
+            # print("tmp: ", tmp)
             log_prior += tmp
 
         return log_prior
@@ -426,3 +420,24 @@ class Model(ABC):
 
         # Combine model information and submodel information
         return "\n".join(model_info + submodel_info)
+
+    def get_solver_parameters(self) -> dict:
+        """Get the solver parameters."""
+        diagonal_blocksize = None
+        n_diag_blocks = None
+        arrowhead_blocksize = 0
+        if isinstance(self.submodels[0], SpatioTemporalSubModel):
+                diagonal_blocksize = self.submodels[0].ns
+                n_diag_blocks = self.submodels[0].nt
+
+        for i in range(1, len(self.submodels)):
+                if isinstance(self.submodels[i], RegressionSubModel):
+                    arrowhead_blocksize += self.submodels[i].n_latent_parameters
+
+        param = {
+            "diagonal_blocksize": diagonal_blocksize,
+            "n_diag_blocks": n_diag_blocks,
+            "arrowhead_blocksize": arrowhead_blocksize,
+        }
+
+        return param

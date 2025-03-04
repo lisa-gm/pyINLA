@@ -64,30 +64,19 @@ class PyINLA:
                 config=self.config.solver,
             )
         elif self.config.solver.type == "serinv":
-            diagonal_blocksize: int = 0
-            arrowhead_blocksize: int = 0
-            n_diag_blocks: int = 0
+            serinv_parameters = model.get_solver_parameters()
+            diagonal_blocksize: int = serinv_parameters["diagonal_blocksize"]
+            arrowhead_blocksize: int = serinv_parameters["arrowhead_blocksize"]
+            n_diag_blocks: int = serinv_parameters["n_diag_blocks"]
 
             # Check the model compute parameters
-            if isinstance(self.model.submodels[0], SpatioTemporalSubModel):
-                diagonal_blocksize = self.model.submodels[0].ns
-                n_diag_blocks = self.model.submodels[0].nt
-            else:
-                logging.critical("Trying to instanciate Serinv solver on non-ST model.")
+            if diagonal_blocksize is None or n_diag_blocks is None:
+                logging.critical(
+                    "Trying to instanciate Serinv solver on non-ST model."
+                )
                 raise ValueError(
                     "Serinv solver is not made for non spatio-temporal models."
                 )
-
-            for i in range(1, len(self.model.submodels)):
-                if isinstance(self.model.submodels[i], RegressionSubModel):
-                    arrowhead_blocksize += self.model.submodels[i].n_latent_parameters
-                else:
-                    logging.critical(
-                        "While measuring the number of arrowhead elements, bumping into a non-supported submodel."
-                    )
-                    raise ValueError(
-                        "Only regression submodels are currently supported in the arrowhead shape of the Serinv solver."
-                    )
 
             self.solver = SerinvSolver(
                 config=self.config.solver,
