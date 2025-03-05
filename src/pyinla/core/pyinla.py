@@ -108,6 +108,8 @@ class PyINLA:
         self.theta_mat = xp.zeros(
             (self.model.theta.size, self.n_f_evaluations), dtype=xp.float64
         )
+        self.theta_optimizer = xp.zeros_like(self.model.theta)
+        self.theta_optimizer[:] = self.model.theta
 
         # --- Metrics
         self.f_values: ArrayLike = []
@@ -117,6 +119,10 @@ class PyINLA:
 
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
+
+        self.i = 0
+
+        self.initial_f_value = 0.
 
     def run(self) -> optimize.OptimizeResult:
         """Fit the model using INLA.
@@ -157,7 +163,8 @@ class PyINLA:
                     f"{grad: .6f}" for grad in get_host(self.gradient_f)
                 )
 
-                print_msg(
+                print(
+                    f"comm_rank: {comm_rank} | "
                     f"Iteration: {self.iter:2d} | "
                     f"Theta: [{theta_str}] | "
                     f"Function Value: {fun_i: .6f} | "
@@ -170,14 +177,13 @@ class PyINLA:
 
             scipy_result = optimize.minimize(
                 fun=self._objective_function,
-                x0=get_host(self.model.theta),
+                x0=get_host(self.theta_optimizer),
                 method="L-BFGS-B",
                 jac=self.config.minimize.jac,
                 options={
                     "maxiter": self.config.minimize.max_iter,
                     "gtol": self.config.minimize.gtol,
-                    "c1": self.config.minimize.c1,
-                    "c2": self.config.minimize.c2,
+                    "ftol": 0.0,
                     "disp": self.config.minimize.disp,
                 },
                 callback=callback,
@@ -185,21 +191,28 @@ class PyINLA:
 
             # MEMO:
             # From here rank 0 own the optimized theta_star and the
-            # corresponding x_star. Other ranks own garbage thetas
-            # ... Could be bcast or other things
+            # corresponding x_star. Other ranks own garbage thetas in 
+            # their self.model.theta
             if scipy_result.success:
                 print_msg(
                     "Optimization converged successfully after",
                     self.iter,
-                    "iterations.",
+                    "iterations.\n",
+                    "SUCCESS MSG: ",
+                    scipy_result.message,
                     flush=True,
                 )
             else:
-                print_msg("Optimization did not converge.", flush=True)
+                print_msg(
+                    "Optimization did not converge.", 
+                    "FAILURE MSG: ",
+                    scipy_result.message,
+                    flush=True,
+                )
 
             minimization_result: dict = {
                 "theta": scipy_result.x,
-                "x": self.model.x,
+                "x": get_host(self.model.x),
                 "f": scipy_result.fun,
                 "grad_f": self.gradient_f,
                 "f_values": self.f_values,
@@ -228,9 +241,8 @@ class PyINLA:
         # currently central difference scheme is used for gradient
         self.f_values_i[:] = 0.0
 
-        # task to rank assignment
+        # Multiprocessing task to rank assignment
         task_to_rank = xp.zeros(self.n_f_evaluations, dtype=int)
-
         for i in range(self.n_f_evaluations):
             task_to_rank[i] = i % comm_size
 
@@ -244,10 +256,10 @@ class PyINLA:
             :, self.model.n_hyperparameters + 1 : self.n_f_evaluations
         ] -= self.eps_mat
 
+        # Proceed to the parallel function evaluation
         for i in range(self.n_f_evaluations - 1, -1, -1):
             if task_to_rank[i] == comm_rank:
                 self.f_values_i[i] = self._evaluate_f(theta_i=self.theta_mat[:, i])
-
         allreduce(self.f_values_i, op="sum")
 
         # Compute gradient using central difference scheme
@@ -342,7 +354,7 @@ class PyINLA:
         counter: int = 0
         while x_i_norm >= self.eps_inner_iteration:
             if counter > self.inner_iteration_max_iter:
-                print_msg("current theta value: ", self.model.theta)
+                print_msg("Theta value at failing of the inner_iteration: ", self.model.theta, flush=True)
                 raise ValueError(
                     f"Inner iteration did not converge after {counter} iterations."
                 )
