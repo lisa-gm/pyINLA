@@ -31,7 +31,7 @@ from pyinla.submodels import (
     SpatialSubModel,
 )
 
-# from pyinla.utils import bdiag_tilling
+from pyinla.utils import bdiag_tilling
 
 class CoregionalModel(Model):
     """Core class for statistical models."""
@@ -329,11 +329,11 @@ class CoregionalModel(Model):
 
         if Q_r != []:
 
-            # Qprior_reg = bdiag_tilling(Q_r)
-            # self.Q_prior = bdiag_tilling([Qprior_st_perm, Qprior_reg])
+            Qprior_reg = bdiag_tilling(Q_r).tocsc()
+            self.Q_prior = bdiag_tilling([Qprior_st_perm, Qprior_reg]).tocsc()
 
-            Qprior_reg = sp.sparse.block_diag(Q_r).tocsc()
-            self.Q_prior = sp.sparse.block_diag([Qprior_st_perm, Qprior_reg]).tocsc()
+            # Qprior_reg = sp.sparse.block_diag(Q_r).tocsc()
+            # self.Q_prior = sp.sparse.block_diag([Qprior_st_perm, Qprior_reg]).tocsc()
         else:
             self.Q_prior = Qprior_st_perm
 
@@ -366,7 +366,7 @@ class CoregionalModel(Model):
 
             d_list.append(model.likelihood.evaluate_hessian_likelihood(**kwargs))
 
-        d_matrix = sp.sparse.block_diag(d_list).tocsc()
+        d_matrix = bdiag_tilling(d_list).tocsc()
 
         self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 
