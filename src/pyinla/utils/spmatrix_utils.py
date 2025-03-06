@@ -1,7 +1,7 @@
 
 from pyinla import sp, xp
 
-def bdiag_tilling(
+def bdiag_tiling(
         sparse_blocks: list[sp.sparse.spmatrix],
     ) -> sp.sparse.spmatrix:
     """ Tile in a block-diagonal fashion the given sparse blocks.

@@ -31,7 +31,7 @@ from pyinla.submodels import (
     SpatialSubModel,
 )
 
-from pyinla.utils import bdiag_tilling
+from pyinla.utils import bdiag_tiling
 
 class CoregionalModel(Model):
     """Core class for statistical models."""
@@ -197,7 +197,7 @@ class CoregionalModel(Model):
                 self.n_observations_idx[i] : self.n_observations_idx[i + 1]
             ] = model.y
 
-        self.a: spmatrix = bdiag_tilling([model.a for model in self.models]).tocsc()
+        self.a: spmatrix = bdiag_tiling([model.a for model in self.models]).tocsc()
 
         permutation_latent_variables = self._generate_permutation_indices_for_a(
             self.n_temporal_nodes,
@@ -306,12 +306,8 @@ class CoregionalModel(Model):
             Qprior_st_perm = Qprior_st[p_vec, :][:, p_vec]
 
         if Q_r != []:
-
-            Qprior_reg = bdiag_tilling(Q_r).tocsc()
-            self.Q_prior = bdiag_tilling([Qprior_st_perm, Qprior_reg]).tocsc()
-
-            # Qprior_reg = sp.sparse.block_diag(Q_r).tocsc()
-            # self.Q_prior = sp.sparse.block_diag([Qprior_st_perm, Qprior_reg]).tocsc()
+            Qprior_reg = bdiag_tiling(Q_r).tocsc()
+            self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
         else:
             self.Q_prior = Qprior_st_perm
 
@@ -344,7 +340,7 @@ class CoregionalModel(Model):
 
             d_list.append(model.likelihood.evaluate_hessian_likelihood(**kwargs))
 
-        d_matrix = bdiag_tilling(d_list).tocsc()
+        d_matrix = bdiag_tiling(d_list).tocsc()
 
         self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 
