@@ -2,8 +2,8 @@
 from pyinla import sp, xp
 
 def bdiag_tilling(
-        sparse_blocks: list[sp.sparray],
-    ) -> sp.sparray:
+        sparse_blocks: list,
+    ):
     """ Tile in a block-diagonal fashion the given sparse blocks.
     This is equivalent to the scipy.sparse.block_diag function but is needed
     as the latter is not supported in cupyx.scipy.sparse.

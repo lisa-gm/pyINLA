@@ -31,6 +31,8 @@ from pyinla.submodels import (
     SpatialSubModel,
 )
 
+# from pyinla.utils import bdiag_tilling
+
 class CoregionalModel(Model):
     """Core class for statistical models."""
 
@@ -231,7 +233,6 @@ class CoregionalModel(Model):
         self.Q_conditional_data_mapping = [0]
 
     def construct_Q_prior(self) -> spmatrix:
-
         Qst_list: list = []
         Q_r: list = []
         for i, model in enumerate(self.models):
@@ -330,6 +331,9 @@ class CoregionalModel(Model):
         # if Q_r:
             # Qprior_reg = sp.sparse.bmat([[Q] for Q in Q_r]).tocsc()
             # self.Q_prior = sp.sparse.bmat([[Qprior_st_perm, None], [None, Qprior_reg]]).tocsc()
+
+            # Qprior_reg = bdiag_tilling(Q_r)
+            # self.Q_prior = bdiag_tilling([Qprior_st_perm, Qprior_reg])
 
             Qprior_reg = sp.sparse.block_diag(Q_r).tocsc()
             self.Q_prior = sp.sparse.block_diag([Qprior_st_perm, Qprior_reg]).tocsc()
