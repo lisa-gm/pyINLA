@@ -31,7 +31,7 @@ from pyinla.submodels import (
     SpatialSubModel,
 )
 
-# from pyinla.utils import bdiag_tilling
+from pyinla.utils import bdiag_tiling
 
 class CoregionalModel(Model):
     """Core class for statistical models."""
@@ -179,35 +179,16 @@ class CoregionalModel(Model):
         self.latent_parameters_idx: list[int] = [0]
         self.n_observations: int = 0
         self.n_observations_idx: list[int] = [0]
-
         for model in self.models:
             self.n_latent_parameters += model.n_latent_parameters
             self.latent_parameters_idx.append(self.n_latent_parameters)
-
             self.n_observations += model.n_observations
             self.n_observations_idx.append(self.n_observations)
 
+        # Assemble the latent parameters and observations from the Models()
         self.x: NDArray = xp.zeros(self.n_latent_parameters)
         self.y: NDArray = xp.zeros(self.n_observations)
-
-        a_data = []
-        a_rows = []
-        a_cols = []
         for i, model in enumerate(self.models):
-            coo_model_a = model.a.tocoo()
-            a_data.append(coo_model_a.data)
-            # a_rows.append(coo_model_a.row)
-            a_rows.append(
-                coo_model_a.row
-                + self.n_observations_idx[i]
-                * xp.ones(coo_model_a.row.size, dtype=int)
-            )
-            a_cols.append(
-                coo_model_a.col
-                + self.latent_parameters_idx[i]
-                * xp.ones(coo_model_a.col.size, dtype=int)
-            )
-
             self.x[
                 self.latent_parameters_idx[i] : self.latent_parameters_idx[i + 1]
             ] = model.x
@@ -216,10 +197,7 @@ class CoregionalModel(Model):
                 self.n_observations_idx[i] : self.n_observations_idx[i + 1]
             ] = model.y
 
-        self.a: spmatrix = sp.sparse.coo_matrix(
-            (xp.concatenate(a_data), (xp.concatenate(a_rows), xp.concatenate(a_cols))),
-            shape=(self.n_observations, self.n_latent_parameters),
-        ).tocsc()
+        self.a: spmatrix = bdiag_tiling([model.a for model in self.models]).tocsc()
 
         permutation_latent_variables = self._generate_permutation_indices_for_a(
             self.n_temporal_nodes,
@@ -328,12 +306,8 @@ class CoregionalModel(Model):
             Qprior_st_perm = Qprior_st[p_vec, :][:, p_vec]
 
         if Q_r != []:
-
-            # Qprior_reg = bdiag_tilling(Q_r)
-            # self.Q_prior = bdiag_tilling([Qprior_st_perm, Qprior_reg])
-
-            Qprior_reg = sp.sparse.block_diag(Q_r).tocsc()
-            self.Q_prior = sp.sparse.block_diag([Qprior_st_perm, Qprior_reg]).tocsc()
+            Qprior_reg = bdiag_tiling(Q_r).tocsc()
+            self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
         else:
             self.Q_prior = Qprior_st_perm
 
@@ -366,7 +340,7 @@ class CoregionalModel(Model):
 
             d_list.append(model.likelihood.evaluate_hessian_likelihood(**kwargs))
 
-        d_matrix = sp.sparse.block_diag(d_list).tocsc()
+        d_matrix = bdiag_tiling(d_list).tocsc()
 
         self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 
