@@ -5,7 +5,7 @@ import math
 
 from scipy import optimize
 
-from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp
+from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp, sp
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
@@ -108,8 +108,8 @@ class PyINLA:
         # --- Set up recurrent variables
         self.gradient_f = xp.zeros(self.model.n_hyperparameters, dtype=xp.float64)
         self.f_values_i = xp.zeros(self.n_f_evaluations, dtype=xp.float64)
-        self.eta = xp.zeros_like(self.model.y, dtype=xp.float64)
-        self.x_update = xp.zeros_like(self.model.x, dtype=xp.float64)
+        # self.eta = xp.zeros_like(self.model.y, dtype=xp.float64)
+        # self.x_update = xp.zeros_like(self.model.x, dtype=xp.float64)
         self.eps_mat = xp.zeros(
             (self.model.n_hyperparameters, self.model.n_hyperparameters),
             dtype=xp.float64,
@@ -275,6 +275,8 @@ class PyINLA:
                     theta_i=self.theta_mat[:, feval_i], 
                     comm=self.comm_feval
                 )
+
+        # Here carefull on the reduction as it's gonna add the values from all ranks and not only the root of the groups - TODO
         allreduce(self.f_values_i, op="sum", comm=self.comm_world)
 
         # Compute gradient using central difference scheme
@@ -284,7 +286,7 @@ class PyINLA:
                 - self.f_values_i[self.model.n_hyperparameters + i + 1]
             ) / (2 * self.eps_gradient_f)
 
-        print(f"self.f_values_i: {self.f_values_i}")
+        # print(f"self.f_values_i: {self.f_values_i}")
 
         return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
 
@@ -323,22 +325,46 @@ class PyINLA:
         # --- Construct the prior precision matrix of the latent parameters
         self.model.construct_Q_prior()
 
-        # --- Optimize x (latent parameters) and construct conditional precision matrix
-        logdet_Q_conditional: float = self._inner_iteration()
+
+        # --- Optimize x and evaluate the conditional of the latent parameters
+        if self.model.is_likelihood_gaussian():
+            eta = xp.zeros_like(self.model.y, dtype=xp.float64)
+            x = xp.zeros_like(self.model.x, dtype=xp.float64)
+
+            # Done by processes "even"
+            prior_latent_parameters: float = self._evaluate_prior_latent_parameters()
+
+            # Done by processes "odd"
+            Q_conditional = self.model.construct_Q_conditional(eta)
+            self.solver.cholesky(A=Q_conditional)
+            rhs: NDArray = self.model.construct_information_vector(
+                eta, x,
+            )
+            self.model.x[:] = self.solver.solve(
+                rhs=rhs,
+            )
+
+            conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
+                Q_conditional=Q_conditional,
+                x=None,
+                x_mean=self.model.x,
+            )
+        else:
+            Q_conditional, self.model.x[:], eta = self._inner_iteration()
+
+            conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
+                Q_conditional=Q_conditional,
+                x=None,
+                x_mean=None,
+            )
+
+            prior_latent_parameters: float = self._evaluate_prior_latent_parameters(
+                x=self.model.x,
+            )
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
         likelihood: float = self.model.evaluate_likelihood(
-            eta=self.eta,
-        )
-
-        # --- Evaluate the prior of the latent parameters at x_star
-        prior_latent_parameters: float = self._evaluate_prior_latent_parameters(
-            x_star=self.model.x
-        )
-
-        # --- Evaluate the conditional of the latent parameters at x_star
-        conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
-            logdet_Q_conditional
+            eta=eta,
         )
 
         f_theta: float = -1.0 * (
@@ -364,8 +390,10 @@ class PyINLA:
         logdet : float
             Log determinant of the conditional precision matrix Q_conditional.
         """
-        self.x_update[:] = 0.0
+        x_star = self.model.x.copy()
+        x_update = xp.zeros_like(self.model.x, dtype=xp.float64)
         x_i_norm: float = 1.0
+        eta = xp.zeros_like(self.model.y, dtype=xp.float64)
 
         counter: int = 0
         while x_i_norm >= self.eps_inner_iteration:
@@ -375,29 +403,27 @@ class PyINLA:
                     f"Inner iteration did not converge after {counter} iterations."
                 )
 
-            self.model.x[:] += self.x_update[:]
-            self.eta[:] = self.model.a @ self.model.x
+            x_star[:] += x_update
+            eta[:] = self.model.a @ x_star
 
-            Q_conditional = self.model.construct_Q_conditional(self.eta)
+            Q_conditional = self.model.construct_Q_conditional(eta)
             self.solver.cholesky(A=Q_conditional)
 
             rhs: NDArray = self.model.construct_information_vector(
-                self.eta, self.model.x
+                eta, x_star,
             )
-            self.x_update[:] = self.solver.solve(
+            x_update[:] = self.solver.solve(
                 rhs=rhs,
             )
 
-            x_i_norm = xp.linalg.norm(self.x_update)
+            x_i_norm = xp.linalg.norm(x_update)
             counter += 1
 
-        logdet: float = self.solver.logdet()
-
-        return logdet
+        return Q_conditional, x_star, eta
 
     def _evaluate_prior_latent_parameters(
         self,
-        x_star: NDArray,
+        x: NDArray = None,
     ) -> float:
         """Evaluation of the prior of the latent parameters at x using
         the prior precision matrix Q_prior and assuming mean zero.
@@ -421,36 +447,34 @@ class PyINLA:
         Log normal:
         .. math:: 0.5*log(1/(2*\pi)^n * |Q_prior|)) - 0.5 * x.T Q_prior x
         """
-        n: int = x_star.shape[0]
-
         self.solver.cholesky(self.model.Q_prior)
-
-        # with time_range('getLogDet', color_id=0):
         logdet_Q_prior: float = self.solver.logdet()
 
-        # with time_range('compute_xtQx', color_id=0):
         log_prior_latent_parameters: float = (
-            -n / 2 * xp.log(2 * math.pi)
             + 0.5 * logdet_Q_prior
-            - 0.5 * x_star.T @ self.model.Q_prior @ x_star
         )
+
+        if x is not None:
+            log_prior_latent_parameters -= 0.5 * x.T @ self.model.Q_prior @ x
 
         return log_prior_latent_parameters
 
     def _evaluate_conditional_latent_parameters(
         self,
-        logdet_Q_conditional: float,
+        Q_conditional: NDArray,
+        x: NDArray = None,
+        x_mean: NDArray = None,
     ) -> float:
         """Evaluation of the conditional of the latent parameters at x using
         the conditional precision matrix Q_conditional and the mean x_mean.
 
         Parameters
         ----------
-        Q_conditional : ArrayLike
+        Q_conditional : NDArray
             Conditional precision matrix.
-        x : ArrayLike
+        x : NDArray
             Latent parameters.
-        x_mean : ArrayLike
+        x_mean : NDArray
             Mean of the latent parameters.
 
         Returns
@@ -464,10 +488,21 @@ class PyINLA:
         x_mean and precision matrix Q_conditional which is evaluated at x in log-scale.
         The evaluation requires the computation of the log determinant of Q_conditional.
         log normal: 0.5*log(1/(2*pi)^n * |Q_conditional|)) - 0.5 * (x - x_mean).T @ Q_conditional @ (x - x_mean)
-
-        TODO: add note for the general way of doing it
         """
+        # Compute the log determinant of Q_conditional
+        logdet_Q_conditional = self.solver.logdet()
 
-        log_conditional_latent_parameters = 0.5 * logdet_Q_conditional
+        # Compute the quadratic form (x - x_mean).T @ Q_conditional @ (x - x_mean)
+        if x is None and x_mean is not None:
+            quadratic_form = x_mean.T @ Q_conditional @ x_mean
+        elif x is None and x_mean is None:
+            quadratic_form = 0.0
+        else:
+            quadratic_form = (x - x_mean).T @ Q_conditional @ (x - x_mean)
+        
+        # Compute the log conditional
+        log_conditional = (
+            0.5 * logdet_Q_conditional - 0.5 * quadratic_form
+        )
 
-        return log_conditional_latent_parameters
+        return log_conditional
