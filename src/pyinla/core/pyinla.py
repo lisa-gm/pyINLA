@@ -263,8 +263,8 @@ class PyINLA:
             # Perform the evaluation in reverse order so that the stored and returned
             # self.x value matches the "bare" hyperparameters evaluation
             if self.color_feval == task_mapping[feval_i]:
-                self.f_values_i[i] = self._evaluate_f(
-                    theta_i=self.theta_mat[:, i], 
+                self.f_values_i[feval_i] = self._evaluate_f(
+                    theta_i=self.theta_mat[:, feval_i], 
                     comm=self.comm_feval
                 )
         allreduce(self.f_values_i, op="sum", comm=self.comm_world)
