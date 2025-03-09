@@ -119,6 +119,7 @@ def smartsplit(
     tag: str,
 ) -> tuple[MPI.Comm, int]:
     if backend_flags["mpi_avail"]:
+        # TODO: This function should return a "root" communicator, aka. a communicator made only of the root processes of each group
         active_comm = get_active_comm(comm, n_parallelizable_evaluations, tag)
         rank = active_comm.Get_rank()
         size = active_comm.Get_size()
