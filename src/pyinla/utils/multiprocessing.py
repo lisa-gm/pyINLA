@@ -39,7 +39,7 @@ def synchronize(comm=None):
 def allreduce(
     recvbuf: ArrayLike,
     op: str = "sum",
-    comm=None,
+    comm: MPI.Comm = None,
 ):
     """
     Perform a reduction operation across all processes within the given communication group.
@@ -83,3 +83,33 @@ def bcast(
         if comm is None:
             comm = MPI.COMM_WORLD
         comm.Bcast(data, root=root)
+
+
+def smartsplit(
+    comm: MPI.Comm,
+    n_parallelizable_evaluations: int,  
+    tag: str,
+) -> tuple[MPI.Comm, int]:
+    if backend_flags["mpi_avail"]:
+        rank = comm.Get_rank()
+        size = comm.Get_size()
+
+        group_size = size // n_parallelizable_evaluations
+        if size < n_parallelizable_evaluations:
+            # Less processes than n_parallelizable_evaluations
+            color_new_group = rank
+        else:
+            # More (or =) processes than n_parallelizable_evaluations
+            color_new_group = rank // group_size
+        key_new_group = rank
+        comm_new_group = comm.Split(color_new_group, key_new_group)
+
+        if size > n_parallelizable_evaluations and rank >= (group_size * n_parallelizable_evaluations):
+                # Remainder processes are terminated because cannot be assigned to any group
+                print(f"Rank: {rank} terminated at the '{tag}' level because you need a multiple of {n_parallelizable_evaluations} processes in the calling comm_group")
+                exit()
+    else:
+        comm_new_group = comm
+        color_new_group = 0
+
+    return comm_new_group, color_new_group

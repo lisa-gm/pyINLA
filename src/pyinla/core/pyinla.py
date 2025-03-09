@@ -10,10 +10,11 @@ from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
-from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device
+from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device, smartsplit
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
 
+from mpi4py import MPI
 
 class PyINLA:
     """PyINLA is a Python implementation of the Integrated Nested
@@ -52,6 +53,15 @@ class PyINLA:
         set_device(comm_rank, comm_size)
 
         self.n_f_evaluations = 2 * self.model.n_hyperparameters + 1
+
+        self.comm_world = MPI.COMM_WORLD
+        self.world_size = self.comm_world.Get_size()
+
+        self.comm_feval, self.color_feval = smartsplit(
+            comm=self.comm_world, 
+            n_parallelizable_evaluations=self.n_f_evaluations, 
+            tag="feval"
+        )
 
         # --- Initialize solver
         if self.config.solver.type == "dense":
@@ -232,9 +242,11 @@ class PyINLA:
         self.f_values_i[:] = 0.0
 
         # Multiprocessing task to rank assignment
-        task_to_rank = xp.zeros(self.n_f_evaluations, dtype=int)
+        task_mapping = []
         for i in range(self.n_f_evaluations):
-            task_to_rank[i] = i % comm_size
+                task_mapping.append(i % self.world_size)
+
+        print(f"task_mapping: {task_mapping}")
 
         # Initialize central difference scheme matrix
         self.eps_mat[:] = self.eps_gradient_f * xp.eye(self.model.n_hyperparameters)
@@ -247,10 +259,15 @@ class PyINLA:
         ] -= self.eps_mat
 
         # Proceed to the parallel function evaluation
-        for i in range(self.n_f_evaluations - 1, -1, -1):
-            if task_to_rank[i] == comm_rank:
-                self.f_values_i[i] = self._evaluate_f(theta_i=self.theta_mat[:, i])
-        allreduce(self.f_values_i, op="sum")
+        for feval_i in range(self.n_f_evaluations - 1, -1, -1):
+            # Perform the evaluation in reverse order so that the stored and returned
+            # self.x value matches the "bare" hyperparameters evaluation
+            if self.color_feval == task_mapping[feval_i]:
+                self.f_values_i[i] = self._evaluate_f(
+                    theta_i=self.theta_mat[:, i], 
+                    comm=self.comm_feval
+                )
+        allreduce(self.f_values_i, op="sum", comm=self.comm_world)
 
         # Compute gradient using central difference scheme
         for i in range(self.model.n_hyperparameters):
@@ -259,11 +276,14 @@ class PyINLA:
                 - self.f_values_i[self.model.n_hyperparameters + i + 1]
             ) / (2 * self.eps_gradient_f)
 
+        print(f"self.f_values_i: {self.f_values_i}")
+
         return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
 
     def _evaluate_f(
         self,
         theta_i: NDArray,
+        comm: MPI.Comm,
     ) -> float:
         """Evaluate the objective function f(theta) = log(p(theta|y)).
 
