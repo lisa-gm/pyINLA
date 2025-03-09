@@ -344,13 +344,6 @@ class CoregionalModel(Model):
             Qprior_st_perm = Qprior_st[p_vec, :][:, p_vec]
 
         if Q_r != []:
-            # if Q_r:
-            # Qprior_reg = sp.sparse.bmat([[Q] for Q in Q_r]).tocsc()
-            # self.Q_prior = sp.sparse.bmat([[Qprior_st_perm, None], [None, Qprior_reg]]).tocsc()
-
-            # Qprior_reg = bdiag_tilling(Q_r)
-            # self.Q_prior = bdiag_tilling([Qprior_st_perm, Qprior_reg])
-
             Qprior_reg = sp.sparse.block_diag(Q_r).tocsc()
             self.Q_prior = sp.sparse.block_diag([Qprior_st_perm, Qprior_reg]).tocsc()
         else:
@@ -390,7 +383,17 @@ class CoregionalModel(Model):
             d_list.append(model.likelihood.evaluate_hessian_likelihood(**kwargs))
 
         d_matrix = sp.sparse.block_diag(d_list).tocsc()
+        # tmp = self.a.T @ d_matrix @ self.a
+        # perm_vec = self._generate_permutation_indices_for_a_new(
+        #     self.n_temporal_nodes,
+        #     self.n_spatial_nodes,
+        #     self.n_models,
+        #     self.n_fixed_effects_per_model,
+        # )
+        # tmp = tmp[perm_vec, :][:, perm_vec]
+        # self.Q_conditional = self.Q_prior - tmp
 
+        # print("here...")
         self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 
         return self.Q_conditional
@@ -424,7 +427,6 @@ class CoregionalModel(Model):
         self,
         eta: NDArray,
     ) -> float:
-        # print("\nin evaluate likelihood:")
         likelihood: float = 0.0
         for i, model in enumerate(self.models):
             likelihood += model.likelihood.evaluate_likelihood(
@@ -496,6 +498,69 @@ class CoregionalModel(Model):
         if n_models == 3:
             third_idx = second_idx + n_temporal_nodes * n_spatial_nodes
             perm_vectorized = np.hstack((first_idx, second_idx, third_idx)).flatten()
+
+        return perm_vectorized
+
+    def _generate_permutation_indices_for_a_new(
+        self,
+        n_temporal_nodes: int,
+        n_spatial_nodes: int,
+        n_models: int,
+        n_fixed_effects_per_model: int,
+    ):
+        """
+        Generate a permutation vector containing indices in the pattern:
+        [0:block_size, n*block_size:(n+1)*block_size, 1*block_size:(1+1)*block_size, (n+1)*block_size:(n+1+1)*block_size, ...]
+
+        Parameters
+        ----------
+        n_temporal_nodes : int
+            Number of blocks.
+        n_spatial_nodes : int
+            Size of each block.
+        n_models : int
+            Number of models.
+
+        Returns
+        -------
+        np.ndarray
+            The generated permutation vector.
+        """
+        indices = np.arange(n_temporal_nodes * n_spatial_nodes)
+        first_idx = indices.reshape(n_temporal_nodes, n_spatial_nodes)
+        second_idx = first_idx + n_temporal_nodes * n_spatial_nodes
+        indices_fixed_effects_1 = 2 * n_temporal_nodes * n_spatial_nodes + np.arange(
+            n_fixed_effects_per_model
+        )
+        indices_fixed_effects_2 = n_fixed_effects_per_model + indices_fixed_effects_1
+
+        if n_models == 2:
+            perm_vectorized = np.concatenate(
+                [
+                    np.hstack((first_idx, second_idx)).flatten(),
+                    indices_fixed_effects_1,
+                    indices_fixed_effects_2,
+                ]
+            )
+        elif n_models == 3:
+            third_idx = (
+                second_idx
+                + n_temporal_nodes * n_spatial_nodes
+                + 2 * n_fixed_effects_per_model
+            )
+            indices_fixed_effects_3 = (
+                3 * n_temporal_nodes * n_spatial_nodes
+                + 2 * n_fixed_effects_per_model
+                + np.arange(n_fixed_effects_per_model)
+            )
+            perm_vectorized = np.concatenate(
+                [
+                    np.hstack((first_idx, second_idx, third_idx)).flatten(),
+                    indices_fixed_effects_1,
+                    indices_fixed_effects_2,
+                    indices_fixed_effects_3,
+                ]
+            )
 
         return perm_vectorized
 

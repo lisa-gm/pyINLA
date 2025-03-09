@@ -9,7 +9,8 @@ from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
-from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
+
+# from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
 from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
@@ -71,9 +72,7 @@ class PyINLA:
 
             # Check the model compute parameters
             if diagonal_blocksize is None or n_diag_blocks is None:
-                logging.critical(
-                    "Trying to instanciate Serinv solver on non-ST model."
-                )
+                logging.critical("Trying to instanciate Serinv solver on non-ST model.")
                 raise ValueError(
                     "Serinv solver is not made for non spatio-temporal models."
                 )
@@ -111,7 +110,7 @@ class PyINLA:
 
         self.i = 0
 
-        self.initial_f_value = 0.
+        self.initial_f_value = 0.0
 
     def run(self) -> optimize.OptimizeResult:
         """Fit the model using INLA.
@@ -172,7 +171,6 @@ class PyINLA:
                 options={
                     "maxiter": self.config.minimize.max_iter,
                     "gtol": self.config.minimize.gtol,
-                    "ftol": 0.0,
                     "disp": self.config.minimize.disp,
                     "ftol": 1e-18,
                 },
@@ -181,7 +179,7 @@ class PyINLA:
 
             # MEMO:
             # From here rank 0 own the optimized theta_star and the
-            # corresponding x_star. Other ranks own garbage thetas in 
+            # corresponding x_star. Other ranks own garbage thetas in
             # their self.model.theta
             if scipy_result.success:
                 print_msg(
@@ -194,7 +192,7 @@ class PyINLA:
                 )
             else:
                 print_msg(
-                    "Optimization did not converge.", 
+                    "Optimization did not converge.",
                     "FAILURE MSG: ",
                     scipy_result.message,
                     flush=True,
@@ -291,7 +289,7 @@ class PyINLA:
         log_prior_hyperparameters: float = (
             self.model.evaluate_log_prior_hyperparameters()
         )
-        print("log_prior_hyperparameters: ", log_prior_hyperparameters)
+        # print("log_prior_hyperparameters: ", log_prior_hyperparameters)
 
         # --- Construct the prior precision matrix of the latent parameters
         self.model.construct_Q_prior()
@@ -303,19 +301,19 @@ class PyINLA:
         likelihood: float = self.model.evaluate_likelihood(
             eta=self.eta,
         )
-        print("likelihood: ", likelihood)
+        # print("likelihood: ", likelihood)
 
         # --- Evaluate the prior of the latent parameters at x_star
         prior_latent_parameters: float = self._evaluate_prior_latent_parameters(
             x_star=self.model.x
         )
-        print("prior_latent_parameters: ", prior_latent_parameters)
+        # print("prior_latent_parameters: ", prior_latent_parameters)
 
         # --- Evaluate the conditional of the latent parameters at x_star
         conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
             logdet_Q_conditional
         )
-        print("conditional_latent_parameters: ", conditional_latent_parameters)
+        # print("conditional_latent_parameters: ", conditional_latent_parameters)
 
         f_theta: float = -1.0 * (
             log_prior_hyperparameters
@@ -346,7 +344,11 @@ class PyINLA:
         counter: int = 0
         while x_i_norm >= self.eps_inner_iteration:
             if counter > self.inner_iteration_max_iter:
-                print_msg("Theta value at failing of the inner_iteration: ", self.model.theta, flush=True)
+                print_msg(
+                    "Theta value at failing of the inner_iteration: ",
+                    self.model.theta,
+                    flush=True,
+                )
                 raise ValueError(
                     f"Inner iteration did not converge after {counter} iterations."
                 )
