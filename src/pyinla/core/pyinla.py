@@ -10,7 +10,7 @@ from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
-from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device, smartsplit
+from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device, get_active_comm, smartsplit
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
 
@@ -54,13 +54,23 @@ class PyINLA:
 
         self.n_f_evaluations = 2 * self.model.n_hyperparameters + 1
 
-        self.comm_world = MPI.COMM_WORLD
-        self.world_size = self.comm_world.Get_size()
-
-        self.comm_feval, self.color_feval = smartsplit(
-            comm=self.comm_world, 
+        # Split the feval communicator
+        self.comm_world, self.comm_feval, self.color_feval = smartsplit(
+            comm=MPI.COMM_WORLD, 
             n_parallelizable_evaluations=self.n_f_evaluations, 
             tag="feval"
+        )
+        self.world_size = self.comm_world.Get_size()
+
+        # Split the qeval communicator
+        if self.model.is_likelihood_gaussian():
+            self.n_qeval = 2
+        else:
+            self.n_qeval = 1
+        _, self.comm_qeval, self.color_qeval = smartsplit(
+            comm=self.comm_feval,
+            n_parallelizable_evaluations=self.n_qeval,
+            tag="qeval"
         )
 
         # --- Initialize solver
@@ -245,8 +255,6 @@ class PyINLA:
         task_mapping = []
         for i in range(self.n_f_evaluations):
                 task_mapping.append(i % self.world_size)
-
-        print(f"task_mapping: {task_mapping}")
 
         # Initialize central difference scheme matrix
         self.eps_mat[:] = self.eps_gradient_f * xp.eye(self.model.n_hyperparameters)

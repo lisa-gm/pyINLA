@@ -391,6 +391,10 @@ class Model(ABC):
 
         return information_vector
 
+    def is_likelihood_gaussian(self) -> bool:
+        """Check if the likelihood is Gaussian."""
+        return self.likelihood_config.type == "gaussian"
+
     def evaluate_likelihood(self, 
             eta: NDArray,
         ) -> float:
