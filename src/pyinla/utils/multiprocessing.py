@@ -39,6 +39,7 @@ def synchronize(comm=None):
 def allreduce(
     recvbuf: ArrayLike,
     op: str = "sum",
+    factor: int = None,
     comm: MPI.Comm = None,
 ):
     """
@@ -60,6 +61,8 @@ def allreduce(
             comm = MPI.COMM_WORLD
         if op == "sum":
             comm.Allreduce(MPI.IN_PLACE, recvbuf, op=MPI.SUM)
+            if factor is not None:
+                recvbuf *= factor
 
 
 def bcast(

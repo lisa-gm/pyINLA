@@ -277,7 +277,7 @@ class PyINLA:
                 )
 
         # Here carefull on the reduction as it's gonna add the values from all ranks and not only the root of the groups - TODO
-        allreduce(self.f_values_i, op="sum", comm=self.comm_world)
+        allreduce(self.f_values_i, op="sum", factor= 1/self.comm_feval.Get_size(), comm=self.comm_world)
 
         # Compute gradient using central difference scheme
         for i in range(self.model.n_hyperparameters):
@@ -285,8 +285,6 @@ class PyINLA:
                 self.f_values_i[i + 1]
                 - self.f_values_i[self.model.n_hyperparameters + i + 1]
             ) / (2 * self.eps_gradient_f)
-
-        # print(f"self.f_values_i: {self.f_values_i}")
 
         return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
 
