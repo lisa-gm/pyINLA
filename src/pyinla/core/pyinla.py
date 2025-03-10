@@ -10,11 +10,20 @@ from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
-from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device, get_active_comm, smartsplit
+from pyinla.utils import (
+    allreduce,
+    get_device,
+    get_host,
+    print_msg,
+    set_device,
+    get_active_comm,
+    smartsplit,
+)
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
 
 from mpi4py import MPI
+
 
 class PyINLA:
     """PyINLA is a Python implementation of the Integrated Nested
@@ -56,9 +65,9 @@ class PyINLA:
 
         # Split the feval communicator
         self.comm_world, self.comm_feval, self.color_feval = smartsplit(
-            comm=MPI.COMM_WORLD, 
-            n_parallelizable_evaluations=self.n_f_evaluations, 
-            tag="feval"
+            comm=MPI.COMM_WORLD,
+            n_parallelizable_evaluations=self.n_f_evaluations,
+            tag="feval",
         )
         self.world_size = self.comm_world.Get_size()
 
@@ -68,9 +77,7 @@ class PyINLA:
         else:
             self.n_qeval = 1
         _, self.comm_qeval, self.color_qeval = smartsplit(
-            comm=self.comm_feval,
-            n_parallelizable_evaluations=self.n_qeval,
-            tag="qeval"
+            comm=self.comm_feval, n_parallelizable_evaluations=self.n_qeval, tag="qeval"
         )
 
         # --- Initialize solver
@@ -91,9 +98,7 @@ class PyINLA:
 
             # Check the model compute parameters
             if diagonal_blocksize is None or n_diag_blocks is None:
-                logging.critical(
-                    "Trying to instanciate Serinv solver on non-ST model."
-                )
+                logging.critical("Trying to instanciate Serinv solver on non-ST model.")
                 raise ValueError(
                     "Serinv solver is not made for non spatio-temporal models."
                 )
@@ -108,8 +113,6 @@ class PyINLA:
         # --- Set up recurrent variables
         self.gradient_f = xp.zeros(self.model.n_hyperparameters, dtype=xp.float64)
         self.f_values_i = xp.zeros(self.n_f_evaluations, dtype=xp.float64)
-        # self.eta = xp.zeros_like(self.model.y, dtype=xp.float64)
-        # self.x_update = xp.zeros_like(self.model.x, dtype=xp.float64)
         self.eps_mat = xp.zeros(
             (self.model.n_hyperparameters, self.model.n_hyperparameters),
             dtype=xp.float64,
@@ -131,7 +134,7 @@ class PyINLA:
 
         self.i = 0
 
-        self.initial_f_value = 0.
+        self.initial_f_value = 0.0
 
     def run(self) -> optimize.OptimizeResult:
         """Fit the model using INLA.
@@ -201,7 +204,7 @@ class PyINLA:
 
             # MEMO:
             # From here rank 0 own the optimized theta_star and the
-            # corresponding x_star. Other ranks own garbage thetas in 
+            # corresponding x_star. Other ranks own garbage thetas in
             # their self.model.theta
             if scipy_result.success:
                 print_msg(
@@ -214,7 +217,7 @@ class PyINLA:
                 )
             else:
                 print_msg(
-                    "Optimization did not converge.", 
+                    "Optimization did not converge.",
                     "FAILURE MSG: ",
                     scipy_result.message,
                     flush=True,
@@ -254,7 +257,7 @@ class PyINLA:
         # Multiprocessing task to rank assignment
         task_mapping = []
         for i in range(self.n_f_evaluations):
-                task_mapping.append(i % self.world_size)
+            task_mapping.append(i % self.world_size)
 
         # Initialize central difference scheme matrix
         self.eps_mat[:] = self.eps_gradient_f * xp.eye(self.model.n_hyperparameters)
@@ -272,12 +275,16 @@ class PyINLA:
             # self.x value matches the "bare" hyperparameters evaluation
             if self.color_feval == task_mapping[feval_i]:
                 self.f_values_i[feval_i] = self._evaluate_f(
-                    theta_i=self.theta_mat[:, feval_i], 
-                    comm=self.comm_feval
+                    theta_i=self.theta_mat[:, feval_i], comm=self.comm_feval
                 )
 
         # Here carefull on the reduction as it's gonna add the values from all ranks and not only the root of the groups - TODO
-        allreduce(self.f_values_i, op="sum", factor= 1/self.comm_feval.Get_size(), comm=self.comm_world)
+        allreduce(
+            self.f_values_i,
+            op="sum",
+            factor=1 / self.comm_feval.Get_size(),
+            comm=self.comm_world,
+        )
 
         # Compute gradient using central difference scheme
         for i in range(self.model.n_hyperparameters):
@@ -314,65 +321,94 @@ class PyINLA:
         and log conditional of the latent parameters.
         """
         self.model.theta[:] = theta_i
-
-        # --- Evaluate the log prior of the hyperparameters
-        log_prior_hyperparameters: float = (
-            self.model.evaluate_log_prior_hyperparameters()
-        )
-
-        # --- Construct the prior precision matrix of the latent parameters
-        self.model.construct_Q_prior()
-
+        f_theta = xp.zeros(1, dtype=xp.float64)
 
         # --- Optimize x and evaluate the conditional of the latent parameters
         if self.model.is_likelihood_gaussian():
+            # Done by both processes
+            self.model.construct_Q_prior()
+
             eta = xp.zeros_like(self.model.y, dtype=xp.float64)
             x = xp.zeros_like(self.model.x, dtype=xp.float64)
 
-            # Done by processes "even"
-            prior_latent_parameters: float = self._evaluate_prior_latent_parameters()
+            task_mapping = [i % self.comm_feval.Get_size() for i in range(2)]
 
-            # Done by processes "odd"
-            Q_conditional = self.model.construct_Q_conditional(eta)
-            self.solver.cholesky(A=Q_conditional)
-            rhs: NDArray = self.model.construct_information_vector(
-                eta, x,
-            )
-            self.model.x[:] = self.solver.solve(
-                rhs=rhs,
-            )
+            if task_mapping[0] == self.color_qeval:
+                # Done by processes "even"
+                Q_conditional = self.model.construct_Q_conditional(eta)
+                self.solver.cholesky(A=Q_conditional)
+                rhs: NDArray = self.model.construct_information_vector(
+                    eta,
+                    x,
+                )
+                self.model.x[:] = self.solver.solve(
+                    rhs=rhs,
+                )
 
-            conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
-                Q_conditional=Q_conditional,
-                x=None,
-                x_mean=self.model.x,
-            )
+                conditional_latent_parameters = (
+                    self._evaluate_conditional_latent_parameters(
+                        Q_conditional=Q_conditional,
+                        x=None,
+                        x_mean=self.model.x,
+                    )
+                )
+
+                f_theta[0] += conditional_latent_parameters
+            if task_mapping[1] == self.color_qeval:
+                # Done by processes "odd"
+                log_prior_hyperparameters: float = (
+                    self.model.evaluate_log_prior_hyperparameters()
+                )
+                likelihood: float = self.model.evaluate_likelihood(
+                    eta=eta,
+                )
+                prior_latent_parameters: float = (
+                    self._evaluate_prior_latent_parameters()
+                )
+
+                f_theta[0] -= (
+                    log_prior_hyperparameters + likelihood + prior_latent_parameters
+                )
+            if task_mapping[0] != task_mapping[1]:
+                allreduce(
+                    f_theta,
+                    op="sum",
+                    factor=1 / self.comm_qeval.Get_size(),
+                    comm=self.comm_feval,
+                )
         else:
+            self.model.construct_Q_prior()
+
+            log_prior_hyperparameters: float = (
+                self.model.evaluate_log_prior_hyperparameters()
+            )
+
             Q_conditional, self.model.x[:], eta = self._inner_iteration()
 
-            conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
-                Q_conditional=Q_conditional,
-                x=None,
-                x_mean=None,
+            conditional_latent_parameters = (
+                self._evaluate_conditional_latent_parameters(
+                    Q_conditional=Q_conditional,
+                    x=None,
+                    x_mean=None,
+                )
             )
 
             prior_latent_parameters: float = self._evaluate_prior_latent_parameters(
                 x=self.model.x,
             )
 
-        # --- Evaluate likelihood at the optimized latent parameters x_star
-        likelihood: float = self.model.evaluate_likelihood(
-            eta=eta,
-        )
+            likelihood: float = self.model.evaluate_likelihood(
+                eta=eta,
+            )
 
-        f_theta: float = -1.0 * (
-            log_prior_hyperparameters
-            + likelihood
-            + prior_latent_parameters
-            - conditional_latent_parameters
-        )
+            f_theta[0] -= (
+                log_prior_hyperparameters
+                + likelihood
+                + prior_latent_parameters
+                - conditional_latent_parameters
+            )
 
-        return f_theta
+        return f_theta[0]
 
     def _inner_iteration(
         self,
@@ -396,7 +432,11 @@ class PyINLA:
         counter: int = 0
         while x_i_norm >= self.eps_inner_iteration:
             if counter > self.inner_iteration_max_iter:
-                print_msg("Theta value at failing of the inner_iteration: ", self.model.theta, flush=True)
+                print_msg(
+                    "Theta value at failing of the inner_iteration: ",
+                    self.model.theta,
+                    flush=True,
+                )
                 raise ValueError(
                     f"Inner iteration did not converge after {counter} iterations."
                 )
@@ -408,7 +448,8 @@ class PyINLA:
             self.solver.cholesky(A=Q_conditional)
 
             rhs: NDArray = self.model.construct_information_vector(
-                eta, x_star,
+                eta,
+                x_star,
             )
             x_update[:] = self.solver.solve(
                 rhs=rhs,
@@ -448,9 +489,7 @@ class PyINLA:
         self.solver.cholesky(self.model.Q_prior)
         logdet_Q_prior: float = self.solver.logdet()
 
-        log_prior_latent_parameters: float = (
-            + 0.5 * logdet_Q_prior
-        )
+        log_prior_latent_parameters: float = +0.5 * logdet_Q_prior
 
         if x is not None:
             log_prior_latent_parameters -= 0.5 * x.T @ self.model.Q_prior @ x
@@ -497,10 +536,8 @@ class PyINLA:
             quadratic_form = 0.0
         else:
             quadratic_form = (x - x_mean).T @ Q_conditional @ (x - x_mean)
-        
+
         # Compute the log conditional
-        log_conditional = (
-            0.5 * logdet_Q_conditional - 0.5 * quadratic_form
-        )
+        log_conditional = 0.5 * logdet_Q_conditional - 0.5 * quadratic_form
 
         return log_conditional

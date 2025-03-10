@@ -58,7 +58,6 @@ class PoissonLikelihood(Likelihood):
     ) -> ArrayLike:
         eta: NDArray = kwargs.get("eta")
 
-        print("max value of eta: ", xp.max(eta))
         hessian_likelihood: ArrayLike = -1.0 * sp.sparse.diags(self.e * xp.exp(eta))
 
         return hessian_likelihood
