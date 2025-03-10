@@ -377,6 +377,13 @@ class CoregionalModel(Model):
 
         return information_vector
 
+    def is_likelihood_gaussian(self) -> bool:
+        """Check if the likelihood is Gaussian."""
+        for model in self.models:
+            if not model.is_likelihood_gaussian():
+                return False
+        return True
+
     def evaluate_likelihood(self, 
             eta: NDArray,
         ) -> float:
