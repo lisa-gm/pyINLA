@@ -108,8 +108,6 @@ class PyINLA:
         # --- Set up recurrent variables
         self.gradient_f = xp.zeros(self.model.n_hyperparameters, dtype=xp.float64)
         self.f_values_i = xp.zeros(self.n_f_evaluations, dtype=xp.float64)
-        # self.eta = xp.zeros_like(self.model.y, dtype=xp.float64)
-        # self.x_update = xp.zeros_like(self.model.x, dtype=xp.float64)
         self.eps_mat = xp.zeros(
             (self.model.n_hyperparameters, self.model.n_hyperparameters),
             dtype=xp.float64,
@@ -315,39 +313,85 @@ class PyINLA:
         """
         self.model.theta[:] = theta_i
 
-        # --- Evaluate the log prior of the hyperparameters
-        log_prior_hyperparameters: float = (
-            self.model.evaluate_log_prior_hyperparameters()
-        )
-
-        # --- Construct the prior precision matrix of the latent parameters
-        self.model.construct_Q_prior()
-
+        f_theta: float = 0.0
 
         # --- Optimize x and evaluate the conditional of the latent parameters
         if self.model.is_likelihood_gaussian():
+            # Done by both processes
+            self.model.construct_Q_prior()
+
             eta = xp.zeros_like(self.model.y, dtype=xp.float64)
             x = xp.zeros_like(self.model.x, dtype=xp.float64)
 
-            # Done by processes "even"
-            prior_latent_parameters: float = self._evaluate_prior_latent_parameters()
+            task_mapping = [i % self.comm_feval.Get_size() for i in range(2)]
 
-            # Done by processes "odd"
-            Q_conditional = self.model.construct_Q_conditional(eta)
-            self.solver.cholesky(A=Q_conditional)
-            rhs: NDArray = self.model.construct_information_vector(
-                eta, x,
-            )
-            self.model.x[:] = self.solver.solve(
-                rhs=rhs,
-            )
+            # task_mapping = [0, 0]
 
-            conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
-                Q_conditional=Q_conditional,
-                x=None,
-                x_mean=self.model.x,
-            )
+
+
+
+            # task_mapping = [self.color_feval, self.color_feval]
+
+            # if self.comm_feval.Get_size() > 1:
+            #     task_mapping = [i % self.comm_feval.Get_size() for i in range(2)]
+            # else:
+            #     task_mapping = [self.color_feval, self.color_feval]
+
+                
+
+            print(f"task_mapping: {task_mapping}")
+            print(f"color_feval: {self.color_feval}")
+            print(f"color_qeval: {self.color_qeval}")
+
+            if task_mapping[0] == self.color_qeval:
+                # Done by processes "even"
+                log_prior_hyperparameters: float = (
+                    self.model.evaluate_log_prior_hyperparameters()
+                )
+                likelihood: float = self.model.evaluate_likelihood(
+                    eta=eta,
+                )
+                prior_latent_parameters: float = self._evaluate_prior_latent_parameters()
+            
+                f_theta -= (
+                    log_prior_hyperparameters
+                    + likelihood
+                    + prior_latent_parameters
+                )
+                print(f"log_prior_hyperparameters: {log_prior_hyperparameters}")
+                print(f"likelihood: {likelihood}")
+                print(f"prior_latent_parameters: {prior_latent_parameters}")
+                print(f"f_theta: {f_theta}")
+            if task_mapping[1] == self.color_qeval:
+                # Done by processes "odd"
+                Q_conditional = self.model.construct_Q_conditional(eta)
+                self.solver.cholesky(A=Q_conditional)
+                rhs: NDArray = self.model.construct_information_vector(
+                    eta, x,
+                )
+                self.model.x[:] = self.solver.solve(
+                    rhs=rhs,
+                )
+
+                conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
+                    Q_conditional=Q_conditional,
+                    x=None,
+                    x_mean=self.model.x,
+                )
+
+                f_theta += conditional_latent_parameters
+                print(f"conditional_latent_parameters: {conditional_latent_parameters}")
+                print(f"f_theta: {f_theta}")
+            if task_mapping[0] != task_mapping[1]:
+                print(f"Error: task_mapping[0] != task_mapping[1] ({task_mapping[0]} != {task_mapping[1]})")
+                allreduce(f_theta, op="sum", factor= 1/self.comm_qeval.Get_size(), comm=self.comm_feval)
         else:
+            self.model.construct_Q_prior()
+
+            log_prior_hyperparameters: float = (
+                self.model.evaluate_log_prior_hyperparameters()
+            )
+
             Q_conditional, self.model.x[:], eta = self._inner_iteration()
 
             conditional_latent_parameters = self._evaluate_conditional_latent_parameters(
@@ -360,17 +404,20 @@ class PyINLA:
                 x=self.model.x,
             )
 
-        # --- Evaluate likelihood at the optimized latent parameters x_star
-        likelihood: float = self.model.evaluate_likelihood(
-            eta=eta,
-        )
+            likelihood: float = self.model.evaluate_likelihood(
+                eta=eta,
+            )
 
-        f_theta: float = -1.0 * (
-            log_prior_hyperparameters
-            + likelihood
-            + prior_latent_parameters
-            - conditional_latent_parameters
-        )
+            f_theta -= (
+                log_prior_hyperparameters
+                + likelihood
+                + prior_latent_parameters
+                - conditional_latent_parameters
+            )
+
+        print(f"f_theta: {f_theta}")
+
+        # exit()
 
         return f_theta
 
