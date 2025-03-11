@@ -1,9 +1,6 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
-import os
 import re
-from abc import ABC
-from pathlib import Path
 
 import numpy as np
 from scipy.sparse import spmatrix
@@ -11,16 +8,8 @@ from scipy.sparse import spmatrix
 from pyinla import ArrayLike, NDArray, sp, xp
 from pyinla.core.model import Model
 
-
 from pyinla.configs.models_config import CoregionalModelConfig
-from pyinla.configs.priorhyperparameters_config import (
-    GaussianPriorHyperparametersConfig,
-    PenalizedComplexityPriorHyperparametersConfig,
-)
-from pyinla.core.likelihood import Likelihood
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
-from pyinla.core.submodel import SubModel
-from pyinla.likelihoods import BinomialLikelihood, GaussianLikelihood, PoissonLikelihood
 from pyinla.prior_hyperparameters import (
     GaussianPriorHyperparameters,
     PenalizedComplexityPriorHyperparameters,
