@@ -51,3 +51,14 @@ class DenseSolver(Solver):
         **kwargs,
     ) -> float:
         return 2 * xp.sum(xp.log(xp.diag(self.L)))
+
+    # TODO: optimize for memory??
+    def selected_inversion(self, A: NDArray, **kwargs) -> None:
+
+        self.L[:] = A.todense()
+        self.L = xp.linalg.cholesky(self.L)
+
+        L_inv = sp.linalg.solve_triangular(self.L, xp.eye(self.L.shape[0]), lower=True)
+        A_inv = L_inv.T @ L_inv
+
+        return A_inv

@@ -55,3 +55,6 @@ class SparseSolver(Solver):
             raise ValueError("Cholesky factor not computed")
 
         return 2 * xp.sum(xp.log(self.L.diagonal()))
+
+    def selected_inversion(self, **kwargs):
+        return super().selected_inversion(**kwargs)

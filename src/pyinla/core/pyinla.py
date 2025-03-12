@@ -351,6 +351,7 @@ class PyINLA:
 
         return cov_theta
 
+    # TODO: update this to use smartsplit() - correct communicator
     def _evaluate_hessian_f(
         self,
         theta_i: NDArray,
@@ -487,8 +488,8 @@ class PyINLA:
 
         return hess
 
-    def compute_marginals_latent_parameters(
-        self, theta_i: NDArray, x_star: NDArray
+    def _compute_covariance_latent_parameters(
+        self, theta: NDArray, x_star: NDArray
     ) -> NDArray:
         """Compute the marginal distribution of the latent parameters x.
 
@@ -504,13 +505,63 @@ class PyINLA:
         marginal_latent_parameters : NDArray
             Marginal distribution of the latent parameters x.
         """
-        self.model.theta[:] = theta_i
+        self.model.theta[:] = theta
         self.model.x[:] = x_star
 
         eta = self.model.a @ self.model.x
 
         self.model.construct_Q_conditional(eta)
-        Q_selected_inverse = self.solver.get_selected_inverse()
+        # TODO: call this with correct mpi split ...
+        Q_selected_inverse = self.solver.selected_inversion(self.model.Q_conditional)
+
+        return Q_selected_inverse
+
+    def get_marginal_variances_latent_parameters(
+        self, theta: NDArray = None, x_star: NDArray = None
+    ) -> NDArray:
+
+        # TODO: this should be only called by rank 0?
+        if theta is None and x_star is None:
+            print(
+                "Computing marginal variances for currently stored latent parameters. "
+            )
+            x_star = self.model.x
+            theta = self.model.theta
+        elif theta is None or x_star is None:
+            raise ValueError(
+                "BOTH or NEITHER theta and x_star must be provided to compute the marginal variances."
+            )
+
+        # check order x_star ... -> potentially need to reorder marginal variances
+        Q_selected_inverse = self._compute_covariance_latent_parameters(theta, x_star)
+        marginal_variances = xp.diag(Q_selected_inverse)
+
+        return marginal_variances
+
+    def get_marginal_variances_observations(
+        self, theta_i: NDArray, x_star: NDArray
+    ) -> NDArray:
+        """Extract the marginal variances of the observations.
+
+        Parameters
+        ----------
+        theta_i : NDArray
+            Hyperparameters theta.
+        x_star : NDArray
+            Latent parameters x(theta_i).
+
+        Notes
+        -----
+
+        Cov(y) = Cov(Ax) = A Cov(x) A^T = A Q_selected_inv A^T
+        -> diag(Cov(y)) = diag(A Q_selected_inv A^T)
+
+        Returns
+        -------
+        marginal_variances_observations : NDArray
+            Marginal variances of the observations.
+        """
+        ...
 
     def _inner_iteration(
         self,
