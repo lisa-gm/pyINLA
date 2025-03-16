@@ -65,7 +65,7 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
                 xp.log(self.lambda_theta)
                 - self.lambda_theta * xp.exp(-0.5 * theta)
                 + xp.log(0.5)
-                - theta
+                - 0.5 * theta
             )
             # print("log prior r t: ", log_prior)
         elif (

@@ -321,6 +321,7 @@ class PyINLA:
         and log conditional of the latent parameters.
         """
         self.model.theta[:] = theta_i
+        print("in evaluate f. theta_i: ", theta_i)
         f_theta = xp.zeros(1, dtype=xp.float64)
 
         # --- Optimize x and evaluate the conditional of the latent parameters
@@ -332,7 +333,6 @@ class PyINLA:
             x = xp.zeros_like(self.model.x, dtype=xp.float64)
 
             task_mapping = [i % self.comm_feval.Get_size() for i in range(2)]
-
             if task_mapping[0] == self.color_qeval:
                 # Done by processes "even"
                 Q_conditional = self.model.construct_Q_conditional(eta)
@@ -341,6 +341,7 @@ class PyINLA:
                     eta,
                     x,
                 )
+
                 self.model.x[:] = self.solver.solve(
                     rhs=rhs,
                 )

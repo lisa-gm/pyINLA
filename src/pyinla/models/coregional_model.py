@@ -52,6 +52,7 @@ class CoregionalModel(Model):
                     self.coregionalization_type = "spatial"
                     self.n_spatial_nodes = model.submodels[0].ns
                 else:
+                    print("model.submodels[0]: ", model.submodels[0])
                     raise ValueError(
                         "Invalid model type. Must be 'spatial' or 'spatio-temporal'."
                     )
@@ -188,15 +189,16 @@ class CoregionalModel(Model):
 
         self.a: spmatrix = bdiag_tiling([model.a for model in self.models]).tocsc()
 
-        permutation_latent_variables = self._generate_permutation_indices_for_a(
-            self.n_temporal_nodes,
-            self.n_spatial_nodes,
-            self.n_models,
-            self.n_fixed_effects_per_model,
-        )
+        if self.coregionalization_type == "spatio_temporal":
+            permutation_latent_variables = self._generate_permutation_indices_for_a(
+                self.n_temporal_nodes,
+                self.n_spatial_nodes,
+                self.n_models,
+                self.n_fixed_effects_per_model,
+            )
 
-        self.a = self.a[:, permutation_latent_variables]
-        self.x = self.x[permutation_latent_variables]
+            self.a = self.a[:, permutation_latent_variables]
+            self.x = self.x[permutation_latent_variables]
 
         # --- Recurrent variables
         self.Q_prior = None
@@ -207,6 +209,7 @@ class CoregionalModel(Model):
     def construct_Q_prior(self) -> spmatrix:
         Qst_list: list = []
         Q_r: list = []
+
         for i, model in enumerate(self.models):
             submodel_st = model.submodels[0]
             # Get the spatio-temporal submodel idx
@@ -214,7 +217,23 @@ class CoregionalModel(Model):
             for hp_idx in range(
                 model.hyperparameters_idx[0], model.hyperparameters_idx[1]
             ):
+                # need to get theta from self.theta
                 kwargs_st[model.theta_keys[hp_idx]] = float(model.theta[hp_idx])
+                idx = self.hyperparameters_idx[i] + hp_idx
+                # print(
+                #     "idx: ",
+                #     idx,
+                #     "theta_keys[idx]: ",
+                #     model.theta_keys[hp_idx],
+                #     "theta[idx]: ",
+                #     self.theta[idx],
+                # )
+                # print("theta_keys[idx]: ", model.theta_keys[hp_idx])
+                # kwargs_st[model.theta_keys[hp_idx]] = float(model.theta[hp_idx])
+                kwargs_st[model.theta_keys[hp_idx]] = float(self.theta[idx])
+                # print("self.model.theta: ", model.theta)
+
+            # print("in construct Qprior: kwargs_st: ", kwargs_st)
             Qst_list.append(submodel_st.construct_Q_prior(**kwargs_st).tocsc())
 
             if len(model.submodels) > 1:
@@ -293,6 +312,8 @@ class CoregionalModel(Model):
             # Permute matrix
             p_vec = self._generate_permutation_indices(self.n_temporal_nodes, self.n_spatial_nodes, self.n_models)
             Qprior_st_perm = Qprior_st[p_vec, :][:, p_vec]
+        else:
+            Qprior_st_perm = Qprior_st
 
         if Q_r != []:
             Qprior_reg = bdiag_tiling(Q_r).tocsc()
