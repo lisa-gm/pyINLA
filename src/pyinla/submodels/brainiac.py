@@ -3,7 +3,7 @@
 from pyinla import sp, NDArray
 from pyinla.configs.submodels_config import BrainiacSubModelConfig
 from pyinla.core.submodel import SubModel
-from pyinla.utils import cloglog
+from pyinla.utils import scaled_logit
 
 import numpy as np
 from pyinla import sp, xp
@@ -55,7 +55,7 @@ class BrainiacSubModel(SubModel):
 
         h2_scaled = kwargs.get("h2")
         # rescale h2 to (0,1) as it's currently between -INF:+INF
-        h2 = cloglog(h2_scaled, direction="backward")
+        h2 = scaled_logit(h2_scaled, direction="backward")
 
         theta_interpret = np.array([h2, *kwargs["alpha"]])
         print("theta_interpret: ", theta_interpret)
@@ -69,8 +69,7 @@ class BrainiacSubModel(SubModel):
         h2_scaled = kwargs.get("h2")
 
         # rescale h2 to (0,1) as it's currently between -INF:+INF
-        h2 = cloglog(h2_scaled, direction="backward")
-        print("h2: ", h2)
+        h2 = scaled_logit(h2_scaled, direction="backward")
 
         # \Phi = 1 / \sum_k=1^B exp(Z^k \alpha) * diag(exp(Z_1 \alpha), exp(Z_2 \alpha), ... )
         exp_Z_alpha = xp.exp(self.z @ alpha)
@@ -81,39 +80,60 @@ class BrainiacSubModel(SubModel):
         normalized_exp_Z_alpha = exp_Z_alpha / sum_exp_Z_alpha
         # print(normalized_exp_Z_alpha)
 
-        h2_phi = h2**2 * normalized_exp_Z_alpha.flatten()
+        h2_phi = h2 * normalized_exp_Z_alpha.flatten()
         Q_prior: sp.sparse.spmatrix = sp.sparse.diags(1 / h2_phi)
 
         return Q_prior.tocoo()
 
+    def evaluate_likelihood(
+        self, eta: NDArray, y: NDArray, **kwargs
+    ) -> float:
+        n_observations = y.shape[0]
+
+        h2_scaled = kwargs.get("h2")
+        # rescale h2 to (0,1) as it's currently between -INF:+INF
+        h2 = scaled_logit(h2_scaled, direction="backward")
+        if(h2 == 1):
+            raise ValueError("h2 is 1. Will lead to division by zero.")
+
+        yEta = y - eta
+        likelihood: float = (
+            0.5 *  - np.log(1 - h2)  * n_observations - 0.5 / (1 - h2) * yEta.T @ yEta
+        )
+
+        return likelihood
+
     def evaluate_gradient_likelihood(
         self, eta: NDArray, y: NDArray, **kwargs
     ) -> NDArray:
-        print("kwargs: ", kwargs)
         h2_scaled = kwargs.get("h2")
-
+        
         # rescale h2 to (0,1) as it's currently between -INF:+INF
-        h2 = cloglog(h2_scaled, direction="backward")
-        print("h2: ", h2)
+        h2 = scaled_logit(h2_scaled, direction="backward")
+        if(h2 == 1):
+            raise ValueError("h2 is 1. Will lead to division by zero.")
+
         gradient = -1 / (1 - h2) * (eta - y)
 
         return gradient
 
     def evaluate_d_matrix(self, **kwargs) -> NDArray:
         h2_scaled = kwargs.get("h2")
-
         # rescale h2 to (0,1) as it's currently between -INF:+INF
-        h2 = cloglog(h2_scaled, direction="backward")
+        h2 = scaled_logit(h2_scaled, direction="backward")
 
+        if(h2 == 1):
+            raise ValueError("h2 is 1. Will lead to division by zero.")
         d_matrix = -1 / (1 - h2) * sp.sparse.eye(self.a.shape[0])
 
         return d_matrix
 
-    def get_theta_likelihood(self) -> NDArray:
+    # def get_theta_likelihood(self) -> NDArray:
+    #     print("in get_theta_likelihood brainiac")
+    #     raise NotImplementedError
+    #     # theta likelihood is 1-h2 (in correct scaling)
 
-        # theta likelihood is 1-h2 (in correct scaling)
-
-        return
+    #     return
 
     def __str__(self) -> str:
         """String representation of the submodel."""

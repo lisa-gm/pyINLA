@@ -12,7 +12,7 @@ from pyinla.configs.priorhyperparameters_config import PriorHyperparametersConfi
 from pyinla.configs.priorhyperparameters_config import (
     parse_config as parse_priorhyperparameters_config,
 )
-from pyinla.utils import cloglog
+from pyinla.utils import scaled_logit
 
 
 class SubModelConfig(BaseModel, ABC):
@@ -74,10 +74,11 @@ class BrainiacSubModelConfig(SubModelConfig):
     def read_hyperparameters(self):
 
         # input of h2 is in (0,1), rescale to -/+ INF
-        self.h2_scaled = cloglog(self.h2, direction="forward")
+        self.h2_scaled = scaled_logit(self.h2, direction="forward")
 
         theta = xp.concatenate(([self.h2_scaled], self.alpha))
         theta_keys = ["h2"] + [f"alpha_{i}" for i in range(len(self.alpha))]
+
         return theta, theta_keys
 
 

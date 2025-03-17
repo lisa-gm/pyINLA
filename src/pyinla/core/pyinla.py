@@ -180,8 +180,6 @@ class PyINLA:
                 options={
                     "maxiter": self.config.minimize.max_iter,
                     "gtol": self.config.minimize.gtol,
-                    "c1": self.config.minimize.c1,
-                    "c2": self.config.minimize.c2,
                     "disp": self.config.minimize.disp,
                     # "ftol": 1e-12,  # default 1e7
                 },
@@ -263,7 +261,7 @@ class PyINLA:
             ) / (2 * self.eps_gradient_f)
 
         # print f(theta)  = f_values_i[0]
-        print_msg("f(", theta_i, ") = ", self.f_values_i[0])
+        # print_msg("f(", theta_i, ") = ", self.f_values_i[0])
 
         return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
 
@@ -305,13 +303,9 @@ class PyINLA:
         logdet_Q_conditional: float = self._inner_iteration()
 
         # --- Evaluate likelihood at the optimized latent parameters x_star
-        # typically theta_likelihood is the last element of theta, but can be different
-        theta_likelihood = self.model.get_theta_likelihood()
-
-        likelihood: float = self.model.likelihood.evaluate_likelihood(
+        likelihood: float = self.model.evaluate_likelihood(
             eta=self.eta,
             y=self.model.y,
-            theta=theta_likelihood,
         )
 
         # --- Evaluate the prior of the latent parameters at x_star
@@ -324,10 +318,10 @@ class PyINLA:
             logdet_Q_conditional
         )
 
-        print("log_prior_hyperparameters: ", log_prior_hyperparameters)
-        print("likelihood: ", likelihood)
-        print("prior_latent_parameters: ", prior_latent_parameters)
-        print("conditional_latent_parameters: ", conditional_latent_parameters)
+        # print("log_prior_hyperparameters: ", log_prior_hyperparameters)
+        # print("likelihood: ", likelihood)
+        # print("prior_latent_parameters: ", prior_latent_parameters)
+        # print("conditional_latent_parameters: ", conditional_latent_parameters)
 
         f_theta: float = -1.0 * (
             log_prior_hyperparameters
@@ -353,7 +347,6 @@ class PyINLA:
             Log determinant of the conditional precision matrix Q_conditional.
         """
         self.x_update[:] = 0.0
-        print("shape(x_update): ", self.x_update.shape)
         x_i_norm: float = 1.0
 
         counter: int = 0
@@ -365,11 +358,7 @@ class PyINLA:
                 )
 
             self.model.x[:] += self.x_update[:]
-            print("dim(a): ", self.model.a.shape)
-            print("dim(x): ", self.model.x.shape)
             self.eta[:] = self.model.a @ self.model.x
-            # self.eta[:] = self.model.a @ self.model.x
-            print("dim(eta): ", self.eta.shape)
 
             Q_conditional = self.model.construct_Q_conditional(self.eta)
             self.solver.cholesky(A=Q_conditional)
@@ -377,13 +366,16 @@ class PyINLA:
             rhs: NDArray = self.model.construct_information_vector(
                 self.eta, self.model.x
             )
+
             self.x_update[:] = self.solver.solve(
                 rhs=rhs,
             )
-            print("shape(x_update): ", self.x_update.shape)
 
             x_i_norm = xp.linalg.norm(self.x_update)
+            print("x_i_norm: ", x_i_norm)
             counter += 1
+
+        print("model.x: ", self.model.x)
 
         logdet: float = self.solver.logdet()
 

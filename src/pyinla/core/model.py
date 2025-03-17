@@ -26,7 +26,7 @@ from pyinla.prior_hyperparameters import (
     BetaPriorHyperparameters,
 )
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel, BrainiacSubModel
-from pyinla.utils import cloglog
+from pyinla.utils import scaled_logit
 
 class Model(ABC):
     """Core class for statistical models."""
@@ -197,9 +197,7 @@ class Model(ABC):
         else:
             self.y: NDArray = xp.asarray(y)
 
-        print("shape y: ", self.y.shape)
         self.y = self.y.flatten()
-        print("shape y: ", self.y.shape)
 
         self.n_observations: int = self.y.shape[0]
 
@@ -213,7 +211,7 @@ class Model(ABC):
 
             if self.submodels[0] == BrainiacSubModel:
                 # skip setting prior as it's already set in the submodel
-                print("here in brainiac")
+                print("Brainiac model detected. Skipping setting prior hyperparameters as already set.")
             # Instantiate the prior hyperparameters for the likelihood
             elif isinstance(
                 likelihood_config.prior_hyperparameters,
@@ -359,8 +357,6 @@ class Model(ABC):
             # General rules
             d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
 
-        print("dim d_matrix: ", d_matrix.shape)
-        print("dim a: ", self.a.shape)
         self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 
         return self.Q_conditional
@@ -372,22 +368,12 @@ class Model(ABC):
     ) -> NDArray:
         """Construct the information vector."""
 
-        # TODO: need to vectorize !!
-        # gradient_likelihood = gradient_finite_difference_5pt(
-        #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
-        # )
-
-        print("submodels.t: ", self.submodels[0])
         if isinstance(self.submodels[0], BrainiacSubModel):
-            # if self.submodels[0] == BrainiacSubModel:
-            print("here in brainiac construct information vector")
-            kwargs = {"h2 scaled": float(self.theta[0])}
-            # kwargs = {}
-            # kwargs["h2"] = float(self.theta[0])
+            kwargs = {"h2": float(self.theta[0])}
+            # print("kwargs: ", kwargs)
             gradient_likelihood = self.submodels[0].evaluate_gradient_likelihood(
                 eta=eta, y=self.y, **kwargs
             )
-            print("shape gradient_likelihood: ", gradient_likelihood.shape)
 
         else:
             gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
@@ -399,15 +385,6 @@ class Model(ABC):
         information_vector: NDArray = (
             -1 * self.Q_prior @ x_i + self.a.T @ gradient_likelihood
         )
-        print("shape gradient_likelihood: ", gradient_likelihood.shape)
-        print("shape Q_prior: ", self.Q_prior.shape)
-        print("shape x_i: ", x_i.shape)
-        print("shape Q_prior @ x_i: ", (self.Q_prior @ x_i).shape)
-        print("shape a: ", self.a.shape)
-        print(
-            "shape a.T @ gradient_likelihood: ", (self.a.T @ gradient_likelihood).shape
-        )
-        print("shape information_vector: ", information_vector.shape)
 
         return information_vector
 
@@ -416,15 +393,21 @@ class Model(ABC):
         log_prior = 0.0
 
         # if BFGS and model scale differ: rescale -- generalize
-        if self.submodels[0] == BrainiacSubModel:
+        if isinstance(self.submodels[0], BrainiacSubModel):
             #
             theta_interpret = self.theta.copy()
-            theta_interpret[0] = cloglog(self.theta[0], direction="backward")
+            #print("in evaluate log prior: theta_interpret unscaled: ", theta_interpret)
+            theta_interpret[0] = scaled_logit(self.theta[0], direction="backward")
+            #print("theta_interpret scaled: ", theta_interpret)
+            # TODO: multivariate prior for a ... need to generalize for now:
+            log_prior += self.prior_hyperparameters[0].evaluate_log_prior(theta_interpret[0])
+
+            log_prior += self.prior_hyperparameters[1].evaluate_log_prior(theta_interpret[1:])
         else:
             theta_interpret = self.theta
 
-        for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-            log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
+            for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
+                log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
 
         return log_prior
 
@@ -432,12 +415,22 @@ class Model(ABC):
         """Return the likelihood hyperparameters."""
 
         if isinstance(self.submodels[0], BrainiacSubModel):
-            theta_likelihood = 1 - cloglog(self.theta[0], direction="backward")
-            print("theta_likelihood: ", theta_likelihood)
+            theta_likelihood = 1 - scaled_logit(self.theta[0], direction="backward")
         else:
             theta_likelihood = self.theta[self.hyperparameters_idx[-1] :]
 
         return theta_likelihood
+    
+    def evaluate_likelihood(self, eta: NDArray, y: NDArray, **kwargs) -> float:
+        """Evaluate the likelihood."""
+
+        if isinstance(self.submodels[0], BrainiacSubModel):
+            kwargs["h2"] = float(self.theta[0])
+            likelihood = self.submodels[0].evaluate_likelihood(eta, y, **kwargs)
+        else:
+            likelihood = self.likelihood.evaluate_likelihood(eta, y)
+        
+        return likelihood
 
     def __str__(self) -> str:
         """String representation of the model."""

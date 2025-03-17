@@ -35,6 +35,11 @@ class GaussianMVNPriorHyperparameters(PriorHyperparameters):
         """Evaluate the log prior hyperparameters."""
 
         # TODO: add check in config or somewhere else that dim(theta) and dim(mean) match
+        if self.mean.shape != theta.shape:
+            raise ValueError(
+                f"Shape of theta ({theta.shape}) and mean ({self.mean.shape}) do not match."
+            )
+
         if isinstance(self.mean, float):
             return -0.5 * self.precision * (theta - self.mean) ** 2
         else:
