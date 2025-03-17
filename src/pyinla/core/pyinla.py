@@ -321,7 +321,6 @@ class PyINLA:
         and log conditional of the latent parameters.
         """
         self.model.theta[:] = theta_i
-        print("in evaluate f. theta_i: ", theta_i)
         f_theta = xp.zeros(1, dtype=xp.float64)
 
         # --- Optimize x and evaluate the conditional of the latent parameters
@@ -368,6 +367,7 @@ class PyINLA:
                 f_theta[0] -= (
                     log_prior_hyperparameters + likelihood + prior_latent_parameters
                 )
+
             if task_mapping[0] != task_mapping[1]:
                 allreduce(
                     f_theta,

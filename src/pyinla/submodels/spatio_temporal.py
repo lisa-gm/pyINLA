@@ -20,6 +20,8 @@ class SpatioTemporalSubModel(SubModel):
         """Initializes the model."""
         super().__init__(config)
 
+        self.sigma_st: float = config.sigma_st
+
         # Load spatial_matrices
         c0: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("c0.npz")))
         g1: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("g1.npz")))
@@ -114,10 +116,9 @@ class SpatioTemporalSubModel(SubModel):
         gamma_s, gamma_t, gamma_st = self._interpretable2compute(
             r_s=kwargs.get("r_s"),
             r_t=kwargs.get("r_t"),
-            sigma_st=kwargs.get("sigma_st"),
+            sigma_st=kwargs.get("sigma_st", self.sigma_st), 
             dim_spatial_domain=2,
         )
-
         # print(f"Thetas used in Qprior construction: gamma_s: {gamma_s}, gamma_t: {gamma_t}, gamma_st: {gamma_st}")
 
         exp_gamma_s = xp.exp(gamma_s)

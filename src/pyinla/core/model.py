@@ -357,12 +357,6 @@ class Model(ABC):
             }
 
         d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
-        # print("dim d_matrix: ", d_matrix.shape)
-        # print("d_matrix: \n", d_matrix.toarray()[:5, :5])
-        # print("dim(a): ", self.a.shape)
-        # print("A: ", self.a.toarray()[:5, :5])
-        # print("dim(Q_prior): ", self.Q_prior.shape)
-        # print("Q_prior: ", self.Q_prior[:5, :5])
 
         self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 

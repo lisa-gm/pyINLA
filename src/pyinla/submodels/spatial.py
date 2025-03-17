@@ -20,6 +20,8 @@ class SpatialSubModel(SubModel):
         """Initializes the model."""
         super().__init__(config)
 
+        self.sigma_e = self.config.sigma_e
+
         # Load spatial_matrices
         c0: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("c0.npz")))
         g1: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("g1.npz")))
@@ -76,13 +78,13 @@ class SpatialSubModel(SubModel):
 
         gamma_s, gamma_e = self._interpretable2compute(
             r_s=kwargs.get("r_s"),
-            sigma_e=kwargs.get("sigma_e"),
+            sigma_e=kwargs.get("sigma_e", self.sigma_e),
             dim_spatial_domain=2,
         )
 
-        print(
-            f"Thetas used in Qprior construction: gamma_s: {gamma_s}, gamma_e: {gamma_e}"
-        )
+        # print(
+        #     f"Thetas used in Qprior construction: gamma_s: {gamma_s}, gamma_e: {gamma_e}"
+        # )
 
         exp_gamma_s = xp.exp(gamma_s)
         exp_gamma_e = xp.exp(gamma_e)

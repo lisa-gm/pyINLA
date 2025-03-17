@@ -151,6 +151,9 @@ class CoregionalModel(Model):
         self.n_hyperparameters = self.theta.size
         self.theta_keys: NDArray = theta_keys
 
+        print("theta: ", self.theta)
+        print("theta_keys: ", self.theta_keys)
+
         # Initialize the Coregional Prior Hyperparameters
         for ph in coregional_model_config.ph_sigmas:
             if ph.type == "gaussian":
@@ -220,6 +223,21 @@ class CoregionalModel(Model):
             self.a = self.a[:, permutation_latent_variables]
             self.x = self.x[permutation_latent_variables]
 
+        elif self.coregionalization_type == "spatial":
+            # permute fixed effects to the end
+            permutation_latent_variables = self._generate_permutation_indices_spatial(
+                self.n_spatial_nodes, self.n_fixed_effects_per_model, self.n_models
+            )
+
+            self.a = self.a[:, permutation_latent_variables]
+            self.x = self.x[permutation_latent_variables]
+
+
+
+
+
+            
+
         # --- Recurrent variables
         self.Q_prior = None
         self.Q_prior_data_mapping = [0]
@@ -235,23 +253,9 @@ class CoregionalModel(Model):
             # Get the spatio-temporal submodel idx
             kwargs_st = {}
             for hp_idx in range(
-                model.hyperparameters_idx[0], model.hyperparameters_idx[1]
-            ):
-                # need to get theta from self.theta
-                kwargs_st[model.theta_keys[hp_idx]] = float(model.theta[hp_idx])
-                idx = self.hyperparameters_idx[i] + hp_idx
-                # print(
-                #     "idx: ",
-                #     idx,
-                #     "theta_keys[idx]: ",
-                #     model.theta_keys[hp_idx],
-                #     "theta[idx]: ",
-                #     self.theta[idx],
-                # )
-                # print("theta_keys[idx]: ", model.theta_keys[hp_idx])
-                # kwargs_st[model.theta_keys[hp_idx]] = float(model.theta[hp_idx])
-                kwargs_st[model.theta_keys[hp_idx]] = float(self.theta[idx])
-                # print("self.model.theta: ", model.theta)
+                self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+            ):                
+                kwargs_st[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
 
             # print("in construct Qprior: kwargs_st: ", kwargs_st)
             Qst_list.append(submodel_st.construct_Q_prior(**kwargs_st).tocsc())
@@ -261,14 +265,11 @@ class CoregionalModel(Model):
                 submodel_r = model.submodels[1]
                 # Get the spatio-temporal submodel idx
                 kwargs_r = {}
-                for hp_idx in range(
-                    model.hyperparameters_idx[1], model.hyperparameters_idx[2]
-                ):
-                    kwargs_r[model.theta_keys[hp_idx]] = float(model.theta[hp_idx])
                 Q_r.append(submodel_r.construct_Q_prior(**kwargs_r).tocsc())
 
         sigma_0 = xp.exp(self.theta[self.theta_keys.index("sigma_0")])
         sigma_1 = xp.exp(self.theta[self.theta_keys.index("sigma_1")])
+        #print("sigma_0: ", sigma_0, "sigma_1: ", sigma_1)
 
         lambda_0_1 = self.theta[self.theta_keys.index("lambda_0_1")]
 
@@ -342,6 +343,8 @@ class CoregionalModel(Model):
             self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
         else:
             self.Q_prior = Qprior_st_perm
+
+        self.Q_prior = self.Q_prior + 1e-4 * sp.sparse.eye(self.Q_prior.shape[0])
 
         return self.Q_prior
 
@@ -457,6 +460,18 @@ class CoregionalModel(Model):
 
         # Combine model information and submodel information
         return "\n".join(coregional_model_info + model_info)
+
+
+    def _generate_permutation_indices_spatial(
+        self, n_spatial_nodes: int, n_fixed_effects_per_model: int, n_models: int
+    ):
+        
+        perm_vec = np.zeros(n_models * ( n_spatial_nodes + n_fixed_effects_per_model), dtype=int)
+        for i in range(n_models):
+            perm_vec[i * n_spatial_nodes: (i+1) * n_spatial_nodes] = range(i * (n_spatial_nodes + n_fixed_effects_per_model), i * (n_spatial_nodes + n_fixed_effects_per_model) + n_spatial_nodes)
+            perm_vec[n_models * n_spatial_nodes + i * n_fixed_effects_per_model: n_models * n_spatial_nodes + (i+1) * n_fixed_effects_per_model] = range(i * (n_spatial_nodes + n_fixed_effects_per_model) + n_spatial_nodes , (i+1) * (n_spatial_nodes + n_fixed_effects_per_model))
+
+        return perm_vec
 
     def _generate_permutation_indices(
         self, n_temporal_nodes: int, n_spatial_nodes: int, n_models: int
