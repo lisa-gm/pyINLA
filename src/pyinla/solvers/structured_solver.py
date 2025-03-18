@@ -121,14 +121,8 @@ class SerinvSolver(Solver):
 
         return 2 * logdet
 
-    def selected_inversion(self, A: NDArray, **kwargs) -> None:
+    def selected_inversion(self, A: sp.sparse.spmatrix, **kwargs) -> None:
         """Compute selected inversion of input matrix using Cholesky factor."""
-
-        L = A.todense()
-        L = xp.linalg.cholesky(L)
-
-        L_inv = sp.linalg.solve_triangular(L, xp.eye(L.shape[0]), lower=True)
-        A_inv = L_inv.T @ L_inv
 
         self._spmatrix_to_structured(A)
 
@@ -147,37 +141,15 @@ class SerinvSolver(Solver):
                 self.A_arrow_bottom_blocks,
                 self.A_arrow_tip_block,
             )
-
-            L2 = self._bta_arrays_to_dense(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-                self.A_lower_diagonal_blocks.transpose(0, 2, 1),
-                self.A_arrow_bottom_blocks,
-                self.A_arrow_bottom_blocks.transpose(0, 2, 1),
-                self.A_arrow_tip_block,
-            )
-
-            print("norm: ", xp.linalg.norm(np.tril(L - L2)))
         else:
+            self.bt_dense_to_arrays(A, self.diagonal_blocksize, self.n_diag_blocks)
+
             pobtf(self.A_diagonal_blocks, self.A_lower_diagonal_blocks)
 
             pobtsi(
                 self.A_diagonal_blocks,
                 self.A_lower_diagonal_blocks,
             )
-
-        A_inv2 = self._bta_arrays_to_dense(
-            self.A_diagonal_blocks,
-            self.A_lower_diagonal_blocks,
-            self.A_lower_diagonal_blocks.transpose(0, 2, 1),
-            self.A_arrow_bottom_blocks,
-            self.A_arrow_bottom_blocks.transpose(0, 2, 1),
-            self.A_arrow_tip_block,
-        )
-
-        print("norm: ", xp.linalg.norm(np.tril(A_inv - A_inv2)))
-
-        return A_inv
 
     def _spmatrix_to_structured(self, A: sp.sparse.spmatrix) -> None:
         """Map sp.spmatrix to BT or BTA."""
@@ -213,6 +185,183 @@ class SerinvSolver(Solver):
         if self.arrowhead_blocksize is not None:
             csc_slice = A_csc[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :]
             self.A_arrow_tip_block[:, :] = csc_slice.todense()
+
+    def bta_dense_to_arrays(
+        self,
+        A: NDArray,
+        diagonal_blocksize: int,
+        arrowhead_blocksize: int,
+        n_diag_blocks: int,
+    ):
+        """Converts a block tridiagonal arrowhead matrix from a dense representation to arrays of blocks.
+
+        Parameters
+        ----------
+        A : ArrayLike
+            Dense representation of the block tridiagonal arrowhead matrix.
+        diagonal_blocksize : int
+            Size of the diagonal blocks.
+        arrowhead_blocksize : int
+            Size of the arrowhead blocks.
+        n_diag_blocks : int
+            Number of diagonal blocks.
+
+        Returns
+        -------
+        A_diagonal_blocks : ArrayLike
+            The diagonal blocks of the block tridiagonal with arrowhead matrix.
+        A_lower_diagonal_blocks : ArrayLike
+            The lower diagonal blocks of the block tridiagonal with arrowhead matrix.
+        A_upper_diagonal_blocks : ArrayLike
+            The upper diagonal blocks of the block tridiagonal with arrowhead matrix.
+        A_lower_arrow_blocks : ArrayLike
+            The arrow bottom blocks of the block tridiagonal with arrowhead matrix.
+        A_upper_arrow_blocks : ArrayLike
+            The arrow right blocks of the block tridiagonal with arrowhead matrix.
+        A_arrow_tip_block : ArrayLike
+            The arrow tip block of the block tridiagonal with arrowhead matrix.
+
+        Notes
+        -----
+        - The BTA matrix in array representation will be returned according
+        to the array module of the input matrix, A.
+        """
+        #xp, _ = _get_module_from_array(A)
+
+        A_diagonal_blocks = xp.zeros(
+            (n_diag_blocks, diagonal_blocksize, diagonal_blocksize),
+            dtype=A.dtype,
+        )
+
+        A_lower_diagonal_blocks = xp.zeros(
+            (n_diag_blocks - 1, diagonal_blocksize, diagonal_blocksize),
+            dtype=A.dtype,
+        )
+        A_upper_diagonal_blocks = xp.zeros(
+            (n_diag_blocks - 1, diagonal_blocksize, diagonal_blocksize),
+            dtype=A.dtype,
+        )
+
+        A_lower_arrow_blocks = xp.zeros(
+            (n_diag_blocks, arrowhead_blocksize, diagonal_blocksize),
+            dtype=A.dtype,
+        )
+
+        A_upper_arrow_blocks = xp.zeros(
+            (n_diag_blocks, diagonal_blocksize, arrowhead_blocksize),
+            dtype=A.dtype,
+        )
+
+        A_arrow_tip_block = xp.zeros(
+            (arrowhead_blocksize, arrowhead_blocksize),
+            dtype=A.dtype,
+        )
+
+        for i in range(n_diag_blocks):
+            A_diagonal_blocks[i] = A[
+                i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+                i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+            ]
+            if i > 0:
+                A_lower_diagonal_blocks[i - 1] = A[
+                    i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+                    (i - 1) * diagonal_blocksize : i * diagonal_blocksize,
+                ]
+            if i < n_diag_blocks - 1:
+                A_upper_diagonal_blocks[i] = A[
+                    i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+                    (i + 1) * diagonal_blocksize : (i + 2) * diagonal_blocksize,
+                ]
+
+            A_lower_arrow_blocks[i] = A[
+                -arrowhead_blocksize:,
+                i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+            ]
+
+            A_upper_arrow_blocks[i] = A[
+                i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+                -arrowhead_blocksize:,
+            ]
+
+        A_arrow_tip_block[:] = A[-arrowhead_blocksize:, -arrowhead_blocksize:]
+
+        return (
+            A_diagonal_blocks,
+            A_lower_diagonal_blocks,
+            A_upper_diagonal_blocks,
+            A_lower_arrow_blocks,
+            A_upper_arrow_blocks,
+            A_arrow_tip_block,
+        )
+
+
+    def bt_dense_to_arrays(
+            A: NDArray,
+            diagonal_blocksize: int,
+            n_diag_blocks: int,
+        ):
+            """Converts a block tridiagonal arrowhead matrix from a dense representation to arrays of blocks.
+
+            Parameters
+            ----------
+            A : ArrayLike
+                Dense representation of the block tridiagonal arrowhead matrix.
+            diagonal_blocksize : int
+                Size of the diagonal blocks.
+            n_diag_blocks : int
+                Number of diagonal blocks.
+
+            Returns
+            -------
+            A_diagonal_blocks : ArrayLike
+                The diagonal blocks of the block tridiagonal with arrowhead matrix.
+            A_lower_diagonal_blocks : ArrayLike
+                The lower diagonal blocks of the block tridiagonal with arrowhead matrix.
+            A_upper_diagonal_blocks : ArrayLike
+                The upper diagonal blocks of the block tridiagonal with arrowhead matrix.
+
+            Notes
+            -----
+            - The BT matrix in array representation will be returned according
+            to the array module of the input matrix, A.
+            """
+            xp, _ = _get_module_from_array(A)
+
+            A_diagonal_blocks = xp.zeros(
+                (n_diag_blocks, diagonal_blocksize, diagonal_blocksize),
+                dtype=A.dtype,
+            )
+
+            A_lower_diagonal_blocks = xp.zeros(
+                (n_diag_blocks - 1, diagonal_blocksize, diagonal_blocksize),
+                dtype=A.dtype,
+            )
+            A_upper_diagonal_blocks = xp.zeros(
+                (n_diag_blocks - 1, diagonal_blocksize, diagonal_blocksize),
+                dtype=A.dtype,
+            )
+
+            for i in range(n_diag_blocks):
+                A_diagonal_blocks[i] = A[
+                    i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+                    i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+                ]
+                if i > 0:
+                    A_lower_diagonal_blocks[i - 1] = A[
+                        i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+                        (i - 1) * diagonal_blocksize : i * diagonal_blocksize,
+                    ]
+                if i < n_diag_blocks - 1:
+                    A_upper_diagonal_blocks[i] = A[
+                        i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+                        (i + 1) * diagonal_blocksize : (i + 2) * diagonal_blocksize,
+                    ]
+
+            return (
+                A_diagonal_blocks,
+                A_lower_diagonal_blocks,
+                A_upper_diagonal_blocks,
+            )
 
     def _bta_arrays_to_dense(
         self,
@@ -309,6 +458,8 @@ class SerinvSolver(Solver):
         sparsity_pattern_csc = sp.sparse.csc_matrix(sparsity_pattern)
         # get lower triangular part
         sparsity_pattern_csc = sp.sparse.tril(sparsity_pattern_csc)
+        sparsity_pattern_csc = sp.sparse.csc_matrix(sparsity_pattern)
+
 
         for col in range(sparsity_pattern.shape[1]):
             start = sparsity_pattern_csc.indptr[col]
@@ -322,23 +473,15 @@ class SerinvSolver(Solver):
                 local_j = col % self.diagonal_blocksize
 
                 if block_i == block_j and block_i < self.n_diag_blocks:
-                    self.A_diagonal_blocks[block_i, local_i, local_j] = (
-                        sparsity_pattern_csc[row, col]
-                    )
-                elif block_i + 1 == block_j and block_i < self.n_diag_blocks - 1:
-                    print("block_i: ", block_i, "block_j: ", block_j)
-                    self.A_lower_diagonal_blocks[block_i, local_i, local_j] = (
-                        sparsity_pattern_csc[row, col]
-                    )
+                    sparsity_pattern_csc[row, col] = self.A_diagonal_blocks[block_i, local_i, local_j] 
+                
+                elif block_i == block_j + 1 and block_i < self.n_diag_blocks - 1:
+                    sparsity_pattern_csc[row, col] = self.A_lower_diagonal_blocks[block_i, local_i, local_j] 
                 # arrowhead
                 elif block_i == self.n_diag_blocks and block_j < self.n_diag_blocks:
-                    self.A_arrow_bottom_blocks[block_j, local_i, local_j] = (
-                        sparsity_pattern_csc[row, col]
-                    )
+                    sparsity_pattern_csc[row, col] = self.A_arrow_bottom_blocks[block_j, local_i, local_j] 
                 elif block_i == self.n_diag_blocks and block_j == self.n_diag_blocks:
-                    self.A_arrow_tip_block[local_i, local_j] = sparsity_pattern_csc[
-                        row, col
-                    ]
+                    sparsity_pattern_csc[row, col ] = self.A_arrow_tip_block[local_i, local_j] 
 
         print("output matrix: ", sparsity_pattern_csc.todense())
         return sparsity_pattern_csc
@@ -502,9 +645,9 @@ def bta_to_dense(
 
 if __name__ == "__main__":
 
-    diagonal_blocksize = 2
+    diagonal_blocksize = 3
     arrowhead_blocksize = 1
-    n_diag_blocks = 5
+    n_diag_blocks = 4
 
     # Define the required keyword arguments
     kwargs = {
@@ -539,9 +682,14 @@ if __name__ == "__main__":
     plt.savefig("A_dense.png")
 
     # save as coo
-    A_coo = sp.sparse.coo_matrix(A_dense)
+    A_csc = sp.sparse.csc_matrix(A_dense)
+    nnz_A = A_csc.nnz
 
-    nnz_A = A_coo.nnz
+    L = A_dense.copy()
+    L = xp.linalg.cholesky(L)
+
+    L_inv = sp.linalg.solve_triangular(L, xp.eye(L.shape[0]), lower=True)
+    A_inv_ref = L_inv.T @ L_inv
 
     # # generate random sparse matrix
     # n = 5
@@ -562,10 +710,48 @@ if __name__ == "__main__":
     # Now you can use the solver instance
     print("Solver initialized successfully.")
 
-    solver.cholesky(A_coo)
+    solver.cholesky(A_csc)
 
-    A_inv = solver._structured_to_spmatrix(A_coo)
+    # call selected inversion
+    solver.selected_inversion(A_csc)
+
+    #if arrowhead_blocksize > 0:
+    Ainv = bta_to_dense(
+        solver.A_diagonal_blocks,
+        solver.A_lower_diagonal_blocks,
+        solver.A_arrow_bottom_blocks,
+        solver.A_lower_diagonal_blocks.transpose(0, 2, 1),
+        solver.A_arrow_bottom_blocks.transpose(0, 2, 1),
+        solver.A_arrow_tip_block,
+        )
+        
+    print("A_inv[:6, :6]: \n", Ainv[:6, :6])
+
+        #self._structured_to_spmatrix(A)
 
     plt.figure()
-    plt.spy(A_inv)
+    plt.spy(Ainv)
     plt.savefig("A_inv.png")
+
+    diff = Ainv - A_inv_ref
+
+    # set entries to zero if they are smaller than 1e-10
+    diff[abs(diff) < 1e-10] = 0
+    
+    plt.figure()
+    plt.spy(diff)
+    plt.savefig("diff.png")   
+
+    Ainv2 = solver._structured_to_spmatrix(A_csc)
+
+    diff2 = Ainv2 - A_inv_ref
+    diff2[abs(diff2) < 1e-10] = 0
+
+    print("diff2[:6, :6]: \n", diff2[:10, :10]) 
+
+
+
+    plt.figure()
+    plt.spy(diff2)
+    plt.savefig("diff2.png")  
+
