@@ -9,11 +9,7 @@ from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
-from pyinla.submodels import (
-    RegressionSubModel,
-    SpatioTemporalSubModel,
-)
-
+from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
 from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
@@ -140,11 +136,16 @@ class PyINLA:
             print_msg("No hyperparameters, just running inner iteration.")
             self.f_value = self._evaluate_f(self.model.theta)
 
+            # internal order and parametrization
             minimization_result: dict = {
                 "theta": self.model.theta,
                 "x": self.model.x,
                 "f": self.f_value,
             }
+
+            # original order and parametrization
+            # minimization_result: dict = {
+
         else:
             print_msg("Starting optimization.")
             self.iter = 0
@@ -372,10 +373,8 @@ class PyINLA:
             )
 
             x_i_norm = xp.linalg.norm(self.x_update)
-            print("x_i_norm: ", x_i_norm)
+            # print("x_i_norm: ", x_i_norm)
             counter += 1
-
-        print("model.x: ", self.model.x)
 
         logdet: float = self.solver.logdet()
 

@@ -29,7 +29,6 @@ class SubModel(ABC):
             self.a: sp.sparse.spmatrix = sp.sparse.csc_matrix(a)
         self.n_latent_parameters: int = self.a.shape[1]
 
-        print("dimensions of a: ", self.a.shape)
         # --- Load latent parameters vector
         try:
             x_initial: NDArray = np.load(self.input_path.joinpath("x.npy"))
@@ -39,8 +38,6 @@ class SubModel(ABC):
                 self.x_initial: NDArray = xp.array(x_initial)
         except FileNotFoundError:
             self.x_initial: NDArray = xp.zeros((self.a.shape[1]), dtype=float)
-
-        print("shape of x_initial: ", self.x_initial.shape)
 
     @abstractmethod
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:

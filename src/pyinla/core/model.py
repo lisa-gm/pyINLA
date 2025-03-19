@@ -10,23 +10,28 @@ from scipy.sparse import spmatrix
 from pyinla import ArrayLike, NDArray, sp, xp
 from pyinla.configs.likelihood_config import LikelihoodConfig
 from pyinla.configs.priorhyperparameters_config import (
-    GaussianPriorHyperparametersConfig,
-    GaussianMVNPriorHyperparametersConfig,
-    PenalizedComplexityPriorHyperparametersConfig,
     BetaPriorHyperparametersConfig,
+    GaussianMVNPriorHyperparametersConfig,
+    GaussianPriorHyperparametersConfig,
+    PenalizedComplexityPriorHyperparametersConfig,
 )
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
 from pyinla.core.submodel import SubModel
 from pyinla.likelihoods import BinomialLikelihood, GaussianLikelihood, PoissonLikelihood
 from pyinla.prior_hyperparameters import (
-    GaussianPriorHyperparameters,
-    GaussianMVNPriorHyperparameters,
-    PenalizedComplexityPriorHyperparameters,
     BetaPriorHyperparameters,
+    GaussianMVNPriorHyperparameters,
+    GaussianPriorHyperparameters,
+    PenalizedComplexityPriorHyperparameters,
 )
-from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel, BrainiacSubModel
+from pyinla.submodels import (
+    BrainiacSubModel,
+    RegressionSubModel,
+    SpatioTemporalSubModel,
+)
 from pyinla.utils import scaled_logit
+
 
 class Model(ABC):
     """Core class for statistical models."""
@@ -120,7 +125,9 @@ class Model(ABC):
                     )
 
                 # alpha hyperparameters
-                if isinstance(submodel.config.ph_alpha, GaussianMVNPriorHyperparametersConfig):
+                if isinstance(
+                    submodel.config.ph_alpha, GaussianMVNPriorHyperparametersConfig
+                ):
                     self.prior_hyperparameters.append(
                         GaussianMVNPriorHyperparameters(
                             config=submodel.config.ph_alpha,
@@ -211,7 +218,9 @@ class Model(ABC):
 
             if self.submodels[0] == BrainiacSubModel:
                 # skip setting prior as it's already set in the submodel
-                print("Brainiac model detected. Skipping setting prior hyperparameters as already set.")
+                print(
+                    "Brainiac model detected. Skipping setting prior hyperparameters as already set."
+                )
             # Instantiate the prior hyperparameters for the likelihood
             elif isinstance(
                 likelihood_config.prior_hyperparameters,
@@ -396,13 +405,17 @@ class Model(ABC):
         if isinstance(self.submodels[0], BrainiacSubModel):
             #
             theta_interpret = self.theta.copy()
-            #print("in evaluate log prior: theta_interpret unscaled: ", theta_interpret)
+            # print("in evaluate log prior: theta_interpret unscaled: ", theta_interpret)
             theta_interpret[0] = scaled_logit(self.theta[0], direction="backward")
-            #print("theta_interpret scaled: ", theta_interpret)
+            # print("theta_interpret scaled: ", theta_interpret)
             # TODO: multivariate prior for a ... need to generalize for now:
-            log_prior += self.prior_hyperparameters[0].evaluate_log_prior(theta_interpret[0])
+            log_prior += self.prior_hyperparameters[0].evaluate_log_prior(
+                theta_interpret[0]
+            )
 
-            log_prior += self.prior_hyperparameters[1].evaluate_log_prior(theta_interpret[1:])
+            log_prior += self.prior_hyperparameters[1].evaluate_log_prior(
+                theta_interpret[1:]
+            )
         else:
             theta_interpret = self.theta
 
@@ -420,7 +433,7 @@ class Model(ABC):
             theta_likelihood = self.theta[self.hyperparameters_idx[-1] :]
 
         return theta_likelihood
-    
+
     def evaluate_likelihood(self, eta: NDArray, y: NDArray, **kwargs) -> float:
         """Evaluate the likelihood."""
 
@@ -429,7 +442,7 @@ class Model(ABC):
             likelihood = self.submodels[0].evaluate_likelihood(eta, y, **kwargs)
         else:
             likelihood = self.likelihood.evaluate_likelihood(eta, y)
-        
+
         return likelihood
 
     def __str__(self) -> str:
