@@ -29,7 +29,8 @@ from pyinla.submodels import (
     RegressionSubModel,
     SpatioTemporalSubModel,
     SpatialSubModel,
-), BrainiacSubModel
+    BrainiacSubModel,
+    )
 from pyinla.utils import scaled_logit
 
 class Model(ABC):
@@ -405,8 +406,6 @@ class Model(ABC):
             # General rules
             d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
 
-        d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
-
         self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 
         return self.Q_conditional
@@ -442,17 +441,15 @@ class Model(ABC):
         """Check if the likelihood is Gaussian."""
         return self.likelihood_config.type == "gaussian"
 
-    def evaluate_likelihood(self, 
-            eta: NDArray,
-        ) -> float:
-        
-        likelihood: float = self.likelihood.evaluate_likelihood(
-            eta=eta,
-            y=self.y,
-            theta=self.theta[self.hyperparameters_idx[-1] :],
-        )
+    def get_theta_likelihood(self) -> NDArray:
+        """Return the likelihood hyperparameters."""
 
-        return likelihood
+        if isinstance(self.submodels[0], BrainiacSubModel):
+            theta_likelihood = 1 - scaled_logit(self.theta[0], direction="backward")
+        else:
+            theta_likelihood = self.theta[self.hyperparameters_idx[-1] :]
+
+        return theta_likelihood
 
     def evaluate_log_prior_hyperparameters(self) -> float:
         """Evaluate the log prior hyperparameters."""
@@ -487,14 +484,15 @@ class Model(ABC):
 
         return theta_likelihood
     
-    def evaluate_likelihood(self, eta: NDArray, y: NDArray, **kwargs) -> float:
+    def evaluate_likelihood(self, eta: NDArray, **kwargs) -> float:
         """Evaluate the likelihood."""
 
         if isinstance(self.submodels[0], BrainiacSubModel):
             kwargs["h2"] = float(self.theta[0])
-            likelihood = self.submodels[0].evaluate_likelihood(eta, y, **kwargs)
+            likelihood = self.submodels[0].evaluate_likelihood(eta, self.y, **kwargs)
         else:
-            likelihood = self.likelihood.evaluate_likelihood(eta, y)
+
+            likelihood = self.likelihood.evaluate_likelihood(eta, self.y, theta=self.theta[self.hyperparameters_idx[-1] :])
         
         return likelihood
 

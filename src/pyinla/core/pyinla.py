@@ -4,19 +4,14 @@ import logging
 import math
 
 from scipy import optimize
-from numpy.linalg import cholesky
 from scipy.sparse import eye
 
 from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp, sp
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
-from pyinla.submodels import (
-    RegressionSubModel,
-    SpatioTemporalSubModel,
-)
 
-from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device
+from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device, smartsplit, synchronize
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
 
