@@ -52,3 +52,8 @@ class Solver(ABC):
     def selected_inversion(self, **kwargs) -> NDArray:
         """Compute selected inversion of input matrix using Cholesky factor."""
         ...
+
+    @abstractmethod
+    def _structured_to_spmatrix(self, **kwargs) -> None:
+        """Convert structured matrix to sparse matrix."""
+        ...

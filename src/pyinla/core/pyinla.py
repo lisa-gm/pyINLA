@@ -5,6 +5,7 @@ import math
 
 from scipy import optimize
 from numpy.linalg import cholesky
+from scipy.sparse import eye
 
 from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp
 from pyinla.configs.pyinla_config import PyinlaConfig
@@ -127,7 +128,41 @@ class PyINLA:
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
 
-    def run(self) -> optimize.OptimizeResult:
+    def run(self) -> dict:
+        """ Run the PyINLA """
+
+        # compute mode of the hyperparameters theta
+        minimization_result = self.minimize()
+
+        # compute covariance of the hyperparameters theta at the mode
+        cov_theta = self.compute_covariance_hp(minimization_result["theta"])
+
+        # compute marginal variances of the latent parameters
+        marginal_variances_latent = self.get_marginal_variances_latent_parameters(
+            minimization_result["theta"], minimization_result["x"]
+        )
+
+        # compute marginal variances of the observations
+        marginal_variances_observations = self.get_marginal_variances_observations(
+            minimization_result["theta"], minimization_result["x"]
+        )
+
+        # construct new dictionary with the results
+        results = {
+            "theta": minimization_result["theta"],
+            "x": minimization_result["x"],
+            "f": minimization_result["f"],
+            "grad_f": minimization_result["grad_f"],
+            "f_values": minimization_result["f_values"],
+            "theta_values": minimization_result["theta_values"],
+            "cov_theta": cov_theta,
+            "marginal_variances_latent": marginal_variances_latent,
+            "marginal_variances_observations": marginal_variances_observations,
+        }
+
+        return results
+
+    def minimize(self) -> optimize.OptimizeResult:
         """Fit the model using INLA.
 
         Parameters
@@ -472,8 +507,8 @@ class PyINLA:
                 ) / (4 * eps_mat[i, i] * eps_mat[j, j])
                 hess[j, i] = hess[i, j]
 
-        print("hess")
-        print(hess)
+        # print("hess")
+        # print(hess)
 
         # compute eigenvalues
         eigvals = xp.linalg.eigvalsh(hess)
@@ -483,14 +518,11 @@ class PyINLA:
             print("eigvals")
             print(eigvals)
 
-        print("eigvals")
-        print(eigvals)
-
         return hess
 
     def _compute_covariance_latent_parameters(
         self, theta: NDArray, x_star: NDArray
-    ) -> NDArray:
+    ) -> None:
         """Compute the marginal distribution of the latent parameters x.
 
         Parameters
@@ -512,9 +544,8 @@ class PyINLA:
 
         self.model.construct_Q_conditional(eta)
         # TODO: call this with correct mpi split ...
-        Q_selected_inverse = self.solver.selected_inversion(self.model.Q_conditional)
+        self.solver.selected_inversion(self.model.Q_conditional)
 
-        return Q_selected_inverse
 
     def get_marginal_variances_latent_parameters(
         self, theta: NDArray = None, x_star: NDArray = None
@@ -533,13 +564,14 @@ class PyINLA:
             )
 
         # check order x_star ... -> potentially need to reorder marginal variances
-        Q_selected_inverse = self._compute_covariance_latent_parameters(theta, x_star)
-        marginal_variances = xp.diag(Q_selected_inverse)
+        self._compute_covariance_latent_parameters(theta, x_star)
 
-        return marginal_variances
+        # now only extract diagonal elements corresponding to marginal variances of the latent parameters
+        marginal_variances = self.solver._structured_to_spmatrix(eye(self.model.n_latent_parameters, dtype=xp.float64))
+        return marginal_variances.diagonal()
 
     def get_marginal_variances_observations(
-        self, theta_i: NDArray, x_star: NDArray
+        self, theta: NDArray, x_star: NDArray
     ) -> NDArray:
         """Extract the marginal variances of the observations.
 
@@ -561,7 +593,36 @@ class PyINLA:
         marginal_variances_observations : NDArray
             Marginal variances of the observations.
         """
-        ...
+
+        if self.model.likelihood.config.type == "gaussian":
+            # TODO: this should be only called by rank 0?
+            if theta is None and x_star is None:
+                print(
+                    "Computing marginal variances for currently stored latent parameters. "
+                )
+                x_star = self.model.x
+                theta = self.model.theta
+            elif theta is None or x_star is None:
+                raise ValueError(
+                    "BOTH or NEITHER theta and x_star must be provided to compute the marginal variances."
+                )
+
+                    # check order x_star ... -> potentially need to reorder marginal variances
+            self._compute_covariance_latent_parameters(theta, x_star)
+
+            # now only extract diagonal elements corresponding to marginal variances of the latent parameters
+            variances_latent = self.solver._structured_to_spmatrix(self.model.Q_conditional)
+
+            # compute diag(A Q_selected_inv A^T)
+            # TODO: sparsify this. can be improved A LOT
+            marginal_variances_observations = (self.model.a @ variances_latent @ self.model.a.T).diagonal()
+
+            return marginal_variances_observations
+    
+        else:
+            raise NotImplementedError(
+                "in compute marginals observations: Only Gaussian likelihood is currently supported."
+            )
 
     def _inner_iteration(
         self,

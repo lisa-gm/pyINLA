@@ -451,21 +451,18 @@ class SerinvSolver(Solver):
         return A
 
     def _structured_to_spmatrix(
-        self, sparsity_pattern: sp.sparse.spmatrix
+        self, A: sp.sparse.spmatrix
     ) -> sp.sparse.spmatrix:
-        """Map BT or BTA matrix to sp.spmatrix using pattern provided in sparsity_pattern."""
+        """Map BT or BTA matrix to sp.spmatrix using sparsity pattern provided in A."""
 
-        sparsity_pattern_csc = sp.sparse.csc_matrix(sparsity_pattern)
-        # get lower triangular part
-        sparsity_pattern_csc = sp.sparse.tril(sparsity_pattern_csc)
-        sparsity_pattern_csc = sp.sparse.csc_matrix(sparsity_pattern)
+        # A is assumed to be symmetric, only use lower triangular part
+        B = sp.sparse.csc_matrix(sp.sparse.tril(sp.sparse.csc_matrix(A)))
 
-
-        for col in range(sparsity_pattern.shape[1]):
-            start = sparsity_pattern_csc.indptr[col]
-            end = sparsity_pattern_csc.indptr[col + 1]
+        for col in range(A.shape[1]):
+            start = B.indptr[col]
+            end = B.indptr[col + 1]
             for i in range(start, end):
-                row = sparsity_pattern_csc.indices[i]
+                row = B.indices[i]
 
                 block_i = row // self.diagonal_blocksize
                 block_j = col // self.diagonal_blocksize
@@ -473,18 +470,20 @@ class SerinvSolver(Solver):
                 local_j = col % self.diagonal_blocksize
 
                 if block_i == block_j and block_i < self.n_diag_blocks:
-                    sparsity_pattern_csc[row, col] = self.A_diagonal_blocks[block_i, local_i, local_j] 
+                    B[row, col] = self.A_diagonal_blocks[block_i, local_i, local_j] 
                 
-                elif block_i == block_j + 1 and block_i < self.n_diag_blocks - 1:
-                    sparsity_pattern_csc[row, col] = self.A_lower_diagonal_blocks[block_i, local_i, local_j] 
+                elif block_i == block_j + 1 and block_j < self.n_diag_blocks - 1:
+                    B[row, col] = self.A_lower_diagonal_blocks[block_j, local_i, local_j] 
                 # arrowhead
                 elif block_i == self.n_diag_blocks and block_j < self.n_diag_blocks:
-                    sparsity_pattern_csc[row, col] = self.A_arrow_bottom_blocks[block_j, local_i, local_j] 
+                    B[row, col] = self.A_arrow_bottom_blocks[block_j, local_i, local_j] 
                 elif block_i == self.n_diag_blocks and block_j == self.n_diag_blocks:
-                    sparsity_pattern_csc[row, col ] = self.A_arrow_tip_block[local_i, local_j] 
+                    B[row, col ] = self.A_arrow_tip_block[local_i, local_j] 
 
-        print("output matrix: ", sparsity_pattern_csc.todense())
-        return sparsity_pattern_csc
+        # symmetrize B
+        B = B + sp.sparse.tril(B, k=-1).T
+
+        return B
 
 
 import numpy as np
@@ -645,9 +644,9 @@ def bta_to_dense(
 
 if __name__ == "__main__":
 
-    diagonal_blocksize = 3
+    diagonal_blocksize = 2
     arrowhead_blocksize = 1
-    n_diag_blocks = 4
+    n_diag_blocks = 3
 
     # Define the required keyword arguments
     kwargs = {
@@ -691,16 +690,6 @@ if __name__ == "__main__":
     L_inv = sp.linalg.solve_triangular(L, xp.eye(L.shape[0]), lower=True)
     A_inv_ref = L_inv.T @ L_inv
 
-    # # generate random sparse matrix
-    # n = 5
-
-    # A = sp.sparse.random(n, n, density=0.2)
-    # A = A @ A.T
-    # # add diagonal
-    # A = A + n * sp.sparse.eye(n, n)
-
-    # print("A: \n", A.todense())
-
     # Create a SolverConfig instance
     config = SolverConfig()
 
@@ -725,7 +714,7 @@ if __name__ == "__main__":
         solver.A_arrow_tip_block,
         )
         
-    print("A_inv[:6, :6]: \n", Ainv[:6, :6])
+    print("A_inv[:6, :6]: \n", Ainv[-6:, -6:])
 
         #self._structured_to_spmatrix(A)
 
@@ -744,12 +733,10 @@ if __name__ == "__main__":
 
     Ainv2 = solver._structured_to_spmatrix(A_csc)
 
+    print("Ainv2[-6:, -6:]: \n", Ainv2[-6:, -6:].toarray())
+
     diff2 = Ainv2 - A_inv_ref
     diff2[abs(diff2) < 1e-10] = 0
-
-    print("diff2[:6, :6]: \n", diff2[:10, :10]) 
-
-
 
     plt.figure()
     plt.spy(diff2)
