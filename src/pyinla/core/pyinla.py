@@ -494,6 +494,7 @@ class PyINLA:
         eps_mat *= self.eps_hessian_f
 
         loop_dim = dim_theta * dim_theta
+
         # store: theta+eps_i, theta, theta-eps_i
         f_ii_loc = xp.zeros((3, dim_theta), dtype=xp.float64)
         # store: theta+eps_i+eps_j, theta+eps_i-eps_j, theta-eps_i+eps_j, theta-eps_i-eps_j
@@ -502,15 +503,18 @@ class PyINLA:
         # compute number of necessary function evaluations
         # f(theta), 2*dim_theta for the diagonal, 4*dim_theta*(dim_theta-1)/2 for the off-diagonal
         no_eval = 1 + 2 * dim_theta + 4 * dim_theta * (dim_theta - 1) // 2
+        if self.world_size > no_eval:
+            print("No idea what happens with MPI split here.")
+            raise ValueError("no_eval > 2*loop_dim")
 
         task_to_rank = xp.ndarray(no_eval, dtype=xp.int64)
         for i in range(no_eval):
-            task_to_rank[i] = i % comm_size
+            task_to_rank[i] = i % self.world_size
 
         counter = 0
         # compute f(theta)
-        if comm_rank == task_to_rank[0]:
-            f_theta = self._evaluate_f(theta_i)
+        if self.color_feval == task_to_rank[0]:
+            f_theta = self._evaluate_f(theta_i, comm=self.comm_feval)
             f_ii_loc[1, :] = f_theta
         counter += 1
 
@@ -521,43 +525,43 @@ class PyINLA:
             # diagonal elements
             if i == j:
 
-                if comm_rank == task_to_rank[counter]:
+                if self.color_feval == task_to_rank[counter]:
                     # theta+eps_i
-                    f_ii_loc[0, i] = self._evaluate_f(theta_i + eps_mat[i, :])
+                    f_ii_loc[0, i] = self._evaluate_f(theta_i + eps_mat[i, :], comm=self.comm_feval)
                 counter += 1
 
-                if comm_rank == task_to_rank[counter]:
+                if self.color_feval == task_to_rank[counter]:
                     # theta-eps_i
-                    f_ii_loc[2, i] = self._evaluate_f(theta_i - eps_mat[i, :])
+                    f_ii_loc[2, i] = self._evaluate_f(theta_i - eps_mat[i, :], comm=self.comm_feval)
                 counter += 1
 
             # as hessian is symmetric we only have to compute the upper triangle
             elif i < j:
                 # theta+eps_i+eps_j
-                if comm_rank == task_to_rank[counter]:
+                if self.color_feval == task_to_rank[counter]:
                     f_ij_loc[0, k] = self._evaluate_f(
-                        theta_i + eps_mat[i, :] + eps_mat[j, :]
+                        theta_i + eps_mat[i, :] + eps_mat[j, :], comm=self.comm_feval
                     )
                 counter += 1
 
                 # theta+eps_i-eps_j
-                if comm_rank == task_to_rank[counter]:
+                if self.color_feval == task_to_rank[counter]:
                     f_ij_loc[1, k] = self._evaluate_f(
-                        theta_i + eps_mat[i, :] - eps_mat[j, :]
+                        theta_i + eps_mat[i, :] - eps_mat[j, :], comm=self.comm_feval
                     )
                 counter += 1
 
                 # theta-eps_i+eps_j
-                if comm_rank == task_to_rank[counter]:
+                if self.color_feval == task_to_rank[counter]:
                     f_ij_loc[2, k] = self._evaluate_f(
-                        theta_i - eps_mat[i, :] + eps_mat[j, :]
+                        theta_i - eps_mat[i, :] + eps_mat[j, :], comm=self.comm_feval
                     )
                 counter += 1
 
                 # theta-eps_i-eps_j
-                if comm_rank == task_to_rank[counter]:
+                if self.color_feval == task_to_rank[counter]:
                     f_ij_loc[3, k] = self._evaluate_f(
-                        theta_i - eps_mat[i, :] - eps_mat[j, :]
+                        theta_i - eps_mat[i, :] - eps_mat[j, :], comm=self.comm_feval
                     )
                 counter += 1
 
