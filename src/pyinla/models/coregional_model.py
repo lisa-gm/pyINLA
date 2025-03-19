@@ -1,0 +1,655 @@
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
+
+import re
+
+import numpy as np
+from scipy.sparse import spmatrix
+
+from pyinla import ArrayLike, NDArray, sp, xp
+from pyinla.configs.models_config import CoregionalModelConfig
+from pyinla.core.model import Model
+from pyinla.core.prior_hyperparameters import PriorHyperparameters
+from pyinla.prior_hyperparameters import (
+    GaussianPriorHyperparameters,
+    PenalizedComplexityPriorHyperparameters,
+)
+from pyinla.submodels import RegressionSubModel, SpatialSubModel, SpatioTemporalSubModel
+from pyinla.utils import bdiag_tiling
+
+
+class CoregionalModel(Model):
+    """Core class for statistical models."""
+
+    def __init__(
+        self,
+        models: list[Model],
+        coregional_model_config: CoregionalModelConfig,
+        **kwargs,
+    ) -> None:
+        """Initializes the model."""
+
+        self.models: list[Model] = models
+
+        # Check the coregionalization type (Spacial or SpatioTemporal)
+        self.coregionalization_type: str
+        self.n_models: int = coregional_model_config.n_models
+        assert self.n_models == len(
+            self.models
+        ), "Number of models does not match the number of models in the CoregionalModelConfig"
+        self.n_spatial_nodes: int = None
+        self.n_temporal_nodes: int = 1
+        self.n_fixed_effects_per_model: int = 0
+        for i, model in enumerate(self.models):
+            if i == 0:
+                if isinstance(model.submodels[0], SpatioTemporalSubModel):
+                    self.coregionalization_type = "spatio_temporal"
+                    self.n_spatial_nodes = model.submodels[0].ns
+                    self.n_temporal_nodes = model.submodels[0].nt
+                elif isinstance(model.submodels[0], SpatialSubModel):
+                    self.coregionalization_type = "spatial"
+                    self.n_spatial_nodes = model.submodels[0].ns
+                else:
+                    print("model.submodels[0]: ", model.submodels[0])
+                    raise ValueError(
+                        "Invalid model type. Must be 'spatial' or 'spatio-temporal'."
+                    )
+                if len(model.submodels) > 1:
+                    if isinstance(model.submodels[1], RegressionSubModel):
+                        self.n_fixed_effects_per_model = model.submodels[
+                            1
+                        ].n_fixed_effects
+            else:
+                # Check that all models are the same
+                if isinstance(model.submodels[0], SpatioTemporalSubModel):
+                    if self.coregionalization_type != "spatio_temporal":
+                        raise ValueError(
+                            f"Model {model} is not of the same type as the first model (SpatioTemporalModel)"
+                        )
+                    # Check that the size of the SpatioTemporal fields are the same
+                    if (
+                        model.submodels[0].ns != self.n_spatial_nodes
+                        or model.submodels[0].nt != self.n_temporal_nodes
+                    ):
+                        raise ValueError(
+                            f"Model {model} is not of the same size as the first model (SpatioTemporalModel)"
+                        )
+                elif isinstance(model.submodels[0], SpatialSubModel):
+                    if self.coregionalization_type != "spatial":
+                        raise ValueError(
+                            f"Model {model} is not of the same type as the first model (SpatialModel)"
+                        )
+                    # Check that the size of the Spatial fields are the same
+                    if model.submodels[0].ns != self.n_spatial_nodes:
+                        raise ValueError(
+                            f"Model {model} is not of the same size as the first model (SpatialModel)"
+                        )
+                else:
+                    raise ValueError(
+                        "Invalid model type. Must be 'spatial' or 'spatio-temporal'."
+                    )
+                if len(model.submodels) > 1:
+                    if isinstance(model.submodels[1], RegressionSubModel):
+                        if (
+                            model.submodels[1].n_fixed_effects
+                            != self.n_fixed_effects_per_model
+                        ):
+                            raise ValueError(
+                                f"Model {model} has a different number of fixed effects than the first model"
+                            )
+
+        # Get Models() hyperparameters
+        theta: ArrayLike = []
+        theta_keys: ArrayLike = []
+        self.hyperparameters_idx: ArrayLike = [0]
+        self.prior_hyperparameters: list[PriorHyperparameters] = []
+
+        for model in self.models:
+            theta_model = model.theta
+            theta_keys_model = model.theta_keys
+
+            # remove the theta that correspond to the "sigma_xx" where x can be whatever
+            sigma_indices = [
+                i
+                for i, key in enumerate(theta_keys_model)
+                if re.match(r"sigma_\w+", key)
+            ]
+            theta_model = [
+                theta for i, theta in enumerate(theta_model) if i not in sigma_indices
+            ]
+            theta_keys_model = [
+                key for i, key in enumerate(theta_keys_model) if i not in sigma_indices
+            ]
+
+            theta.append(xp.array(theta_model))
+            theta_keys += theta_keys_model
+
+            self.hyperparameters_idx.append(
+                self.hyperparameters_idx[-1] + len(theta_model)
+            )
+
+            # Get the prior hyperparameters of the model
+            self.prior_hyperparameters += [
+                prior_hyperparameters
+                for i, prior_hyperparameters in enumerate(model.prior_hyperparameters)
+                if i not in sigma_indices
+            ]
+
+        # Initialize the Coregional Hyperparameters:
+        (
+            theta_coregional_model,
+            theta_keys_coregional_model,
+        ) = coregional_model_config.read_hyperparameters()
+        theta.append(xp.array(theta_coregional_model))
+        theta_keys += theta_keys_coregional_model
+
+        self.hyperparameters_idx.append(
+            self.hyperparameters_idx[-1] + len(theta_coregional_model)
+        )
+
+        # Finalize the hyperparameters
+        self.theta: NDArray = xp.concatenate(theta)
+        self.n_hyperparameters = self.theta.size
+        self.theta_keys: NDArray = theta_keys
+
+        print("theta: ", self.theta)
+        print("theta_keys: ", self.theta_keys)
+
+        # Initialize the Coregional Prior Hyperparameters
+        for ph in coregional_model_config.ph_sigmas:
+            if ph.type == "gaussian":
+                self.prior_hyperparameters.append(
+                    GaussianPriorHyperparameters(
+                        config=ph,
+                    )
+                )
+            elif ph.type == "penalized_complexity":
+                self.prior_hyperparameters.append(
+                    PenalizedComplexityPriorHyperparameters(
+                        config=ph,
+                    )
+                )
+            else:
+                raise ValueError(f"Invalid prior hyperparameters type: {ph.type}")
+
+        for ph in coregional_model_config.ph_lambdas:
+            if ph.type == "gaussian":
+                self.prior_hyperparameters.append(
+                    GaussianPriorHyperparameters(
+                        config=ph,
+                    )
+                )
+            elif ph.type == "penalized_complexity":
+                self.prior_hyperparameters.append(
+                    PenalizedComplexityPriorHyperparameters(
+                        config=ph,
+                    )
+                )
+            else:
+                raise ValueError(f"Invalid prior hyperparameters type: {ph.type}")
+
+        # Construct Coregional Model data from its Models()
+        self.n_latent_parameters: int = 0
+        self.latent_parameters_idx: list[int] = [0]
+        self.n_observations: int = 0
+        self.n_observations_idx: list[int] = [0]
+        for model in self.models:
+            self.n_latent_parameters += model.n_latent_parameters
+            self.latent_parameters_idx.append(self.n_latent_parameters)
+            self.n_observations += model.n_observations
+            self.n_observations_idx.append(self.n_observations)
+
+        # Assemble the latent parameters and observations from the Models()
+        self.x: NDArray = xp.zeros(self.n_latent_parameters)
+        self.y: NDArray = xp.zeros(self.n_observations)
+        for i, model in enumerate(self.models):
+            self.x[
+                self.latent_parameters_idx[i] : self.latent_parameters_idx[i + 1]
+            ] = model.x
+
+            self.y[
+                self.n_observations_idx[i] : self.n_observations_idx[i + 1]
+            ] = model.y
+
+        self.a: spmatrix = bdiag_tiling([model.a for model in self.models]).tocsc()
+
+        if self.coregionalization_type == "spatio_temporal":
+            permutation_latent_variables = self._generate_permutation_indices_for_a(
+                self.n_temporal_nodes,
+                self.n_spatial_nodes,
+                self.n_models,
+                self.n_fixed_effects_per_model,
+            )
+
+            self.a = self.a[:, permutation_latent_variables]
+            self.x = self.x[permutation_latent_variables]
+
+        elif self.coregionalization_type == "spatial":
+            # permute fixed effects to the end
+            permutation_latent_variables = self._generate_permutation_indices_spatial(
+                self.n_spatial_nodes, self.n_fixed_effects_per_model, self.n_models
+            )
+
+            self.a = self.a[:, permutation_latent_variables]
+            self.x = self.x[permutation_latent_variables]
+
+
+
+
+
+            
+
+        # --- Recurrent variables
+        self.Q_prior = None
+        self.Q_prior_data_mapping = [0]
+        self.Q_conditional = None
+        self.Q_conditional_data_mapping = [0]
+
+    def construct_Q_prior(self) -> spmatrix:
+        Qst_list: list = []
+        Q_r: list = []
+
+        for i, model in enumerate(self.models):
+            submodel_st = model.submodels[0]
+            # Get the spatio-temporal submodel idx
+            kwargs_st = {}
+            for hp_idx in range(
+                self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+            ):                
+                kwargs_st[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+
+            # print("in construct Qprior: kwargs_st: ", kwargs_st)
+            Qst_list.append(submodel_st.construct_Q_prior(**kwargs_st).tocsc())
+
+            if len(model.submodels) > 1:
+                # Create the regression tip
+                submodel_r = model.submodels[1]
+                # Get the spatio-temporal submodel idx
+                kwargs_r = {}
+                Q_r.append(submodel_r.construct_Q_prior(**kwargs_r).tocsc())
+
+        sigma_0 = xp.exp(self.theta[self.theta_keys.index("sigma_0")])
+        sigma_1 = xp.exp(self.theta[self.theta_keys.index("sigma_1")])
+        #print("sigma_0: ", sigma_0, "sigma_1: ", sigma_1)
+
+        lambda_0_1 = self.theta[self.theta_keys.index("lambda_0_1")]
+
+        if self.n_models == 2:
+            Qprior_st = sp.sparse.vstack(
+                [
+                    sp.sparse.hstack(
+                        [
+                            (1 / sigma_0**2) * Qst_list[0]
+                            + (lambda_0_1**2 / sigma_1**2) * Qst_list[1],
+                            (-lambda_0_1 / sigma_1**2) * Qst_list[1],
+                        ]
+                    ),
+                    sp.sparse.hstack(
+                        [
+                            (-lambda_0_1 / sigma_1**2) * Qst_list[1],
+                            (1 / sigma_1**2) * Qst_list[1],
+                        ]
+                    ),
+                ]
+            ).tocsc()
+        elif self.n_models == 3:
+            sigma_2 = xp.exp(self.theta[self.theta_keys.index("sigma_2")])
+
+            lambda_0_2 = self.theta[self.theta_keys.index("lambda_0_2")]
+            lambda_1_2 = self.theta[self.theta_keys.index("lambda_1_2")]
+
+            Qprior_st = sp.sparse.vstack(
+                [
+                    sp.sparse.hstack(
+                        [
+                            (1 / sigma_0**2) * Qst_list[0]
+                            + (lambda_0_1**2 / sigma_1**2) * Qst_list[1]
+                            + (lambda_1_2**2 / sigma_2**2) * Qst_list[2],
+                            (-lambda_0_1 / sigma_1**2) * Qst_list[1]
+                            + (lambda_0_2 * lambda_1_2 / sigma_2**2) * Qst_list[2],
+                            -lambda_1_2 / sigma_2**2 * Qst_list[2],
+                        ]
+                    ),
+                    sp.sparse.hstack(
+                        [
+                            (-lambda_0_1 / sigma_1**2) * Qst_list[1]
+                            + (lambda_0_2 * lambda_1_2 / sigma_2**2) * Qst_list[2],
+                            (1 / sigma_1**2) * Qst_list[1]
+                            + (lambda_0_2**2 / sigma_2**2) * Qst_list[2],
+                            -lambda_0_2 / sigma_2**2 * Qst_list[2],
+                        ]
+                    ),
+                    sp.sparse.hstack(
+                        [
+                            -lambda_1_2 / sigma_2**2 * Qst_list[2],
+                            -lambda_0_2 / sigma_2**2 * Qst_list[2],
+                            (1 / sigma_2**2) * Qst_list[2],
+                        ]
+                    ),
+                ]
+            ).tocsc()
+
+        # Apply the permutation to the Qprior_st
+        if self.coregionalization_type == "spatio_temporal":
+            # Permute matrix
+            p_vec = self._generate_permutation_indices(
+                self.n_temporal_nodes, self.n_spatial_nodes, self.n_models
+            )
+            Qprior_st_perm = Qprior_st[p_vec, :][:, p_vec]
+        else:
+            Qprior_st_perm = Qprior_st
+
+        if Q_r != []:
+            Qprior_reg = bdiag_tiling(Q_r).tocsc()
+            self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
+        else:
+            self.Q_prior = Qprior_st_perm
+
+        self.Q_prior = self.Q_prior + 1e-4 * sp.sparse.eye(self.Q_prior.shape[0])
+
+        return self.Q_prior
+
+    def construct_Q_conditional(
+        self,
+        eta: NDArray,
+    ) -> float:
+        """Construct the conditional precision matrix.
+
+        Note
+        ----
+        Input of the hessian of the likelihood is a diagonal matrix.
+        The negative hessian is required, therefore the minus in front.
+
+        """
+
+        d_list = []
+        for i, model in enumerate(self.models):
+            if model.likelihood_config.type == "gaussian":
+                kwargs = {
+                    "eta": eta[
+                        self.n_observations_idx[i] : self.n_observations_idx[i + 1]
+                    ],
+                    "theta": float(self.theta[self.hyperparameters_idx[i + 1] - 1]),
+                }
+            else:
+                kwargs = {
+                    "eta": eta[
+                        self.n_observations_idx[i] : self.n_observations_idx[i + 1]
+                    ],
+                }
+
+            d_list.append(model.likelihood.evaluate_hessian_likelihood(**kwargs))
+
+        d_matrix = bdiag_tiling(d_list).tocsc()
+
+        self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
+
+        return self.Q_conditional
+
+    def construct_information_vector(
+        self,
+        eta: NDArray,
+        x_i: NDArray,
+    ) -> NDArray:
+        """Construct the information vector."""
+
+        gradient_vector_list = []
+        for i, model in enumerate(self.models):
+            gradient_likelihood = model.likelihood.evaluate_gradient_likelihood(
+                eta=eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
+                y=self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
+                theta=float(self.theta[self.hyperparameters_idx[i + 1] - 1]),
+            )
+
+            gradient_vector_list.append(gradient_likelihood)
+
+        gradient_likelihood = xp.concatenate(gradient_vector_list)
+
+        information_vector: NDArray = (
+            -1 * self.Q_prior @ x_i + self.a.T @ gradient_likelihood
+        )
+
+        return information_vector
+
+    def is_likelihood_gaussian(self) -> bool:
+        """Check if the likelihood is Gaussian."""
+        for model in self.models:
+            if not model.is_likelihood_gaussian():
+                return False
+        return True
+
+    def evaluate_likelihood(
+        self,
+        eta: NDArray,
+    ) -> float:
+        likelihood: float = 0.0
+        for i, model in enumerate(self.models):
+            likelihood += model.likelihood.evaluate_likelihood(
+                eta=eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
+                y=self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
+                theta=float(self.theta[self.hyperparameters_idx[i + 1] - 1]),
+            )
+            # print("theta: ", float(self.theta[self.hyperparameters_idx[i+1]-1]))
+
+        return likelihood
+
+    def evaluate_log_prior_hyperparameters(self) -> float:
+        """Evaluate the log prior hyperparameters."""
+        log_prior = 0.0
+
+        theta_interpret = self.theta
+
+        # print("\nin evaluate_log_prior_hyperparameters")
+        for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
+            # print(f"theta_interpret{i}: {theta_interpret[i]}, log prior: ", prior_hyperparameter.evaluate_log_prior(theta_interpret[i]))
+            log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
+
+        return log_prior
+
+    def __str__(self) -> str:
+        """String representation of the model."""
+        # Collect general information about the model
+        coregional_model_info = [
+            " --- Coregional Model ---",
+            f"n_hyperparameters: {self.n_hyperparameters}",
+            f"n_latent_parameters: {self.n_latent_parameters}",
+            f"n_observations: {self.n_observations}",
+        ]
+
+        # Collect each submodel's information
+        model_info = [str(model) for model in self.models]
+
+        # Combine model information and submodel information
+        return "\n".join(coregional_model_info + model_info)
+
+
+    def _generate_permutation_indices_spatial(
+        self, n_spatial_nodes: int, n_fixed_effects_per_model: int, n_models: int
+    ):
+        
+        perm_vec = np.zeros(n_models * ( n_spatial_nodes + n_fixed_effects_per_model), dtype=int)
+        for i in range(n_models):
+            perm_vec[i * n_spatial_nodes: (i+1) * n_spatial_nodes] = range(i * (n_spatial_nodes + n_fixed_effects_per_model), i * (n_spatial_nodes + n_fixed_effects_per_model) + n_spatial_nodes)
+            perm_vec[n_models * n_spatial_nodes + i * n_fixed_effects_per_model: n_models * n_spatial_nodes + (i+1) * n_fixed_effects_per_model] = range(i * (n_spatial_nodes + n_fixed_effects_per_model) + n_spatial_nodes , (i+1) * (n_spatial_nodes + n_fixed_effects_per_model))
+
+        return perm_vec
+
+    def _generate_permutation_indices(
+        self, n_temporal_nodes: int, n_spatial_nodes: int, n_models: int
+    ):
+        """
+        Generate a permutation vector containing indices in the pattern:
+        [0:block_size, n*block_size:(n+1)*block_size, 1*block_size:(1+1)*block_size, (n+1)*block_size:(n+1+1)*block_size, ...]
+
+        Parameters
+        ----------
+        n_temporal_nodes : int
+            Number of blocks.
+        n_spatial_nodes : int
+            Size of each block.
+        n_models : int
+            Number of models.
+
+        Returns
+        -------
+        np.ndarray
+            The generated permutation vector.
+        """
+        indices = np.arange(n_temporal_nodes * n_spatial_nodes)
+
+        first_idx = indices.reshape(n_temporal_nodes, n_spatial_nodes)
+        second_idx = first_idx + n_temporal_nodes * n_spatial_nodes
+
+        if n_models == 2:
+            perm_vectorized = np.hstack((first_idx, second_idx)).flatten()
+        if n_models == 3:
+            third_idx = second_idx + n_temporal_nodes * n_spatial_nodes
+            perm_vectorized = np.hstack((first_idx, second_idx, third_idx)).flatten()
+
+        return perm_vectorized
+
+    def _generate_permutation_indices_for_a_new(
+        self,
+        n_temporal_nodes: int,
+        n_spatial_nodes: int,
+        n_models: int,
+        n_fixed_effects_per_model: int,
+    ):
+        """
+        Generate a permutation vector containing indices in the pattern:
+        [0:block_size, n*block_size:(n+1)*block_size, 1*block_size:(1+1)*block_size, (n+1)*block_size:(n+1+1)*block_size, ...]
+
+        Parameters
+        ----------
+        n_temporal_nodes : int
+            Number of blocks.
+        n_spatial_nodes : int
+            Size of each block.
+        n_models : int
+            Number of models.
+
+        Returns
+        -------
+        np.ndarray
+            The generated permutation vector.
+        """
+        indices = np.arange(n_temporal_nodes * n_spatial_nodes)
+        # indices_fixed_effects_1 = len(indices) + np.arange(n_fixed_effects_per_model)
+
+        first_idx = indices.reshape(n_temporal_nodes, n_spatial_nodes)
+        second_idx = first_idx + n_temporal_nodes * n_spatial_nodes
+        indices_fixed_effects_1 = 2 * n_temporal_nodes * n_spatial_nodes + np.arange(
+            n_fixed_effects_per_model
+        )
+        indices_fixed_effects_2 = n_fixed_effects_per_model + indices_fixed_effects_1
+
+        if n_models == 2:
+            perm_vectorized = np.concatenate(
+                [
+                    np.hstack((first_idx, second_idx)).flatten(),
+                    indices_fixed_effects_1,
+                    indices_fixed_effects_2,
+                ]
+            )
+        elif n_models == 3:
+            third_idx = (
+                second_idx
+                + n_temporal_nodes * n_spatial_nodes
+                + 2 * n_fixed_effects_per_model
+            )
+            indices_fixed_effects_3 = (
+                3 * n_temporal_nodes * n_spatial_nodes
+                + 2 * n_fixed_effects_per_model
+                + np.arange(n_fixed_effects_per_model)
+            )
+            perm_vectorized = np.concatenate(
+                [
+                    np.hstack((first_idx, second_idx, third_idx)).flatten(),
+                    indices_fixed_effects_1,
+                    indices_fixed_effects_2,
+                    indices_fixed_effects_3,
+                ]
+            )
+
+        return perm_vectorized
+
+    def _generate_permutation_indices_for_a(
+        self,
+        n_temporal_nodes: int,
+        n_spatial_nodes: int,
+        n_models: int,
+        n_fixed_effects_per_model: int,
+    ):
+        """
+        Generate a permutation vector containing indices in the pattern:
+        [0:block_size, n*block_size:(n+1)*block_size, 1*block_size:(1+1)*block_size, (n+1)*block_size:(n+1+1)*block_size, ...]
+
+        Parameters
+        ----------
+        n_temporal_nodes : int
+            Number of blocks.
+        n_spatial_nodes : int
+            Size of each block.
+        n_models : int
+            Number of models.
+
+        Returns
+        -------
+        np.ndarray
+            The generated permutation vector.
+        """
+        indices = np.arange(n_temporal_nodes * n_spatial_nodes)
+        indices_fixed_effects_1 = len(indices) + np.arange(n_fixed_effects_per_model)
+
+        first_idx = indices.reshape(n_temporal_nodes, n_spatial_nodes)
+        second_idx = (
+            first_idx + n_fixed_effects_per_model + n_temporal_nodes * n_spatial_nodes
+        )
+        indices_fixed_effects_2 = (
+            2 * n_temporal_nodes * n_spatial_nodes
+            + n_fixed_effects_per_model
+            + np.arange(n_fixed_effects_per_model)
+        )
+
+        if n_models == 2:
+            perm_vectorized = np.concatenate(
+                [
+                    np.hstack((first_idx, second_idx)).flatten(),
+                    indices_fixed_effects_1,
+                    indices_fixed_effects_2,
+                ]
+            )
+        elif n_models == 3:
+            third_idx = (
+                second_idx
+                + n_temporal_nodes * n_spatial_nodes
+                + n_fixed_effects_per_model
+            )
+            indices_fixed_effects_3 = (
+                3 * n_temporal_nodes * n_spatial_nodes
+                + 2 * n_fixed_effects_per_model
+                + np.arange(n_fixed_effects_per_model)
+            )
+            perm_vectorized = np.concatenate(
+                [
+                    np.hstack((first_idx, second_idx, third_idx)).flatten(),
+                    indices_fixed_effects_1,
+                    indices_fixed_effects_2,
+                    indices_fixed_effects_3,
+                ]
+            )
+
+        return perm_vectorized
+
+    def get_solver_parameters(self) -> dict:
+        """Get the solver parameters."""
+        diagonal_blocksize = self.n_models * self.n_spatial_nodes
+        n_diag_blocks = self.n_temporal_nodes
+        arrowhead_blocksize = self.n_fixed_effects_per_model * self.n_models
+
+        param = {
+            "diagonal_blocksize": diagonal_blocksize,
+            "n_diag_blocks": n_diag_blocks,
+            "arrowhead_blocksize": arrowhead_blocksize,
+        }
+
+        return param

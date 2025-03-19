@@ -21,7 +21,11 @@ from pyinla.prior_hyperparameters import (
     GaussianPriorHyperparameters,
     PenalizedComplexityPriorHyperparameters,
 )
-from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
+from pyinla.submodels import (
+    RegressionSubModel,
+    SpatioTemporalSubModel,
+    SpatialSubModel,
+)
 
 
 class Model(ABC):
@@ -51,9 +55,7 @@ class Model(ABC):
 
         for submodel in self.submodels:
             # ...initialize their prior hyperparameters matching their hyperparameters
-            if isinstance(submodel, RegressionSubModel):
-                ...
-            elif isinstance(submodel, SpatioTemporalSubModel):
+            if isinstance(submodel, SpatioTemporalSubModel):
                 # Spatial hyperparameters
                 if isinstance(submodel.config.ph_s, GaussianPriorHyperparametersConfig):
                     self.prior_hyperparameters.append(
@@ -106,6 +108,43 @@ class Model(ABC):
                             hyperparameter_type="sigma_st",
                         )
                     )
+            elif isinstance(submodel, SpatialSubModel):
+                # spatial range
+                if isinstance(submodel.config.ph_s, GaussianPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_s,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_s, PenalizedComplexityPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_s,
+                            hyperparameter_type="r_s",
+                        )
+                    )
+
+                # spatial variation
+                if isinstance(submodel.config.ph_e, GaussianPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_e,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_e, PenalizedComplexityPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_e,
+                            hyperparameter_type="sigma_e",
+                        )
+                    )
+            elif isinstance(submodel, RegressionSubModel):
+                ...
+
             else:
                 raise ValueError("Unknown submodel type")
 
@@ -135,7 +174,7 @@ class Model(ABC):
 
         # --- Initialize the latent parameters and the design matrix
         self.n_latent_parameters: int = 0
-        self.latent_parameters_idx: int = [0]
+        self.latent_parameters_idx: list[int] = [0]
 
         for submodel in self.submodels:
             self.n_latent_parameters += submodel.n_latent_parameters
@@ -180,6 +219,7 @@ class Model(ABC):
         self.n_observations: int = self.y.shape[0]
 
         # --- Initialize likelihood
+        # TODO: clean this -> so that for brainiac model we don't add additional hyperperameter
         if likelihood_config.type == "gaussian":
             self.likelihood: Likelihood = GaussianLikelihood(
                 n_observations=self.n_observations,
@@ -236,13 +276,18 @@ class Model(ABC):
             data = []
 
             for i, submodel in enumerate(self.submodels):
-                if isinstance(submodel, RegressionSubModel):
-                    ...
-                elif isinstance(submodel, SpatioTemporalSubModel):
+                if isinstance(submodel, SpatioTemporalSubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
                         kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, SpatialSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, RegressionSubModel):
+                    ...
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
 
@@ -274,6 +319,11 @@ class Model(ABC):
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
                         kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, SpatialSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
 
@@ -296,12 +346,6 @@ class Model(ABC):
 
         """
 
-        # TODO: need to vectorize
-        # hessian_likelihood_diag = hessian_diag_finite_difference_5pt(
-        #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
-        # )
-        # hessian_likelihood = diags(hessian_likelihood_diag)
-
         if self.likelihood_config.type == "gaussian":
             kwargs = {
                 "eta": eta,
@@ -311,9 +355,10 @@ class Model(ABC):
             kwargs = {
                 "eta": eta,
             }
-        hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(**kwargs)
 
-        self.Q_conditional = self.Q_prior - self.a.T @ hessian_likelihood @ self.a
+        d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
+
+        self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 
         return self.Q_conditional
 
@@ -340,18 +385,37 @@ class Model(ABC):
 
         return information_vector
 
+    def is_likelihood_gaussian(self) -> bool:
+        """Check if the likelihood is Gaussian."""
+        return self.likelihood_config.type == "gaussian"
+
+    def evaluate_likelihood(self, 
+            eta: NDArray,
+        ) -> float:
+        
+        likelihood: float = self.likelihood.evaluate_likelihood(
+            eta=eta,
+            y=self.y,
+            theta=self.theta[self.hyperparameters_idx[-1] :],
+        )
+
+        return likelihood
+
     def evaluate_log_prior_hyperparameters(self) -> float:
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0
 
+        theta_interpret = self.theta
+
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-            log_prior += prior_hyperparameter.evaluate_log_prior(self.theta[i])
+            tmp = prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
+            # print("tmp: ", tmp)
+            log_prior += tmp
 
         return log_prior
 
     def __str__(self) -> str:
         """String representation of the model."""
-        # Collect general information about the model
         # Collect general information about the model
         model_info = [
             " --- Model ---",
@@ -366,3 +430,24 @@ class Model(ABC):
 
         # Combine model information and submodel information
         return "\n".join(model_info + submodel_info)
+
+    def get_solver_parameters(self) -> dict:
+        """Get the solver parameters."""
+        diagonal_blocksize = None
+        n_diag_blocks = None
+        arrowhead_blocksize = 0
+        if isinstance(self.submodels[0], SpatioTemporalSubModel):
+                diagonal_blocksize = self.submodels[0].ns
+                n_diag_blocks = self.submodels[0].nt
+
+        for i in range(1, len(self.submodels)):
+                if isinstance(self.submodels[i], RegressionSubModel):
+                    arrowhead_blocksize += self.submodels[i].n_latent_parameters
+
+        param = {
+            "diagonal_blocksize": diagonal_blocksize,
+            "n_diag_blocks": n_diag_blocks,
+            "arrowhead_blocksize": arrowhead_blocksize,
+        }
+
+        return param
