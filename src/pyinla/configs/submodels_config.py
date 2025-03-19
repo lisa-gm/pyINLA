@@ -7,19 +7,20 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt
 from typing_extensions import Annotated
 
-from pyinla.__init__ import ArrayLike, xp
-from pyinla.configs.priorhyperparameters_config import PriorHyperparametersConfig
+from pyinla.__init__ import ArrayLike, NDArray, xp
+from pyinla.configs.priorhyperparameters_config import PriorHyperparametersConfig, BetaPriorHyperparametersConfig, GaussianMVNPriorHyperparametersConfig
 from pyinla.configs.priorhyperparameters_config import (
     parse_config as parse_priorhyperparameters_config,
 )
+from pyinla.utils import scaled_logit
 
 
 class SubModelConfig(BaseModel, ABC):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     # Input folder for this specific submodel
     input_dir: str = None
-    type: Literal["spatio_temporal", "spatial", "regression"] = None
+    type: Literal["spatio_temporal", "spatial", "regression", "brainiac"] = None
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
@@ -124,12 +125,34 @@ class TemporalSubModelConfig(SubModelConfig): ...
         return theta, theta_keys """
 
 
+class BrainiacSubModelConfig(SubModelConfig):
+    # --- Hyperparameters ---
+    h2: float = None
+    h2_scaled: float = None
+    alpha: NDArray = None 
+
+    # --- Prior hyperparameters ---
+    ph_h2: BetaPriorHyperparametersConfig = None
+    ph_alpha: GaussianMVNPriorHyperparametersConfig = None
+
+    def read_hyperparameters(self):
+
+        # input of h2 is in (0,1), rescale to -/+ INF
+        self.h2_scaled = scaled_logit(self.h2, direction="forward")
+
+        theta = xp.concatenate(([self.h2_scaled], self.alpha))
+        theta_keys = ["h2"] + [f"alpha_{i}" for i in range(len(self.alpha))]
+
+        return theta, theta_keys
+
+
 def parse_config(config: dict | str) -> SubModelConfig:
     if isinstance(config, str):
         with open(config, "rb") as f:
             config = tomllib.load(f)
 
     type = config.get("type")
+    print("type: ", type)
     if type == "spatio_temporal":
         config["ph_s"] = parse_priorhyperparameters_config(config["ph_s"])
         config["ph_t"] = parse_priorhyperparameters_config(config["ph_t"])
@@ -141,6 +164,12 @@ def parse_config(config: dict | str) -> SubModelConfig:
         return SpatialSubModelConfig(**config)
     elif type == "regression":
         return RegressionSubModelConfig(**config)
+    elif type == "brainiac":
+        print("in brainiac parse config")
+        print("config: ", config)
+        config["ph_h2"] = parse_priorhyperparameters_config(config["ph_h2"])
+        config["ph_alpha"] = parse_priorhyperparameters_config(config["ph_alpha"])
+        return BrainiacSubModelConfig(**config)
     # Add more elif branches for other submodel types
     else:
         raise ValueError(f"Unknown submodel type: {type}")

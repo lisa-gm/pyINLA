@@ -11,6 +11,8 @@ from pyinla.utils.host import get_host_configuration
 from pyinla.utils.link_functions import sigmoid
 from pyinla.utils.multiprocessing import allreduce, bcast, print_msg, synchronize, get_active_comm, smartsplit
 from pyinla.utils.spmatrix_utils import bdiag_tiling
+from pyinla.utils.link_functions import sigmoid, cloglog, scaled_logit
+from pyinla.utils.multiprocessing import allreduce, bcast, print_msg, synchronize
 
 __all__ = [
     "get_available_devices",
@@ -20,6 +22,8 @@ __all__ = [
     "get_device",
     "get_host_configuration",
     "sigmoid",
+    "cloglog",
+    "scaled_logit",
     "print_msg",
     "synchronize",
     "get_active_comm",

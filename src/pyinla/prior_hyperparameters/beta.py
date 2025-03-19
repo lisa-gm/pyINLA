@@ -1,8 +1,6 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
-from pyinla import NDArray
-from scipy.sparse import spmatrix
+import scipy.stats as stats
 
-import numpy as np
 
 from pyinla.configs.priorhyperparameters_config import (
     GaussianPriorHyperparametersConfig,
@@ -10,7 +8,7 @@ from pyinla.configs.priorhyperparameters_config import (
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
 
 
-class GaussianPriorHyperparameters(PriorHyperparameters):
+class BetaPriorHyperparameters(PriorHyperparameters):
     """Gaussian prior hyperparameters."""
 
     def __init__(
@@ -20,10 +18,16 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
         """Initializes the Gaussian prior hyperparameters."""
         super().__init__(config)
 
-        self.mean: float = config.mean
-        self.precision: float = config.precision
+        self.alpha: float = config.alpha
+        self.beta: float = config.beta
 
     def evaluate_log_prior(self, theta: float, **kwargs) -> float:
         """Evaluate the log prior hyperparameters."""
 
-        return -0.5 * self.precision * (theta - self.mean) ** 2
+        if theta < 0 or theta > 1:
+            ValueError(
+                "Beta distribution is defined on the interval [0, 1]. theta: {theta}"
+            )
+
+        log_prior = stats.beta.logpdf(theta, self.alpha, self.beta)
+        return log_prior
