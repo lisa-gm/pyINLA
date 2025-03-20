@@ -382,7 +382,6 @@ class CoregionalModel(Model):
         d_matrix = bdiag_tiling(d_list).tocsc()
 
         self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
-
         return self.Q_conditional
 
     def construct_information_vector(

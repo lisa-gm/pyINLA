@@ -669,7 +669,7 @@ class PyINLA:
             Marginal variances of the observations.
         """
 
-        if self.model.likelihood.config.type == "gaussian":
+        if self.model.is_likelihood_gaussian():
             # TODO: this should be only called by rank 0?
             if theta is None and x_star is None:
                 print(

@@ -76,7 +76,7 @@ import numpy as np
 if __name__ == "__main__":
 
     # Set matrix size (larger matrix = more noticeable multithreading impact)
-    n = 6
+    n = 6000
 
     # Generate a random sparse symmetric positive-definite matrix
     A = random(n, n, density=0.2, format="csc")
@@ -96,8 +96,8 @@ if __name__ == "__main__":
     solver = DenseSolver(config, n=n)
     A_inv = solver.selected_inversion(A)
     print(A_inv)
-    print(np.linalg.inv(A_dense))
-    print(np.allclose(A_inv, np.linalg.inv(A_dense)))
+    # print(np.linalg.inv(A_dense))
+    # print(np.allclose(A_inv, np.linalg.inv(A_dense)))
 
     A_inv_spmatrix = solver._structured_to_spmatrix(A)
     print(A_inv_spmatrix.toarray())
