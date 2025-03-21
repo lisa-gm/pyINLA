@@ -8,11 +8,16 @@ from pyinla.utils.gpu_utils import (
     set_device,
 )
 from pyinla.utils.host import get_host_configuration
-from pyinla.utils.link_functions import sigmoid
-from pyinla.utils.multiprocessing import allreduce, bcast, print_msg, synchronize, get_active_comm, smartsplit
-from pyinla.utils.spmatrix_utils import bdiag_tiling
-from pyinla.utils.link_functions import sigmoid, cloglog, scaled_logit
-from pyinla.utils.multiprocessing import allreduce, bcast, print_msg, synchronize
+from pyinla.utils.link_functions import cloglog, scaled_logit, sigmoid
+from pyinla.utils.multiprocessing import (
+    allreduce,
+    bcast,
+    get_active_comm,
+    print_msg,
+    smartsplit,
+    synchronize,
+)
+from pyinla.utils.spmatrix_utils import bdiag_tiling, extract_diagonal
 
 __all__ = [
     "get_available_devices",
@@ -31,4 +36,5 @@ __all__ = [
     "allreduce",
     "bcast",
     "bdiag_tiling",
+    "extract_diagonal",
 ]
