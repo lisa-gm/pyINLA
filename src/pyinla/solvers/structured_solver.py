@@ -1,11 +1,8 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
-import os
 from warnings import warn
 
-import numpy as np
-
-from pyinla import NDArray, _get_module_from_array, sp, xp
+from pyinla import NDArray, sp, xp
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 from pyinla.utils import print_msg
@@ -326,7 +323,6 @@ class SerinvSolver(Solver):
         - The BT matrix in array representation will be returned according
         to the array module of the input matrix, A.
         """
-        xp, _ = _get_module_from_array(A)
 
         A_diagonal_blocks = xp.zeros(
             (n_diag_blocks, diagonal_blocksize, diagonal_blocksize),
@@ -632,8 +628,8 @@ def bta_to_dense(
     return A
 
 
-np.random.seed(41)
-path = os.path.dirname(__file__)
+# np.random.seed(41)
+# path = os.path.dirname(__file__)
 
 
 if __name__ == "__main__":
