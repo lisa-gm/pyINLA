@@ -10,28 +10,29 @@ from scipy.sparse import spmatrix
 from pyinla import ArrayLike, NDArray, sp, xp
 from pyinla.configs.likelihood_config import LikelihoodConfig
 from pyinla.configs.priorhyperparameters_config import (
-    GaussianPriorHyperparametersConfig,
-    GaussianMVNPriorHyperparametersConfig,
-    PenalizedComplexityPriorHyperparametersConfig,
     BetaPriorHyperparametersConfig,
+    GaussianMVNPriorHyperparametersConfig,
+    GaussianPriorHyperparametersConfig,
+    PenalizedComplexityPriorHyperparametersConfig,
 )
 from pyinla.core.likelihood import Likelihood
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
 from pyinla.core.submodel import SubModel
 from pyinla.likelihoods import BinomialLikelihood, GaussianLikelihood, PoissonLikelihood
 from pyinla.prior_hyperparameters import (
-    GaussianPriorHyperparameters,
-    GaussianMVNPriorHyperparameters,
-    PenalizedComplexityPriorHyperparameters,
     BetaPriorHyperparameters,
+    GaussianMVNPriorHyperparameters,
+    GaussianPriorHyperparameters,
+    PenalizedComplexityPriorHyperparameters,
 )
 from pyinla.submodels import (
-    RegressionSubModel,
-    SpatioTemporalSubModel,
-    SpatialSubModel,
     BrainiacSubModel,
-    )
+    RegressionSubModel,
+    SpatialSubModel,
+    SpatioTemporalSubModel,
+)
 from pyinla.utils import scaled_logit
+
 
 class Model(ABC):
     """Core class for statistical models."""
@@ -160,7 +161,9 @@ class Model(ABC):
                     )
 
                 # alpha hyperparameters
-                if isinstance(submodel.config.ph_alpha, GaussianMVNPriorHyperparametersConfig):
+                if isinstance(
+                    submodel.config.ph_alpha, GaussianMVNPriorHyperparametersConfig
+                ):
                     self.prior_hyperparameters.append(
                         GaussianMVNPriorHyperparameters(
                             config=submodel.config.ph_alpha,
@@ -226,6 +229,10 @@ class Model(ABC):
             shape=(submodel.a.shape[0], self.n_latent_parameters),
         )
 
+        # TODO: not so efficient ...
+        self.permutation_latent_variables = xp.arange(self.n_latent_parameters)
+        self.inverse_permutation_latent_variables = xp.arange(self.n_latent_parameters)
+
         # --- Load observation vector
         input_dir = Path(
             kwargs.get("input_dir", os.path.dirname(submodels[0].config.input_dir))
@@ -251,7 +258,9 @@ class Model(ABC):
 
             if self.submodels[0] == BrainiacSubModel:
                 # skip setting prior as it's already set in the submodel
-                print("Brainiac model detected. Skipping setting prior hyperparameters as already set.")
+                print(
+                    "Brainiac model detected. Skipping setting prior hyperparameters as already set."
+                )
             # Instantiate the prior hyperparameters for the likelihood
             elif isinstance(
                 likelihood_config.prior_hyperparameters,
@@ -441,16 +450,6 @@ class Model(ABC):
         """Check if the likelihood is Gaussian."""
         return self.likelihood_config.type == "gaussian"
 
-    def get_theta_likelihood(self) -> NDArray:
-        """Return the likelihood hyperparameters."""
-
-        if isinstance(self.submodels[0], BrainiacSubModel):
-            theta_likelihood = 1 - scaled_logit(self.theta[0], direction="backward")
-        else:
-            theta_likelihood = self.theta[self.hyperparameters_idx[-1] :]
-
-        return theta_likelihood
-
     def evaluate_log_prior_hyperparameters(self) -> float:
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0
@@ -459,13 +458,17 @@ class Model(ABC):
         if isinstance(self.submodels[0], BrainiacSubModel):
             #
             theta_interpret = self.theta.copy()
-            #print("in evaluate log prior: theta_interpret unscaled: ", theta_interpret)
+            # print("in evaluate log prior: theta_interpret unscaled: ", theta_interpret)
             theta_interpret[0] = scaled_logit(self.theta[0], direction="backward")
-            #print("theta_interpret scaled: ", theta_interpret)
+            # print("theta_interpret scaled: ", theta_interpret)
             # TODO: multivariate prior for a ... need to generalize for now:
-            log_prior += self.prior_hyperparameters[0].evaluate_log_prior(theta_interpret[0])
+            log_prior += self.prior_hyperparameters[0].evaluate_log_prior(
+                theta_interpret[0]
+            )
 
-            log_prior += self.prior_hyperparameters[1].evaluate_log_prior(theta_interpret[1:])
+            log_prior += self.prior_hyperparameters[1].evaluate_log_prior(
+                theta_interpret[1:]
+            )
         else:
             theta_interpret = self.theta
 
@@ -483,7 +486,7 @@ class Model(ABC):
             theta_likelihood = self.theta[self.hyperparameters_idx[-1] :]
 
         return theta_likelihood
-    
+
     def evaluate_likelihood(self, eta: NDArray, **kwargs) -> float:
         """Evaluate the likelihood."""
 
@@ -491,9 +494,10 @@ class Model(ABC):
             kwargs["h2"] = float(self.theta[0])
             likelihood = self.submodels[0].evaluate_likelihood(eta, self.y, **kwargs)
         else:
+            likelihood = self.likelihood.evaluate_likelihood(
+                eta, self.y, theta=self.theta[self.hyperparameters_idx[-1] :]
+            )
 
-            likelihood = self.likelihood.evaluate_likelihood(eta, self.y, theta=self.theta[self.hyperparameters_idx[-1] :])
-        
         return likelihood
 
     def __str__(self) -> str:
@@ -519,12 +523,12 @@ class Model(ABC):
         n_diag_blocks = None
         arrowhead_blocksize = 0
         if isinstance(self.submodels[0], SpatioTemporalSubModel):
-                diagonal_blocksize = self.submodels[0].ns
-                n_diag_blocks = self.submodels[0].nt
+            diagonal_blocksize = self.submodels[0].ns
+            n_diag_blocks = self.submodels[0].nt
 
         for i in range(1, len(self.submodels)):
-                if isinstance(self.submodels[i], RegressionSubModel):
-                    arrowhead_blocksize += self.submodels[i].n_latent_parameters
+            if isinstance(self.submodels[i], RegressionSubModel):
+                arrowhead_blocksize += self.submodels[i].n_latent_parameters
 
         param = {
             "diagonal_blocksize": diagonal_blocksize,

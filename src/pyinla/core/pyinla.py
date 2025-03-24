@@ -1,21 +1,27 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import logging
-import math
 
+from mpi4py import MPI
 from scipy import optimize
 from scipy.sparse import eye
 
-from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp, sp
+from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
-
-from pyinla.utils import allreduce, get_device, get_host, print_msg, set_device, smartsplit, synchronize
+from pyinla.utils import (
+    allreduce,
+    extract_diagonal,
+    get_device,
+    get_host,
+    print_msg,
+    set_device,
+    smartsplit,
+    synchronize,
+)
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
-
-from mpi4py import MPI
 
 
 class PyINLA:
@@ -127,22 +133,25 @@ class PyINLA:
         print_msg("PyINLA initialized.", flush=True)
 
     def run(self) -> dict:
-        """ Run the PyINLA """
+        """Run the PyINLA"""
 
         # compute mode of the hyperparameters theta
         minimization_result = self.minimize()
 
+        theta_star = get_device(minimization_result["theta"])
+        x_star = get_device(minimization_result["x"])
+
         # compute covariance of the hyperparameters theta at the mode
-        cov_theta = self.compute_covariance_hp(minimization_result["theta"])
+        cov_theta = self.compute_covariance_hp(theta_star)
 
         # compute marginal variances of the latent parameters
         marginal_variances_latent = self.get_marginal_variances_latent_parameters(
-            minimization_result["theta"], minimization_result["x"]
+            theta_star, x_star
         )
 
         # compute marginal variances of the observations
         marginal_variances_observations = self.get_marginal_variances_observations(
-            minimization_result["theta"], minimization_result["x"]
+            theta_star, x_star
         )
 
         # construct new dictionary with the results
@@ -153,9 +162,11 @@ class PyINLA:
             "grad_f": minimization_result["grad_f"],
             "f_values": minimization_result["f_values"],
             "theta_values": minimization_result["theta_values"],
-            "cov_theta": cov_theta,
-            "marginal_variances_latent": marginal_variances_latent,
-            "marginal_variances_observations": marginal_variances_observations,
+            "cov_theta": get_host(cov_theta),
+            "marginal_variances_latent": get_host(marginal_variances_latent),
+            "marginal_variances_observations": get_host(
+                marginal_variances_observations
+            ),
         }
 
         return results
@@ -180,7 +191,7 @@ class PyINLA:
 
             minimization_result: dict = {
                 "theta": self.model.theta,
-                "x": self.model.x,
+                "x": self.model.x[self.model.inverse_permutation_latent_variables],
                 "f": self.f_value,
             }
         else:
@@ -219,8 +230,6 @@ class PyINLA:
                 options={
                     "maxiter": self.config.minimize.max_iter,
                     "gtol": self.config.minimize.gtol,
-                    "c1": self.config.minimize.c1,
-                    "c2": self.config.minimize.c2,
                     "disp": self.config.minimize.disp,
                     "ftol": 1e-18,
                 },
@@ -250,7 +259,9 @@ class PyINLA:
 
             minimization_result: dict = {
                 "theta": scipy_result.x,
-                "x": get_host(self.model.x),
+                "x": get_host(
+                    self.model.x[self.model.inverse_permutation_latent_variables]
+                ),
                 "f": scipy_result.fun,
                 "grad_f": self.gradient_f,
                 "f_values": self.f_values,
@@ -457,7 +468,6 @@ class PyINLA:
 
         return cov_theta
 
-    # TODO: update this to use smartsplit() - correct communicator
     def _evaluate_hessian_f(
         self,
         theta_i: NDArray,
@@ -477,6 +487,10 @@ class PyINLA:
         -----
         Compute finite difference approximation of the hessian of f at theta_i.
         """
+
+        print("epsilon hessian f: ", self.eps_hessian_f)
+        print("theta_i: ", theta_i)
+
         self.model.theta[:] = theta_i
         dim_theta = self.model.n_hyperparameters
 
@@ -518,15 +532,18 @@ class PyINLA:
 
             # diagonal elements
             if i == j:
-
                 if self.color_feval == task_to_rank[counter]:
                     # theta+eps_i
-                    f_ii_loc[0, i] = self._evaluate_f(theta_i + eps_mat[i, :], comm=self.comm_feval)
+                    f_ii_loc[0, i] = self._evaluate_f(
+                        theta_i + eps_mat[i, :], comm=self.comm_feval
+                    )
                 counter += 1
 
                 if self.color_feval == task_to_rank[counter]:
                     # theta-eps_i
-                    f_ii_loc[2, i] = self._evaluate_f(theta_i - eps_mat[i, :], comm=self.comm_feval)
+                    f_ii_loc[2, i] = self._evaluate_f(
+                        theta_i - eps_mat[i, :], comm=self.comm_feval
+                    )
                 counter += 1
 
             # as hessian is symmetric we only have to compute the upper triangle
@@ -621,11 +638,9 @@ class PyINLA:
         # TODO: call this with correct mpi split ...
         self.solver.selected_inversion(self.model.Q_conditional)
 
-
     def get_marginal_variances_latent_parameters(
         self, theta: NDArray = None, x_star: NDArray = None
     ) -> NDArray:
-
         # TODO: this should be only called by rank 0?
         if theta is None and x_star is None:
             print(
@@ -642,8 +657,11 @@ class PyINLA:
         self._compute_covariance_latent_parameters(theta, x_star)
 
         # now only extract diagonal elements corresponding to marginal variances of the latent parameters
-        marginal_variances = self.solver._structured_to_spmatrix(eye(self.model.n_latent_parameters, dtype=xp.float64))
-        return marginal_variances.diagonal()
+        marginal_variances_sp = self.solver._structured_to_spmatrix(
+            eye(self.model.n_latent_parameters, dtype=xp.float64)
+        )
+        marginal_variances = extract_diagonal(marginal_variances_sp)
+        return marginal_variances
 
     def get_marginal_variances_observations(
         self, theta: NDArray, x_star: NDArray
@@ -682,18 +700,22 @@ class PyINLA:
                     "BOTH or NEITHER theta and x_star must be provided to compute the marginal variances."
                 )
 
-                    # check order x_star ... -> potentially need to reorder marginal variances
+                # check order x_star ... -> potentially need to reorder marginal variances
             self._compute_covariance_latent_parameters(theta, x_star)
 
             # now only extract diagonal elements corresponding to marginal variances of the latent parameters
-            variances_latent = self.solver._structured_to_spmatrix(self.model.Q_conditional)
+            variances_latent = self.solver._structured_to_spmatrix(
+                self.model.Q_conditional
+            )
 
             # compute diag(A Q_selected_inv A^T)
             # TODO: sparsify this. can be improved A LOT
-            marginal_variances_observations = (self.model.a @ variances_latent @ self.model.a.T).diagonal()
+            marginal_variances_observations = (
+                self.model.a @ variances_latent @ self.model.a.T
+            ).diagonal()
 
             return marginal_variances_observations
-    
+
         else:
             raise NotImplementedError(
                 "in compute marginals observations: Only Gaussian likelihood is currently supported."
