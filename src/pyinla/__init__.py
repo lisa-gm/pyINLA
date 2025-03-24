@@ -21,13 +21,11 @@ if backend_flags["array_module"] is not None:
     if backend_flags["array_module"] == "numpy":
         import numpy as xp
         import scipy as sp
-        import scipy.linalg as spl
 
     elif backend_flags["array_module"] == "cupy":
         try:
             import cupy as xp
             import cupyx.scipy as sp
-            import cupyx.scipy.linalg as spl
 
             # Check if cupy is actually working. This could still raise
             # a cudaErrorInsufficientDriver error or something.
@@ -45,7 +43,6 @@ else:
     warn("No `ARRAY_MODULE` specified, pyINLA.core defaulting to 'NumPy'.")
     import numpy as xp
     import scipy as sp
-    import scipy.linalg as spl
 
 # In any case, check if CuPy is available.
 try:
@@ -84,7 +81,6 @@ __all__ = [
     "__version__",
     "xp",
     "sp",
-    "spl",
     "ArrayLike",
     "NDArray",
     "comm_rank",
