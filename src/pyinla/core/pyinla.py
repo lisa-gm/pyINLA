@@ -488,9 +488,6 @@ class PyINLA:
         Compute finite difference approximation of the hessian of f at theta_i.
         """
 
-        print("epsilon hessian f: ", self.eps_hessian_f)
-        print("theta_i: ", theta_i)
-
         self.model.theta[:] = theta_i
         dim_theta = self.model.n_hyperparameters
 
@@ -576,9 +573,7 @@ class PyINLA:
                     )
                 counter += 1
 
-        # mpi barrier
         synchronize()
-
         allreduce(f_ii_loc, op="sum")
         allreduce(f_ij_loc, op="sum")
 
@@ -599,16 +594,11 @@ class PyINLA:
                 ) / (4 * eps_mat[i, i] * eps_mat[j, j])
                 hess[j, i] = hess[i, j]
 
-        # print("hess")
-        # print(hess)
-
         # compute eigenvalues
         eigvals = xp.linalg.eigvalsh(hess)
 
         if xp.any(eigvals < 0):
-            print("Negative eigenvalues detected.")
-            print("eigvals")
-            print(eigvals)
+            print(f"Negative eigenvalues detected: {eigvals}")
 
         return hess
 

@@ -90,19 +90,23 @@ def bcast(
 
 def get_active_comm(
     comm: MPI.Comm,
-    n_parallelizable_evaluations: int,  
+    n_parallelizable_evaluations: int,
     tag: str,
 ) -> MPI.Comm:
-    """ Return a communicator made out of all the processes that can be active
-    given the number of parallelizable evaluations. """
+    """Return a communicator made out of all the processes that can be active
+    given the number of parallelizable evaluations."""
     if backend_flags["mpi_avail"]:
         rank = comm.Get_rank()
         size = comm.Get_size()
         group_size = size // n_parallelizable_evaluations
 
-        if size > n_parallelizable_evaluations and rank >= (group_size * n_parallelizable_evaluations):
+        if size > n_parallelizable_evaluations and rank >= (
+            group_size * n_parallelizable_evaluations
+        ):
             # Remainder processes are excluded because they cannot be assigned to any group
-            print(f"Rank: {rank} won't party tonight at '{tag}' level because you need a multiple of {n_parallelizable_evaluations} processes in the calling comm_group")
+            print(
+                f"Rank: {rank} won't party tonight at '{tag}' level because you need a multiple of {n_parallelizable_evaluations} processes in the calling comm_group"
+            )
             color = MPI.UNDEFINED
         else:
             color = 0
@@ -116,31 +120,31 @@ def get_active_comm(
 
     return active_comm
 
+
 def smartsplit(
     comm: MPI.Comm,
-    n_parallelizable_evaluations: int,  
+    n_parallelizable_evaluations: int,
     tag: str,
-) -> tuple[MPI.Comm, int]:
+    min_group_size: int = 1,
+) -> tuple[MPI.Comm, MPI.Comm, int]:
     if backend_flags["mpi_avail"]:
-        # TODO: This function should return a "root" communicator, aka. a communicator made only of the root processes of each group
-        active_comm = get_active_comm(comm, n_parallelizable_evaluations, tag)
+        # Checks for compatibility of given comm sizes
+        min_comm = get_active_comm(comm, min_group_size, tag="minimum_comm")
+        active_comm = get_active_comm(
+            min_comm, n_parallelizable_evaluations * min_group_size, tag
+        )
         rank = active_comm.Get_rank()
         size = active_comm.Get_size()
 
+        # Compute the group size, given its minimum
         group_size = size // n_parallelizable_evaluations
-        if size < n_parallelizable_evaluations:
-            # Less processes than n_parallelizable_evaluations
-            color_new_group = rank
-        else:
-            # More (or =) processes than n_parallelizable_evaluations
-            color_new_group = rank // group_size
+        if group_size < min_group_size:
+            group_size = min_group_size
+
+        # Split the communicator
+        color_new_group = rank // group_size
         key_new_group = rank
         comm_new_group = active_comm.Split(color_new_group, key_new_group)
-
-        """ if size > n_parallelizable_evaluations and rank >= (group_size * n_parallelizable_evaluations):
-                # Remainder processes are terminated because cannot be assigned to any group
-                print(f"Rank: {rank} terminated at the '{tag}' level because you need a multiple of {n_parallelizable_evaluations} processes in the calling comm_group")
-                exit() """
     else:
         active_comm = comm
         comm_new_group = comm

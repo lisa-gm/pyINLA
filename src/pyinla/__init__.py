@@ -35,7 +35,6 @@ if backend_flags["array_module"] is not None:
             warn(f"'CuPy' is unavailable, defaulting to 'NumPy'. ({e})")
             import numpy as xp
             import scipy as sp
-            import scipy.linalg as spl
     else:
         raise ValueError(f"Unrecognized ARRAY_MODULE '{backend_flags['array_module']}'")
 else:

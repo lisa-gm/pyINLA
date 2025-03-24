@@ -45,26 +45,3 @@ class GaussianMVNPriorHyperparameters(PriorHyperparameters):
         else:
             # neglect constant as the precision is fixed
             return -0.5 * (theta - self.mean).T @ self.precision @ (theta - self.mean)
-
-
-if __name__ == "__main__":
-    """ -> Careful with the np array, this code might be broken if 
-    running on GPU now as I modifed the array to be on the GPU if xp is cp
-    # Test GaussianPriorHyperparameters
-    config = GaussianMVNPriorHyperparametersConfig(mean=0, precision=2)
-    prior_hyperparameters = GaussianMVNPriorHyperparameters(config)
-
-    theta = 1
-    log_prior = prior_hyperparameters.evaluate_log_prior(theta)
-    print(log_prior)  # -0.0
-
-    n = 3
-    mean = np.ones((n, 1))
-    precision = 2 * np.eye(n)
-
-    config = GaussianMVNPriorHyperparametersConfig(mean=mean, precision=precision)
-
-    theta = np.random.randn(n, 1)
-    prior_hyperparameters = GaussianMVNPriorHyperparameters(config)
-    log_prior = prior_hyperparameters.evaluate_log_prior(theta)
-    print(log_prior)  # -0.0 """
