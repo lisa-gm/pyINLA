@@ -138,17 +138,20 @@ class PyINLA:
         # compute mode of the hyperparameters theta
         minimization_result = self.minimize()
 
+        theta_star = get_device(minimization_result["theta"])
+        x_star = get_device(minimization_result["x"])
+
         # compute covariance of the hyperparameters theta at the mode
-        cov_theta = self.compute_covariance_hp(self.model.theta)
+        cov_theta = self.compute_covariance_hp(theta_star)
 
         # compute marginal variances of the latent parameters
         marginal_variances_latent = self.get_marginal_variances_latent_parameters(
-            self.model.theta, self.model.x
+            theta_star, x_star
         )
 
         # compute marginal variances of the observations
         marginal_variances_observations = self.get_marginal_variances_observations(
-            self.model.theta, self.model.x
+            theta_star, x_star
         )
 
         # construct new dictionary with the results
@@ -159,9 +162,11 @@ class PyINLA:
             "grad_f": minimization_result["grad_f"],
             "f_values": minimization_result["f_values"],
             "theta_values": minimization_result["theta_values"],
-            "cov_theta": cov_theta,
-            "marginal_variances_latent": marginal_variances_latent,
-            "marginal_variances_observations": marginal_variances_observations,
+            "cov_theta": get_host(cov_theta),
+            "marginal_variances_latent": get_host(marginal_variances_latent),
+            "marginal_variances_observations": get_host(
+                marginal_variances_observations
+            ),
         }
 
         return results
@@ -186,7 +191,7 @@ class PyINLA:
 
             minimization_result: dict = {
                 "theta": self.model.theta,
-                "x": self.model.x,
+                "x": self.model.x[self.model.inverse_permutation_latent_variables],
                 "f": self.f_value,
             }
         else:
@@ -225,8 +230,6 @@ class PyINLA:
                 options={
                     "maxiter": self.config.minimize.max_iter,
                     "gtol": self.config.minimize.gtol,
-                    "c1": self.config.minimize.c1,
-                    "c2": self.config.minimize.c2,
                     "disp": self.config.minimize.disp,
                     "ftol": 1e-18,
                 },
@@ -256,7 +259,9 @@ class PyINLA:
 
             minimization_result: dict = {
                 "theta": scipy_result.x,
-                "x": get_host(self.model.x),
+                "x": get_host(
+                    self.model.x[self.model.inverse_permutation_latent_variables]
+                ),
                 "f": scipy_result.fun,
                 "grad_f": self.gradient_f,
                 "f_values": self.f_values,
@@ -482,6 +487,10 @@ class PyINLA:
         -----
         Compute finite difference approximation of the hessian of f at theta_i.
         """
+
+        print("epsilon hessian f: ", self.eps_hessian_f)
+        print("theta_i: ", theta_i)
+
         self.model.theta[:] = theta_i
         dim_theta = self.model.n_hyperparameters
 
