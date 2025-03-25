@@ -6,10 +6,10 @@ from mpi4py import MPI
 from scipy import optimize
 from scipy.sparse import eye
 
-from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp
+from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp, backend_flags
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
-from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver
+from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver, DistSerinvSolver
 from pyinla.utils import (
     allreduce,
     extract_diagonal,
@@ -63,21 +63,31 @@ class PyINLA:
 
         self.n_f_evaluations = 2 * self.model.n_hyperparameters + 1
 
-        # Split the feval communicator
+        # Create the appropriate communicators
+        min_solver_size = self.config.solver.min_processes
+        if backend_flags["mpi_avail"]:
+            if MPI.COMM_WORLD.Get_size() < min_solver_size:
+                raise ValueError(
+                    f"Number of processes must be at least {min_solver_size} to fullfil the distributed solver requirments."
+                )
+
         self.comm_world, self.comm_feval, self.color_feval = smartsplit(
             comm=MPI.COMM_WORLD,
             n_parallelizable_evaluations=self.n_f_evaluations,
             tag="feval",
+            min_group_size=min_solver_size,
         )
         self.world_size = self.comm_world.Get_size()
 
-        # Split the qeval communicator
         if self.model.is_likelihood_gaussian():
             self.n_qeval = 2
         else:
             self.n_qeval = 1
         _, self.comm_qeval, self.color_qeval = smartsplit(
-            comm=self.comm_feval, n_parallelizable_evaluations=self.n_qeval, tag="qeval"
+            comm=self.comm_feval,
+            n_parallelizable_evaluations=self.n_qeval,
+            tag="qeval",
+            min_group_size=min_solver_size,
         )
 
         # --- Initialize solver
@@ -103,12 +113,31 @@ class PyINLA:
                     "Serinv solver is not made for non spatio-temporal models."
                 )
 
-            self.solver = SerinvSolver(
-                config=self.config.solver,
-                diagonal_blocksize=diagonal_blocksize,
-                arrowhead_blocksize=arrowhead_blocksize,
-                n_diag_blocks=n_diag_blocks,
-            )
+            n_processes_solver = self.comm_qeval.Get_size()
+
+            if n_processes_solver == 1:
+                self.solver = SerinvSolver(
+                    config=self.config.solver,
+                    diagonal_blocksize=diagonal_blocksize,
+                    arrowhead_blocksize=arrowhead_blocksize,
+                    n_diag_blocks=n_diag_blocks,
+                )
+            else:
+                if n_diag_blocks < n_processes_solver * 3:
+                    raise ValueError(
+                        f"Not enough diagonal blocks ({n_diag_blocks}) to use the distributed solver with {n_processes_solver} processes."
+                    )
+
+                self.solver = DistSerinvSolver(
+                    config=self.config.solver,
+                    diagonal_blocksize=diagonal_blocksize,
+                    arrowhead_blocksize=arrowhead_blocksize,
+                    n_diag_blocks=n_diag_blocks,
+                    comm=self.comm_qeval,
+                )
+
+        print(f"Finished solver init, exiting for now.")
+        exit()
 
         # --- Set up recurrent variables
         self.gradient_f = xp.zeros(self.model.n_hyperparameters, dtype=xp.float64)

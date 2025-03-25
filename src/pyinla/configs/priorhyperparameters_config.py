@@ -8,6 +8,7 @@ from typing_extensions import Annotated
 from pyinla.__init__ import NDArray
 from scipy.sparse import spmatrix
 
+
 # --- PRIOR HYPERPARAMETERS ----------------------------------------------------
 class PriorHyperparametersConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)

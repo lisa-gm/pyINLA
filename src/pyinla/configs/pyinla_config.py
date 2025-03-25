@@ -12,6 +12,8 @@ class SolverConfig(BaseModel):
 
     type: Literal["dense", "scipy", "serinv"] = "scipy"
 
+    min_processes: PositiveInt = 1
+
 
 class BFGSConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
