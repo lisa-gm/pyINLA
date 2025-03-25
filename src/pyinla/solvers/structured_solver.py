@@ -13,6 +13,9 @@ except ImportError as e:
     warn(f"The serinv package is required to use the SerinvSolver: {e}")
 
 
+import time
+
+
 class SerinvSolver(Solver):
     """Serinv Solver class."""
 
@@ -163,7 +166,6 @@ class SerinvSolver(Solver):
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
             ]
-
             self.A_diagonal_blocks[i, :, :] = csc_slice.todense()
 
             if i < self.n_diag_blocks - 1:
@@ -181,7 +183,6 @@ class SerinvSolver(Solver):
                     -self.arrowhead_blocksize :,
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 ]
-
                 self.A_arrow_bottom_blocks[i, :, :] = csc_slice.todense()
 
         if self.arrowhead_blocksize is not None:
@@ -194,31 +195,84 @@ class SerinvSolver(Solver):
         # A is assumed to be symmetric, only use lower triangular part
         B = sp.sparse.csc_matrix(sp.sparse.tril(sp.sparse.csc_matrix(A)))
 
-        for col in range(A.shape[1]):
-            start = B.indptr[col]
-            end = B.indptr[col + 1]
+        for i in range(self.n_diag_blocks):
+            # Extract the sparsity pattern of the current Diagonal, Lower, and Arrowhead blocks
+            row_diag, col_diag = B[
+                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+            ].nonzero()
+            B[
+                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+            ] = sp.sparse.coo_matrix(
+                (self.A_diagonal_blocks[i, row_diag, col_diag], (row_diag, col_diag)),
+                shape=B[
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                ].shape,
+            )
 
-            rows = B.indices[start:end]
-            for row in rows:
-                block_i = row // self.diagonal_blocksize
-                block_j = col // self.diagonal_blocksize
-                local_i = row % self.diagonal_blocksize
-                local_j = col % self.diagonal_blocksize
+            if i < self.n_diag_blocks - 1:
+                row_lower, col_lower = B[
+                    (i + 1)
+                    * self.diagonal_blocksize : (i + 2)
+                    * self.diagonal_blocksize,
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                ].nonzero()
+                B[
+                    (i + 1)
+                    * self.diagonal_blocksize : (i + 2)
+                    * self.diagonal_blocksize,
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                ] = sp.sparse.coo_matrix(
+                    (
+                        self.A_lower_diagonal_blocks[i, row_lower, col_lower],
+                        (row_lower, col_lower),
+                    ),
+                    shape=B[
+                        (i + 1)
+                        * self.diagonal_blocksize : (i + 2)
+                        * self.diagonal_blocksize,
+                        i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                    ].shape,
+                )
 
-                if block_i == block_j and block_i < self.n_diag_blocks:
-                    B[row, col] = self.A_diagonal_blocks[block_i, local_i, local_j]
+            if self.arrowhead_blocksize is not None:
+                row_arrow, col_arrow = B[
+                    -self.arrowhead_blocksize :,
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                ].nonzero()
+                B[
+                    -self.arrowhead_blocksize :,
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                ] = sp.sparse.coo_matrix(
+                    (
+                        self.A_arrow_bottom_blocks[i, row_arrow, col_arrow],
+                        (row_arrow, col_arrow),
+                    ),
+                    shape=B[
+                        -self.arrowhead_blocksize :,
+                        i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                    ].shape,
+                )
 
-                elif block_i == block_j + 1 and block_j < self.n_diag_blocks - 1:
-                    B[row, col] = self.A_lower_diagonal_blocks[
-                        block_j, local_i, local_j
-                    ]
-                # arrowhead
-                elif block_i == self.n_diag_blocks and block_j < self.n_diag_blocks:
-                    B[row, col] = self.A_arrow_bottom_blocks[block_j, local_i, local_j]
-                elif block_i == self.n_diag_blocks and block_j == self.n_diag_blocks:
-                    B[row, col] = self.A_arrow_tip_block[local_i, local_j]
+        if self.arrowhead_blocksize is not None:
+            row_arrow_tip, col_arrow_tip = B[
+                -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
+            ].nonzero()
+            B[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :] = (
+                sp.sparse.coo_matrix(
+                    (
+                        self.A_arrow_tip_block[row_arrow_tip, col_arrow_tip],
+                        (row_arrow_tip, col_arrow_tip),
+                    ),
+                    shape=B[
+                        -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
+                    ].shape,
+                )
+            )
 
-        # symmetrize B
+        # Symmetrize B
         B = B + sp.sparse.tril(B, k=-1).T
 
         return B
