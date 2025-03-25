@@ -507,8 +507,7 @@ class CoregionalModel(Model):
 
         else:
             self.Qprior_re_perm = sp.sparse.coo_matrix(
-                self.data_Qprior_re,
-                (self.rows_Qprior_re, self.columns_Qprior_re),
+                (self.data_Qprior_re, (self.rows_Qprior_re, self.columns_Qprior_re)),
                 shape=(self.n_models * n_re, self.n_models * n_re),
             ).tocsc()
 
@@ -516,13 +515,17 @@ class CoregionalModel(Model):
             if self.Q_prior is None:
                 Qprior_r = bdiag_tiling(Q_r).tocsc()
                 self.Q_prior = bdiag_tiling([self.Qprior_re_perm, Qprior_r]).tocsc()
+                print("Qprior_data[-5:]: ", self.Q_prior.data[-5:])
             else:
                 # only update data array related to Qprior_st_perm, Qprior_r is fixed
                 self.Q_prior.data[: self.Qprior_re_perm.nnz] = self.Qprior_re_perm.data
+                print("Qprior_data[-5:]: ", self.Q_prior.data[-5:])
         else:
             self.Q_prior = self.Qprior_re_perm
 
-        self.Q_prior = self.Q_prior + 1e-4 * sp.sparse.eye(self.Q_prior.shape[0])
+        # TODO: if we need this figure out how, can't just add to anymore
+        # self.Q_prior = self.Q_prior + 1e-4 * sp.sparse.eye(self.Q_prior.shape[0])
+
         nvtx.RangePop()  # End profiling range
         return self.Q_prior
 
@@ -630,7 +633,7 @@ class CoregionalModel(Model):
         else:
             self.Q_prior = Qprior_st_perm
 
-        self.Q_prior = self.Q_prior + 1e-4 * sp.sparse.eye(self.Q_prior.shape[0])
+        # self.Q_prior = self.Q_prior + 1e-4 * sp.sparse.eye(self.Q_prior.shape[0])
         nvtx.RangePop()  # End profiling range
         return self.Q_prior
 
