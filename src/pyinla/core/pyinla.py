@@ -65,12 +65,6 @@ class PyINLA:
 
         # Create the appropriate communicators
         min_solver_size = self.config.solver.min_processes
-        if backend_flags["mpi_avail"]:
-            if MPI.COMM_WORLD.Get_size() < min_solver_size:
-                raise ValueError(
-                    f"Number of processes must be at least {min_solver_size} to fullfil the distributed solver requirments."
-                )
-
         self.comm_world, self.comm_feval, self.color_feval = smartsplit(
             comm=MPI.COMM_WORLD,
             n_parallelizable_evaluations=self.n_f_evaluations,
@@ -114,7 +108,6 @@ class PyINLA:
                 )
 
             n_processes_solver = self.comm_qeval.Get_size()
-
             if n_processes_solver == 1:
                 self.solver = SerinvSolver(
                     config=self.config.solver,
@@ -136,9 +129,6 @@ class PyINLA:
                     comm=self.comm_qeval,
                 )
 
-        print(f"Finished solver init, exiting for now.")
-        exit()
-
         # --- Set up recurrent variables
         self.gradient_f = xp.zeros(self.model.n_hyperparameters, dtype=xp.float64)
         self.f_values_i = xp.zeros(self.n_f_evaluations, dtype=xp.float64)
@@ -155,8 +145,6 @@ class PyINLA:
         # --- Metrics
         self.f_values: ArrayLike = []
         self.theta_values: ArrayLike = []
-
-        print_msg("Initial theta:", self.model.theta)
 
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)

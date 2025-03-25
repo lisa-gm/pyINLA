@@ -128,6 +128,11 @@ def smartsplit(
     min_group_size: int = 1,
 ) -> tuple[MPI.Comm, MPI.Comm, int]:
     if backend_flags["mpi_avail"]:
+        if comm.Get_size() < min_group_size:
+            raise ValueError(
+                f"Initial communicator size must be at least {min_group_size} to fullfill the split requirements."
+            )
+
         # Checks for compatibility of given comm sizes
         min_comm = get_active_comm(comm, min_group_size, tag="minimum_comm")
         active_comm = get_active_comm(
