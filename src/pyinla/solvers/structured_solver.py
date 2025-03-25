@@ -99,12 +99,28 @@ class SerinvSolver(Solver):
                 self.A_arrow_bottom_blocks,
                 self.A_arrow_tip_block,
                 rhs,
+                trans="N",
+            )
+            pobtas(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                self.A_arrow_bottom_blocks,
+                self.A_arrow_tip_block,
+                rhs,
+                trans="C",
             )
         else:
             pobts(
                 self.A_diagonal_blocks,
                 self.A_lower_diagonal_blocks,
                 rhs,
+                trans="N",
+            )
+            pobts(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                rhs,
+                trans="C",
             )
 
         return rhs
@@ -596,26 +612,26 @@ def bta_to_dense(
         for n_i in range(n):
             A[n_i * b : (n_i + 1) * b, n_i * b : (n_i + 1) * b] = A_diagonal_blocks[n_i]
             if n_i > 0:
-                A[
-                    n_i * b : (n_i + 1) * b, (n_i - 1) * b : n_i * b
-                ] = A_lower_diagonal_blocks[n_i - 1]
+                A[n_i * b : (n_i + 1) * b, (n_i - 1) * b : n_i * b] = (
+                    A_lower_diagonal_blocks[n_i - 1]
+                )
             if n_i < n - 1:
-                A[
-                    n_i * b : (n_i + 1) * b, (n_i + 1) * b : (n_i + 2) * b
-                ] = A_upper_diagonal_blocks[n_i]
+                A[n_i * b : (n_i + 1) * b, (n_i + 1) * b : (n_i + 2) * b] = (
+                    A_upper_diagonal_blocks[n_i]
+                )
             A[n_i * b : (n_i + 1) * b, -a:] = A_upper_arrow_blocks[n_i]
             A[-a:, n_i * b : (n_i + 1) * b] = A_lower_arrow_blocks[n_i]
         A[-a:, -a:] = A_arrow_tip_block[:]
 
     if direction == "upward" or direction == "up-middleward":
         for n_i in range(n - 1, -1, -1):
-            A[
-                n_i * b + a : (n_i + 1) * b + a, n_i * b + a : (n_i + 1) * b + a
-            ] = A_diagonal_blocks[n_i]
+            A[n_i * b + a : (n_i + 1) * b + a, n_i * b + a : (n_i + 1) * b + a] = (
+                A_diagonal_blocks[n_i]
+            )
             if n_i > 0:
-                A[
-                    n_i * b + a : (n_i + 1) * b + a, (n_i - 1) * b + a : n_i * b + a
-                ] = A_lower_diagonal_blocks[n_i - 1]
+                A[n_i * b + a : (n_i + 1) * b + a, (n_i - 1) * b + a : n_i * b + a] = (
+                    A_lower_diagonal_blocks[n_i - 1]
+                )
             if n_i < n - 1:
                 A[
                     n_i * b + a : (n_i + 1) * b + a,

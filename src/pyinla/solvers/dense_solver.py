@@ -3,7 +3,7 @@
 import numpy as np
 from scipy.sparse import random
 
-from pyinla import NDArray, sp, spl, xp
+from pyinla import NDArray, sp, xp
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 
@@ -63,7 +63,9 @@ class DenseSolver(Solver):
         self.L = xp.linalg.cholesky(self.L)
 
         L_inv = xp.eye(self.L.shape[0])
-        L_inv[:] = spl.solve_triangular(self.L, L_inv, lower=True, overwrite_b=True)
+        L_inv[:] = sp.linalg.solve_triangular(
+            self.L, L_inv, lower=True, overwrite_b=True
+        )
         self.A_inv = L_inv.T @ L_inv
 
         return self.A_inv
