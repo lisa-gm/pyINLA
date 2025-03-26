@@ -62,3 +62,23 @@ def extract_diagonal(
         return xp.array(a.data[diagonal_mask])
 
     return diagonal
+
+
+def memory_footprint(
+    sparse_matrix: sp.sparse.spmatrix,
+) -> int:
+    """Calculate the memory footprint of a sparse matrix in bytes."""
+    if not isinstance(sparse_matrix, sp.sparse.spmatrix):
+        raise ValueError("Input must be a sparse matrix.")
+
+    A = sparse_matrix.tocsc()
+
+    data_size = A.data.nbytes
+    indices_size = A.indices.nbytes
+    indptr_size = A.indptr.nbytes
+
+    total_memory_bytes = data_size + indices_size + indptr_size
+    total_memory_gb = total_memory_bytes / (1024**3)
+
+    print(f"Total memory footprint of Q_prior: {total_memory_gb:.6f} GB")
+

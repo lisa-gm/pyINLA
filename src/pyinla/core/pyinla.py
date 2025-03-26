@@ -309,9 +309,10 @@ class PyINLA:
         self.f_values_i[:] = 0.0
 
         # Multiprocessing task to rank assignment
+        n_feval_comm = self.world_size // self.comm_feval.size
         task_mapping = []
         for i in range(self.n_f_evaluations):
-            task_mapping.append(i % self.world_size)
+            task_mapping.append(i % n_feval_comm)
 
         # Initialize central difference scheme matrix
         self.eps_mat[:] = self.eps_gradient_f * xp.eye(self.model.n_hyperparameters)
@@ -347,9 +348,6 @@ class PyINLA:
                 - self.f_values_i[self.model.n_hyperparameters + i + 1]
             ) / (2 * self.eps_gradient_f)
 
-        # print f(theta)  = f_values_i[0]
-        # print_msg("f(", theta_i, ") = ", self.f_values_i[0])
-
         return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
 
     def _evaluate_f(
@@ -384,8 +382,6 @@ class PyINLA:
         if self.model.is_likelihood_gaussian():
             # Done by both processes
             self.model.construct_Q_prior()
-
-            # print(f"rank {comm_rank} | Q_prior constructed.")
 
             eta = xp.zeros_like(self.model.y, dtype=xp.float64)
             x = xp.zeros_like(self.model.x, dtype=xp.float64)
@@ -467,9 +463,6 @@ class PyINLA:
                 + prior_latent_parameters
                 - conditional_latent_parameters
             )
-
-        print(f"rank {comm_rank} | here should have performed ppobtaf and ppobtf")
-        exit()
 
         return f_theta[0]
 
@@ -781,6 +774,7 @@ class PyINLA:
             )
             x_update[:] = self.solver.solve(
                 rhs=rhs,
+                sparsity="bta",
             )
 
             x_i_norm = xp.linalg.norm(x_update)

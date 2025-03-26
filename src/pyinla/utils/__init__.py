@@ -17,7 +17,7 @@ from pyinla.utils.multiprocessing import (
     smartsplit,
     synchronize,
 )
-from pyinla.utils.spmatrix_utils import bdiag_tiling, extract_diagonal
+from pyinla.utils.spmatrix_utils import bdiag_tiling, extract_diagonal, memory_footprint
 
 __all__ = [
     "get_available_devices",
@@ -37,4 +37,5 @@ __all__ = [
     "bcast",
     "bdiag_tiling",
     "extract_diagonal",
+    "memory_footprint",
 ]

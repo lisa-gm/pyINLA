@@ -149,9 +149,6 @@ class SerinvSolver(Solver):
         if sparsity == "bta":
             logdet += xp.sum(xp.log(self.A_arrow_tip_block.diagonal()))
 
-        # print(f"sequential! logdet: {logdet}")
-        # exit()
-
         return 2 * logdet
 
     def selected_inversion(
