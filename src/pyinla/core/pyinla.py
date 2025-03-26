@@ -78,7 +78,7 @@ class PyINLA:
             self.n_qeval = 2
         else:
             self.n_qeval = 1
-        _, self.comm_qeval, self.color_qeval = smartsplit(
+        self.qeval_world, self.comm_qeval, self.color_qeval = smartsplit(
             comm=self.comm_feval,
             n_parallelizable_evaluations=self.n_qeval,
             tag="qeval",
@@ -390,7 +390,8 @@ class PyINLA:
             eta = xp.zeros_like(self.model.y, dtype=xp.float64)
             x = xp.zeros_like(self.model.x, dtype=xp.float64)
 
-            task_mapping = [i % self.comm_feval.Get_size() for i in range(2)]
+            n_qeval_comm = self.qeval_world.size // self.comm_qeval.size
+            task_mapping = [i % n_qeval_comm for i in range(2)]
             if task_mapping[0] == self.color_qeval:
                 # Done by processes "even"
                 Q_conditional = self.model.construct_Q_conditional(eta)
@@ -466,6 +467,9 @@ class PyINLA:
                 + prior_latent_parameters
                 - conditional_latent_parameters
             )
+
+        print(f"rank {comm_rank} | here should have performed ppobtaf and ppobtf")
+        exit()
 
         return f_theta[0]
 
