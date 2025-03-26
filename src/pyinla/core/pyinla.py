@@ -2,6 +2,7 @@
 
 import logging
 
+from cupy.cuda import nvtx
 from mpi4py import MPI
 from scipy import optimize
 from scipy.sparse import eye
@@ -374,7 +375,9 @@ class PyINLA:
             if task_mapping[0] == self.color_qeval:
                 # Done by processes "even"
                 Q_conditional = self.model.construct_Q_conditional(eta)
+                nvtx.RangePush("Cholesky_Q_conditional")
                 self.solver.cholesky(A=Q_conditional)
+                nvtx.RangePop()
                 rhs: NDArray = self.model.construct_information_vector(
                     eta,
                     x,
@@ -399,9 +402,11 @@ class PyINLA:
                     self.model.evaluate_log_prior_hyperparameters()
                 )
                 likelihood: float = float(self.model.evaluate_likelihood(eta=eta))
+                nvtx.RangePush("Prior_latent_parameters")
                 prior_latent_parameters: float = (
                     self._evaluate_prior_latent_parameters()
                 )
+                nvtx.RangePop()
 
                 f_theta[0] -= (
                     log_prior_hyperparameters + likelihood + prior_latent_parameters
