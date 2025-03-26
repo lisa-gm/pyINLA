@@ -156,7 +156,6 @@ class SerinvSolver(Solver):
 
     def selected_inversion(
         self,
-        A: sp.sparse.spmatrix,
         sparsity: str,
     ) -> None:
         """Compute selected inversion of input matrix using Cholesky factor."""

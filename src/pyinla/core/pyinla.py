@@ -647,7 +647,7 @@ class PyINLA:
 
         self.model.construct_Q_conditional(eta)
         self.solver.cholesky(self.model.Q_conditional, sparsity="bta")
-        self.solver.selected_inversion(self.model.Q_conditional, sparsity="bta")
+        self.solver.selected_inversion(sparsity="bta")
 
     def get_marginal_variances_latent_parameters(
         self, theta: NDArray = None, x_star: NDArray = None
