@@ -57,4 +57,5 @@ class SparseSolver(Solver):
         return 2 * xp.sum(xp.log(self.L.diagonal()))
 
     def selected_inversion(self, **kwargs):
+        # Placeholder for the selected inversion method.
         return super().selected_inversion(**kwargs)

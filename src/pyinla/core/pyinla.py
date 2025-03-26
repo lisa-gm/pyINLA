@@ -19,6 +19,7 @@ from pyinla.utils import (
     set_device,
     smartsplit,
     synchronize,
+    memory_footprint,
 )
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
@@ -384,6 +385,8 @@ class PyINLA:
             # Done by both processes
             self.model.construct_Q_prior()
 
+            # print(f"rank {comm_rank} | Q_prior constructed.")
+
             eta = xp.zeros_like(self.model.y, dtype=xp.float64)
             x = xp.zeros_like(self.model.x, dtype=xp.float64)
 
@@ -391,7 +394,7 @@ class PyINLA:
             if task_mapping[0] == self.color_qeval:
                 # Done by processes "even"
                 Q_conditional = self.model.construct_Q_conditional(eta)
-                self.solver.cholesky(A=Q_conditional)
+                self.solver.cholesky(A=Q_conditional, sparsity="bta")
                 rhs: NDArray = self.model.construct_information_vector(
                     eta,
                     x,
@@ -399,6 +402,7 @@ class PyINLA:
 
                 self.model.x[:] = self.solver.solve(
                     rhs=rhs,
+                    sparsity="bta",
                 )
 
                 conditional_latent_parameters = (
@@ -642,8 +646,8 @@ class PyINLA:
         eta = self.model.a @ self.model.x
 
         self.model.construct_Q_conditional(eta)
-        # TODO: call this with correct mpi split ...
-        self.solver.selected_inversion(self.model.Q_conditional)
+        self.solver.cholesky(self.model.Q_conditional, sparsity="bta")
+        self.solver.selected_inversion(self.model.Q_conditional, sparsity="bta")
 
     def get_marginal_variances_latent_parameters(
         self, theta: NDArray = None, x_star: NDArray = None
@@ -665,7 +669,8 @@ class PyINLA:
 
         # now only extract diagonal elements corresponding to marginal variances of the latent parameters
         marginal_variances_sp = self.solver._structured_to_spmatrix(
-            eye(self.model.n_latent_parameters, dtype=xp.float64)
+            eye(self.model.n_latent_parameters, dtype=xp.float64),
+            sparsity="bta",
         )
         marginal_variances = extract_diagonal(marginal_variances_sp)
         return marginal_variances
@@ -712,7 +717,8 @@ class PyINLA:
 
             # now only extract diagonal elements corresponding to marginal variances of the latent parameters
             variances_latent = self.solver._structured_to_spmatrix(
-                self.model.Q_conditional
+                self.model.Q_conditional,
+                sparsity="bta",
             )
 
             # compute diag(A Q_selected_inv A^T)
@@ -804,8 +810,8 @@ class PyINLA:
         Log normal:
         .. math:: 0.5*log(1/(2*\pi)^n * |Q_prior|)) - 0.5 * x.T Q_prior x
         """
-        self.solver.cholesky(self.model.Q_prior)
-        logdet_Q_prior: float = self.solver.logdet()
+        self.solver.cholesky(self.model.Q_prior, sparsity="bt")
+        logdet_Q_prior: float = self.solver.logdet(sparsity="bt")
 
         log_prior_latent_parameters: float = +0.5 * logdet_Q_prior
 
@@ -845,7 +851,7 @@ class PyINLA:
         log normal: 0.5*log(1/(2*pi)^n * |Q_conditional|)) - 0.5 * (x - x_mean).T @ Q_conditional @ (x - x_mean)
         """
         # Compute the log determinant of Q_conditional
-        logdet_Q_conditional = self.solver.logdet()
+        logdet_Q_conditional = self.solver.logdet(sparsity="bta")
 
         # Compute the quadratic form (x - x_mean).T @ Q_conditional @ (x - x_mean)
         if x is None and x_mean is not None:

@@ -69,26 +69,38 @@ class SerinvSolver(Solver):
         total_gb: int = total_bytes / (1024**3)
         print_msg(f"Allocated memory for SerinvSolver: {total_gb:.2f} GB", flush=True)
 
-    def cholesky(self, A: sp.sparse.spmatrix) -> None:
+    def cholesky(
+        self,
+        A: sp.sparse.spmatrix,
+        sparsity: str,
+    ) -> None:
         """Compute Cholesky factor of input matrix."""
-        self._spmatrix_to_structured(A)
+        self._spmatrix_to_structured(A, sparsity)
 
-        if self.A_arrow_bottom_blocks is not None:
+        if sparsity == "bta":
             pobtaf(
                 self.A_diagonal_blocks,
                 self.A_lower_diagonal_blocks,
                 self.A_arrow_bottom_blocks,
                 self.A_arrow_tip_block,
             )
-        else:
+        elif sparsity == "bt":
             pobtf(
                 self.A_diagonal_blocks,
                 self.A_lower_diagonal_blocks,
             )
+        else:
+            raise ValueError(
+                f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
+            )
 
-    def solve(self, rhs: NDArray) -> NDArray:
+    def solve(
+        self,
+        rhs: NDArray,
+        sparsity: str,
+    ) -> NDArray:
         """Solve linear system using Cholesky factor."""
-        if self.A_arrow_bottom_blocks is not None:
+        if sparsity == "bta":
             pobtas(
                 self.A_diagonal_blocks,
                 self.A_lower_diagonal_blocks,
@@ -102,61 +114,76 @@ class SerinvSolver(Solver):
                 self.A_lower_diagonal_blocks,
                 self.A_arrow_bottom_blocks,
                 self.A_arrow_tip_block,
+                rhs,
+                trans="C",
+            )
+        elif sparsity == "bt":
+            pobts(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                rhs,
+                trans="N",
+            )
+            pobts(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
                 rhs,
                 trans="C",
             )
         else:
-            pobts(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-                rhs,
-                trans="N",
-            )
-            pobts(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-                rhs,
-                trans="C",
+            raise ValueError(
+                f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
 
         return rhs
 
-    def logdet(self) -> float:
+    def logdet(
+        self,
+        sparsity: str,
+    ) -> float:
         """Compute logdet of input matrix using Cholesky factor."""
         logdet: float = 0.0
         for i in range(self.n_diag_blocks):
             logdet += xp.sum(xp.log(self.A_diagonal_blocks[i].diagonal()))
 
-        logdet += xp.sum(xp.log(self.A_arrow_tip_block.diagonal()))
+        if sparsity == "bta":
+            logdet += xp.sum(xp.log(self.A_arrow_tip_block.diagonal()))
+
+        # print(f"sequential! logdet: {logdet}")
+        # exit()
 
         return 2 * logdet
 
-    def selected_inversion(self, A: sp.sparse.spmatrix, **kwargs) -> None:
+    def selected_inversion(
+        self,
+        A: sp.sparse.spmatrix,
+        sparsity: str,
+    ) -> None:
         """Compute selected inversion of input matrix using Cholesky factor."""
-        self._spmatrix_to_structured(A)
+        # self._spmatrix_to_structured(A, sparsity)
 
-        if self.A_arrow_bottom_blocks is not None:
-            pobtaf(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-                self.A_arrow_bottom_blocks,
-                self.A_arrow_tip_block,
-            )
+        if sparsity == "bta":
             pobtasi(
                 self.A_diagonal_blocks,
                 self.A_lower_diagonal_blocks,
                 self.A_arrow_bottom_blocks,
                 self.A_arrow_tip_block,
             )
-        else:
-            pobtf(self.A_diagonal_blocks, self.A_lower_diagonal_blocks)
-
+        elif sparsity == "bt":
             pobtsi(
                 self.A_diagonal_blocks,
                 self.A_lower_diagonal_blocks,
             )
+        else:
+            raise ValueError(
+                f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
+            )
 
-    def _spmatrix_to_structured(self, A: sp.sparse.spmatrix) -> None:
+    def _spmatrix_to_structured(
+        self,
+        A: sp.sparse.spmatrix,
+        sparsity: str,
+    ) -> None:
         """Map sp.spmatrix to BT or BTA."""
 
         A_csc = sp.sparse.csc_matrix(A)
@@ -178,18 +205,22 @@ class SerinvSolver(Solver):
 
                 self.A_lower_diagonal_blocks[i, :, :] = csc_slice.todense()
 
-            if self.arrowhead_blocksize is not None:
+            if sparsity == "bta":
                 csc_slice = A_csc[
                     -self.arrowhead_blocksize :,
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 ]
                 self.A_arrow_bottom_blocks[i, :, :] = csc_slice.todense()
 
-        if self.arrowhead_blocksize is not None:
+        if sparsity == "bta":
             csc_slice = A_csc[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :]
             self.A_arrow_tip_block[:, :] = csc_slice.todense()
 
-    def _structured_to_spmatrix(self, A: sp.sparse.spmatrix) -> sp.sparse.spmatrix:
+    def _structured_to_spmatrix(
+        self,
+        A: sp.sparse.spmatrix,
+        sparsity: str,
+    ) -> sp.sparse.spmatrix:
         """Map BT or BTA matrix to sp.spmatrix using sparsity pattern provided in A."""
 
         # A is assumed to be symmetric, only use lower triangular part
@@ -237,7 +268,7 @@ class SerinvSolver(Solver):
                     ].shape,
                 )
 
-            if self.arrowhead_blocksize is not None:
+            if sparsity == "bta":
                 row_arrow, col_arrow = B[
                     -self.arrowhead_blocksize :,
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
@@ -256,7 +287,7 @@ class SerinvSolver(Solver):
                     ].shape,
                 )
 
-        if self.arrowhead_blocksize is not None:
+        if sparsity == "bta":
             row_arrow_tip, col_arrow_tip = B[
                 -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
             ].nonzero()
