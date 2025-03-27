@@ -287,6 +287,7 @@ class PyINLA:
         objective_function_evalutation : tuple
             Function value f(theta) evaluated at theta_i and its gradient.
         """
+        nvtx.RangePush("Objective_function_w_gradient")
         # Generate theta matrix with different theta's to evaluate
         # currently central difference scheme is used for gradient
         self.f_values_i[:] = 0.0
@@ -311,9 +312,11 @@ class PyINLA:
             # Perform the evaluation in reverse order so that the stored and returned
             # self.x value matches the "bare" hyperparameters evaluation
             if self.color_feval == task_mapping[feval_i]:
+                nvtx.RangePush(f"feval_{feval_i}")
                 self.f_values_i[feval_i] = self._evaluate_f(
                     theta_i=self.theta_mat[:, feval_i], comm=self.comm_feval
                 )
+                nvtx.RangePop()
 
         # Here carefull on the reduction as it's gonna add the values from all ranks and not only the root of the groups - TODO
         allreduce(
@@ -332,6 +335,7 @@ class PyINLA:
 
         # print f(theta)  = f_values_i[0]
         # print_msg("f(", theta_i, ") = ", self.f_values_i[0])
+        nvtx.RangePop()
 
         return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
 

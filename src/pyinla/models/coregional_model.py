@@ -550,7 +550,9 @@ class CoregionalModel(Model):
                 kwargs_st[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
 
             # print("in construct Qprior: kwargs_st: ", kwargs_st)
+            nvtx.RangePush("construct_sub_Qst")  # Start profiling range
             Qu_list.append(submodel_st.construct_Q_prior(**kwargs_st).tocsc())
+            nvtx.RangePop()  # End profiling range
 
             if len(model.submodels) > 1:
                 # Create the regression tip
@@ -565,6 +567,7 @@ class CoregionalModel(Model):
 
         lambda_0_1 = self.theta[self.theta_keys.index("lambda_0_1")]
 
+        nvtx.RangePush("compute_Qii_coreg_prior")  # Start profiling range
         if self.n_models == 2:
             q11 = sp.sparse.coo_matrix(
                 (1 / sigma_0**2) * Qu_list[0]
@@ -694,7 +697,9 @@ class CoregionalModel(Model):
             )
 
             # Qprior_st = sp.sparse.bmat([[q11, q12, q13], [q21, q22, q23], [q31, q32, q33]]).tocsc()
+        nvtx.RangePop()  # End profiling range
 
+        nvtx.RangePush("apply_permutation")  # Start profiling range
         # Apply the permutation to the Qprior_st
         if self.coregionalization_type == "spatio_temporal":
             # Permute matrix
@@ -726,6 +731,7 @@ class CoregionalModel(Model):
                 (self.data_Qprior_re, (self.rows_Qprior_re, self.columns_Qprior_re)),
                 shape=(self.n_models * n_re, self.n_models * n_re),
             ).tocsc()
+        nvtx.RangePop()  # End profiling range
 
         if Q_r != []:
             # if self.Q_prior is None:
