@@ -116,7 +116,7 @@ class SpatioTemporalSubModel(SubModel):
         gamma_s, gamma_t, gamma_st = self._interpretable2compute(
             r_s=kwargs.get("r_s"),
             r_t=kwargs.get("r_t"),
-            sigma_st=kwargs.get("sigma_st", self.sigma_st), 
+            sigma_st=kwargs.get("sigma_st", self.sigma_st),
             dim_spatial_domain=2,
         )
         # print(f"Thetas used in Qprior construction: gamma_s: {gamma_s}, gamma_t: {gamma_t}, gamma_st: {gamma_st}")
@@ -145,7 +145,7 @@ class SpatioTemporalSubModel(SubModel):
                 + pow(exp_gamma_t, 2) * sp.sparse.kron(self.m2, q1s)
             )
         )
-
+        # TODO: csc()
         return Q_prior.tocoo()
 
     def _interpretable2compute(

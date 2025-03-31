@@ -19,8 +19,9 @@ def cloglog(x: NDArray, direction: str) -> NDArray:
 def scaled_logit(x: NDArray, direction: str) -> NDArray:
     k = 1.0 / 12.0
     if direction == "forward":
+        ## TODO: check special function log1p
         return (1.0 / k) * xp.log(x / (1.0 - x))
     elif direction == "backward":
-        return 1 / (1 + xp.exp(- k * x))
+        return 1 / (1 + xp.exp(-k * x))
     else:
         raise ValueError(f"Unknown direction: {direction}")
