@@ -735,12 +735,6 @@ class PyINLA:
                 sparsity="bta",
             )
 
-            # Compute a hash on the data of the matrix
-            hash_data = hash(variances_latent.data.tobytes())
-            norme_data = xp.linalg.norm(variances_latent.data)
-            print(f"rank {comm_rank} hash: {hash_data}, norme: {norme_data}")
-            exit()
-
             # compute diag(A Q_selected_inv A^T)
             # TODO: sparsify this. can be improved A LOT
             marginal_variances_observations = (
