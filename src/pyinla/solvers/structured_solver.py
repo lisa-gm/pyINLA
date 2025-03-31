@@ -2,7 +2,7 @@
 
 from warnings import warn
 
-from pyinla import NDArray, sp, xp
+from pyinla import NDArray, sp, xp, backend_flags
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 from pyinla.utils import print_msg
