@@ -2,7 +2,6 @@
 
 import logging
 
-from cupy.cuda import nvtx
 from mpi4py import MPI
 from scipy import optimize
 from scipy.sparse import eye
@@ -287,7 +286,6 @@ class PyINLA:
         objective_function_evalutation : tuple
             Function value f(theta) evaluated at theta_i and its gradient.
         """
-        nvtx.RangePush("Objective_function_w_gradient")
         # Generate theta matrix with different theta's to evaluate
         # currently central difference scheme is used for gradient
         self.f_values_i[:] = 0.0
@@ -312,12 +310,9 @@ class PyINLA:
             # Perform the evaluation in reverse order so that the stored and returned
             # self.x value matches the "bare" hyperparameters evaluation
             if self.color_feval == task_mapping[feval_i]:
-                nvtx.RangePush(f"feval_{feval_i}")
                 self.f_values_i[feval_i] = self._evaluate_f(
                     theta_i=self.theta_mat[:, feval_i], comm=self.comm_feval
                 )
-                nvtx.RangePop()
-                print(f"f_values[{feval_i}]: {self.f_values_i[feval_i]}")
 
         # Here carefull on the reduction as it's gonna add the values from all ranks and not only the root of the groups - TODO
         allreduce(
@@ -336,7 +331,6 @@ class PyINLA:
 
         # print f(theta)  = f_values_i[0]
         # print_msg("f(", theta_i, ") = ", self.f_values_i[0])
-        nvtx.RangePop()
 
         return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
 
@@ -380,9 +374,7 @@ class PyINLA:
             if task_mapping[0] == self.color_qeval:
                 # Done by processes "even"
                 Q_conditional = self.model.construct_Q_conditional(eta)
-                nvtx.RangePush("Cholesky_Q_conditional")
                 self.solver.cholesky(A=Q_conditional)
-                nvtx.RangePop()
                 rhs: NDArray = self.model.construct_information_vector(
                     eta,
                     x,
@@ -407,11 +399,9 @@ class PyINLA:
                     self.model.evaluate_log_prior_hyperparameters()
                 )
                 likelihood: float = float(self.model.evaluate_likelihood(eta=eta))
-                nvtx.RangePush("Prior_latent_parameters")
                 prior_latent_parameters: float = (
                     self._evaluate_prior_latent_parameters()
                 )
-                nvtx.RangePop()
 
                 f_theta[0] -= (
                     log_prior_hyperparameters + likelihood + prior_latent_parameters
@@ -809,7 +799,6 @@ class PyINLA:
         """
         self.solver.cholesky(self.model.Q_prior)
         logdet_Q_prior: float = self.solver.logdet()
-
         log_prior_latent_parameters: float = +0.5 * logdet_Q_prior
 
         if x is not None:

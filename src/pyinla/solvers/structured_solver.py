@@ -2,8 +2,6 @@
 
 from warnings import warn
 
-from cupy.cuda import nvtx
-
 from pyinla import NDArray, sp, xp
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
@@ -76,11 +74,8 @@ class SerinvSolver(Solver):
     def cholesky(self, A: sp.sparse.spmatrix) -> None:
         """Compute Cholesky factor of input matrix."""
 
-        nvtx.RangePush("spmatrix_to_structured")
         self._spmatrix_to_structured(A)
-        nvtx.RangePop()
 
-        nvtx.RangePush("pobtaf")
         if self.A_arrow_bottom_blocks is not None:
             pobtaf(
                 self.A_diagonal_blocks,
@@ -93,7 +88,6 @@ class SerinvSolver(Solver):
                 self.A_diagonal_blocks,
                 self.A_lower_diagonal_blocks,
             )
-        nvtx.RangePop()
 
     def solve(self, rhs: NDArray) -> NDArray:
         """Solve linear system using Cholesky factor."""
@@ -172,7 +166,7 @@ class SerinvSolver(Solver):
                 self.A_lower_diagonal_blocks,
             )
 
-    def spmatrix_to_structured(
+    def _spmatrix_to_structured(
         self,
         A: sp.sparse.spmatrix,
     ) -> None:

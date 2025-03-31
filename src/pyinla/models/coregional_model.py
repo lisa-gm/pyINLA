@@ -3,7 +3,6 @@
 import re
 
 import numpy as np
-from cupy.cuda import nvtx
 from scipy.sparse import spmatrix
 
 from pyinla import ArrayLike, NDArray, sp, xp
@@ -263,8 +262,6 @@ class CoregionalModel(Model):
         self.Q_conditional_data_mapping = [0]
 
     def construct_Q_prior(self) -> spmatrix:
-        nvtx.RangePush("construct_Q_prior")  # Start profiling range
-
         # number of random effects per model
         n_re = self.n_spatial_nodes * self.n_temporal_nodes
 
@@ -281,9 +278,7 @@ class CoregionalModel(Model):
                 kwargs_st[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
 
             # print("in construct Qprior: kwargs_st: ", kwargs_st)
-            nvtx.RangePush("construct_sub_Qst")  # Start profiling range
             Qu_list.append(submodel_st.construct_Q_prior(**kwargs_st).tocsc())
-            nvtx.RangePop()  # End profiling range
 
             if len(model.submodels) > 1:
                 # Create the regression tip
@@ -298,7 +293,6 @@ class CoregionalModel(Model):
 
         lambda_0_1 = self.theta[self.theta_keys.index("lambda_0_1")]
 
-        nvtx.RangePush("compute_Qii_coreg_prior")  # Start profiling range
         if self.n_models == 2:
             q11 = sp.sparse.coo_matrix(
                 (1 / sigma_0**2) * Qu_list[0]
@@ -424,9 +418,7 @@ class CoregionalModel(Model):
             )
 
             # Qprior_st = sp.sparse.bmat([[q11, q12, q13], [q21, q22, q23], [q31, q32, q33]]).tocsc()
-        nvtx.RangePop()  # End profiling range
 
-        nvtx.RangePush("apply_permutation")  # Start profiling range
         # Apply the permutation to the Qprior_st
         if self.coregionalization_type == "spatio_temporal":
             # Permute matrix
@@ -454,31 +446,30 @@ class CoregionalModel(Model):
             ]
 
         else:
+            # Qprior_st_perm = Qprior_st
             self.Qprior_re_perm = sp.sparse.coo_matrix(
                 (self.data_Qprior_re, (self.rows_Qprior_re, self.columns_Qprior_re)),
                 shape=(self.n_models * n_re, self.n_models * n_re),
             ).tocsc()
-        nvtx.RangePop()  # End profiling range
 
         if Q_r != []:
             if self.Q_prior is None:
-                nvtx.RangePush(
-                    "construct_Q_prior bdiag_tiling"
-                )  # Start profiling range
                 Qprior_reg = bdiag_tiling(Q_r).tocsc()
                 self.Q_prior = bdiag_tiling([self.Qprior_re_perm, Qprior_reg]).tocsc()
-                nvtx.RangePop()  # End profiling range
 
+                # self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
             else:
                 self.Q_prior.tocsc()
                 self.Q_prior.sort_indices()
-
                 self.Q_prior.data[: self.Qprior_re_perm.nnz] = self.Qprior_re_perm.data
+
+                # Qprior_reg = bdiag_tiling(Q_r).tocsc()
+                # self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
 
         else:
             self.Q_prior = self.Qprior_re_perm
+            # self.Q_prior = Qprior_st_perm
 
-        nvtx.RangePop()  # End profiling range
         return self.Q_prior
 
     def construct_Q_conditional(
@@ -493,7 +484,6 @@ class CoregionalModel(Model):
         The negative hessian is required, therefore the minus in front.
 
         """
-        nvtx.RangePush("construct_Q_conditional")  # Start profiling range
         d_list = []
         for i, model in enumerate(self.models):
             if model.likelihood_config.type == "gaussian":
@@ -515,7 +505,6 @@ class CoregionalModel(Model):
         d_matrix = bdiag_tiling(d_list).tocsc()
 
         self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
-        nvtx.RangePop()
         return self.Q_conditional
 
     def construct_information_vector(
