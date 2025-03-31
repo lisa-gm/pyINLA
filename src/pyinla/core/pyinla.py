@@ -317,6 +317,7 @@ class PyINLA:
                     theta_i=self.theta_mat[:, feval_i], comm=self.comm_feval
                 )
                 nvtx.RangePop()
+                print(f"f_values[{feval_i}]: {self.f_values_i[feval_i]}")
 
         # Here carefull on the reduction as it's gonna add the values from all ranks and not only the root of the groups - TODO
         allreduce(

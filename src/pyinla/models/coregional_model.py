@@ -262,275 +262,6 @@ class CoregionalModel(Model):
         self.Q_conditional = None
         self.Q_conditional_data_mapping = [0]
 
-    # # add nvtx range
-    # # @nvtx.annotate("construct_Q_prior", color="blue")
-    # def construct_Q_prior(self) -> spmatrix:
-    #     nvtx.RangePush("construct_Q_prior")  # Start profiling range
-
-    #     # number of random variables (dim(Qprior_st))
-    #     n_re = self.n_spatial_nodes * self.n_temporal_nodes
-
-    #     Qu_list: list = []
-    #     Q_r: list = []
-
-    #     for i, model in enumerate(self.models):
-    #         submodel_st = model.submodels[0]
-    #         # Get the spatio-temporal submodel idx
-    #         kwargs_st = {}
-    #         for hp_idx in range(
-    #             self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
-    #         ):
-    #             kwargs_st[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
-
-    #         # print("in construct Qprior: kwargs_st: ", kwargs_st)
-    #         Qu_list.append(submodel_st.construct_Q_prior(**kwargs_st).tocsc())
-
-    #         if len(model.submodels) > 1:
-    #             # Create the regression tip
-    #             submodel_r = model.submodels[1]
-    #             # Get the spatio-temporal submodel idx
-    #             kwargs_r = {}
-    #             Q_r.append(submodel_r.construct_Q_prior(**kwargs_r).tocsc())
-
-    #     sigma_0 = xp.exp(self.theta[self.theta_keys.index("sigma_0")])
-    #     sigma_1 = xp.exp(self.theta[self.theta_keys.index("sigma_1")])
-    #     # print("sigma_0: ", sigma_0, "sigma_1: ", sigma_1)
-
-    #     lambda_0_1 = self.theta[self.theta_keys.index("lambda_0_1")]
-
-    #     if self.n_models == 2:
-    #         # q11 = sp.sparse.coo_matrix((1 / sigma_0**2) * sp.sparse.tril(Qu_list[0]) + (lambda_0_1**2 / sigma_1**2) * sp.sparse.tril(Qu_list[1]))
-    #         q11 = sp.sparse.coo_matrix(
-    #             (1 / sigma_0**2) * Qu_list[0]
-    #             + (lambda_0_1**2 / sigma_1**2) * Qu_list[1]
-    #         )
-    #         q11_rows = q11.row
-    #         q11_columns = q11.col
-
-    #         q21 = sp.sparse.coo_matrix((-lambda_0_1 / sigma_1**2) * Qu_list[1])
-    #         q21_rows = q21.row + n_re
-    #         q21_columns = q21.col
-
-    #         q12 = sp.sparse.coo_matrix((-lambda_0_1 / sigma_1**2) * Qu_list[1])
-    #         q12_rows = q12.row
-    #         q12_columns = q12.col + n_re
-
-    #         q22 = sp.sparse.coo_matrix((1 / sigma_1**2) * Qu_list[1])
-    #         q22_rows = q22.row + n_re
-    #         q22_columns = q22.col + n_re
-
-    #         self.rows_Qprior_re = xp.concatenate(
-    #             [q11_rows, q12_rows, q21_rows, q22_rows]
-    #         )
-    #         self.columns_Qprior_re = xp.concatenate(
-    #             [q11_columns, q12_columns, q21_columns, q22_columns]
-    #         )
-    #         self.data_Qprior_re = xp.concatenate(
-    #             [q11.data, q12.data, q21.data, q22.data]
-    #         )
-
-    #     elif self.n_models == 3:
-    #         sigma_2 = xp.exp(self.theta[self.theta_keys.index("sigma_2")])
-
-    #         lambda_0_2 = self.theta[self.theta_keys.index("lambda_0_2")]
-    #         lambda_1_2 = self.theta[self.theta_keys.index("lambda_1_2")]
-
-    #         q11 = sp.sparse.coo_matrix(
-    #             (1 / sigma_0**2) * Qu_list[0]
-    #             + (lambda_0_1**2 / sigma_1**2) * Qu_list[1]
-    #             + (lambda_1_2**2 / sigma_2**2) * Qu_list[2]
-    #         )
-    #         q11_rows = q11.row
-    #         q11_columns = q11.col
-
-    #         q21 = sp.sparse.coo_matrix(
-    #             (-lambda_0_1 / sigma_1**2) * Qu_list[1]
-    #             + (lambda_0_2 * lambda_1_2 / sigma_2**2) * Qu_list[2]
-    #         )
-    #         q21_rows = q21.row + n_re
-    #         q21_columns = q21.col
-
-    #         q31 = sp.sparse.coo_matrix(-lambda_1_2 / sigma_2**2 * Qu_list[2])
-    #         q31_rows = q31.row + 2 * n_re
-    #         q31_columns = q31.col
-
-    #         q22 = sp.sparse.coo_matrix(
-    #             (1 / sigma_1**2) * Qu_list[1]
-    #             + (lambda_0_2**2 / sigma_2**2) * Qu_list[2]
-    #         )
-    #         q22_rows = q22.row + n_re
-    #         q22_columns = q22.col + n_re
-
-    #         q32 = sp.sparse.coo_matrix(-lambda_0_2 / sigma_2**2 * Qu_list[2])
-    #         q32_rows = q32.row + 2 * n_re
-    #         q32_columns = q32.col + n_re
-
-    #         q33 = sp.sparse.coo_matrix((1 / sigma_2**2) * Qu_list[2])
-    #         q33_rows = q33.row + 2 * n_re
-    #         q33_columns = q33.col + 2 * n_re
-
-    #         q12 = q21.T
-    #         q12_rows = q12.row
-    #         q12_columns = q12.col + n_re
-
-    #         q13 = q31.T
-    #         q13_rows = q13.row
-    #         q13_columns = q13.col + 2 * n_re
-
-    #         q23 = q32.T
-    #         q23_rows = q23.row + n_re
-    #         q23_columns = q23.col + 2 * n_re
-
-    #         self.rows_Qprior_re = xp.concatenate(
-    #             [
-    #                 q11_rows,
-    #                 q12_rows,
-    #                 q13_rows,
-    #                 q21_rows,
-    #                 q22_rows,
-    #                 q23_rows,
-    #                 q31_rows,
-    #                 q32_rows,
-    #                 q33_rows,
-    #             ]
-    #         )
-    #         self.columns_Qprior_re = xp.concatenate(
-    #             [
-    #                 q11_columns,
-    #                 q12_columns,
-    #                 q13_columns,
-    #                 q21_columns,
-    #                 q22_columns,
-    #                 q23_columns,
-    #                 q31_columns,
-    #                 q32_columns,
-    #                 q33_columns,
-    #             ]
-    #         )
-    #         self.data_Qprior_re = xp.concatenate(
-    #             [
-    #                 q11.data,
-    #                 q12.data,
-    #                 q13.data,
-    #                 q21.data,
-    #                 q22.data,
-    #                 q23.data,
-    #                 q31.data,
-    #                 q32.data,
-    #                 q33.data,
-    #             ]
-    #         )
-
-    #         Qprior_st = sp.sparse.vstack(
-    #             [
-    #                 sp.sparse.hstack(
-    #                     [
-    #                         (1 / sigma_0**2) * Qu_list[0]
-    #                         + (lambda_0_1**2 / sigma_1**2) * Qu_list[1]
-    #                         + (lambda_1_2**2 / sigma_2**2) * Qu_list[2],
-    #                         (-lambda_0_1 / sigma_1**2) * Qu_list[1]
-    #                         + (lambda_0_2 * lambda_1_2 / sigma_2**2) * Qu_list[2],
-    #                         -lambda_1_2 / sigma_2**2 * Qu_list[2],
-    #                     ]
-    #                 ),
-    #                 sp.sparse.hstack(
-    #                     [
-    #                         (-lambda_0_1 / sigma_1**2) * Qu_list[1]
-    #                         + (lambda_0_2 * lambda_1_2 / sigma_2**2) * Qu_list[2],
-    #                         (1 / sigma_1**2) * Qu_list[1]
-    #                         + (lambda_0_2**2 / sigma_2**2) * Qu_list[2],
-    #                         -lambda_0_2 / sigma_2**2 * Qu_list[2],
-    #                     ]
-    #                 ),
-    #                 sp.sparse.hstack(
-    #                     [
-    #                         -lambda_1_2 / sigma_2**2 * Qu_list[2],
-    #                         -lambda_0_2 / sigma_2**2 * Qu_list[2],
-    #                         (1 / sigma_2**2) * Qu_list[2],
-    #                     ]
-    #                 ),
-    #             ]
-    #         ).tocsc()
-
-    #     # Apply the permutation to the Qprior_st
-    #     if self.coregionalization_type == "spatio_temporal":
-    #         # Permute matrix
-
-    #         if self.permutation_indices_Q_prior is None:
-    #             self.Qprior_re_perm = sp.sparse.csr_matrix(
-    #                 (self.n_models * n_re, self.n_models * n_re),
-    #                 dtype=self.data_Qprior_re.dtype,
-    #             )
-    #             # perm = np.arange(Qprior_st.shape[0])
-    #             self.set_data_array_permutation_indices(
-    #                 self.permutation_Qst,
-    #                 self.rows_Qprior_re,
-    #                 self.columns_Qprior_re,
-    #                 self.n_models * n_re,
-    #             )
-
-    #             # we only need to set these once
-    #             self.Qprior_re_perm.indices = self.permutation_indices_Q_prior
-    #             self.Qprior_re_perm.indptr = self.permutation_indptr_Q_prior
-
-    #         self.Qprior_re_perm.data = self.data_Qprior_re[
-    #             self.permutation_vector_Q_prior
-    #         ]
-
-    #         # self.Qprior_st_perm = sp.sparse.csr_matrix((self.Qprior_st_perm.data, self.Qprior_st_perm.indices, self.Qprior_st_perm.indptr), shape=(Qprior_st.shape[0], Qprior_st.shape[1]))
-    #         Qprior_st = sp.sparse.csr_matrix(Qprior_st)
-    #         Qprior_st_perm_ref = Qprior_st[self.permutation_Qst, :][
-    #             :, self.permutation_Qst
-    #         ]
-
-    #         # diff = get_host((self.Qprior_st_perm - Qprior_st_perm_ref).toarray())
-    #         diff = get_host((self.Qprior_re_perm - Qprior_st_perm_ref).toarray())
-
-    #         print("max(abs(diff)): ", xp.max(xp.abs(diff)))
-
-    #         import matplotlib.pyplot as plt
-
-    #         plt.figure()  # Start a new figure
-    #         plt.spy(diff, markersize=0.1)
-    #         plt.savefig("diff_permuted.png")
-    #         plt.close()
-
-    #         plt.figure()  # Start a new figure
-    #         plt.spy(Qprior_st, markersize=0.1)
-    #         plt.savefig("Qprior_st_ref.png")
-    #         plt.close()
-
-    #         plt.figure()  # Start a new figure
-    #         plt.spy(self.Qprior_re_perm, markersize=0.1)
-    #         plt.savefig("Qprior_st_new.png")
-    #         plt.close()
-
-    #     else:
-    #         self.Qprior_re_perm = sp.sparse.coo_matrix(
-    #             (self.data_Qprior_re, (self.rows_Qprior_re, self.columns_Qprior_re)),
-    #             shape=(self.n_models * n_re, self.n_models * n_re),
-    #         ).tocsc()
-
-    #     if Q_r != []:
-    #         if self.Q_prior is None:
-    #             Qprior_r = bdiag_tiling(Q_r).tocsc()
-    #             self.Q_prior = bdiag_tiling([self.Qprior_re_perm, Qprior_r]).tocsc()
-    #             print("Qprior_data[-5:]: ", self.Q_prior.data[-5:])
-    #         else:
-    #             # only update data array related to Qprior_st_perm, Qprior_r is fixed
-    #             self.Q_prior.data[: self.Qprior_re_perm.nnz] = self.Qprior_re_perm.data
-    #             print("Qprior_data[-5:]: ", self.Q_prior.data[-5:])
-    #     else:
-    #         self.Q_prior = self.Qprior_re_perm
-
-    #     # TODO: if we need this figure out how, can't just add to anymore
-    #     # self.Q_prior = self.Q_prior + 1e-4 * sp.sparse.eye(self.Q_prior.shape[0])
-
-    #     nvtx.RangePop()  # End profiling range
-    #     return self.Q_prior
-
-    # add nvtx range
-    # @nvtx.annotate("construct_Q_prior", color="blue")
     def construct_Q_prior(self) -> spmatrix:
         nvtx.RangePush("construct_Q_prior")  # Start profiling range
 
@@ -599,10 +330,6 @@ class CoregionalModel(Model):
             )
 
             # Qprior_st = sp.sparse.bmat([[q11, q12], [q21, q22]]).tocsc()
-
-            # Qprior_st = sp.sparse.bmat([[(1 / sigma_0**2) * Qu_list[0]
-            #                 + (lambda_0_1**2 / sigma_1**2) * Qu_list[1], (-lambda_0_1 / sigma_1**2) * Qu_list[1]],
-            #                 [(-lambda_0_1 / sigma_1**2) * Qu_list[1], (1 / sigma_1**2) * Qu_list[1]]]).tocsc()
 
         elif self.n_models == 3:
             sigma_2 = xp.exp(self.theta[self.theta_keys.index("sigma_2")])
@@ -706,7 +433,7 @@ class CoregionalModel(Model):
             # Qprior_st_perm = Qprior_st[self.permutation_Qst, :][:, self.permutation_Qst]
 
             if self.permutation_indices_Q_prior is None:
-                self.Qprior_re_perm = sp.sparse.csr_matrix(
+                self.Qprior_re_perm = sp.sparse.csc_matrix(
                     (self.n_models * n_re, self.n_models * n_re),
                     dtype=self.data_Qprior_re.dtype,
                 )
@@ -734,97 +461,26 @@ class CoregionalModel(Model):
         nvtx.RangePop()  # End profiling range
 
         if Q_r != []:
-            # if self.Q_prior is None:
-            nvtx.RangePush("construct_Q_prior bdiag_tiling")  # Start profiling range
-            Qprior_reg = bdiag_tiling(Q_r).tocsc()
-            self.Q_prior = bdiag_tiling([self.Qprior_re_perm, Qprior_reg]).tocsc()
-            nvtx.RangePop()  # End profiling range
-            ### TODO: this caused the error! figure out why ...
-            # else:
-            #     self.Q_prior.data[: self.Qprior_re_perm.nnz] = self.Qprior_re_perm.data
+            if self.Q_prior is None:
+                nvtx.RangePush(
+                    "construct_Q_prior bdiag_tiling"
+                )  # Start profiling range
+                Qprior_reg = bdiag_tiling(Q_r).tocsc()
+                self.Q_prior = bdiag_tiling([self.Qprior_re_perm, Qprior_reg]).tocsc()
+                nvtx.RangePop()  # End profiling range
+
+            else:
+                self.Q_prior.tocsc()
+                self.Q_prior.sort_indices()
+
+                self.Q_prior.data[: self.Qprior_re_perm.nnz] = self.Qprior_re_perm.data
+
         else:
             self.Q_prior = self.Qprior_re_perm
 
-        # self.Q_prior = self.Q_prior + 1e-4 * sp.sparse.eye(self.Q_prior.shape[0])
         nvtx.RangePop()  # End profiling range
         return self.Q_prior
 
-        # add nvtx range
-
-    # # @nvtx.annotate("construct_Q_prior", color="blue")
-    # def construct_Q_prior(self) -> spmatrix:
-    #     nvtx.RangePush("construct_Q_prior old")  # Start profiling range
-
-    #     Qu_list: list = []
-    #     Q_r: list = []
-
-    #     for i, model in enumerate(self.models):
-    #         submodel_st = model.submodels[0]
-    #         # Get the spatio-temporal submodel idx
-    #         kwargs_st = {}
-    #         for hp_idx in range(
-    #             self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
-    #         ):
-    #             kwargs_st[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
-
-    #         # print("in construct Qprior: kwargs_st: ", kwargs_st)
-    #         Qu_list.append(submodel_st.construct_Q_prior(**kwargs_st).tocsc())
-
-    #         if len(model.submodels) > 1:
-    #             # Create the regression tip
-    #             submodel_r = model.submodels[1]
-    #             # Get the spatio-temporal submodel idx
-    #             kwargs_r = {}
-    #             Q_r.append(submodel_r.construct_Q_prior(**kwargs_r).tocsc())
-
-    #     sigma_0 = xp.exp(self.theta[self.theta_keys.index("sigma_0")])
-    #     sigma_1 = xp.exp(self.theta[self.theta_keys.index("sigma_1")])
-    #     # print("sigma_0: ", sigma_0, "sigma_1: ", sigma_1)
-
-    #     lambda_0_1 = self.theta[self.theta_keys.index("lambda_0_1")]
-
-    #     if self.n_models == 2:
-    #         Qprior_st = sp.sparse.bmat([[(1 / sigma_0**2) * Qu_list[0]
-    #                         + (lambda_0_1**2 / sigma_1**2) * Qu_list[1], (-lambda_0_1 / sigma_1**2) * Qu_list[1]],
-    #                         [(-lambda_0_1 / sigma_1**2) * Qu_list[1], (1 / sigma_1**2) * Qu_list[1]]]).tocsc()
-
-    #     elif self.n_models == 3:
-    #         sigma_2 = xp.exp(self.theta[self.theta_keys.index("sigma_2")])
-
-    #         lambda_0_2 = self.theta[self.theta_keys.index("lambda_0_2")]
-    #         lambda_1_2 = self.theta[self.theta_keys.index("lambda_1_2")]
-
-    #         Qprior_st = sp.sparse.bmat([[(1 / sigma_0**2) * Qu_list[0] + (lambda_0_1**2 / sigma_1**2) * Qu_list[1] + (lambda_1_2**2 / sigma_2**2) * Qu_list[2],
-    #                                      (-lambda_0_1 / sigma_1**2) * Qu_list[1] + (lambda_0_2 * lambda_1_2 / sigma_2**2) * Qu_list[2],
-    #                                        -lambda_1_2 / sigma_2**2 * Qu_list[2]],
-    #                                     [(-lambda_0_1 / sigma_1**2) * Qu_list[1] + (lambda_0_2 * lambda_1_2 / sigma_2**2) * Qu_list[2],
-    #                                         (1 / sigma_1**2) * Qu_list[1] + (lambda_0_2**2 / sigma_2**2) * Qu_list[2],
-    #                                         -lambda_0_2 / sigma_2**2 * Qu_list[2]],
-    #                                         [-lambda_1_2 / sigma_2**2 * Qu_list[2],
-    #                                         -lambda_0_2 / sigma_2**2 * Qu_list[2],
-    #                                         (1 / sigma_2**2) * Qu_list[2]]]).tocsc()
-
-    #     # Apply the permutation to the Qprior_st
-    #     if self.coregionalization_type == "spatio_temporal":
-    #         # Permute matrix
-    #         p_vec = self._generate_permutation_indices(
-    #             self.n_temporal_nodes, self.n_spatial_nodes, self.n_models
-    #         )
-    #         Qprior_st_perm = Qprior_st[p_vec, :][:, p_vec]
-    #     else:
-    #         Qprior_st_perm = Qprior_st
-
-    #     if Q_r != []:
-    #         Qprior_reg = bdiag_tiling(Q_r).tocsc()
-    #         self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
-    #     else:
-    #         self.Q_prior = Qprior_st_perm
-
-    #     # self.Q_prior = self.Q_prior + 1e-4 * sp.sparse.eye(self.Q_prior.shape[0])
-    #     nvtx.RangePop()  # End profiling range
-    #     return self.Q_prior
-
-    # @nvtx.annotate("construct_Q_conditional", color="green")
     def construct_Q_conditional(
         self,
         eta: NDArray,
