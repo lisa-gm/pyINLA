@@ -12,6 +12,8 @@ try:
 except ImportError as e:
     warn(f"The serinv package is required to use the SerinvSolver: {e}")
 
+if backend_flags["cupy_avail"]:
+    from cupyx.profiler import time_range
 
 import time
 
@@ -19,6 +21,7 @@ import time
 class SerinvSolver(Solver):
     """Serinv Solver class."""
 
+    @time_range()
     def __init__(
         self,
         config: SolverConfig,
@@ -69,6 +72,7 @@ class SerinvSolver(Solver):
         total_gb: int = total_bytes / (1024**3)
         print_msg(f"Allocated memory for SerinvSolver: {total_gb:.2f} GB", flush=True)
 
+    @time_range()
     def cholesky(
         self,
         A: sp.sparse.spmatrix,
@@ -94,6 +98,7 @@ class SerinvSolver(Solver):
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
 
+    @time_range()
     def solve(
         self,
         rhs: NDArray,
@@ -137,6 +142,7 @@ class SerinvSolver(Solver):
 
         return rhs
 
+    @time_range()
     def logdet(
         self,
         sparsity: str,
@@ -151,6 +157,7 @@ class SerinvSolver(Solver):
 
         return 2 * logdet
 
+    @time_range()
     def selected_inversion(
         self,
         sparsity: str,
@@ -175,6 +182,7 @@ class SerinvSolver(Solver):
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
 
+    @time_range()
     def _spmatrix_to_structured(
         self,
         A: sp.sparse.spmatrix,
@@ -222,6 +230,7 @@ class SerinvSolver(Solver):
         ].tocoo()
         self.A_arrow_tip_block[block_slice.row, block_slice.col] = block_slice.data
 
+    @time_range()
     def _structured_to_spmatrix(
         self,
         A: sp.sparse.spmatrix,

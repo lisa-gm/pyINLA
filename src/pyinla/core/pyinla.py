@@ -22,6 +22,9 @@ from pyinla.utils import (
     memory_footprint,
 )
 
+if backend_flags["cupy_avail"]:
+    from cupyx.profiler import time_range
+
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
 
 
@@ -30,6 +33,7 @@ class PyINLA:
     Laplace Approximation (INLA) method.
     """
 
+    @time_range()
     def __init__(
         self,
         model: Model,
@@ -288,6 +292,7 @@ class PyINLA:
 
         return minimization_result
 
+    @time_range()
     def _objective_function(
         self,
         theta_i: NDArray,
@@ -350,6 +355,7 @@ class PyINLA:
 
         return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
 
+    @time_range()
     def _evaluate_f(
         self,
         theta_i: NDArray,
@@ -799,6 +805,7 @@ class PyINLA:
 
         return Q_conditional, x_star, eta
 
+    @time_range()
     def _evaluate_prior_latent_parameters(
         self,
         x: NDArray = None,
@@ -835,6 +842,7 @@ class PyINLA:
 
         return log_prior_latent_parameters
 
+    @time_range()
     def _evaluate_conditional_latent_parameters(
         self,
         Q_conditional: NDArray,
