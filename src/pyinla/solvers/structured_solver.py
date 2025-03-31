@@ -224,10 +224,11 @@ class SerinvSolver(Solver):
 
         for i in range(self.n_diag_blocks):
             # Extract the sparsity pattern of the current Diagonal, Lower, and Arrowhead blocks
-            row_diag, col_diag = B[
+            B_coo = B[
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-            ].nonzero()
+            ].tocoo()
+            row_diag, col_diag = B_coo.row, B_coo.col
             B[
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
@@ -240,12 +241,13 @@ class SerinvSolver(Solver):
             )
 
             if i < self.n_diag_blocks - 1:
-                row_lower, col_lower = B[
+                B_coo = B[
                     (i + 1)
                     * self.diagonal_blocksize : (i + 2)
                     * self.diagonal_blocksize,
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                ].nonzero()
+                ].tocoo()
+                row_lower, col_lower = B_coo.row, B_coo.col
                 B[
                     (i + 1)
                     * self.diagonal_blocksize : (i + 2)
@@ -265,10 +267,11 @@ class SerinvSolver(Solver):
                 )
 
             if sparsity == "bta":
-                row_arrow, col_arrow = B[
+                B_coo = B[
                     -self.arrowhead_blocksize :,
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                ].nonzero()
+                ].tocoo()
+                row_arrow, col_arrow = B_coo.row, B_coo.col
                 B[
                     -self.arrowhead_blocksize :,
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
@@ -284,9 +287,8 @@ class SerinvSolver(Solver):
                 )
 
         if sparsity == "bta":
-            row_arrow_tip, col_arrow_tip = B[
-                -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
-            ].nonzero()
+            B_coo = B[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :].tocoo()
+            row_arrow_tip, col_arrow_tip = B_coo.row, B_coo.col
             B[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :] = (
                 sp.sparse.coo_matrix(
                     (

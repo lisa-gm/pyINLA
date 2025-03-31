@@ -11,6 +11,7 @@ from pyinla.utils.host import get_host_configuration
 from pyinla.utils.link_functions import cloglog, scaled_logit, sigmoid
 from pyinla.utils.multiprocessing import (
     allreduce,
+    allgatherv,
     bcast,
     get_active_comm,
     print_msg,
@@ -34,6 +35,7 @@ __all__ = [
     "get_active_comm",
     "smartsplit",
     "allreduce",
+    "allgatherv",
     "bcast",
     "bdiag_tiling",
     "extract_diagonal",

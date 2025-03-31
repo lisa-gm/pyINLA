@@ -1,6 +1,7 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from pyinla import ArrayLike, backend_flags, comm_rank
+from pyinla.utils.gpu_utils import get_array_module_name, get_host, get_device
 
 if backend_flags["mpi_avail"]:
     from mpi4py import MPI
@@ -38,9 +39,9 @@ def synchronize(comm=None):
 
 def allreduce(
     recvbuf: ArrayLike,
+    comm: MPI.Comm,
     op: str = "sum",
-    factor: int = None,
-    comm: MPI.Comm = None,
+    factor: int = 1,
 ):
     """
     Perform a reduction operation across all processes within the given communication group.
@@ -57,12 +58,64 @@ def allreduce(
         The communication group. Default is MPI.COMM_WORLD.
     """
     if backend_flags["mpi_avail"]:
-        if comm is None:
-            comm = MPI.COMM_WORLD
+        if (
+            get_array_module_name(recvbuf) == "cupy"
+            and not backend_flags["mpi_cuda_aware"]
+        ):
+            recvbuf_comm = get_host(recvbuf)
+        else:
+            recvbuf_comm = recvbuf
+
         if op == "sum":
-            comm.Allreduce(MPI.IN_PLACE, recvbuf, op=MPI.SUM)
-            if factor is not None:
-                recvbuf *= factor
+            comm.Allreduce(MPI.IN_PLACE, recvbuf_comm, op=MPI.SUM)
+            recvbuf_comm *= factor
+
+        if (
+            get_array_module_name(recvbuf) == "cupy"
+            and not backend_flags["mpi_cuda_aware"]
+        ):
+            # Check if recvbuff is an array or a scalar
+            if recvbuf.size > 1:
+                recvbuf[:] = get_device(recvbuf_comm)
+            else:
+                return get_device(recvbuf_comm)
+
+        if recvbuf.size == 1:
+            return recvbuf_comm
+
+
+def allgatherv(
+    sendbuf: ArrayLike,
+    recvbuf: ArrayLike,
+    recv_counts: ArrayLike,
+    displacements: ArrayLike,
+    comm: MPI.Comm,
+):
+    if backend_flags["mpi_avail"]:
+        if (
+            get_array_module_name(recvbuf) == "cupy"
+            and not backend_flags["mpi_cuda_aware"]
+        ):
+            sendbuf_comm = get_host(sendbuf)
+            recvbuf_comm = get_host(recvbuf)
+            recv_counts_comm = get_host(recv_counts)
+            displacements_comm = get_host(displacements)
+        else:
+            sendbuf_comm = sendbuf
+            recvbuf_comm = recvbuf
+            recv_counts_comm = recv_counts
+            displacements_comm = displacements
+
+        comm.Allgatherv(
+            sendbuf=sendbuf_comm,
+            recvbuf=[recvbuf_comm, recv_counts_comm, displacements_comm, MPI.DOUBLE],
+        )
+
+        if (
+            get_array_module_name(recvbuf) == "cupy"
+            and not backend_flags["mpi_cuda_aware"]
+        ):
+            recvbuf[:] = get_device(recvbuf_comm)
 
 
 def bcast(

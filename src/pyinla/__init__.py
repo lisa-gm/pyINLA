@@ -4,6 +4,7 @@ import os
 from typing import Any, TypeAlias, TypeVar
 from warnings import warn
 
+import numpy as np
 from numpy.typing import ArrayLike
 
 from pyinla.__about__ import __version__
@@ -12,6 +13,7 @@ backend_flags = {
     "array_module": None,
     "cupy_avail": False,
     "mpi_avail": False,
+    "mpi_cuda_aware": False,
 }
 
 # Allows user to specify the array module via an environment variable.
@@ -57,13 +59,28 @@ except (ImportError, ImportWarning, ModuleNotFoundError) as e:
 
 
 try:
+    # Check if mpi4py is available
     from mpi4py import MPI
 
-    comm_rank = MPI.COMM_WORLD.Get_rank()
-    comm_size = MPI.COMM_WORLD.Get_size()
+    comm = MPI.COMM_WORLD
+    comm_rank = comm.Get_rank()
+    comm_size = comm.Get_size()
+
+    # Create a small GPU array
+    array = np.array([comm_rank], dtype=np.float32)
+
+    # Perform an MPI operation to check working
+    if comm_size > 1:
+        if comm_rank == 0:
+            comm.Send([array, MPI.FLOAT], dest=1)
+        elif comm_rank == 1:
+            comm.Recv([array, MPI.FLOAT], source=0)
 
     backend_flags["mpi_avail"] = True
-except (ImportError, ImportWarning, ModuleNotFoundError) as e:
+    if backend_flags["cupy_avail"] and os.environ.get("MPI_CUDA_AWARE", "0") == "1":
+        backend_flags["mpi_cuda_aware"] = True
+
+except (ImportError, ImportWarning, ModuleNotFoundError) as w:
     warn(f"No 'MPI' backend detected. ({e})")
 
     comm_rank = 0

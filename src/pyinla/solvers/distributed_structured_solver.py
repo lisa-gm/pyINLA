@@ -2,10 +2,12 @@
 
 from warnings import warn
 
+import numpy as np
+
 from pyinla import NDArray, sp, xp, backend_flags
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
-from pyinla.utils import print_msg
+from pyinla.utils import print_msg, allreduce, allgatherv
 
 if backend_flags["mpi_avail"]:
     from mpi4py.MPI import Comm as mpi_comm
@@ -241,7 +243,11 @@ class DistSerinvSolver(Solver):
             for i in range(1, self.n_locals[self.rank] - 1):
                 logdet += xp.sum(xp.log(self.A_diagonal_blocks[i].diagonal()))
 
-        self.comm.Allreduce(MPI.IN_PLACE, logdet, op=MPI.SUM)
+        logdet = allreduce(
+            logdet,
+            op="sum",
+            comm=self.comm,
+        )
 
         return 2 * logdet
 
@@ -283,9 +289,9 @@ class DistSerinvSolver(Solver):
         """Map sp.spmatrix to BT or BTA."""
         A_csc = sp.sparse.csc_matrix(A)
 
-        n_idx = [0] + self.n_locals
-        start_idx = xp.cumsum(n_idx)[self.rank]
-        end_idx = xp.cumsum(n_idx)[self.rank + 1]
+        n_idx = xp.array([0] + self.n_locals)
+        start_idx = int(xp.cumsum(n_idx)[self.rank])
+        end_idx = int(xp.cumsum(n_idx)[self.rank + 1])
         for i_A in range(start_idx, end_idx):
             i_S = i_A - start_idx
             csc_slice = A_csc[
@@ -327,16 +333,17 @@ class DistSerinvSolver(Solver):
         # A is assumed to be symmetric, only use lower triangular part
         B = sp.sparse.csc_matrix(sp.sparse.tril(sp.sparse.csc_matrix(A)))
 
-        n_idx = [0] + self.n_locals
-        start_idx = xp.cumsum(n_idx)[self.rank]
-        end_idx = xp.cumsum(n_idx)[self.rank + 1]
+        n_idx = xp.array([0] + self.n_locals)
+        start_idx = int(xp.cumsum(n_idx)[self.rank])
+        end_idx = int(xp.cumsum(n_idx)[self.rank + 1])
         for i_A in range(start_idx, end_idx):
             i_S = i_A - start_idx
             # Extract the sparsity pattern of the current Diagonal, Lower, and Arrowhead blocks
-            row_diag, col_diag = B[
+            B_coo = B[
                 i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
                 i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-            ].nonzero()
+            ].tocoo()
+            row_diag, col_diag = B_coo.row, B_coo.col
             B[
                 i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
                 i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
@@ -349,12 +356,13 @@ class DistSerinvSolver(Solver):
             )
 
             if i_A < self.n_diag_blocks - 1:
-                row_lower, col_lower = B[
+                B_coo = B[
                     (i_A + 1)
                     * self.diagonal_blocksize : (i_A + 2)
                     * self.diagonal_blocksize,
                     i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-                ].nonzero()
+                ].tocoo()
+                row_lower, col_lower = B_coo.row, B_coo.col
                 B[
                     (i_A + 1)
                     * self.diagonal_blocksize : (i_A + 2)
@@ -376,10 +384,11 @@ class DistSerinvSolver(Solver):
                 )
 
             if sparsity == "bta":
-                row_arrow, col_arrow = B[
+                B_coo = B[
                     -self.arrowhead_blocksize :,
                     i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-                ].nonzero()
+                ].tocoo()
+                row_arrow, col_arrow = B_coo.row, B_coo.col
                 B[
                     -self.arrowhead_blocksize :,
                     i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
@@ -397,9 +406,8 @@ class DistSerinvSolver(Solver):
                 )
 
         if sparsity == "bta":
-            row_arrow_tip, col_arrow_tip = B[
-                -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
-            ].nonzero()
+            B_coo = B[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :].tocoo()
+            row_arrow_tip, col_arrow_tip = B_coo.row, B_coo.col
             B[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :] = (
                 sp.sparse.coo_matrix(
                     (
@@ -426,9 +434,9 @@ class DistSerinvSolver(Solver):
         sparsity: str,
     ) -> NDArray:
         """Slice the right-hand side vector."""
-        n_idx = [0] + self.n_locals
-        start_idx = xp.cumsum(n_idx)[self.rank]
-        end_idx = xp.cumsum(n_idx)[self.rank + 1]
+        n_idx = xp.array([0] + self.n_locals)
+        start_idx = int(xp.cumsum(n_idx)[self.rank])
+        end_idx = int(xp.cumsum(n_idx)[self.rank + 1])
 
         # Ensure rhs is a 2D array with shape (n, 1)
         if rhs.ndim == 1:
@@ -450,9 +458,9 @@ class DistSerinvSolver(Solver):
             rhs = rhs[:, None]
 
         # Calculate the start and end indices for the local slice of rhs
-        n_idx = [0] + self.n_locals
-        start_idx = xp.cumsum(n_idx)[self.rank]
-        end_idx = xp.cumsum(n_idx)[self.rank + 1]
+        n_idx = xp.array([0] + self.n_locals)
+        start_idx = int(xp.cumsum(n_idx)[self.rank])
+        end_idx = int(xp.cumsum(n_idx)[self.rank + 1])
 
         # 1. Map back the local result of self.B in the global rhs
         rhs[start_idx * self.diagonal_blocksize : end_idx * self.diagonal_blocksize] = (
@@ -462,16 +470,13 @@ class DistSerinvSolver(Solver):
             rhs[-self.arrowhead_blocksize :] = self.B[-self.arrowhead_blocksize :]
 
         # 2. Communicate the rhs, AllGatherV on the global rhs
-        recvbuf = xp.empty(rhs[: -self.arrowhead_blocksize].shape, dtype=rhs.dtype)
-
-        # Calculate the receive counts and displacements
         recv_counts = xp.array(self.n_locals) * self.diagonal_blocksize
         displacements = xp.cumsum(recv_counts) - recv_counts
 
-        self.comm.Allgatherv(
+        allgatherv(
             sendbuf=self.B[: -self.arrowhead_blocksize],
-            recvbuf=[recvbuf, recv_counts, displacements, MPI.DOUBLE],
+            recvbuf=rhs[: -self.arrowhead_blocksize],
+            recv_counts=recv_counts,
+            displacements=displacements,
+            comm=self.comm,
         )
-
-        # Update rhs with the gathered values
-        rhs[: -self.arrowhead_blocksize] = recvbuf

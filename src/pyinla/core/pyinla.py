@@ -592,8 +592,8 @@ class PyINLA:
                 counter += 1
 
         synchronize()
-        allreduce(f_ii_loc, op="sum")
-        allreduce(f_ij_loc, op="sum")
+        allreduce(f_ii_loc, op="sum", comm=self.comm_world)
+        allreduce(f_ij_loc, op="sum", comm=self.comm_world)
 
         # compute hessian
         for k in range(loop_dim):
