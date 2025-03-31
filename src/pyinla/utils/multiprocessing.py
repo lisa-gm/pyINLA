@@ -1,5 +1,7 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
+import numpy as np
+
 from pyinla import ArrayLike, backend_flags, comm_rank
 from pyinla.utils.gpu_utils import get_array_module_name, get_host, get_device
 
@@ -82,6 +84,18 @@ def allreduce(
 
         if recvbuf.size == 1:
             return recvbuf_comm
+
+
+def allgather(
+    obj: ArrayLike,
+    comm: MPI.Comm,
+):
+    if backend_flags["mpi_avail"]:
+        if get_array_module_name(obj) == "cupy" and not backend_flags["mpi_cuda_aware"]:
+            obj_comm = get_host(obj)
+            return get_device(np.concatenate(comm.allgather(obj_comm)))
+        else:
+            return comm.allgather(obj)
 
 
 def allgatherv(

@@ -7,7 +7,7 @@ import numpy as np
 from pyinla import NDArray, sp, xp, backend_flags
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
-from pyinla.utils import print_msg, allreduce, allgatherv
+from pyinla.utils import print_msg, allreduce, allgather, allgatherv
 
 if backend_flags["mpi_avail"]:
     from mpi4py.MPI import Comm as mpi_comm
@@ -329,9 +329,12 @@ class DistSerinvSolver(Solver):
         sparsity: str,
     ) -> sp.sparse.spmatrix:
         """Map BT or BTA matrix to sp.spmatrix using sparsity pattern provided in A."""
-
         # A is assumed to be symmetric, only use lower triangular part
         B = sp.sparse.csc_matrix(sp.sparse.tril(sp.sparse.csc_matrix(A)))
+
+        data = []
+        rows = []
+        cols = []
 
         n_idx = xp.array([0] + self.n_locals)
         start_idx = int(xp.cumsum(n_idx)[self.rank])
@@ -344,16 +347,9 @@ class DistSerinvSolver(Solver):
                 i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
             ].tocoo()
             row_diag, col_diag = B_coo.row, B_coo.col
-            B[
-                i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-                i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-            ] = sp.sparse.coo_matrix(
-                (self.A_diagonal_blocks[i_S, row_diag, col_diag], (row_diag, col_diag)),
-                shape=B[
-                    i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-                    i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-                ].shape,
-            )
+            data.append(self.A_diagonal_blocks[i_S, row_diag, col_diag].flatten())
+            rows.append(i_A * self.diagonal_blocksize + row_diag)
+            cols.append(i_A * self.diagonal_blocksize + col_diag)
 
             if i_A < self.n_diag_blocks - 1:
                 B_coo = B[
@@ -363,25 +359,11 @@ class DistSerinvSolver(Solver):
                     i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
                 ].tocoo()
                 row_lower, col_lower = B_coo.row, B_coo.col
-                B[
-                    (i_A + 1)
-                    * self.diagonal_blocksize : (i_A + 2)
-                    * self.diagonal_blocksize,
-                    i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-                ] = sp.sparse.coo_matrix(
-                    (
-                        self.A_lower_diagonal_blocks[i_S, row_lower, col_lower],
-                        (row_lower, col_lower),
-                    ),
-                    shape=B[
-                        (i_A + 1)
-                        * self.diagonal_blocksize : (i_A + 2)
-                        * self.diagonal_blocksize,
-                        i_A
-                        * self.diagonal_blocksize : (i_A + 1)
-                        * self.diagonal_blocksize,
-                    ].shape,
+                data.append(
+                    self.A_lower_diagonal_blocks[i_S, row_lower, col_lower].flatten()
                 )
+                rows.append((i_A + 1) * self.diagonal_blocksize + row_lower)
+                cols.append(i_A * self.diagonal_blocksize + col_lower)
 
             if sparsity == "bta":
                 B_coo = B[
@@ -389,44 +371,44 @@ class DistSerinvSolver(Solver):
                     i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
                 ].tocoo()
                 row_arrow, col_arrow = B_coo.row, B_coo.col
-                B[
-                    -self.arrowhead_blocksize :,
-                    i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-                ] = sp.sparse.coo_matrix(
-                    (
-                        self.A_arrow_bottom_blocks[i_S, row_arrow, col_arrow],
-                        (row_arrow, col_arrow),
-                    ),
-                    shape=B[
-                        -self.arrowhead_blocksize :,
-                        i_A
-                        * self.diagonal_blocksize : (i_A + 1)
-                        * self.diagonal_blocksize,
-                    ].shape,
+                data.append(
+                    self.A_arrow_bottom_blocks[i_S, row_arrow, col_arrow].flatten()
                 )
+                rows.append(self.n_diag_blocks * self.diagonal_blocksize + row_arrow)
+                cols.append(i_A * self.diagonal_blocksize + col_arrow)
 
         if sparsity == "bta":
-            B_coo = B[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :].tocoo()
-            row_arrow_tip, col_arrow_tip = B_coo.row, B_coo.col
-            B[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :] = (
-                sp.sparse.coo_matrix(
-                    (
-                        self.A_arrow_tip_block[row_arrow_tip, col_arrow_tip],
-                        (row_arrow_tip, col_arrow_tip),
-                    ),
-                    shape=B[
-                        -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
-                    ].shape,
+            if self.rank == 0:
+                # only rank 0 contribute the tip of the arrow
+                B_coo = B[
+                    -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
+                ].tocoo()
+                row_arrow_tip, col_arrow_tip = B_coo.row, B_coo.col
+                data.append(
+                    self.A_arrow_tip_block[row_arrow_tip, col_arrow_tip].flatten()
                 )
-            )
+                rows.append(
+                    self.n_diag_blocks * self.diagonal_blocksize + row_arrow_tip
+                )
+                cols.append(
+                    self.n_diag_blocks * self.diagonal_blocksize + col_arrow_tip
+                )
+
+        data = xp.concatenate(data)
+        rows = xp.concatenate(rows)
+        cols = xp.concatenate(cols)
 
         # TODO: Need to communicate to agregates/Map the local B matrix to all ranks
         # Need to operate on the datas
+        l_data = allgather(data, comm=self.comm)
+        l_rows = allgather(rows, comm=self.comm)
+        l_cols = allgather(cols, comm=self.comm)
+        B_out = sp.sparse.coo_matrix((l_data, (l_rows, l_cols)), shape=B.shape).tocsc()
 
         # Symmetrize B
-        B = B + sp.sparse.tril(B, k=-1).T
+        B_out = B_out + sp.sparse.tril(B_out, k=-1).T
 
-        return B
+        return B_out
 
     def _slice_rhs(
         self,

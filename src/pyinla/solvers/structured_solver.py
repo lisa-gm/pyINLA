@@ -222,6 +222,10 @@ class SerinvSolver(Solver):
         # A is assumed to be symmetric, only use lower triangular part
         B = sp.sparse.csc_matrix(sp.sparse.tril(sp.sparse.csc_matrix(A)))
 
+        data = []
+        rows = []
+        cols = []
+
         for i in range(self.n_diag_blocks):
             # Extract the sparsity pattern of the current Diagonal, Lower, and Arrowhead blocks
             B_coo = B[
@@ -229,16 +233,9 @@ class SerinvSolver(Solver):
                 i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
             ].tocoo()
             row_diag, col_diag = B_coo.row, B_coo.col
-            B[
-                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-            ] = sp.sparse.coo_matrix(
-                (self.A_diagonal_blocks[i, row_diag, col_diag], (row_diag, col_diag)),
-                shape=B[
-                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                ].shape,
-            )
+            data.append(self.A_diagonal_blocks[i, row_diag, col_diag].flatten())
+            rows.append(i * self.diagonal_blocksize + row_diag)
+            cols.append(i * self.diagonal_blocksize + col_diag)
 
             if i < self.n_diag_blocks - 1:
                 B_coo = B[
@@ -248,23 +245,11 @@ class SerinvSolver(Solver):
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 ].tocoo()
                 row_lower, col_lower = B_coo.row, B_coo.col
-                B[
-                    (i + 1)
-                    * self.diagonal_blocksize : (i + 2)
-                    * self.diagonal_blocksize,
-                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                ] = sp.sparse.coo_matrix(
-                    (
-                        self.A_lower_diagonal_blocks[i, row_lower, col_lower],
-                        (row_lower, col_lower),
-                    ),
-                    shape=B[
-                        (i + 1)
-                        * self.diagonal_blocksize : (i + 2)
-                        * self.diagonal_blocksize,
-                        i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                    ].shape,
+                data.append(
+                    self.A_lower_diagonal_blocks[i, row_lower, col_lower].flatten()
                 )
+                rows.append((i + 1) * self.diagonal_blocksize + row_lower)
+                cols.append(i * self.diagonal_blocksize + col_lower)
 
             if sparsity == "bta":
                 B_coo = B[
@@ -272,36 +257,27 @@ class SerinvSolver(Solver):
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 ].tocoo()
                 row_arrow, col_arrow = B_coo.row, B_coo.col
-                B[
-                    -self.arrowhead_blocksize :,
-                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                ] = sp.sparse.coo_matrix(
-                    (
-                        self.A_arrow_bottom_blocks[i, row_arrow, col_arrow],
-                        (row_arrow, col_arrow),
-                    ),
-                    shape=B[
-                        -self.arrowhead_blocksize :,
-                        i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                    ].shape,
+                data.append(
+                    self.A_arrow_bottom_blocks[i, row_arrow, col_arrow].flatten()
                 )
+                rows.append(self.n_diag_blocks * self.diagonal_blocksize + row_arrow)
+                cols.append(i * self.diagonal_blocksize + col_arrow)
 
         if sparsity == "bta":
             B_coo = B[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :].tocoo()
             row_arrow_tip, col_arrow_tip = B_coo.row, B_coo.col
-            B[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :] = (
-                sp.sparse.coo_matrix(
-                    (
-                        self.A_arrow_tip_block[row_arrow_tip, col_arrow_tip],
-                        (row_arrow_tip, col_arrow_tip),
-                    ),
-                    shape=B[
-                        -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
-                    ].shape,
-                )
-            )
+            data.append(self.A_arrow_tip_block[row_arrow_tip, col_arrow_tip].flatten())
+            rows.append(self.n_diag_blocks * self.diagonal_blocksize + row_arrow_tip)
+            cols.append(self.n_diag_blocks * self.diagonal_blocksize + col_arrow_tip)
+
+        # Create the sparse matrix from the data, rows, and cols
+        data = xp.concatenate(data)
+        rows = xp.concatenate(rows)
+        cols = xp.concatenate(cols)
+
+        B_out = sp.sparse.coo_matrix((data, (rows, cols)), shape=B.shape).tocsc()
 
         # Symmetrize B
-        B = B + sp.sparse.tril(B, k=-1).T
+        B_out = B_out + sp.sparse.tril(B_out, k=-1).T
 
-        return B
+        return B_out

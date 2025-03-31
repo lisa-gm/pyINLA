@@ -526,17 +526,18 @@ class PyINLA:
         # compute number of necessary function evaluations
         # f(theta), 2*dim_theta for the diagonal, 4*dim_theta*(dim_theta-1)/2 for the off-diagonal
         no_eval = 1 + 2 * dim_theta + 4 * dim_theta * (dim_theta - 1) // 2
-        if self.world_size > no_eval:
+        n_feval_comm = self.world_size // self.comm_feval.size
+        if n_feval_comm > no_eval:
             print("No idea what happens with MPI split here.")
             raise ValueError("no_eval > 2*loop_dim")
 
-        task_to_rank = xp.ndarray(no_eval, dtype=xp.int64)
+        task_mapping = []
         for i in range(no_eval):
-            task_to_rank[i] = i % self.world_size
+            task_mapping.append(i % n_feval_comm)
 
         counter = 0
         # compute f(theta)
-        if self.color_feval == task_to_rank[0]:
+        if self.color_feval == task_mapping[0]:
             f_theta = self._evaluate_f(theta_i, comm=self.comm_feval)
             f_ii_loc[1, :] = f_theta
         counter += 1
@@ -547,14 +548,14 @@ class PyINLA:
 
             # diagonal elements
             if i == j:
-                if self.color_feval == task_to_rank[counter]:
+                if self.color_feval == task_mapping[counter]:
                     # theta+eps_i
                     f_ii_loc[0, i] = self._evaluate_f(
                         theta_i + eps_mat[i, :], comm=self.comm_feval
                     )
                 counter += 1
 
-                if self.color_feval == task_to_rank[counter]:
+                if self.color_feval == task_mapping[counter]:
                     # theta-eps_i
                     f_ii_loc[2, i] = self._evaluate_f(
                         theta_i - eps_mat[i, :], comm=self.comm_feval
@@ -564,36 +565,46 @@ class PyINLA:
             # as hessian is symmetric we only have to compute the upper triangle
             elif i < j:
                 # theta+eps_i+eps_j
-                if self.color_feval == task_to_rank[counter]:
+                if self.color_feval == task_mapping[counter]:
                     f_ij_loc[0, k] = self._evaluate_f(
                         theta_i + eps_mat[i, :] + eps_mat[j, :], comm=self.comm_feval
                     )
                 counter += 1
 
                 # theta+eps_i-eps_j
-                if self.color_feval == task_to_rank[counter]:
+                if self.color_feval == task_mapping[counter]:
                     f_ij_loc[1, k] = self._evaluate_f(
                         theta_i + eps_mat[i, :] - eps_mat[j, :], comm=self.comm_feval
                     )
                 counter += 1
 
                 # theta-eps_i+eps_j
-                if self.color_feval == task_to_rank[counter]:
+                if self.color_feval == task_mapping[counter]:
                     f_ij_loc[2, k] = self._evaluate_f(
                         theta_i - eps_mat[i, :] + eps_mat[j, :], comm=self.comm_feval
                     )
                 counter += 1
 
                 # theta-eps_i-eps_j
-                if self.color_feval == task_to_rank[counter]:
+                if self.color_feval == task_mapping[counter]:
                     f_ij_loc[3, k] = self._evaluate_f(
                         theta_i - eps_mat[i, :] - eps_mat[j, :], comm=self.comm_feval
                     )
                 counter += 1
 
         synchronize()
-        allreduce(f_ii_loc, op="sum", comm=self.comm_world)
-        allreduce(f_ij_loc, op="sum", comm=self.comm_world)
+        allreduce(
+            f_ii_loc,
+            op="sum",
+            comm=self.comm_world,
+            factor=1 / self.comm_feval.Get_size(),
+        )
+        allreduce(
+            f_ij_loc,
+            op="sum",
+            comm=self.comm_world,
+            factor=1 / self.comm_feval.Get_size(),
+        )
 
         # compute hessian
         for k in range(loop_dim):
@@ -717,6 +728,12 @@ class PyINLA:
                 self.model.Q_conditional,
                 sparsity="bta",
             )
+
+            # Compute a hash on the data of the matrix
+            hash_data = hash(variances_latent.data.tobytes())
+            norme_data = xp.linalg.norm(variances_latent.data)
+            print(f"rank {comm_rank} hash: {hash_data}, norme: {norme_data}")
+            exit()
 
             # compute diag(A Q_selected_inv A^T)
             # TODO: sparsify this. can be improved A LOT
