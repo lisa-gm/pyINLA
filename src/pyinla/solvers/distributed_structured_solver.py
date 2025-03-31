@@ -289,39 +289,45 @@ class DistSerinvSolver(Solver):
         """Map sp.spmatrix to BT or BTA."""
         A_csc = sp.sparse.csc_matrix(A)
 
+        self.A_diagonal_blocks[:] = 0.0
+        self.A_lower_diagonal_blocks[:] = 0.0
+        self.A_arrow_bottom_blocks[:] = 0.0
+        self.A_arrow_tip_block[:] = 0.0
+
         n_idx = xp.array([0] + self.n_locals)
         start_idx = int(xp.cumsum(n_idx)[self.rank])
         end_idx = int(xp.cumsum(n_idx)[self.rank + 1])
         for i_A in range(start_idx, end_idx):
             i_S = i_A - start_idx
-            csc_slice = A_csc[
+            block_slice = A_csc[
                 i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
                 i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-            ]
-
-            self.A_diagonal_blocks[i_S] = csc_slice.todense()
+            ].tocoo()
+            self.A_diagonal_blocks[i_S][block_slice.row, block_slice.col] = block_slice.data
 
             if i_A < self.n_diag_blocks - 1:
-                csc_slice = A_csc[
+                block_slice = A_csc[
                     (i_A + 1)
                     * self.diagonal_blocksize : (i_A + 2)
                     * self.diagonal_blocksize,
                     i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-                ]
-
-                self.A_lower_diagonal_blocks[i_S] = csc_slice.todense()
+                ].tocoo()
+                self.A_lower_diagonal_blocks[i_S][block_slice.row, block_slice.col] = (
+                    block_slice.data
+                )
 
             if sparsity == "bta":
-                csc_slice = A_csc[
+                block_slice = A_csc[
                     -self.arrowhead_blocksize :,
                     i_A * self.diagonal_blocksize : (i_A + 1) * self.diagonal_blocksize,
-                ]
-
-                self.A_arrow_bottom_blocks[i_S] = csc_slice.todense()
+                ].tocoo()
+                self.A_arrow_bottom_blocks[i_S][block_slice.row, block_slice.col] = (
+                    block_slice.data
+                )
 
         if sparsity == "bta":
-            csc_slice = A_csc[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :]
-            self.A_arrow_tip_block[:, :] = csc_slice.todense()
+            block_slice = A_csc[-self.arrowhead_blocksize :, -self.arrowhead_blocksize :].tocoo()
+            self.A_arrow_tip_block[block_slice.row, block_slice.col] = block_slice.data
 
     def _structured_to_spmatrix(
         self,
