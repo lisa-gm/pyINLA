@@ -387,7 +387,8 @@ class PyINLA:
         # --- Optimize x and evaluate the conditional of the latent parameters
         if self.model.is_likelihood_gaussian():
             # Done by both processes
-            self.model.construct_Q_prior()
+            with time_range("Construct Q_prior"):
+                self.model.construct_Q_prior()
 
             eta = xp.zeros_like(self.model.y, dtype=xp.float64)
             x = xp.zeros_like(self.model.x, dtype=xp.float64)
@@ -396,12 +397,14 @@ class PyINLA:
             task_mapping = [i % n_qeval_comm for i in range(2)]
             if task_mapping[0] == self.color_qeval:
                 # Done by processes "even"
-                Q_conditional = self.model.construct_Q_conditional(eta)
+                with time_range("Construct Q_conditional"):
+                    Q_conditional = self.model.construct_Q_conditional(eta)
                 self.solver.cholesky(A=Q_conditional, sparsity="bta")
-                rhs: NDArray = self.model.construct_information_vector(
-                    eta,
-                    x,
-                )
+                with time_range("Construct information vector"):
+                    rhs: NDArray = self.model.construct_information_vector(
+                        eta,
+                        x,
+                    )
 
                 self.model.x[:] = self.solver.solve(
                     rhs=rhs,

@@ -82,17 +82,19 @@ class SerinvSolver(Solver):
         self._spmatrix_to_structured(A, sparsity)
 
         if sparsity == "bta":
-            pobtaf(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-                self.A_arrow_bottom_blocks,
-                self.A_arrow_tip_block,
-            )
+            with time_range():
+                pobtaf(
+                    self.A_diagonal_blocks,
+                    self.A_lower_diagonal_blocks,
+                    self.A_arrow_bottom_blocks,
+                    self.A_arrow_tip_block,
+                )
         elif sparsity == "bt":
-            pobtf(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-            )
+            with time_range():
+                pobtf(
+                    self.A_diagonal_blocks,
+                    self.A_lower_diagonal_blocks,
+                )
         else:
             raise ValueError(
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
@@ -106,35 +108,37 @@ class SerinvSolver(Solver):
     ) -> NDArray:
         """Solve linear system using Cholesky factor."""
         if sparsity == "bta":
-            pobtas(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-                self.A_arrow_bottom_blocks,
-                self.A_arrow_tip_block,
-                rhs,
-                trans="N",
-            )
-            pobtas(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-                self.A_arrow_bottom_blocks,
-                self.A_arrow_tip_block,
-                rhs,
-                trans="C",
-            )
+            with time_range():
+                pobtas(
+                    self.A_diagonal_blocks,
+                    self.A_lower_diagonal_blocks,
+                    self.A_arrow_bottom_blocks,
+                    self.A_arrow_tip_block,
+                    rhs,
+                    trans="N",
+                )
+                pobtas(
+                    self.A_diagonal_blocks,
+                    self.A_lower_diagonal_blocks,
+                    self.A_arrow_bottom_blocks,
+                    self.A_arrow_tip_block,
+                    rhs,
+                    trans="C",
+                )
         elif sparsity == "bt":
-            pobts(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-                rhs,
-                trans="N",
-            )
-            pobts(
-                self.A_diagonal_blocks,
-                self.A_lower_diagonal_blocks,
-                rhs,
-                trans="C",
-            )
+            with time_range():
+                pobts(
+                    self.A_diagonal_blocks,
+                    self.A_lower_diagonal_blocks,
+                    rhs,
+                    trans="N",
+                )
+                pobts(
+                    self.A_diagonal_blocks,
+                    self.A_lower_diagonal_blocks,
+                    rhs,
+                    trans="C",
+                )
         else:
             raise ValueError(
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
