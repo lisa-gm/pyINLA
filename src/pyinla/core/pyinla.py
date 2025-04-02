@@ -216,7 +216,7 @@ class PyINLA:
 
             self.minimization_result: dict = {
                 "theta": self.model.theta,
-                "x": self.model.x[self.model.inverse_permutation_latent_variables],
+                "x": self.model.x,  # [self.model.inverse_permutation_latent_variables],
                 "f": self.f_value,
             }
         else:
@@ -268,9 +268,10 @@ class PyINLA:
                         self.minimization_result = {
                             "theta": get_host(self.model.theta),
                             "x": get_host(
-                                self.model.x[
-                                    self.model.inverse_permutation_latent_variables
-                                ]
+                                self.model.x
+                                # self.model.x[
+                                #     self.model.inverse_permutation_latent_variables
+                                # ]
                             ),
                             "f": fun_i,
                             "grad_f": self.gradient_f,
@@ -325,7 +326,7 @@ class PyINLA:
             self.minimization_result: dict = {
                 "theta": scipy_result.x,
                 "x": get_host(
-                    self.model.x[self.model.inverse_permutation_latent_variables]
+                    self.model.x,  # [self.model.inverse_permutation_latent_variables]
                 ),
                 "f": scipy_result.fun,
                 "grad_f": self.gradient_f,
