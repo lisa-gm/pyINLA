@@ -166,6 +166,7 @@ cython_debug/
 *.out
 dev/*
 data/*
+runs_sc25/*
 settings.json
 *.out
 *.nsys-rep

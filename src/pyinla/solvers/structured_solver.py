@@ -2,9 +2,10 @@
 
 from warnings import warn
 
-from pyinla import NDArray, sp, xp, backend_flags
+from pyinla import NDArray, sp, xp, xp_host, backend_flags
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
+from pyinla.kernels.blockmapping import compute_block_slice, compute_block_sort_index
 from pyinla.utils import print_msg
 
 try:
@@ -14,8 +15,6 @@ except ImportError as e:
 
 if backend_flags["cupy_avail"]:
     from cupyx.profiler import time_range
-
-import time
 
 
 class SerinvSolver(Solver):
@@ -62,15 +61,18 @@ class SerinvSolver(Solver):
                 dtype=xp.float64,
             )
 
+        # If running with cupy, initialize the caching strategy
+        self.bta_cache_block_sort_index = None
+        self.bt_cache_block_sort_index = None
+
         # Print the allocated memory for the BTA-array
-        total_bytes: int = (
+        self.total_bytes: int = (
             self.A_diagonal_blocks.nbytes
             + self.A_lower_diagonal_blocks.nbytes
             + self.A_arrow_bottom_blocks.nbytes
             + self.A_arrow_tip_block.nbytes
         )
-        total_gb: int = total_bytes / (1024**3)
-        print_msg(f"Allocated memory for SerinvSolver: {total_gb:.2f} GB", flush=True)
+        print_msg(f"Allocated memory for SerinvSolver: {self.total_bytes / (1024**3):.2f} GB", flush=True)
 
     @time_range()
     def cholesky(
@@ -82,7 +84,7 @@ class SerinvSolver(Solver):
         self._spmatrix_to_structured(A, sparsity)
 
         if sparsity == "bta":
-            with time_range():
+            with time_range("pobtaf"):
                 pobtaf(
                     self.A_diagonal_blocks,
                     self.A_lower_diagonal_blocks,
@@ -90,7 +92,7 @@ class SerinvSolver(Solver):
                     self.A_arrow_tip_block,
                 )
         elif sparsity == "bt":
-            with time_range():
+            with time_range("pobtf"):
                 pobtf(
                     self.A_diagonal_blocks,
                     self.A_lower_diagonal_blocks,
@@ -108,7 +110,7 @@ class SerinvSolver(Solver):
     ) -> NDArray:
         """Solve linear system using Cholesky factor."""
         if sparsity == "bta":
-            with time_range():
+            with time_range("pobtas"):
                 pobtas(
                     self.A_diagonal_blocks,
                     self.A_lower_diagonal_blocks,
@@ -126,7 +128,7 @@ class SerinvSolver(Solver):
                     trans="C",
                 )
         elif sparsity == "bt":
-            with time_range():
+            with time_range("pobts"):
                 pobts(
                     self.A_diagonal_blocks,
                     self.A_lower_diagonal_blocks,
@@ -193,46 +195,271 @@ class SerinvSolver(Solver):
         sparsity: str,
     ) -> None:
         """Map sp.spmatrix to BT or BTA."""
-        # About 3x faster...
-        A_csc = sp.sparse.csc_matrix(A)
-
         self.A_diagonal_blocks[:] = 0.0
         self.A_lower_diagonal_blocks[:] = 0.0
         self.A_arrow_bottom_blocks[:] = 0.0
         self.A_arrow_tip_block[:] = 0.0
 
-        for i in range(self.n_diag_blocks):
-            block_slice = A_csc[
-                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-            ].tocoo()
-            self.A_diagonal_blocks[i][
-                block_slice.row, block_slice.col
-            ] = block_slice.data
-
-            if i < self.n_diag_blocks - 1:
+        if xp.__name__ == "cupy":
+            if sparsity == "bta":
+                self._spmatrix_to_bta(A)
+            elif sparsity == "bt":
+                self._spmatrix_to_bt(A)
+            else:
+                raise ValueError(
+                    f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
+                )
+        else:
+            # CPU fall-back strategy
+            A_csc = sp.sparse.csc_matrix(A)
+            for i in range(self.n_diag_blocks):
                 block_slice = A_csc[
-                    (i + 1)
-                    * self.diagonal_blocksize : (i + 2)
-                    * self.diagonal_blocksize,
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                     i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
                 ].tocoo()
-                self.A_lower_diagonal_blocks[i][
+                self.A_diagonal_blocks[i][
                     block_slice.row, block_slice.col
                 ] = block_slice.data
 
-            block_slice = A_csc[
-                -self.arrowhead_blocksize :,
-                i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-            ].tocoo()
-            self.A_arrow_bottom_blocks[i][
-                block_slice.row, block_slice.col
-            ] = block_slice.data
+                if i < self.n_diag_blocks - 1:
+                    block_slice = A_csc[
+                        (i + 1)
+                        * self.diagonal_blocksize : (i + 2)
+                        * self.diagonal_blocksize,
+                        i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                    ].tocoo()
+                    self.A_lower_diagonal_blocks[i][
+                        block_slice.row, block_slice.col
+                    ] = block_slice.data
 
-        block_slice = A_csc[
-            -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
-        ].tocoo()
-        self.A_arrow_tip_block[block_slice.row, block_slice.col] = block_slice.data
+                if sparsity == "bta":
+                    block_slice = A_csc[
+                        -self.arrowhead_blocksize :,
+                        i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                    ].tocoo()
+                    self.A_arrow_bottom_blocks[i][
+                        block_slice.row, block_slice.col
+                    ] = block_slice.data
+
+            if sparsity == "bta":
+                block_slice = A_csc[
+                    -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
+                ].tocoo()
+                self.A_arrow_tip_block[block_slice.row, block_slice.col] = block_slice.data
+
+    @time_range()
+    def _spmatrix_to_bta(
+        self,
+        A: sp.sparse.spmatrix,
+    ) -> None:
+        coo = sp.sparse.coo_matrix(A)
+
+        if self.bta_cache_block_sort_index is None:
+            block_sizes = xp_host.array(
+                [self.diagonal_blocksize for _ in range(self.n_diag_blocks)]
+                + [self.arrowhead_blocksize]
+            )
+            self.bta_cache_block_sort_index = compute_block_sort_index(
+                coo.row, coo.col, block_sizes
+            )
+            block_offsets = xp_host.hstack(
+                ([0], xp_host.cumsum(block_sizes)), dtype=xp_host.int32
+            )
+
+            rows = coo.row[self.bta_cache_block_sort_index]
+            cols = coo.col[self.bta_cache_block_sort_index]
+
+            self.bta_diag_rows = []
+            self.bta_diag_cols = []
+            self.bta_diag_slices = []
+
+            self.bta_lower_rows = []
+            self.bta_lower_cols = []
+            self.bta_lower_slice = []
+
+            self.bta_arrow_bottom_rows = []
+            self.bta_arrow_bottom_cols = []
+            self.bta_arrow_bottom_slice = []
+
+            self.bta_arrow_tip_rows = None
+            self.bta_arrow_tip_cols = None
+            self.bta_arrow_tip_slice = None
+
+            for i in range(self.n_diag_blocks):
+                inds = compute_block_slice(
+                    rows, cols, block_offsets, block_row=i, block_col=i
+                )
+                slice_idx = slice(int(inds[0]), int(inds[-1] + 1), 1)
+                self.bta_diag_rows.append(rows[slice_idx] - block_offsets[i])
+                self.bta_diag_cols.append(cols[slice_idx] - block_offsets[i])
+                self.bta_diag_slices.append(slice_idx)
+
+                if i < self.n_diag_blocks - 1:
+                    inds = compute_block_slice(
+                        rows, cols, block_offsets, block_row=i + 1, block_col=i
+                    )
+                    slice_idx = slice(int(inds[0]), int(inds[-1] + 1), 1)
+                    self.bta_lower_rows.append(rows[slice_idx] - block_offsets[i + 1])
+                    self.bta_lower_cols.append(cols[slice_idx] - block_offsets[i])
+                    self.bta_lower_slice.append(slice_idx)
+
+                inds = compute_block_slice(
+                    rows,
+                    cols,
+                    block_offsets,
+                    block_row=self.n_diag_blocks,
+                    block_col=i,
+                )
+                slice_idx = slice(int(inds[0]), int(inds[-1] + 1), 1)
+                self.bta_arrow_bottom_rows.append(
+                    rows[slice_idx] - block_offsets[self.n_diag_blocks]
+                )
+                self.bta_arrow_bottom_cols.append(cols[slice_idx] - block_offsets[i])
+                self.bta_arrow_bottom_slice.append(slice_idx)
+
+            # Arrow tip block
+            inds = compute_block_slice(
+                rows,
+                cols,
+                block_offsets,
+                block_row=self.n_diag_blocks,
+                block_col=self.n_diag_blocks,
+            )
+            slice_idx = slice(int(inds[0]), int(inds[-1] + 1), 1)
+            self.bta_arrow_tip_rows = (
+                rows[slice_idx] - block_offsets[self.n_diag_blocks]
+            )
+            self.bta_arrow_tip_cols = (
+                cols[slice_idx] - block_offsets[self.n_diag_blocks]
+            )
+            self.bta_arrow_tip_slice = slice_idx
+
+            self.bta_diag_rows = xp.array(self.bta_diag_rows, dtype=xp.int32)
+            self.bta_diag_cols = xp.array(self.bta_diag_cols, dtype=xp.int32)
+            self.bta_lower_rows = xp.array(self.bta_lower_rows, dtype=xp.int32)
+            self.bta_lower_cols = xp.array(self.bta_lower_cols, dtype=xp.int32)
+            self.bta_arrow_bottom_rows = xp.array(self.bta_arrow_bottom_rows, dtype=xp.int32)
+            self.bta_arrow_bottom_cols = xp.array(self.bta_arrow_bottom_cols, dtype=xp.int32)
+            self.bta_arrow_tip_rows = xp.array(self.bta_arrow_tip_rows, dtype=xp.int32)
+            self.bta_arrow_tip_cols = xp.array(self.bta_arrow_tip_cols, dtype=xp.int32)
+
+            # Print the allocated memory for the BTA-array
+            total_bta_bytes: int = (
+                self.bta_diag_rows.nbytes
+                + self.bta_diag_cols.nbytes
+                + self.bta_lower_rows.nbytes
+                + self.bta_lower_cols.nbytes
+                + self.bta_arrow_bottom_rows.nbytes
+                + self.bta_arrow_bottom_cols.nbytes
+                + self.bta_arrow_tip_rows.nbytes
+                + self.bta_arrow_tip_cols.nbytes
+            )
+            self.total_bytes += total_bta_bytes
+            print_msg(f"Allocated an extra {total_bta_bytes / (1024**3):.2f} GB for BTA_mapping caching (total: {self.total_bytes / (1024**3):.2f})")
+
+        # Sort the data:
+        data = coo.data[self.bta_cache_block_sort_index]
+        for i in range(self.n_diag_blocks):
+            self.A_diagonal_blocks[i][
+                self.bta_diag_rows[i],
+                self.bta_diag_cols[i],
+            ] = data[self.bta_diag_slices[i]]
+
+            if i < self.n_diag_blocks - 1:
+                self.A_lower_diagonal_blocks[i][
+                    self.bta_lower_rows[i],
+                    self.bta_lower_cols[i],
+                ] = data[self.bta_lower_slice[i]]
+
+            self.A_arrow_bottom_blocks[i][
+                self.bta_arrow_bottom_rows[i],
+                self.bta_arrow_bottom_cols[i],
+            ] = data[self.bta_arrow_bottom_slice[i]]
+
+        # Arrow tip block
+        self.A_arrow_tip_block[
+            self.bta_arrow_tip_rows,
+            self.bta_arrow_tip_cols,
+        ] = data[self.bta_arrow_tip_slice]
+            
+    @time_range()
+    def _spmatrix_to_bt(
+        self,
+        A: sp.sparse.spmatrix,
+    ) -> None:
+        coo = sp.sparse.coo_matrix(A)
+
+        if self.bt_cache_block_sort_index is None:
+            block_sizes = xp_host.array(
+                [self.diagonal_blocksize for _ in range(self.n_diag_blocks)]
+                + [self.arrowhead_blocksize]
+            )
+            self.bt_cache_block_sort_index = compute_block_sort_index(
+                coo.row, coo.col, block_sizes
+            )
+            block_offsets = xp_host.hstack(
+                ([0], xp_host.cumsum(block_sizes)), dtype=xp_host.int32
+            )
+
+            rows = coo.row[self.bt_cache_block_sort_index]
+            cols = coo.col[self.bt_cache_block_sort_index]
+
+            self.bt_diag_rows = []
+            self.bt_diag_cols = []
+            self.bt_diag_slices = []
+
+            self.bt_lower_rows = []
+            self.bt_lower_cols = []
+            self.bt_lower_slice = []
+
+            for i in range(self.n_diag_blocks):
+                inds = compute_block_slice(
+                    rows, cols, block_offsets, block_row=i, block_col=i
+                )
+                slice_idx = slice(int(inds[0]), int(inds[-1] + 1), 1)
+                self.bt_diag_rows.append(rows[slice_idx] - block_offsets[i])
+                self.bt_diag_cols.append(cols[slice_idx] - block_offsets[i])
+                self.bt_diag_slices.append(slice_idx)
+
+                if i < self.n_diag_blocks - 1:
+                    inds = compute_block_slice(
+                        rows, cols, block_offsets, block_row=i + 1, block_col=i
+                    )
+                    slice_idx = slice(int(inds[0]), int(inds[-1] + 1), 1)
+                    self.bt_lower_rows.append(rows[slice_idx] - block_offsets[i + 1])
+                    self.bt_lower_cols.append(cols[slice_idx] - block_offsets[i])
+                    self.bt_lower_slice.append(slice_idx)
+
+            self.bt_diag_rows = xp.array(self.bt_diag_rows, dtype=xp.int32)
+            self.bt_diag_cols = xp.array(self.bt_diag_cols, dtype=xp.int32)
+            self.bt_lower_rows = xp.array(self.bt_lower_rows, dtype=xp.int32)
+            self.bt_lower_cols = xp.array(self.bt_lower_cols, dtype=xp.int32)
+
+            # Print the allocated memory for the BT array
+            total_bt_bytes: int = (
+                self.bt_diag_rows.nbytes
+                + self.bt_diag_cols.nbytes
+                + self.bt_lower_rows.nbytes
+                + self.bt_lower_cols.nbytes
+            )
+            self.total_bytes += total_bt_bytes
+            print_msg(f"Allocated an extra {total_bt_bytes / (1024**3):.2f} GB for BT_mapping caching (total: {self.total_bytes / (1024**3):.2f})")
+
+        # Sort the data:
+        data = coo.data[self.bt_cache_block_sort_index]
+        for i in range(self.n_diag_blocks):
+            self.A_diagonal_blocks[i][
+                self.bt_diag_rows[i],
+                self.bt_diag_cols[i],
+            ] = data[self.bt_diag_slices[i]]
+
+            if i < self.n_diag_blocks - 1:
+                self.A_lower_diagonal_blocks[i][
+                    self.bt_lower_rows[i],
+                    self.bt_lower_cols[i],
+                ] = data[self.bt_lower_slice[i]]
+
+
 
     @time_range()
     def _structured_to_spmatrix(
