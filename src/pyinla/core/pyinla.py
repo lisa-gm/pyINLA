@@ -24,6 +24,8 @@ from pyinla.utils import (
 
 if backend_flags["cupy_avail"]:
     from cupyx.profiler import time_range
+    import cupy as cp
+import time
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
 
@@ -150,6 +152,7 @@ class PyINLA:
         # --- Metrics
         self.f_values: ArrayLike = []
         self.theta_values: ArrayLike = []
+        self.objective_function_time: ArrayLike = []
 
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
@@ -234,7 +237,7 @@ class PyINLA:
 
                 print(
                     f"comm_rank: {comm_rank} | "
-                    f"Iteration: {self.iter:2d} | "
+                    f"Iteration: {self.iter:2d} (took: {self.objective_function_time[-1]:.2f}) | "
                     f"Theta: [{theta_str}] | "
                     f"Function Value: {fun_i: .6f} | "
                     f"Gradient: [{gradient_str}]",
@@ -257,6 +260,8 @@ class PyINLA:
                 },
                 callback=callback,
             )
+
+            print(f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}")
 
             # MEMO:
             # From here rank 0 own the optimized theta_star and the
@@ -309,6 +314,7 @@ class PyINLA:
         objective_function_evalutation : tuple
             Function value f(theta) evaluated at theta_i and its gradient.
         """
+        tic = time.perf_counter()
         # Generate theta matrix with different theta's to evaluate
         # currently central difference scheme is used for gradient
         self.f_values_i[:] = 0.0
@@ -353,7 +359,14 @@ class PyINLA:
                 - self.f_values_i[self.model.n_hyperparameters + i + 1]
             ) / (2 * self.eps_gradient_f)
 
-        return (get_host(self.f_values_i[0]), get_host(self.gradient_f))
+        f_0 = get_host(self.f_values_i[0])
+        grad_f = get_host(self.gradient_f)
+
+        cp.cuda.runtime.deviceSynchronize
+
+        toc = time.perf_counter()
+        self.objective_function_time.append(toc - tic)
+        return (f_0, grad_f)
 
     @time_range()
     def _evaluate_f(
