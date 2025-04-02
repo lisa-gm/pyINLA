@@ -6,11 +6,11 @@ from mpi4py import MPI
 from scipy import optimize
 from scipy.sparse import eye
 
-from pyinla import ArrayLike, NDArray, comm_rank, comm_size, xp, backend_flags
+from pyinla import ArrayLike, NDArray, backend_flags, comm_rank, comm_size, xp
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
-from pyinla.solvers import DenseSolver, SerinvSolver, SparseSolver, DistSerinvSolver
-from pyinla.utils import (
+from pyinla.solvers import DenseSolver, DistSerinvSolver, SerinvSolver, SparseSolver
+from pyinla.utils import (  # memory_footprint,
     allreduce,
     extract_diagonal,
     get_device,
@@ -19,12 +19,12 @@ from pyinla.utils import (
     set_device,
     smartsplit,
     synchronize,
-    memory_footprint,
 )
 
 if backend_flags["cupy_avail"]:
     from cupyx.profiler import time_range
     import cupy as cp
+
 import time
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
@@ -214,7 +214,7 @@ class PyINLA:
             print_msg("No hyperparameters, just running inner iteration.")
             self.f_value = self._evaluate_f(self.model.theta)
 
-            minimization_result: dict = {
+            self.minimization_result: dict = {
                 "theta": self.model.theta,
                 "x": self.model.x[self.model.inverse_permutation_latent_variables],
                 "f": self.f_value,
@@ -222,6 +222,10 @@ class PyINLA:
         else:
             print_msg("Starting optimization.")
             self.iter = 0
+
+            # Define a custom exception to signal early exit
+            class OptimizationConvergedEarlyExit(Exception):
+                pass
 
             # Start the minimization procedure
             def callback(intermediate_result: optimize.OptimizeResult):
@@ -247,21 +251,55 @@ class PyINLA:
                 self.theta_values.append(theta_i)
                 self.f_values.append(fun_i)
 
-            scipy_result = optimize.minimize(
-                fun=self._objective_function,
-                x0=get_host(self.theta_optimizer),
-                method="L-BFGS-B",
-                jac=self.config.minimize.jac,
-                options={
-                    "maxiter": self.config.minimize.max_iter,
-                    "gtol": self.config.minimize.gtol,
-                    "disp": self.config.minimize.disp,
-                    "ftol": 1e-18,
-                },
-                callback=callback,
-            )
+                # check if f_values have been decreasing over last iterations
+                if self.iter > self.config.f_reduction_lag:
+                    if (
+                        xp.abs(self.f_values[-self.config.f_reduction_lag] - fun_i)
+                        < self.config.f_reduction_tol
+                    ):
+                        print_msg(
+                            f"Optimization converged!  "
+                            f"|| f({self.iter - self.config.f_reduction_lag}) - f({self.iter}) || = "
+                            f"{self.f_values[self.iter - self.config.f_reduction_lag] - self.f_values[self.iter-1]:.6f} "
+                            f"< {self.config.f_reduction_tol}. Function value: {fun_i:.6f}",
+                            flush=True,
+                        )
 
-            print(f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}")
+                        self.minimization_result = {
+                            "theta": get_host(self.model.theta),
+                            "x": get_host(
+                                self.model.x[
+                                    self.model.inverse_permutation_latent_variables
+                                ]
+                            ),
+                            "f": fun_i,
+                            "grad_f": self.gradient_f,
+                            "f_values": self.f_values,
+                            "theta_values": self.theta_values,
+                        }
+
+                        raise OptimizationConvergedEarlyExit()
+
+            try:
+                scipy_result = optimize.minimize(
+                    fun=self._objective_function,
+                    x0=get_host(self.theta_optimizer),
+                    method="L-BFGS-B",
+                    jac=self.config.minimize.jac,
+                    options={
+                        "maxiter": self.config.minimize.max_iter,
+                        "gtol": self.config.minimize.gtol,
+                        "disp": self.config.minimize.disp,
+                        "ftol": 1e-18,
+                    },
+                    callback=callback,
+                )
+            except OptimizationConvergedEarlyExit:
+                return self.minimization_result
+
+            print(
+                f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}"
+            )
 
             # MEMO:
             # From here rank 0 own the optimized theta_star and the
@@ -284,7 +322,7 @@ class PyINLA:
                     flush=True,
                 )
 
-            minimization_result: dict = {
+            self.minimization_result: dict = {
                 "theta": scipy_result.x,
                 "x": get_host(
                     self.model.x[self.model.inverse_permutation_latent_variables]
@@ -295,7 +333,7 @@ class PyINLA:
                 "theta_values": self.theta_values,
             }
 
-        return minimization_result
+        return self.minimization_result
 
     @time_range()
     def _objective_function(
