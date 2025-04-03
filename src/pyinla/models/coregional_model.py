@@ -14,7 +14,7 @@ from pyinla.prior_hyperparameters import (
     PenalizedComplexityPriorHyperparameters,
 )
 from pyinla.submodels import RegressionSubModel, SpatialSubModel, SpatioTemporalSubModel
-from pyinla.utils import bdiag_tiling  # , get_host
+from pyinla.utils import bdiag_tiling, get_host
 
 
 class CoregionalModel(Model):
@@ -336,97 +336,160 @@ class CoregionalModel(Model):
                 + (lambda_0_1**2 / sigma_1**2) * Qu_list[1]
                 + (lambda_1_2**2 / sigma_2**2) * Qu_list[2]
             )
-            # q11_rows = q11.row
-            # q11_columns = q11.col
+            if not q11.has_canonical_format:
+                # print("didnt have canonical format. converting now.")
+                q11.sum_duplicates()  
+            q11_rows = q11.row
+            q11_columns = q11.col
 
             q21 = sp.sparse.coo_matrix(
                 (-lambda_0_1 / sigma_1**2) * Qu_list[1]
                 + (lambda_0_2 * lambda_1_2 / sigma_2**2) * Qu_list[2]
             )
-            # q21_rows = q21.row + n_re
-            # q21_columns = q21.col
+            if not q21.has_canonical_format:
+                # print("didnt have canonical format. converting now.")
+                q21.sum_duplicates()  
+                
+            q21_rows = q21.row + n_re
+            q21_columns = q21.col
 
             q31 = sp.sparse.coo_matrix(-lambda_1_2 / sigma_2**2 * Qu_list[2])
-            # q31_rows = q31.row + 2 * n_re
-            # q31_columns = q31.col
-
+            if not q31.has_canonical_format:
+                # print("didnt have canonical format. converting now.")
+                q31.sum_duplicates()  
+            q31_rows = q31.row + 2 * n_re
+            q31_columns = q31.col    
+            
             q22 = sp.sparse.coo_matrix(
                 (1 / sigma_1**2) * Qu_list[1]
                 + (lambda_0_2**2 / sigma_2**2) * Qu_list[2]
             )
-            # q22_rows = q22.row + n_re
-            # q22_columns = q22.col + n_re
+            if not q22.has_canonical_format:
+                # print("didnt have canonical format. converting now.")
+                q22.sum_duplicates()  
+            q22_rows = q22.row + n_re
+            q22_columns = q22.col + n_re
 
             q32 = sp.sparse.coo_matrix(-lambda_0_2 / sigma_2**2 * Qu_list[2])
-            # q32_rows = q32.row + 2 * n_re
-            # q32_columns = q32.col + n_re
-
+            q32_row_befores_sorting = q32.row.copy()
+            if not q32.has_canonical_format:
+                # print("didnt have canonical format. converting now.")
+                q32.sum_duplicates()     
+            q32_rows = q32.row + 2 * n_re
+            q32_columns = q32.col + n_re
+            
             q33 = sp.sparse.coo_matrix((1 / sigma_2**2) * Qu_list[2])
-            # q33_rows = q33.row + 2 * n_re
-            # q33_columns = q33.col + 2 * n_re
+            if not q33.has_canonical_format:
+                # print("didnt have canonical format. converting now.")
+                q33.sum_duplicates()   
+            q33_rows = q33.row + 2 * n_re
+            q33_columns = q33.col + 2 * n_re
 
-            q12 = q21.T
-            # q12_rows = q12.row
-            # q12_columns = q12.col + n_re
+            q12 = (q21.copy()).T
+            if not q12.has_canonical_format:
+                # print("didnt have canonical format. converting now.")
+                q12.sum_duplicates()              
+            q12_rows = q12.row
+            q12_columns = q12.col + n_re
 
-            q13 = q31.T
-            # q13_rows = q13.row
-            # q13_columns = q13.col + 2 * n_re
+            q13 = (q31.copy()).T
+            if not q13.has_canonical_format:
+                # print("didnt have canonical format. converting now.")
+                q13.sum_duplicates() 
+               
+            q13_rows = q13.row
+            q13_columns = q13.col + 2 * n_re
 
-            q23 = q32.T
-            # q23_rows = q23.row + n_re
-            # q23_columns = q23.col + 2 * n_re
+            q23 = (q32.copy()).T
+            if not q23.has_canonical_format:
+                # print("didnt have canonical format. converting now.")
+                q23.sum_duplicates() 
+            q23_rows = q23.row + n_re
+            q23_columns = q23.col + 2 * n_re
 
-            # self.rows_Qprior_re = xp.concatenate(
-            #     [
-            #         q11_rows,
-            #         q12_rows,
-            #         q13_rows,
-            #         q21_rows,
-            #         q22_rows,
-            #         q23_rows,
-            #         q31_rows,
-            #         q32_rows,
-            #         q33_rows,
-            #     ]
+            self.rows_Qprior_re = xp.concatenate(
+                [
+                    q11_rows,
+                    q12_rows,
+                    q13_rows,
+                    q21_rows,
+                    q22_rows,
+                    q23_rows,
+                    q31_rows,
+                    q32_rows,
+                    q33_rows,
+                ]
+            )
+            self.columns_Qprior_re = xp.concatenate(
+                [
+                    q11_columns,
+                    q12_columns,
+                    q13_columns,
+                    q21_columns,
+                    q22_columns,
+                    q23_columns,
+                    q31_columns,
+                    q32_columns,
+                    q33_columns,
+                ]
+            )
+            self.data_Qprior_re = xp.concatenate(
+                [
+                    q11.data,
+                    q12.data,
+                    q13.data,
+                    q21.data,
+                    q22.data,
+                    q23.data,
+                    q31.data,
+                    q32.data,
+                    q33.data,
+                ]
+            ) 
+            
+            # print(
+            #     f"data_Qprior_row[0]: {self.rows_Qprior_re[0]}, data_Qprior_col[0]: {self.columns_Qprior_re[0]}, "
+            #     f"data_Qprior[0]: {self.data_Qprior_re[0]}, data_Qprior_row[-1]: {self.rows_Qprior_re[-1]}, "
+            #     f"data_Qprior_col[-1]: {self.columns_Qprior_re[-1]}, data_Qprior[-1]: {self.data_Qprior_re[-1]}"
             # )
-            # self.columns_Qprior_re = xp.concatenate(
-            #     [
-            #         q11_columns,
-            #         q12_columns,
-            #         q13_columns,
-            #         q21_columns,
-            #         q22_columns,
-            #         q23_columns,
-            #         q31_columns,
-            #         q32_columns,
-            #         q33_columns,
-            #     ]
-            # )
-            # self.data_Qprior_re = xp.concatenate(
-            #     [
-            #         q11.data,
-            #         q12.data,
-            #         q13.data,
-            #         q21.data,
-            #         q22.data,
-            #         q23.data,
-            #         q31.data,
-            #         q32.data,
-            #         q33.data,
-            #     ]
-            # )
 
-            Qprior_st = sp.sparse.bmat(
-                [[q11, q12, q13], [q21, q22, q23], [q31, q32, q33]]
-            ).tocsc()
+            # Qprior_st = sp.sparse.bmat(
+            #     [[q11, q12, q13], [q21, q22, q23], [q31, q32, q33]]
+            # ).tocsc()
+            
+            # Qprior_re = sp.sparse.coo_matrix((self.data_Qprior_re, (self.rows_Qprior_re, self.columns_Qprior_re)), shape=( self.n_models * n_re,  self.n_models * n_re))
+            # diff = Qprior_st - Qprior_re
+            # print("max(diff.data): ", max(abs(diff.data)))
 
         # Apply the permutation to the Qprior_st
         if self.coregionalization_type == "spatio_temporal":
             # Permute matrix
-            Qprior_st_perm = Qprior_st[self.permutation_Qst, :][:, self.permutation_Qst]
+            # Qprior_st_perm = Qprior_st[self.permutation_Qst, :][:, self.permutation_Qst]
 
-            # diag_Qprior = Qprior_st_perm.diagonal()
+            if self.permutation_indices_Q_prior is None:
+                self.Qprior_re_perm = sp.sparse.csc_matrix(
+                    (self.n_models * n_re, self.n_models * n_re),
+                    dtype=self.data_Qprior_re.dtype,
+                )
+                #perm = np.arange(Qprior_st.shape[0])
+                self.set_data_array_permutation_indices(
+                    self.permutation_Qst,
+                    self.rows_Qprior_re,
+                    self.columns_Qprior_re,
+                    self.n_models * n_re,
+                )
+
+                # we only need to set these once
+                self.Qprior_re_perm.indices = self.permutation_indices_Q_prior
+                self.Qprior_re_perm.indptr = self.permutation_indptr_Q_prior
+
+            self.Qprior_re_perm.data = self.data_Qprior_re[
+                self.permutation_vector_Q_prior
+            ]
+            
+            # print("Qprior_re_perm:\n", self.Qprior_re_perm[-6:, -6:].toarray())
+                        
+            # diag_Qprior = self.Qprior_re_perm.diagonal()
             # # find negative entries on the diagonal
             # negative_diag_indices = np.where(diag_Qprior < 0)[0]
             # if negative_diag_indices.size > 0:
@@ -434,33 +497,28 @@ class CoregionalModel(Model):
             # else:
             #     print("No negative diagonal entries found.")
 
-            # if self.permutation_indices_Q_prior is None:
-            #     self.Qprior_re_perm = sp.sparse.csc_matrix(
-            #         (self.n_models * n_re, self.n_models * n_re),
-            #         dtype=self.data_Qprior_re.dtype,
-            #     )
-            #     # perm = np.arange(Qprior_st.shape[0])
-            #     self.set_data_array_permutation_indices(
-            #         self.permutation_Qst,
-            #         self.rows_Qprior_re,
-            #         self.columns_Qprior_re,
-            #         self.n_models * n_re,
-            #     )
-
-            #     # we only need to set these once
-            #     self.Qprior_re_perm.indices = self.permutation_indices_Q_prior
-            #     self.Qprior_re_perm.indptr = self.permutation_indptr_Q_prior
-
-            # self.Qprior_re_perm.data = self.data_Qprior_re[
-            #     self.permutation_vector_Q_prior
-            # ]
-
-            # # compute norm difference between Qprior_st_perm and Qprior_re_perm
+            # compute norm difference between Qprior_st_perm and Qprior_re_perm
             # diff = Qprior_st_perm - self.Qprior_re_perm
+            
+            # print("diff: \n", diff[-6:, -6:].toarray())
             # # get max abs value data array
             # max_abs_diff = xp.max(xp.abs(diff.data))
             # print("abs(diff.data): ", max_abs_diff)
+            
+            
+            # # save Qprior_re to file in matrix martket format
+            # from scipy.io import mmwrite
+            # Qprior_re_perm =  sp.sparse.coo_matrix(self.Qprior_re_perm)
+            
+            # Qprior_re_np = Qprior_re_perm.get()
+            # print("Qprior_re_np:\n", Qprior_re_np.data[:10])
 
+            # # Specify the file path to save the matrix
+            # output_file = "Qprior_re_perm_1.mtx"
+
+            # # Write the matrix to the file
+            # mmwrite(output_file, Qprior_re_np)
+            
         else:
             # Qprior_st_perm = Qprior_st
             self.Qprior_re_perm = sp.sparse.coo_matrix(
@@ -471,16 +529,16 @@ class CoregionalModel(Model):
         if Q_r != []:
             if self.Q_prior is None:
                 Qprior_reg = bdiag_tiling(Q_r).tocsc()
-                # self.Q_prior = bdiag_tiling([self.Qprior_re_perm, Qprior_reg]).tocsc()
+                self.Q_prior = bdiag_tiling([self.Qprior_re_perm, Qprior_reg]).tocsc()
 
-                self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
+                #self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
             else:
-                # self.Q_prior.tocsc()
-                # self.Q_prior.sort_indices()
-                # self.Q_prior.data[: self.Qprior_re_perm.nnz] = self.Qprior_re_perm.data
+                self.Q_prior.tocsc()
+                self.Q_prior.sort_indices()
+                self.Q_prior.data[: self.Qprior_re_perm.nnz] = self.Qprior_re_perm.data
 
-                Qprior_reg = bdiag_tiling(Q_r).tocsc()
-                self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
+                # Qprior_reg = bdiag_tiling(Q_r).tocsc()
+                # self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
 
         else:
             # self.Q_prior = self.Qprior_re_perm
@@ -791,16 +849,18 @@ class CoregionalModel(Model):
     def set_data_array_permutation_indices(
         self, permutation, a_rows: NDArray, a_cols: NDArray, n: int
     ) -> None:
-        a_data_placeholder = xp.arange(len(a_rows), dtype=xp.float32)
-        a = sp.sparse.csr_matrix(
-            sp.sparse.coo_matrix((a_data_placeholder, (a_rows, a_cols)), shape=(n, n))
+        
+        a_data_placeholder = xp.arange(0, len(a_rows), 1)
+        a = sp.sparse.csc_matrix(
+            sp.sparse.coo_matrix((a_data_placeholder, (a_rows, a_cols)), shape=(n, n), dtype=xp.float64)
         )
 
         a_perm = a[permutation, :][:, permutation]
-
+        
         self.permutation_vector_Q_prior = a_perm.data.astype(xp.int32)
         self.permutation_indices_Q_prior = a_perm.indices
         self.permutation_indptr_Q_prior = a_perm.indptr
+                
 
     def get_solver_parameters(self) -> dict:
         """Get the solver parameters."""

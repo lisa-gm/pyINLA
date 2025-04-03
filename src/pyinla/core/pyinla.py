@@ -244,7 +244,8 @@ class PyINLA:
                     f"Iteration: {self.iter:2d} (took: {self.objective_function_time[-1]:.2f}) | "
                     f"Theta: [{theta_str}] | "
                     f"Function Value: {fun_i: .6f} | "
-                    f"Gradient: [{gradient_str}]",
+                    f"Gradient: [{gradient_str}] | ",
+                    f"Norm(Grad): [{xp.linalg.norm(self.gradient_f): .6f}]",
                     flush=True,
                 )
 
@@ -261,7 +262,39 @@ class PyINLA:
                             f"Optimization converged!  "
                             f"|| f({self.iter - self.config.f_reduction_lag}) - f({self.iter}) || = "
                             f"{self.f_values[self.iter - self.config.f_reduction_lag] - self.f_values[self.iter-1]:.6f} "
-                            f"< {self.config.f_reduction_tol}. Function value: {fun_i:.6f}",
+                            f"< {self.config.f_reduction_tol}. Function value: {fun_i:.6f}\n",
+                            flush=True,
+                        )
+
+                        self.minimization_result = {
+                            "theta": get_host(self.model.theta),
+                            "x": get_host(
+                                self.model.x
+                                # self.model.x[
+                                #     self.model.inverse_permutation_latent_variables
+                                # ]
+                            ),
+                            "f": fun_i,
+                            "grad_f": self.gradient_f,
+                            "f_values": self.f_values,
+                            "theta_values": self.theta_values,
+                        }
+
+                        raise OptimizationConvergedEarlyExit()
+                    
+                if self.iter > self.config.theta_reduction_lag:
+                    if (
+                       xp.linalg.norm(self.theta_values[-self.config.theta_reduction_lag] - theta_i)
+                        < self.config.theta_reduction_tol
+                    ):
+                        norm_diff = xp.linalg.norm(
+                            self.theta_values[self.iter - self.config.theta_reduction_lag] - theta_i
+                        )
+                        print_msg(
+                            f"Optimization converged!  "
+                            f"|| theta({self.iter - self.config.theta_reduction_lag}) - theta({self.iter}) || = "
+                            f"{norm_diff:.6f} "
+                            f"< {self.config.theta_reduction_tol}. Function value: {fun_i:.6f}\n",
                             flush=True,
                         )
 
@@ -523,6 +556,11 @@ class PyINLA:
                 + likelihood
                 + prior_latent_parameters
                 - conditional_latent_parameters
+            )
+            
+        if xp.isnan(f_theta[0]):
+            raise ValueError(
+                f"f(theta) is NaN. Check what is happening."
             )
 
         return f_theta[0]

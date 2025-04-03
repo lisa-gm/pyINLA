@@ -37,6 +37,10 @@ class PyinlaConfig(BaseModel):
     # exit BFGS early if the reduction in the objective function is less than f_reduction_tol after f_reduction_lag iterations
     f_reduction_lag: int = 3
     f_reduction_tol: float = 1e-4
+    
+    # exit BFGS early if the change in theta is less than theta_reduction_tol after theta_reduction_lag iterations
+    theta_reduction_lag: int = 3
+    theta_reduction_tol: float = 1e-4
 
     inner_iteration_max_iter: PositiveInt = 50
     eps_inner_iteration: float = 1e-3
