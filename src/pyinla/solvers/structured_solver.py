@@ -160,6 +160,9 @@ class SerinvSolver(Solver):
 
         if sparsity == "bta":
             logdet += xp.sum(xp.log(self.A_arrow_tip_block.diagonal()))
+            
+        if xp.isnan(logdet):
+            raise ValueError("Logdet is NaN. Check the input matrix.")
 
         return 2 * logdet
 

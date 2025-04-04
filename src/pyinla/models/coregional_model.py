@@ -268,6 +268,9 @@ class CoregionalModel(Model):
         Qu_list: list = []
         Q_r: list = []
 
+        # Qu_list: list = [None * self.n_models]
+        # Q_r: list = [None * self.n_models]
+
         for i, model in enumerate(self.models):
             submodel_st = model.submodels[0]
             # Get the spatio-temporal submodel idx
@@ -279,6 +282,7 @@ class CoregionalModel(Model):
 
             # print("in construct Qprior: kwargs_st: ", kwargs_st)
             Qu_list.append(submodel_st.construct_Q_prior(**kwargs_st).tocsc())
+            # Qu_list[i] = submodel_st.construct_Q_prior(**kwargs_st).tocsc()
 
             if len(model.submodels) > 1:
                 # Create the regression tip
@@ -286,6 +290,7 @@ class CoregionalModel(Model):
                 # Get the spatio-temporal submodel idx
                 kwargs_r = {}
                 Q_r.append(submodel_r.construct_Q_prior(**kwargs_r).tocsc())
+                # Q_r[i] = submodel_r.construct_Q_prior(**kwargs_r).tocsc()
 
         sigma_0 = xp.exp(self.theta[self.theta_keys.index("sigma_0")])
         sigma_1 = xp.exp(self.theta[self.theta_keys.index("sigma_1")])
@@ -298,6 +303,7 @@ class CoregionalModel(Model):
                 (1 / sigma_0**2) * Qu_list[0]
                 + (lambda_0_1**2 / sigma_1**2) * Qu_list[1]
             )
+            Qu_list[0] = None
             q11_rows = q11.row
             q11_columns = q11.col
 
@@ -336,6 +342,7 @@ class CoregionalModel(Model):
                 + (lambda_0_1**2 / sigma_1**2) * Qu_list[1]
                 + (lambda_1_2**2 / sigma_2**2) * Qu_list[2]
             )
+            Qu_list[0] = None
             if not q11.has_canonical_format:
                 # print("didnt have canonical format. converting now.")
                 q11.sum_duplicates()  
@@ -371,7 +378,6 @@ class CoregionalModel(Model):
             q22_columns = q22.col + n_re
 
             q32 = sp.sparse.coo_matrix(-lambda_0_2 / sigma_2**2 * Qu_list[2])
-            q32_row_befores_sorting = q32.row.copy()
             if not q32.has_canonical_format:
                 # print("didnt have canonical format. converting now.")
                 q32.sum_duplicates()     
