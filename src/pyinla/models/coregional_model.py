@@ -2,6 +2,8 @@
 
 import re
 
+import cupy as cp
+
 import numpy as np
 from scipy.sparse import spmatrix
 
@@ -15,6 +17,13 @@ from pyinla.prior_hyperparameters import (
 )
 from pyinla.submodels import RegressionSubModel, SpatialSubModel, SpatioTemporalSubModel
 from pyinla.utils import bdiag_tiling, get_host
+
+def format_size(size_bytes):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.2f} TB"
 
 
 class CoregionalModel(Model):
@@ -211,6 +220,22 @@ class CoregionalModel(Model):
             ] = model.y
 
         self.a: spmatrix = bdiag_tiling([model.a for model in self.models]).tocsc()
+    
+        mempool = cp.get_default_memory_pool()
+        pinned_mempool = cp.get_default_pinned_memory_pool()
+    
+        print("memory used when model.a is assigned.")
+        print("mem pool used: ", format_size(mempool.used_bytes()))           
+        print("mem total bytes: ", format_size(mempool.total_bytes()))      
+        
+        # free memory -> delete model.a for all models
+        for model in self.models:
+            model.a = None
+            
+        print("memory used after model.a is deleted.")
+        print("mem pool used: ", format_size(mempool.used_bytes()))           
+        print("mem total bytes: ", format_size(mempool.total_bytes()))      
+        
 
         if self.coregionalization_type == "spatio_temporal":
             self.permutation_Qst = self._generate_permutation_indices(
@@ -264,12 +289,15 @@ class CoregionalModel(Model):
     def construct_Q_prior(self) -> spmatrix:
         # number of random effects per model
         n_re = self.n_spatial_nodes * self.n_temporal_nodes
+        
+        mempool = cp.get_default_memory_pool()
+        pinned_mempool = cp.get_default_pinned_memory_pool()
 
-        Qu_list: list = []
-        Q_r: list = []
+        # Qu_list: list = []
+        # Q_r: list = []
 
-        # Qu_list: list = [None * self.n_models]
-        # Q_r: list = [None * self.n_models]
+        Qu_list: list = [None] * self.n_models          
+        Q_r: list = [None] * self.n_models
 
         for i, model in enumerate(self.models):
             submodel_st = model.submodels[0]
@@ -281,16 +309,16 @@ class CoregionalModel(Model):
                 kwargs_st[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
 
             # print("in construct Qprior: kwargs_st: ", kwargs_st)
-            Qu_list.append(submodel_st.construct_Q_prior(**kwargs_st).tocsc())
-            # Qu_list[i] = submodel_st.construct_Q_prior(**kwargs_st).tocsc()
+            #Qu_list.append(submodel_st.construct_Q_prior(**kwargs_st).tocsc())
+            Qu_list[i] = submodel_st.construct_Q_prior(**kwargs_st).tocsc()
 
             if len(model.submodels) > 1:
                 # Create the regression tip
                 submodel_r = model.submodels[1]
                 # Get the spatio-temporal submodel idx
                 kwargs_r = {}
-                Q_r.append(submodel_r.construct_Q_prior(**kwargs_r).tocsc())
-                # Q_r[i] = submodel_r.construct_Q_prior(**kwargs_r).tocsc()
+                #Q_r.append(submodel_r.construct_Q_prior(**kwargs_r).tocsc())
+                Q_r[i] = submodel_r.construct_Q_prior(**kwargs_r).tocsc()
 
         sigma_0 = xp.exp(self.theta[self.theta_keys.index("sigma_0")])
         sigma_1 = xp.exp(self.theta[self.theta_keys.index("sigma_1")])
@@ -318,6 +346,7 @@ class CoregionalModel(Model):
             q22 = sp.sparse.coo_matrix((1 / sigma_1**2) * Qu_list[1])
             q22_rows = q22.row + n_re
             q22_columns = q22.col + n_re
+            Qu_list[1] = None
 
             self.rows_Qprior_re = xp.concatenate(
                 [q11_rows, q12_rows, q21_rows, q22_rows]
@@ -376,6 +405,7 @@ class CoregionalModel(Model):
                 q22.sum_duplicates()  
             q22_rows = q22.row + n_re
             q22_columns = q22.col + n_re
+            Q_list[1] = None
 
             q32 = sp.sparse.coo_matrix(-lambda_0_2 / sigma_2**2 * Qu_list[2])
             if not q32.has_canonical_format:
@@ -390,6 +420,7 @@ class CoregionalModel(Model):
                 q33.sum_duplicates()   
             q33_rows = q33.row + 2 * n_re
             q33_columns = q33.col + 2 * n_re
+            Qu_list[2] = None
 
             q12 = (q21.copy()).T
             if not q12.has_canonical_format:
