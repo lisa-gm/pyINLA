@@ -415,6 +415,7 @@ class PyINLA:
                 self.f_values_i[feval_i] = self._evaluate_f(
                     theta_i=self.theta_mat[:, feval_i], comm=self.comm_feval
                 )
+                print("rank", comm_rank, "evaluated ", feval_i, ", where f(theta_i):", self.f_values_i[feval_i])
 
         # Here carefull on the reduction as it's gonna add the values from all ranks and not only the root of the groups - TODO
         allreduce(

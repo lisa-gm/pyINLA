@@ -7,7 +7,7 @@ import cupy as cp
 import numpy as np
 from scipy.sparse import spmatrix
 
-from pyinla import ArrayLike, NDArray, sp, xp
+from pyinla import ArrayLike, NDArray, sp, xp, backend_flags
 from pyinla.configs.models_config import CoregionalModelConfig
 from pyinla.core.model import Model
 from pyinla.core.prior_hyperparameters import PriorHyperparameters
@@ -17,6 +17,10 @@ from pyinla.prior_hyperparameters import (
 )
 from pyinla.submodels import RegressionSubModel, SpatialSubModel, SpatioTemporalSubModel
 from pyinla.utils import bdiag_tiling, get_host
+
+if backend_flags["cupy_avail"]:
+    from cupyx.profiler import time_range
+    import cupy as cp
 
 def format_size(size_bytes):
     for unit in ['B', 'KB', 'MB', 'GB']:
@@ -278,7 +282,6 @@ class CoregionalModel(Model):
         # self.inverse_permutation_latent_variables = xp.argsort(self.perm2)
 
         # --- Recurrent variables
-        self.Q_prior = None
         self.Q_prior_data_mapping = [0]
         
         self.rows_Qprior_re = None
@@ -291,6 +294,11 @@ class CoregionalModel(Model):
 
         self.Q_conditional = None
         self.Q_conditional_data_mapping = [0]
+        
+        self.Q_prior: spmatrix = None # need this otherwise the construct will fail
+        print("Calling construct_Q_prior in the init...")
+        self.construct_Q_prior()
+
 
     def construct_Q_prior(self) -> spmatrix:
         # number of random effects per model
@@ -337,29 +345,45 @@ class CoregionalModel(Model):
                 (1 / sigma_0**2) * Qu_list[0]
                 + (lambda_0_1**2 / sigma_1**2) * Qu_list[1]
             )
+            if not q11.has_canonical_format:
+                q11.sum_duplicates()  
+            
             Qu_list[0] = None
-            q11_rows = q11.row
-            q11_columns = q11.col
 
             q21 = sp.sparse.coo_matrix((-lambda_0_1 / sigma_1**2) * Qu_list[1])
-            q21_rows = q21.row + n_re
-            q21_columns = q21.col
-
+            if not q21.has_canonical_format:
+                q21.sum_duplicates()  
+                
             q12 = sp.sparse.coo_matrix((-lambda_0_1 / sigma_1**2) * Qu_list[1])
-            q12_rows = q12.row
-            q12_columns = q12.col + n_re
-
+            if not q12.has_canonical_format:
+                q12.sum_duplicates()  
+                
             q22 = sp.sparse.coo_matrix((1 / sigma_1**2) * Qu_list[1])
-            q22_rows = q22.row + n_re
-            q22_columns = q22.col + n_re
+            if not q22.has_canonical_format:
+                q22.sum_duplicates()  
+                
             Qu_list[1] = None
 
-            self.rows_Qprior_re = xp.concatenate(
-                [q11_rows, q12_rows, q21_rows, q22_rows]
-            )
-            self.columns_Qprior_re = xp.concatenate(
-                [q11_columns, q12_columns, q21_columns, q22_columns]
-            )
+            if self.data_Qprior_re is None:
+                q11_rows = q11.row
+                q11_columns = q11.col
+
+                q21_rows = q21.row + n_re
+                q21_columns = q21.col
+
+                q12_rows = q12.row
+                q12_columns = q12.col + n_re
+
+                q22_rows = q22.row + n_re
+                q22_columns = q22.col + n_re
+                
+                self.rows_Qprior_re = xp.concatenate(
+                    [q11_rows, q12_rows, q21_rows, q22_rows]
+                )
+                self.columns_Qprior_re = xp.concatenate(
+                    [q11_columns, q12_columns, q21_columns, q22_columns]
+                )
+                
             self.data_Qprior_re = xp.concatenate(
                 [q11.data, q12.data, q21.data, q22.data]
             )
@@ -372,11 +396,6 @@ class CoregionalModel(Model):
             lambda_0_2 = self.theta[self.theta_keys.index("lambda_0_2")]
             lambda_1_2 = self.theta[self.theta_keys.index("lambda_1_2")]
             
-            print("\nBefore constructing Q11, Q21, Q22, ...")
-            mempool.free_all_blocks()
-            print("mem pool used: ", format_size(mempool.used_bytes()))           
-            print("mem total bytes: ", format_size(mempool.total_bytes())) 
-
             q11 = sp.sparse.coo_matrix(
                 (1 / sigma_0**2) * Qu_list[0]
                 + (lambda_0_1**2 / sigma_1**2) * Qu_list[1]
@@ -384,7 +403,6 @@ class CoregionalModel(Model):
             )
             Qu_list[0] = None
             if not q11.has_canonical_format:
-                # print("didnt have canonical format. converting now.")
                 q11.sum_duplicates()  
 
             q21 = sp.sparse.coo_matrix(
@@ -392,12 +410,10 @@ class CoregionalModel(Model):
                 + (lambda_0_2 * lambda_1_2 / sigma_2**2) * Qu_list[2]
             )
             if not q21.has_canonical_format:
-                # print("didnt have canonical format. converting now.")
                 q21.sum_duplicates()  
                 
             q31 = sp.sparse.coo_matrix(-lambda_1_2 / sigma_2**2 * Qu_list[2])
             if not q31.has_canonical_format:
-                # print("didnt have canonical format. converting now.")
                 q31.sum_duplicates()  
                             
             q22 = sp.sparse.coo_matrix(
@@ -405,45 +421,31 @@ class CoregionalModel(Model):
                 + (lambda_0_2**2 / sigma_2**2) * Qu_list[2]
             )
             if not q22.has_canonical_format:
-                # print("didnt have canonical format. converting now.")
                 q22.sum_duplicates()  
             Qu_list[1] = None
 
             q32 = sp.sparse.coo_matrix(-lambda_0_2 / sigma_2**2 * Qu_list[2])
             if not q32.has_canonical_format:
-                # print("didnt have canonical format. converting now.")
                 q32.sum_duplicates()     
             
             q33 = sp.sparse.coo_matrix((1 / sigma_2**2) * Qu_list[2])
             if not q33.has_canonical_format:
-                # print("didnt have canonical format. converting now.")
                 q33.sum_duplicates()   
-            
             Qu_list[2] = None
             
-            print("\nAfter Q33, before Q21.T, Q23.T ...")     
-            mempool.free_all_blocks()
-            print("mem pool used: ", format_size(mempool.used_bytes()))           
-            print("mem total bytes: ", format_size(mempool.total_bytes())) 
-
+            # not the most elegant way but im afraid that without the copy it might break in some cases
             q12 = (q21.copy()).T
             if not q12.has_canonical_format:
-                # print("didnt have canonical format. converting now.")
                 q12.sum_duplicates()    
-                
                 
             q13 = (q31.copy()).T
             if not q13.has_canonical_format:
-                # print("didnt have canonical format. converting now.")
                 q13.sum_duplicates() 
                
-
             q23 = (q32.copy()).T
             if not q23.has_canonical_format:
-                # print("didnt have canonical format. converting now.")
                 q23.sum_duplicates() 
                             
-            print("\nAfter all Qij ...")     
             mempool.free_all_blocks()
             print("mem pool used: ", format_size(mempool.used_bytes()))           
             print("mem total bytes: ", format_size(mempool.total_bytes()))             
@@ -451,7 +453,7 @@ class CoregionalModel(Model):
             # we only need these indices once in the beginning
             # then they can be none again and we can only collect data array
             if self.data_Qprior_re is None:
-                print("\n Before concatenate calls... first time...")
+                print("\nBefore concatenate calls... first time...")
                 
                 q11_rows = q11.row
                 q11_columns = q11.col
@@ -524,24 +526,13 @@ class CoregionalModel(Model):
                 ]
             ) 
             
-            print("\nAfter concatenate calls...")     
             mempool.free_all_blocks()
-            print("mem pool used: ", format_size(mempool.used_bytes()))           
-            print("mem total bytes: ", format_size(mempool.total_bytes()))    
-            
-            # print(
-            #     f"data_Qprior_row[0]: {self.rows_Qprior_re[0]}, data_Qprior_col[0]: {self.columns_Qprior_re[0]}, "
-            #     f"data_Qprior[0]: {self.data_Qprior_re[0]}, data_Qprior_row[-1]: {self.rows_Qprior_re[-1]}, "
-            #     f"data_Qprior_col[-1]: {self.columns_Qprior_re[-1]}, data_Qprior[-1]: {self.data_Qprior_re[-1]}"
-            # )
 
             # Qprior_st = sp.sparse.bmat(
             #     [[q11, q12, q13], [q21, q22, q23], [q31, q32, q33]]
             # ).tocsc()
             
             # Qprior_re = sp.sparse.coo_matrix((self.data_Qprior_re, (self.rows_Qprior_re, self.columns_Qprior_re)), shape=( self.n_models * n_re,  self.n_models * n_re))
-            # diff = Qprior_st - Qprior_re
-            # print("max(diff.data): ", max(abs(diff.data)))
 
         # Apply the permutation to the Qprior_st
         if self.coregionalization_type == "spatio_temporal":
@@ -577,39 +568,7 @@ class CoregionalModel(Model):
             self.Qprior_re_perm.data = self.data_Qprior_re[
                 self.permutation_vector_Q_prior
             ]
-            
-            # print("Qprior_re_perm:\n", self.Qprior_re_perm[-6:, -6:].toarray())
                         
-            # diag_Qprior = self.Qprior_re_perm.diagonal()
-            # # find negative entries on the diagonal
-            # negative_diag_indices = np.where(diag_Qprior < 0)[0]
-            # if negative_diag_indices.size > 0:
-            #     print("Negative diagonal entries found at indices:", negative_diag_indices)
-            # else:
-            #     print("No negative diagonal entries found.")
-
-            # compute norm difference between Qprior_st_perm and Qprior_re_perm
-            # diff = Qprior_st_perm - self.Qprior_re_perm
-            
-            # print("diff: \n", diff[-6:, -6:].toarray())
-            # # get max abs value data array
-            # max_abs_diff = xp.max(xp.abs(diff.data))
-            # print("abs(diff.data): ", max_abs_diff)
-            
-            
-            # # save Qprior_re to file in matrix martket format
-            # from scipy.io import mmwrite
-            # Qprior_re_perm =  sp.sparse.coo_matrix(self.Qprior_re_perm)
-            
-            # Qprior_re_np = Qprior_re_perm.get()
-            # print("Qprior_re_np:\n", Qprior_re_np.data[:10])
-
-            # # Specify the file path to save the matrix
-            # output_file = "Qprior_re_perm_1.mtx"
-
-            # # Write the matrix to the file
-            # mmwrite(output_file, Qprior_re_np)
-            
         else:
             # Qprior_st_perm = Qprior_st
             self.Qprior_re_perm = sp.sparse.coo_matrix(
@@ -623,20 +582,11 @@ class CoregionalModel(Model):
                 self.Q_prior = bdiag_tiling([self.Qprior_re_perm, Qprior_reg]).tocsc()
 
                 #self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
-            else:
-                
+            else:                
                 mempool.free_all_blocks()
-                print("\nBefore self.Qprior sort indices...")     
-                print("mem pool used: ", format_size(mempool.used_bytes()))           
-                print("mem total bytes: ", format_size(mempool.total_bytes()))        
-                
+                   
                 self.Q_prior.tocsc()
                 self.Q_prior.sort_indices()
-                
-                print("\nAfter self.Qprior sort indices...")
-                print("mem pool used: ", format_size(mempool.used_bytes()))           
-                print("mem total bytes: ", format_size(mempool.total_bytes()))   
-
                 self.Q_prior.data[: self.Qprior_re_perm.nnz] = self.Qprior_re_perm.data
                 
                 # Qprior_reg = bdiag_tiling(Q_r).tocsc()
@@ -652,65 +602,52 @@ class CoregionalModel(Model):
 
         return self.Q_prior
     
-def spgemm(self, A, B, rows: int = 5408):
+    @time_range()
+    def spgemm(self, A, B, rows: int = 5408):
+        
+        mempool = cp.get_default_memory_pool()
+        mempool.free_all_blocks()
+        print("In custom spgemm. mem pool used: ", format_size(mempool.used_bytes()))              # 512
+        print("In custom spgemm. mem total bytes: ", format_size(mempool.total_bytes()))  
+        
+        C = None
+        for i in range(0, A.shape[0], rows):
+            A_block = A[i:min(A.shape[0], i+rows)]
+            C_block = A_block @ B
+            if C is None:
+                C = C_block
+            else:
+                C = cp.sparse.vstack([C, C_block], format="csr")
+                
+        print("after custom sgemm call. mem pool used: ", format_size(mempool.used_bytes()))              # 512
+        print("after custom sgemm call. mem total bytes: ", format_size(mempool.total_bytes()))             # 512
+        mempool.free_all_blocks()
+        return C
     
-    mempool.free_all_blocks()
-    print("In custom spgemm. mem pool used: ", format_size(mempool.used_bytes()))              # 512
-    print("In custom spgemm. mem total bytes: ", format_size(mempool.total_bytes()))  
-    
-    C = None
-    for i in range(0, A.shape[0], rows):
-        A_block = A[i:min(A.shape[0], i+rows)]
-        C_block = A_block @ B
-        if C is None:
-            C = C_block
-        else:
-            C = cp.sparse.vstack([C, C_block], format="csr")
-            
-    print("after custom sgemm call. mem pool used: ", format_size(mempool.used_bytes()))              # 512
-    print("after custom sgemm call. mem total bytes: ", format_size(mempool.total_bytes()))             # 512
-    mempool.free_all_blocks()
-    return C
-    
-def custom_Q_ATDA(self, Q: sp.sparse.csc_matrix, A: sp.sparse.csc_matrix, D_diag: xp.ndarray) -> sp.sparse.csr_matrix:
-    """
-    Computes A^T * D * A with minimal memory and maximum speed.
-    - Uses sparse diagonal multiplication.
-    - No temporary dense matrices.
-    """
-    
-    mempool = cp.get_default_memory_pool()
-    
-    mempool.free_all_blocks()
-    #print("Qprior.nbytes: ", format_size(Qprior.nbytes))                       
-    print("In compute_ATDA_fast before anything. mem pool used: ", format_size(mempool.used_bytes()))              # 512
-    print("In compute_ATDA_fast before anything. mem total bytes: ", format_size(mempool.total_bytes()))             # 512
-     
-    # Step 1: Compute D * A (row-wise scaling)
-    DA = A.multiply(D_diag[:, xp.newaxis]).T.tocsr()  # Efficient sparse operation
+    @time_range()
+    def custom_Q_ATDA(self, Q: sp.sparse.csc_matrix, A: sp.sparse.csc_matrix, D_diag: xp.ndarray) -> sp.sparse.csr_matrix:
+        """
+        Computes A^T * D * A with minimal memory and maximum speed.
+        - Uses sparse diagonal multiplication.
+        - No temporary dense matrices.
+        """
+        
+        mempool = cp.get_default_memory_pool()
+        mempool.free_all_blocks()
 
-    #print("Qprior.nbytes: ", format_size(Qprior.nbytes))                       
-    print("In compute_ATDA_fast after AD. mem pool used: ", format_size(mempool.used_bytes()))              # 512
-    print("In compute_ATDA_fast after AD. mem total bytes: ", format_size(mempool.total_bytes()))             # 512
-    mempool.free_all_blocks()
+        DA = A.multiply(D_diag[:, xp.newaxis]).T.tocsr() 
+        mempool.free_all_blocks()
+        
+        batch_size = int(xp.ceil(A.shape[0] / 3))
+        # batch_size = A.shape[0]
+        print("Calling custom spgemm... with rows: ", batch_size)
+        ATDA = self.spgemm(DA, A, rows=batch_size)
+        mempool.free_all_blocks()
+        
+        self.Qconditional = Q - ATDA  
+        mempool.free_all_blocks()
     
-    # Step 2: Compute A^T * (D * A) in one sparse multiply
-    #ATDA = A.T @ DA  # Uses sparse matrix multiplication (fast)
-    ATDA = spgemm(DA, A, rows=5000)
-    
-    #print("Qprior.nbytes: ", format_size(Qprior.nbytes))                       
-    print("In compute_ATDA_fast after AT @ DA. mem pool used: ", format_size(mempool.used_bytes()))              # 512
-    print("In compute_ATDA_fast after AT @ DA. mem total bytes: ", format_size(mempool.total_bytes()))             # 512
-    mempool.free_all_blocks()
-    
-    Qcond = Q - ATDA  # Subtract the result from Q
-    
-    #print("Qprior.nbytes: ", format_size(Qprior.nbytes))                       
-    print("In compute_ATDA_fast after everything. mem pool used: ", format_size(mempool.used_bytes()))              # 512
-    print("In compute_ATDA_fast after everything. mem total bytes: ", format_size(mempool.total_bytes()))             # 512
-    mempool.free_all_blocks()
-    
-    return Qcond
+        return self.Qconditional
 
     def construct_Q_conditional(
         self,
@@ -726,7 +663,7 @@ def custom_Q_ATDA(self, Q: sp.sparse.csc_matrix, A: sp.sparse.csc_matrix, D_diag
         """
         mempool = cp.get_default_memory_pool()
         
-        d_list = [None] * self.n_models
+        #d_list = [None] * self.n_models
         d_vec = xp.zeros(self.n_observations)
         
         for i, model in enumerate(self.models):
@@ -744,31 +681,20 @@ def custom_Q_ATDA(self, Q: sp.sparse.csc_matrix, A: sp.sparse.csc_matrix, D_diag
                     ],
                 }
 
-            d_list[i] = model.likelihood.evaluate_hessian_likelihood(**kwargs)
+            #d_list[i] = model.likelihood.evaluate_hessian_likelihood(**kwargs)
             d_vec[
                 self.n_observations_idx[i] : self.n_observations_idx[i + 1]
             ] = model.likelihood.evaluate_hessian_likelihood(
                 **kwargs
             ).diagonal()
 
-        mempool.free_all_blocks()
-        print("\nIn Qcond after calling d mat...")     
-        print("mem pool used: ", format_size(mempool.used_bytes()))           
-        print("mem total bytes: ", format_size(mempool.total_bytes()))     
-
-        d_matrix = bdiag_tiling(d_list).tocsc()
-        
-        print("\nIn Qcond after bdiag_tiling d mat...")
-        print(print("norm(diff) = " , norm(diag(d_matrix) - d_vec)))
-        exit()
-
-        print("\nIn Qcond after bdiag_tiling d mat...")     
-        print("mem pool used: ", format_size(mempool.used_bytes()))           
-        print("mem total bytes: ", format_size(mempool.total_bytes())) 
-        mempool.free_all_blocks()
+        self.Qconditional = self.custom_Q_ATDA(
+            Q=self.Q_prior,
+            A=self.a,
+            D_diag=d_vec,
+        )
+        self.Q_conditional = self.Qconditional.tocsc()
                  
-        self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
-
         print("\nIn Qcond after construct Qcond...")     
         print("mem pool used: ", format_size(mempool.used_bytes()))           
         print("mem total bytes: ", format_size(mempool.total_bytes())) 
