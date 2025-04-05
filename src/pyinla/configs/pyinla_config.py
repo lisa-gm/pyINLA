@@ -20,11 +20,15 @@ class BFGSConfig(BaseModel):
 
     max_iter: PositiveInt = 100
     jac: bool = True
+    
+    maxcor: PositiveInt = 10 # maximum number of past gradient vectors to store -> good default: dim(theta)
+    maxls: PositiveInt = 20 # maximum number of line search iterations
 
     gtol: float = 1e-1
-    c1: float = 1e-4  # Default value from the scipy documentation
-    c2: float = 0.9  # Default value from the scipy documentation
+    # c1: float = 1e-4  # only relevant for BFGS not for L-BFGS-B
+    # c2: float = 0.9  # only relevant for BFGS not for L-BFGS-B
     disp: bool = False
+    
 
 
 class PyinlaConfig(BaseModel):
