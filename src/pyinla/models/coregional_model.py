@@ -595,9 +595,7 @@ class CoregionalModel(Model):
         else:
             # self.Q_prior = self.Qprior_re_perm
             self.Q_prior = Qprior_st_perm
-            
-        print("mem pool used: ", format_size(mempool.used_bytes()))              
-        print("mem total bytes: ", format_size(mempool.total_bytes()))             
+                         
         mempool.free_all_blocks()
 
         return self.Q_prior
@@ -607,8 +605,8 @@ class CoregionalModel(Model):
         
         mempool = cp.get_default_memory_pool()
         mempool.free_all_blocks()
-        print("In custom spgemm. mem pool used: ", format_size(mempool.used_bytes()))              # 512
-        print("In custom spgemm. mem total bytes: ", format_size(mempool.total_bytes()))  
+        # print("In custom spgemm. mem pool used: ", format_size(mempool.used_bytes()))             
+        # print("In custom spgemm. mem total bytes: ", format_size(mempool.total_bytes()))  
         
         C = None
         for i in range(0, A.shape[0], rows):
@@ -619,8 +617,8 @@ class CoregionalModel(Model):
             else:
                 C = cp.sparse.vstack([C, C_block], format="csr")
                 
-        print("after custom sgemm call. mem pool used: ", format_size(mempool.used_bytes()))              # 512
-        print("after custom sgemm call. mem total bytes: ", format_size(mempool.total_bytes()))             # 512
+        # print("after custom sgemm call. mem pool used: ", format_size(mempool.used_bytes()))            
+        # print("after custom sgemm call. mem total bytes: ", format_size(mempool.total_bytes()))         
         mempool.free_all_blocks()
         return C
     
@@ -638,9 +636,13 @@ class CoregionalModel(Model):
         DA = A.multiply(D_diag[:, xp.newaxis]).T.tocsr() 
         mempool.free_all_blocks()
         
-        batch_size = int(xp.ceil(A.shape[0] / 2))
-        # batch_size = A.shape[0]
-        print("Calling custom spgemm... with rows: ", batch_size)
+        # use batched spgemm if mempool is full
+        if mempool.used_bytes() > 80 * 1024**3:
+            batch_size = int(xp.ceil(A.shape[0] / 2))
+        else:
+            batch_size = A.shape[0]
+
+        #print("Calling custom spgemm... with rows: ", batch_size)
         ATDA = self.spgemm(DA, A, rows=batch_size)
         mempool.free_all_blocks()
         
@@ -694,10 +696,6 @@ class CoregionalModel(Model):
             D_diag=d_vec,
         )
         self.Q_conditional = self.Qconditional.tocsc()
-                 
-        print("\nIn Qcond after construct Qcond...")     
-        print("mem pool used: ", format_size(mempool.used_bytes()))           
-        print("mem total bytes: ", format_size(mempool.total_bytes())) 
         mempool.free_all_blocks()       
         
         return self.Q_conditional
@@ -976,24 +974,19 @@ class CoregionalModel(Model):
             sp.sparse.coo_matrix((a_data_placeholder, (a_rows, a_cols)), shape=(n, n), dtype=xp.float64)
         )
         
-        print("\nIn set_data_array_permutation_indices. Before permutation")
         mempool = cp.get_default_memory_pool()
-        pinned_mempool = cp.get_default_pinned_memory_pool()
         mempool.free_all_blocks()
-        print("mem pool used: ", format_size(mempool.used_bytes()))           
-        print("mem total bytes: ", format_size(mempool.total_bytes())) 
         
         a_perm = a[permutation, :][:, permutation]
         
-        print("\nIn set_data_array_permutation_indices. After permutation")
         mempool = cp.get_default_memory_pool()
-        print("mem pool used: ", format_size(mempool.used_bytes()))           
-        print("mem total bytes: ", format_size(mempool.total_bytes())) 
+        # print("mem pool used: ", format_size(mempool.used_bytes()))           
+        # print("mem total bytes: ", format_size(mempool.total_bytes())) 
         
-        print("after cleaning up mempool")
+        # print("after cleaning up mempool")
         mempool.free_all_blocks()
-        print("mem pool used: ", format_size(mempool.used_bytes()))
-        print("mem total bytes: ", format_size(mempool.total_bytes()))
+        # print("mem pool used: ", format_size(mempool.used_bytes()))
+        # print("mem total bytes: ", format_size(mempool.total_bytes()))
         
         self.permutation_vector_Q_prior = a_perm.data.astype(xp.int32)
         self.permutation_indices_Q_prior = a_perm.indices
