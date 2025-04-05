@@ -8,7 +8,7 @@ from pyinla import NDArray, sp, xp, xp_host, backend_flags
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 from pyinla.kernels.blockmapping import compute_block_slice, compute_block_sort_index
-from pyinla.utils import print_msg, allreduce, allgather, allgatherv
+from pyinla.utils import print_msg, allreduce, allgather, allgatherv, synchronize
 
 if backend_flags["mpi_avail"]:
     from mpi4py.MPI import Comm as mpi_comm
@@ -37,6 +37,7 @@ class DistSerinvSolver(Solver):
         n_diag_blocks: int,
         comm: mpi_comm,
         arrowhead_blocksize: int = 0,
+        nccl_comm: object = None,
         **kwargs,
     ) -> None:
         """Initializes the SerinV solver."""
@@ -48,6 +49,7 @@ class DistSerinvSolver(Solver):
         self.comm: mpi_comm = comm
         self.rank: int = self.comm.Get_rank()
         self.comm_size: int = self.comm.Get_size()
+        self.nccl_comm = nccl_comm
 
         # Allocating the local slices of the system matrix
         self.n_locals = [n_diag_blocks // self.comm_size] * self.comm_size
@@ -220,7 +222,7 @@ class DistSerinvSolver(Solver):
             raise ValueError(
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
-
+        
         self._gather_rhs(rhs, sparsity)
         return rhs
 
@@ -255,6 +257,9 @@ class DistSerinvSolver(Solver):
             op="sum",
             comm=self.comm,
         )
+        synchronize(comm=self.comm)
+
+
 
         return 2 * logdet
 
@@ -668,6 +673,7 @@ class DistSerinvSolver(Solver):
         l_data = allgather(data, comm=self.comm)
         l_rows = allgather(rows, comm=self.comm)
         l_cols = allgather(cols, comm=self.comm)
+        synchronize(comm=self.comm)
         B_out = sp.sparse.coo_matrix((l_data, (l_rows, l_cols)), shape=B.shape).tocsc()
 
         # Symmetrize B
@@ -727,3 +733,4 @@ class DistSerinvSolver(Solver):
             displacements=displacements,
             comm=self.comm,
         )
+        synchronize(comm=self.comm)

@@ -127,6 +127,19 @@ class PyINLA:
                     raise ValueError(
                         f"Not enough diagonal blocks ({n_diag_blocks}) to use the distributed solver with {n_processes_solver} processes."
                     )
+                
+                if self.qeval_world.rank == 0:
+                    nccl_id = cp.cuda.nccl.get_unique_id()
+                    self.qeval_world.bcast(nccl_id, root=0)
+                else:
+                    nccl_id = self.qeval_world.bcast(None, root=0)
+
+                self.nccl_comm = cp.cuda.nccl.NcclCommunicator(
+                    self.qeval_world.Get_size(),
+                    nccl_id,
+                    self.qeval_world.rank,
+                )
+                cp.cuda.runtime.deviceSynchronize()
 
                 self.solver = DistSerinvSolver(
                     config=self.config.solver,
@@ -134,6 +147,7 @@ class PyINLA:
                     arrowhead_blocksize=arrowhead_blocksize,
                     n_diag_blocks=n_diag_blocks,
                     comm=self.comm_qeval,
+                    nccl_comm=self.nccl_comm,
                 )
 
         # --- Set up recurrent variables
@@ -417,7 +431,7 @@ class PyINLA:
                 self.f_values_i[feval_i] = self._evaluate_f(
                     theta_i=self.theta_mat[:, feval_i], comm=self.comm_feval
                 )
-                print("rank", comm_rank, "evaluated ", feval_i, ", where f(theta_i):", self.f_values_i[feval_i])
+                #print("rank", self.comm_world.rank, "evaluated ", feval_i, ", where f(theta_i):", self.f_values_i[feval_i])
 
         # Here carefull on the reduction as it's gonna add the values from all ranks and not only the root of the groups - TODO
         allreduce(
@@ -426,6 +440,7 @@ class PyINLA:
             factor=1 / self.comm_feval.Get_size(),
             comm=self.comm_world,
         )
+        synchronize(comm=self.comm_world)
 
         # Compute gradient using central difference scheme
         for i in range(self.model.n_hyperparameters):
@@ -437,10 +452,12 @@ class PyINLA:
         f_0 = get_host(self.f_values_i[0])
         grad_f = get_host(self.gradient_f)
 
-        cp.cuda.runtime.deviceSynchronize
+        synchronize(comm=self.comm_world)
 
         toc = time.perf_counter()
         self.objective_function_time.append(toc - tic)
+        print_msg("evaluated objective function at theta_i:", theta_i, ", f = ", f_0, ", time: ", toc - tic, flush=True)
+
         return (f_0, grad_f)
 
     @time_range()
@@ -529,6 +546,7 @@ class PyINLA:
                     factor=1 / self.comm_qeval.Get_size(),
                     comm=self.comm_feval,
                 )
+                synchronize(comm=self.comm_feval)
         else:
             self.model.construct_Q_prior()
 
@@ -560,6 +578,8 @@ class PyINLA:
                 + prior_latent_parameters
                 - conditional_latent_parameters
             )
+            
+        print(f"it: {self.iter}, rank: {self.comm_world.rank} evaluated f(theta): {f_theta[0]}, lp hp: {log_prior_hyperparameters}, lp x: {prior_latent_parameters}, likelihood: {likelihood} cond x: {conditional_latent_parameters}", flush=True)
             
         if xp.isnan(f_theta[0]):
             raise ValueError(
@@ -694,7 +714,6 @@ class PyINLA:
                     )
                 counter += 1
 
-        synchronize()
         allreduce(
             f_ii_loc,
             op="sum",
@@ -707,6 +726,7 @@ class PyINLA:
             comm=self.comm_world,
             factor=1 / self.comm_feval.Get_size(),
         )
+        synchronize(comm=self.comm_world)
 
         # compute hessian
         for k in range(loop_dim):
@@ -965,6 +985,7 @@ class PyINLA:
         """
         # Compute the log determinant of Q_conditional
         logdet_Q_conditional = self.solver.logdet(sparsity="bta")
+        print(f"it: {self.iter}, rank: {self.comm_world.rank} logdet Q_conditional: {logdet_Q_conditional}", flush=True)
 
         # Compute the quadratic form (x - x_mean).T @ Q_conditional @ (x - x_mean)
         if x is None and x_mean is not None:
