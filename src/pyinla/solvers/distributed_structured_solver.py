@@ -259,7 +259,9 @@ class DistSerinvSolver(Solver):
         )
         synchronize(comm=self.comm)
 
-
+        if xp.isnan(logdet):
+            print(f"Rank {self.rank} logdet is NaN for {sparsity} matrix.")
+            exit()
 
         return 2 * logdet
 

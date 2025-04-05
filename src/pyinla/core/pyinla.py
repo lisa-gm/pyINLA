@@ -412,6 +412,7 @@ class PyINLA:
         task_mapping = []
         for i in range(self.n_f_evaluations):
             task_mapping.append(i % n_feval_comm)
+        # print(f"rank {self.comm_world.rank} task mapping: {task_mapping}")
 
         # Initialize central difference scheme matrix
         self.eps_mat[:] = self.eps_gradient_f * xp.eye(self.model.n_hyperparameters)
@@ -440,7 +441,7 @@ class PyINLA:
             factor=1 / self.comm_feval.Get_size(),
             comm=self.comm_world,
         )
-        synchronize(comm=self.comm_world)
+        # synchronize(comm=self.comm_world)
 
         # Compute gradient using central difference scheme
         for i in range(self.model.n_hyperparameters):
@@ -452,7 +453,7 @@ class PyINLA:
         f_0 = get_host(self.f_values_i[0])
         grad_f = get_host(self.gradient_f)
 
-        synchronize(comm=self.comm_world)
+        # synchronize(comm=self.comm_world)
 
         toc = time.perf_counter()
         self.objective_function_time.append(toc - tic)
@@ -500,6 +501,9 @@ class PyINLA:
 
             n_qeval_comm = self.qeval_world.size // self.comm_qeval.size
             task_mapping = [i % n_qeval_comm for i in range(2)]
+            # print(f"rank {self.comm_world.rank} task mapping: {task_mapping}")
+            # exit()
+
             if task_mapping[0] == self.color_qeval:
                 # Done by processes "even"
                 with time_range("Construct Q_conditional"):
@@ -546,7 +550,7 @@ class PyINLA:
                     factor=1 / self.comm_qeval.Get_size(),
                     comm=self.comm_feval,
                 )
-                synchronize(comm=self.comm_feval)
+                # synchronize(comm=self.comm_feval)
         else:
             self.model.construct_Q_prior()
 
@@ -726,7 +730,7 @@ class PyINLA:
             comm=self.comm_world,
             factor=1 / self.comm_feval.Get_size(),
         )
-        synchronize(comm=self.comm_world)
+        # synchronize(comm=self.comm_world)
 
         # compute hessian
         for k in range(loop_dim):

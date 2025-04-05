@@ -16,7 +16,7 @@ from pyinla.prior_hyperparameters import (
     PenalizedComplexityPriorHyperparameters,
 )
 from pyinla.submodels import RegressionSubModel, SpatialSubModel, SpatioTemporalSubModel
-from pyinla.utils import bdiag_tiling, get_host, free_unused_gpu_memory
+from pyinla.utils import bdiag_tiling, get_host, free_unused_gpu_memory, print_msg
 
 if backend_flags["cupy_avail"]:
     from cupyx.profiler import time_range
@@ -157,8 +157,8 @@ class CoregionalModel(Model):
         self.n_hyperparameters = self.theta.size
         self.theta_keys: NDArray = theta_keys
 
-        print("theta: ", self.theta)
-        print("theta_keys: ", self.theta_keys)
+        print_msg("theta: ", self.theta)
+        print_msg("theta_keys: ", self.theta_keys)
 
         # Initialize the Coregional Prior Hyperparameters
         for ph in coregional_model_config.ph_sigmas:
@@ -218,8 +218,8 @@ class CoregionalModel(Model):
 
         self.a: spmatrix = bdiag_tiling([model.a for model in self.models]).tocsc()
     
-        print("memory used when model.a is assigned.")
-        free_unused_gpu_memory(verbose=True) 
+        # print_msg("memory used when model.a is assigned.")
+        # free_unused_gpu_memory(verbose=True) 
         
         # free memory -> delete model.a for all models
         for model in self.models:
@@ -227,8 +227,8 @@ class CoregionalModel(Model):
             model.y = None
             model.x = None
             
-        print("memory used after model.a is deleted.")
-        free_unused_gpu_memory(verbose=True) 
+        #print_msg("memory used after model.a is deleted.")
+        free_unused_gpu_memory(verbose=False) 
         
 
         if self.coregionalization_type == "spatio_temporal":
@@ -283,7 +283,7 @@ class CoregionalModel(Model):
         self.Q_conditional_data_mapping = [0]
         
         self.Q_prior: spmatrix = None # need this otherwise the construct will fail
-        print("Calling construct_Q_prior in the init...")
+        print_msg("Calling construct_Q_prior in the init...")
         self.construct_Q_prior()
 
 
@@ -433,12 +433,12 @@ class CoregionalModel(Model):
             if not q23.has_canonical_format:
                 q23.sum_duplicates() 
                             
-            free_unused_gpu_memory(verbose=True) 
+            free_unused_gpu_memory(verbose=False) 
 
             # we only need these indices once in the beginning
             # then they can be none again and we can only collect data array
             if self.data_Qprior_re is None:
-                print("\nBefore concatenate calls... first time...")
+                print_msg("\nBefore concatenate calls... first time...")
                 
                 q11_rows = q11.row
                 q11_columns = q11.col
@@ -545,8 +545,8 @@ class CoregionalModel(Model):
                 self.rows_Qprior_re = None
                 self.columns_Qprior_re = None
                 
-            print("\nAfter computing Qprior permutation indices...")     
-            free_unused_gpu_memory(verbose=True) 
+            # print("\nAfter computing Qprior permutation indices...")     
+            free_unused_gpu_memory(verbose=False) 
       
             self.Qprior_re_perm.data = self.data_Qprior_re[
                 self.permutation_vector_Q_prior
