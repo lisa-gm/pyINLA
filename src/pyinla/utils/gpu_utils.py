@@ -98,3 +98,36 @@ def get_device(arr: NDArray) -> NDArray:
     if get_array_module_name(arr) == "cupy":
         return arr
     return xp.asarray(arr)
+
+
+def format_size(size_bytes):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.2f} TB"
+
+
+# query memory usage GPU and free unused memory
+def free_unused_gpu_memory(verbose: bool = False) -> int:
+    """Free unused memory on the GPU."""
+    
+    if backend_flags["cupy_avail"]:
+        mempool = cp.get_default_memory_pool()
+
+        if verbose:
+            print("memory used    : ", format_size(mempool.used_bytes()))
+            print("mem total bytes: ", format_size(mempool.total_bytes()))
+        
+        mempool.free_all_blocks()    
+
+        return mempool.total_bytes()
+    
+    else: 
+        # return dummy value for numpy
+        return 1
+
+
+
+
+

@@ -16,18 +16,11 @@ from pyinla.prior_hyperparameters import (
     PenalizedComplexityPriorHyperparameters,
 )
 from pyinla.submodels import RegressionSubModel, SpatialSubModel, SpatioTemporalSubModel
-from pyinla.utils import bdiag_tiling, get_host
+from pyinla.utils import bdiag_tiling, get_host, free_unused_gpu_memory
 
 if backend_flags["cupy_avail"]:
     from cupyx.profiler import time_range
     import cupy as cp
-
-def format_size(size_bytes):
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if size_bytes < 1024:
-            return f"{size_bytes:.2f} {unit}"
-        size_bytes /= 1024
-    return f"{size_bytes:.2f} TB"
 
 
 class CoregionalModel(Model):
@@ -225,12 +218,8 @@ class CoregionalModel(Model):
 
         self.a: spmatrix = bdiag_tiling([model.a for model in self.models]).tocsc()
     
-        mempool = cp.get_default_memory_pool()
-        pinned_mempool = cp.get_default_pinned_memory_pool()
-    
         print("memory used when model.a is assigned.")
-        print("mem pool used: ", format_size(mempool.used_bytes()))           
-        print("mem total bytes: ", format_size(mempool.total_bytes()))      
+        free_unused_gpu_memory(verbose=True) 
         
         # free memory -> delete model.a for all models
         for model in self.models:
@@ -239,9 +228,7 @@ class CoregionalModel(Model):
             model.x = None
             
         print("memory used after model.a is deleted.")
-        mempool.free_all_blocks()
-        print("mem pool used: ", format_size(mempool.used_bytes()))           
-        print("mem total bytes: ", format_size(mempool.total_bytes()))      
+        free_unused_gpu_memory(verbose=True) 
         
 
         if self.coregionalization_type == "spatio_temporal":
@@ -446,9 +433,7 @@ class CoregionalModel(Model):
             if not q23.has_canonical_format:
                 q23.sum_duplicates() 
                             
-            mempool.free_all_blocks()
-            print("mem pool used: ", format_size(mempool.used_bytes()))           
-            print("mem total bytes: ", format_size(mempool.total_bytes()))             
+            free_unused_gpu_memory(verbose=True) 
 
             # we only need these indices once in the beginning
             # then they can be none again and we can only collect data array
@@ -526,7 +511,7 @@ class CoregionalModel(Model):
                 ]
             ) 
             
-            mempool.free_all_blocks()
+            free_unused_gpu_memory(verbose=False) 
 
             # Qprior_st = sp.sparse.bmat(
             #     [[q11, q12, q13], [q21, q22, q23], [q31, q32, q33]]
@@ -561,10 +546,8 @@ class CoregionalModel(Model):
                 self.columns_Qprior_re = None
                 
             print("\nAfter computing Qprior permutation indices...")     
-            mempool.free_all_blocks()
-            print("mem pool used: ", format_size(mempool.used_bytes()))           
-            print("mem total bytes: ", format_size(mempool.total_bytes()))         
-
+            free_unused_gpu_memory(verbose=True) 
+      
             self.Qprior_re_perm.data = self.data_Qprior_re[
                 self.permutation_vector_Q_prior
             ]
@@ -583,8 +566,8 @@ class CoregionalModel(Model):
 
                 #self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
             else:                
-                mempool.free_all_blocks()
-                   
+                free_unused_gpu_memory(verbose=False) 
+               
                 self.Q_prior.tocsc()
                 self.Q_prior.sort_indices()
                 self.Q_prior.data[: self.Qprior_re_perm.nnz] = self.Qprior_re_perm.data
@@ -596,17 +579,14 @@ class CoregionalModel(Model):
             # self.Q_prior = self.Qprior_re_perm
             self.Q_prior = Qprior_st_perm
                          
-        mempool.free_all_blocks()
+        free_unused_gpu_memory(verbose=False) 
 
         return self.Q_prior
     
     @time_range()
     def spgemm(self, A, B, rows: int = 5408):
         
-        mempool = cp.get_default_memory_pool()
-        mempool.free_all_blocks()
-        # print("In custom spgemm. mem pool used: ", format_size(mempool.used_bytes()))             
-        # print("In custom spgemm. mem total bytes: ", format_size(mempool.total_bytes()))  
+        free_unused_gpu_memory(verbose=False)  
         
         C = None
         for i in range(0, A.shape[0], rows):
@@ -617,9 +597,8 @@ class CoregionalModel(Model):
             else:
                 C = cp.sparse.vstack([C, C_block], format="csr")
                 
-        # print("after custom sgemm call. mem pool used: ", format_size(mempool.used_bytes()))            
-        # print("after custom sgemm call. mem total bytes: ", format_size(mempool.total_bytes()))         
-        mempool.free_all_blocks()
+        free_unused_gpu_memory(verbose=False) 
+
         return C
     
     @time_range()
@@ -630,24 +609,22 @@ class CoregionalModel(Model):
         - No temporary dense matrices.
         """
         
-        mempool = cp.get_default_memory_pool()
-        mempool.free_all_blocks()
-
         DA = A.multiply(D_diag[:, xp.newaxis]).T.tocsr() 
-        mempool.free_all_blocks()
         
+        mem_used_bytes = free_unused_gpu_memory(verbose=False) 
+ 
         # use batched spgemm if mempool is full
-        if mempool.used_bytes() > 80 * 1024**3:
+        if mem_used_bytes > 80 * 1024**3:
             batch_size = int(xp.ceil(A.shape[0] / 2))
         else:
             batch_size = A.shape[0]
 
         #print("Calling custom spgemm... with rows: ", batch_size)
         ATDA = self.spgemm(DA, A, rows=batch_size)
-        mempool.free_all_blocks()
+        free_unused_gpu_memory(verbose=False) 
         
         self.Qconditional = Q - ATDA  
-        mempool.free_all_blocks()
+        free_unused_gpu_memory(verbose=False) 
     
         return self.Qconditional
 
@@ -696,7 +673,7 @@ class CoregionalModel(Model):
             D_diag=d_vec,
         )
         self.Q_conditional = self.Qconditional.tocsc()
-        mempool.free_all_blocks()       
+        free_unused_gpu_memory(verbose=False) 
         
         return self.Q_conditional
 
@@ -973,20 +950,10 @@ class CoregionalModel(Model):
         a = sp.sparse.csc_matrix(
             sp.sparse.coo_matrix((a_data_placeholder, (a_rows, a_cols)), shape=(n, n), dtype=xp.float64)
         )
-        
-        mempool = cp.get_default_memory_pool()
-        mempool.free_all_blocks()
+        free_unused_gpu_memory(verbose=False) 
         
         a_perm = a[permutation, :][:, permutation]
-        
-        mempool = cp.get_default_memory_pool()
-        # print("mem pool used: ", format_size(mempool.used_bytes()))           
-        # print("mem total bytes: ", format_size(mempool.total_bytes())) 
-        
-        # print("after cleaning up mempool")
-        mempool.free_all_blocks()
-        # print("mem pool used: ", format_size(mempool.used_bytes()))
-        # print("mem total bytes: ", format_size(mempool.total_bytes()))
+        free_unused_gpu_memory(verbose=False) 
         
         self.permutation_vector_Q_prior = a_perm.data.astype(xp.int32)
         self.permutation_indices_Q_prior = a_perm.indices

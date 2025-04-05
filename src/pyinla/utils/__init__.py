@@ -6,6 +6,7 @@ from pyinla.utils.gpu_utils import (
     get_device,
     get_host,
     set_device,
+    free_unused_gpu_memory,
 )
 from pyinla.utils.host import get_host_configuration
 from pyinla.utils.link_functions import cloglog, scaled_logit, sigmoid
@@ -42,4 +43,6 @@ __all__ = [
     "bdiag_tiling",
     "extract_diagonal",
     "memory_footprint",
+    "free_unused_gpu_memory",
+    
 ]
