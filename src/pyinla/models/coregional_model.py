@@ -638,7 +638,7 @@ class CoregionalModel(Model):
         DA = A.multiply(D_diag[:, xp.newaxis]).T.tocsr() 
         mempool.free_all_blocks()
         
-        batch_size = int(xp.ceil(A.shape[0] / 3))
+        batch_size = int(xp.ceil(A.shape[0] / 2))
         # batch_size = A.shape[0]
         print("Calling custom spgemm... with rows: ", batch_size)
         ATDA = self.spgemm(DA, A, rows=batch_size)
