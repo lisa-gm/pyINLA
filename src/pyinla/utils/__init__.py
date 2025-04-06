@@ -13,7 +13,6 @@ from pyinla.utils.link_functions import cloglog, scaled_logit, sigmoid
 from pyinla.utils.multiprocessing import (
     allreduce,
     allgather,
-    allgatherv,
     bcast,
     get_active_comm,
     print_msg,
@@ -38,7 +37,6 @@ __all__ = [
     "smartsplit",
     "allreduce",
     "allgather",
-    "allgatherv",
     "bcast",
     "bdiag_tiling",
     "extract_diagonal",

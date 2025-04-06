@@ -98,42 +98,6 @@ def allgather(
             return comm.allgather(obj)
 
 
-def allgatherv(
-    sendbuf: ArrayLike,
-    recvbuf: ArrayLike,
-    recv_counts: ArrayLike,
-    displacements: ArrayLike,
-    comm: MPI.Comm,
-):
-    if backend_flags["mpi_avail"]:
-        if (
-            get_array_module_name(recvbuf) == "cupy"
-            and not backend_flags["mpi_cuda_aware"]
-        ):
-            sendbuf_comm = get_host(sendbuf)
-            recvbuf_comm = get_host(recvbuf)
-            recv_counts_comm = get_host(recv_counts)
-            displacements_comm = get_host(displacements)
-        else:
-            sendbuf_comm = sendbuf
-            recvbuf_comm = recvbuf
-            recv_counts_comm = recv_counts
-            displacements_comm = displacements
-
-        comm.Allgatherv(
-            sendbuf=sendbuf_comm,
-            recvbuf=[recvbuf_comm, recv_counts_comm, displacements_comm, MPI.DOUBLE],
-        )
-
-        # recvbug[:] = comm.allgather(sendbuf)
-
-        if (
-            get_array_module_name(recvbuf) == "cupy"
-            and not backend_flags["mpi_cuda_aware"]
-        ):
-            recvbuf[:] = get_device(recvbuf_comm)
-
-
 def bcast(
     data: ArrayLike,
     root: int = 0,

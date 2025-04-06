@@ -8,7 +8,7 @@ from pyinla import NDArray, sp, xp, xp_host, backend_flags
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 from pyinla.kernels.blockmapping import compute_block_slice, compute_block_sort_index
-from pyinla.utils import print_msg, allreduce, allgather, allgatherv, synchronize
+from pyinla.utils import print_msg, allreduce, allgather, synchronize
 
 if backend_flags["mpi_avail"]:
     from mpi4py.MPI import Comm as mpi_comm
@@ -198,7 +198,6 @@ class DistSerinvSolver(Solver):
     ) -> NDArray:
         """Solve linear system using Cholesky factor."""
         self._slice_rhs(rhs, sparsity)
-
 
         if sparsity == "bta":
             ppobtas(
@@ -733,15 +732,16 @@ class DistSerinvSolver(Solver):
         if sparsity == "bta":
             rhs[-self.arrowhead_blocksize :] = self.B[-self.arrowhead_blocksize :]
 
-        # 2. Communicate the rhs, AllGatherV on the global rhs
-        recv_counts = xp.array(self.n_locals) * self.diagonal_blocksize
-        displacements = xp.cumsum(recv_counts) - recv_counts
-
-        allgatherv(
-            sendbuf=self.B[: -self.arrowhead_blocksize],
-            recvbuf=rhs[: -self.arrowhead_blocksize],
-            recv_counts=recv_counts,
-            displacements=displacements,
-            comm=self.comm,
+        mpi_dtype = MPI.DOUBLE if self.B.dtype == np.float64 else MPI.FLOAT
+        if rhs.dtype != self.B.dtype:
+            raise ValueError("rhs and self.B must have the same data type")
+        
+        self.comm.Allgather(
+            [self.B[: -self.arrowhead_blocksize], mpi_dtype],
+            [rhs[: -self.arrowhead_blocksize], mpi_dtype],
         )
+
         synchronize(comm=self.comm)
+
+        print(f"Rank {self.rank} exit successfully.")
+        exit()
