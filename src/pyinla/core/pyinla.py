@@ -72,12 +72,13 @@ class PyINLA:
         self.n_f_evaluations = 2 * self.model.n_hyperparameters + 1
 
         # Create the appropriate communicators
+        min_q_parallel = 1
         min_solver_size = self.config.solver.min_processes
         self.comm_world, self.comm_feval, self.color_feval = smartsplit(
             comm=MPI.COMM_WORLD,
             n_parallelizable_evaluations=self.n_f_evaluations,
             tag="feval",
-            min_group_size=min_solver_size,
+            min_group_size=min_solver_size*min_q_parallel,
         )
         self.world_size = self.comm_world.Get_size()
 
@@ -93,6 +94,23 @@ class PyINLA:
         )
         
         free_unused_gpu_memory(verbose=True)
+
+        if comm_rank == 0:
+            print(f"""
+            ------------- HPC HEADER --------------------
+            Total number of ranks: {MPI.COMM_WORLD.size}, ({MPI.COMM_WORLD.size - self.world_size} won't participate)
+                Parallelization through F(): {self.world_size // self.comm_feval.size}
+                Parallelization through Q(): {self.comm_feval.size // self.comm_qeval.size}
+                Parallelization through S(): {self.comm_qeval.size}
+            ---------------------------------------------
+                ARRAY_MODULE: {xp.__name__}
+            ---------------------------------------------
+                MPI_AVAIL: {backend_flags["mpi_avail"]}
+                CUDA_AWARE_MPI: {backend_flags["mpi_cuda_aware"]}
+                USE_NCCL: {backend_flags["use_nccl"]}
+            """)
+
+        # print(f"Rank: {self.comm_world.rank} | feval color: {self.color_feval} | feval_rank: {self.comm_feval.rank} | qeval color: {self.color_qeval} | qeval_rank: {self.comm_qeval.rank} |", flush=True)
 
         # --- Initialize solver
         if self.config.solver.type == "dense":
@@ -118,7 +136,9 @@ class PyINLA:
                 )
 
             n_processes_solver = self.comm_qeval.Get_size()
+            # print(f"WorldRank {comm_rank}, qeval size: {n_processes_solver}", flush=True)
             if n_processes_solver == 1:
+                # print(f"WorldRank {comm_rank} using sequential solver !!!.", flush=True)
                 self.solver = SerinvSolver(
                     config=self.config.solver,
                     diagonal_blocksize=diagonal_blocksize,
@@ -126,27 +146,63 @@ class PyINLA:
                     n_diag_blocks=n_diag_blocks,
                 )
             else:
+                # print(f"WorldRank {comm_rank} using distributed solver....", flush=True)
                 if n_diag_blocks < n_processes_solver * 3:
                     raise ValueError(
                         f"Not enough diagonal blocks ({n_diag_blocks}) to use the distributed solver with {n_processes_solver} processes."
                     )
-
                 self.nccl_comm = None
                 if backend_flags["use_nccl"]:      
                     # --- Initialize NCCL communicator
-                    print(f"rank {comm_rank} initializing NCCL communicator.")          
-                    if self.qeval_world.rank == 0:
+                    if self.comm_qeval.rank == 0:
+                        print(f"rank {MPI.COMM_WORLD.rank} initializing NCCL communicator.", flush=True)   
                         nccl_id = cp.cuda.nccl.get_unique_id()
-                        self.qeval_world.bcast(nccl_id, root=0)
+                        self.comm_qeval.bcast(nccl_id, root=0)
                     else:
-                        nccl_id = self.qeval_world.bcast(None, root=0)
+                        nccl_id = self.comm_qeval.bcast(None, root=0)
 
                     self.nccl_comm = cp.cuda.nccl.NcclCommunicator(
-                        self.qeval_world.Get_size(),
+                        self.comm_qeval.size,
                         nccl_id,
-                        self.qeval_world.rank,
+                        self.comm_qeval.rank,
                     )
-                    cp.cuda.runtime.deviceSynchronize()
+                    # print(f"Rank: {self.comm_world.rank} @Barrier() | feval color: {self.color_feval} | feval_rank: {self.comm_feval.rank} | qeval color: {self.color_qeval} | qeval_rank: {self.comm_qeval.rank} |", flush=True)
+                    synchronize(comm=self.comm_world)
+
+                # print(f"Rank: {self.comm_world.rank} comm_qeval.size {self.comm_qeval.size}", flush=True)
+
+                # flag = -1
+                # if self.comm_qeval.rank == 0:
+                #     flag = self.comm_world.rank
+                #     self.comm_qeval.bcast(flag, root=0)
+                # else:
+                #     flag = self.comm_qeval.bcast(None, root=0)
+                # print(f"Rank {MPI.COMM_WORLD.rank}, mpi flag: {flag}", flush=True)
+
+
+                # nccl_flag = xp.zeros(1, dtype=xp.int32)
+                # nccl_flag[0] = -1
+                # if self.comm_qeval.rank == 0:
+                #     nccl_flag[0] = self.comm_world.rank
+                #     self.nccl_comm.bcast(
+                #         buff=nccl_flag.data.ptr,
+                #         count=1,
+                #         datatype=cp.cuda.nccl.NCCL_INT32,
+                #         root=0,
+                #         stream=cp.cuda.Stream.null.ptr,
+                #     )
+                # else:
+                #     self.nccl_comm.bcast(
+                #         buff=nccl_flag.data.ptr,
+                #         count=1,
+                #         datatype=cp.cuda.nccl.NCCL_INT32,
+                #         root=0,
+                #         stream=cp.cuda.Stream.null.ptr,
+                #     )
+                # synchronize(comm=self.comm_qeval)
+                # print(f"Rank {MPI.COMM_WORLD.rank}, nccl_flag: {nccl_flag}", flush=True)
+
+
 
                 self.solver = DistSerinvSolver(
                     config=self.config.solver,
@@ -177,6 +233,7 @@ class PyINLA:
 
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
+
 
     def run(self) -> dict:
         """Run the PyINLA"""
@@ -252,7 +309,7 @@ class PyINLA:
             def callback(intermediate_result: optimize.OptimizeResult):
                 theta_i = intermediate_result.x.copy()
                 fun_i = intermediate_result.fun
-                self.iter += 1
+                current_iter = intermediate_result.nit
 
                 # Format the output
                 theta_str = ", ".join(f"{theta: .6f}" for theta in theta_i)
@@ -262,7 +319,7 @@ class PyINLA:
 
                 print(
                     f"comm_rank: {comm_rank} | "
-                    f"Iteration: {self.iter:2d} (took: {self.objective_function_time[-1]:.2f}) | "
+                    f"Iteration: {current_iter:2d} (took: {self.objective_function_time[-1]:.2f}) | "
                     f"Theta: [{theta_str}] | "
                     f"Function Value: {fun_i: .6f} | "
                     f"Gradient: [{gradient_str}] | ",
@@ -274,15 +331,15 @@ class PyINLA:
                 self.f_values.append(fun_i)
 
                 # check if f_values have been decreasing over last iterations
-                if self.iter > self.config.f_reduction_lag:
+                if current_iter > self.config.f_reduction_lag:
                     if (
                         xp.abs(self.f_values[-self.config.f_reduction_lag] - fun_i)
                         < self.config.f_reduction_tol
                     ):
                         print_msg(
                             f"Optimization converged!  "
-                            f"|| f({self.iter - self.config.f_reduction_lag}) - f({self.iter}) || = "
-                            f"{self.f_values[self.iter - self.config.f_reduction_lag] - self.f_values[self.iter-1]:.6f} "
+                            f"|| f({current_iter - self.config.f_reduction_lag}) - f({current_iter}) || = "
+                            f"{self.f_values[current_iter - self.config.f_reduction_lag] - self.f_values[current_iter-1]:.6f} "
                             f"< {self.config.f_reduction_tol}. Function value: {fun_i:.6f}\n",
                             flush=True,
                         )
@@ -303,17 +360,17 @@ class PyINLA:
 
                         raise OptimizationConvergedEarlyExit()
                     
-                if self.iter > self.config.theta_reduction_lag:
+                if current_iter > self.config.theta_reduction_lag:
                     if (
                        xp.linalg.norm(self.theta_values[-self.config.theta_reduction_lag] - theta_i)
                         < self.config.theta_reduction_tol
                     ):
                         norm_diff = xp.linalg.norm(
-                            self.theta_values[self.iter - self.config.theta_reduction_lag] - theta_i
+                            self.theta_values[current_iter - self.config.theta_reduction_lag] - theta_i
                         )
                         print_msg(
                             f"Optimization converged!  "
-                            f"|| theta({self.iter - self.config.theta_reduction_lag}) - theta({self.iter}) || = "
+                            f"|| theta({current_iter - self.config.theta_reduction_lag}) - theta({current_iter}) || = "
                             f"{norm_diff:.6f} "
                             f"< {self.config.theta_reduction_tol}. Function value: {fun_i:.6f}\n",
                             flush=True,
@@ -420,7 +477,8 @@ class PyINLA:
         task_mapping = []
         for i in range(self.n_f_evaluations):
             task_mapping.append(i % n_feval_comm)
-        # print(f"rank {self.comm_world.rank} task mapping: {task_mapping}")
+        # if comm_rank == 0:
+        #     print(f"DEBUG: rank {self.comm_world.rank} feval task mapping: {task_mapping}", flush=True)
 
         # Initialize central difference scheme matrix
         self.eps_mat[:] = self.eps_gradient_f * xp.eye(self.model.n_hyperparameters)
@@ -437,6 +495,8 @@ class PyINLA:
             # Perform the evaluation in reverse order so that the stored and returned
             # self.x value matches the "bare" hyperparameters evaluation
             if self.color_feval == task_mapping[feval_i]:
+                # if self.comm_feval.rank == 0:
+                #     print(f"DEBUG: Feval group: {self.color_feval}, evaluating {feval_i}/{self.n_f_evaluations - 1}", flush=True)
                 self.f_values_i[feval_i] = self._evaluate_f(
                     theta_i=self.theta_mat[:, feval_i], comm=self.comm_feval
                 )
@@ -468,8 +528,9 @@ class PyINLA:
 
         if self.iter > 0:
             print(
-                f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}"
+                f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}", flush=True
             ) 
+        self.iter += 1
 
         return (f_0, grad_f)
 
@@ -499,34 +560,41 @@ class PyINLA:
         hyperparameters, log likelihood, log prior of the latent parameters,
         and log conditional of the latent parameters.
         """
+
+
         self.model.theta[:] = theta_i
         f_theta = xp.zeros(1, dtype=xp.float64)
 
         # --- Optimize x and evaluate the conditional of the latent parameters
         if self.model.is_likelihood_gaussian():
             # Done by both processes
-            with time_range("Construct Q_prior"):
-                self.model.construct_Q_prior()
+            self.model.construct_Q_prior()
+
+            # Qprior_temp = self.model.Qprior.copy().toarray()
+            # Lprior_temp = self.model.Lprior.copy().toarray()
 
             eta = xp.zeros_like(self.model.y, dtype=xp.float64)
             x = xp.zeros_like(self.model.x, dtype=xp.float64)
 
             n_qeval_comm = self.qeval_world.size // self.comm_qeval.size
             task_mapping = [i % n_qeval_comm for i in range(2)]
-            # print(f"rank {self.comm_world.rank} task mapping: {task_mapping}")
+            # print(f"rank {self.comm_world.rank} task mapping: {task_mapping}, colors: {self.color_feval}, {self.color_qeval}", flush=True)
             # exit()
 
             if task_mapping[0] == self.color_qeval:
+                # if self.comm_qeval.rank == 0:
+                #     print(f"DEBUG: Qeval group: {self.color_qeval}, evaluating Qconditional // branch.", flush=True)
                 # Done by processes "even"
-                with time_range("Construct Q_conditional"):
-                    Q_conditional = self.model.construct_Q_conditional(eta)
-                self.solver.cholesky(A=Q_conditional, sparsity="bta")
-                with time_range("Construct information vector"):
-                    rhs: NDArray = self.model.construct_information_vector(
-                        eta,
-                        x,
-                    )
+                Q_conditional = self.model.construct_Q_conditional(eta)
 
+                self.solver.cholesky(A=Q_conditional, sparsity="bta")
+
+                rhs: NDArray = self.model.construct_information_vector(
+                    eta,
+                    x,
+                )
+
+                # print(f"Rank {self.comm_world.rank}, Color: {self.color_qeval}, FLAG 4", flush=True)
                 self.model.x[:] = self.solver.solve(
                     rhs=rhs,
                     sparsity="bta",
@@ -540,8 +608,10 @@ class PyINLA:
                     )
                 )
 
+                # print(f"Rank {self.comm_world.rank}, Color: {self.color_qeval}, is done with Q_conditional", flush=True)
                 f_theta[0] += conditional_latent_parameters
             if task_mapping[1] == self.color_qeval:
+                # print(f"Rank {self.comm_world.rank} DOING Qprior, Color: {self.color_qeval}", flush=True)
                 # Done by processes "odd"
                 log_prior_hyperparameters: float = (
                     self.model.evaluate_log_prior_hyperparameters()
@@ -554,8 +624,10 @@ class PyINLA:
                 f_theta[0] -= (
                     log_prior_hyperparameters + likelihood + prior_latent_parameters
                 )
+                # print(f"Rank {self.comm_world.rank}, Color: {self.color_qeval}, is done with Q_prior", flush=True)
 
             if task_mapping[0] != task_mapping[1]:
+                # print(f"Rank {self.comm_world.rank}, Color: {self.color_qeval}, Going into allreduce", flush=True)
                 allreduce(
                     f_theta,
                     op="sum",
@@ -597,10 +669,10 @@ class PyINLA:
             
         # print(f"it: {self.iter}, rank: {self.comm_world.rank} evaluated f(theta): {f_theta[0]}, lp hp: {log_prior_hyperparameters}, lp x: {prior_latent_parameters}, likelihood: {likelihood} cond x: {conditional_latent_parameters}", flush=True)
             
-        if xp.isnan(f_theta[0]):
-            raise ValueError(
-                f"f(theta) is NaN. Check what is happening."
-            )
+        # if xp.isnan(f_theta[0]):
+        #     raise ValueError(
+        #         f"f(theta) is NaN. Check what is happening."
+        #     )
 
         return f_theta[0]
 
@@ -956,7 +1028,7 @@ class PyINLA:
         x in log-scale. The evaluation requires the computation of the log
         determinant of Q_prior.
         Log normal:
-        .. math:: 0.5*log(1/(2*\pi)^n * |Q_prior|)) - 0.5 * x.T Q_prior x
+        .. math:: 0.5*log(1/(2*pi)^n * |Q_prior|)) - 0.5 * x.T Q_prior x
         """
         self.solver.cholesky(self.model.Q_prior, sparsity="bt")
         logdet_Q_prior: float = self.solver.logdet(sparsity="bt")

@@ -172,6 +172,8 @@ def smartsplit(
         rank = active_comm.Get_rank()
         size = active_comm.Get_size()
 
+        # print(f"Rank: {rank}, size: {size} at '{tag}' level", flush=True)
+
         # Compute the group size, given its minimum
         group_size = size // n_parallelizable_evaluations
         if group_size < min_group_size:
@@ -181,6 +183,7 @@ def smartsplit(
         color_new_group = rank // group_size
         key_new_group = rank
         comm_new_group = active_comm.Split(color_new_group, key_new_group)
+        # print(f"FLG2: new group rank: {comm_new_group.rank}, new group size: {comm_new_group.size} at '{tag}' level", flush=True)
     else:
         active_comm = comm
         comm_new_group = comm
