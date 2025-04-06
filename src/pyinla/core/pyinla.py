@@ -19,6 +19,7 @@ from pyinla.utils import (  # memory_footprint,
     set_device,
     smartsplit,
     synchronize,
+    free_unused_gpu_memory,
 )
 
 if backend_flags["cupy_avail"]:
@@ -90,6 +91,8 @@ class PyINLA:
             tag="qeval",
             min_group_size=min_solver_size,
         )
+        
+        free_unused_gpu_memory(verbose=True)
 
         # --- Initialize solver
         if self.config.solver.type == "dense":
@@ -344,7 +347,7 @@ class PyINLA:
                         "maxls": self.config.minimize.maxls,
                         "gtol": self.config.minimize.gtol,
                         "disp": self.config.minimize.disp,
-                        "ftol": 1e-18,
+                        "ftol": 1e-22,
                     },
                     callback=callback,
                 )

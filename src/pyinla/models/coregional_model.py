@@ -258,7 +258,7 @@ class CoregionalModel(Model):
 
             self.a = self.a[:, self.permutation_latent_variables]
             self.x = self.x[self.permutation_latent_variables]
-
+            
         # self.inverse_permutation_latent_variables = xp.argsort(self.permutation_latent_variables)
         # self.perm2 = self._generate_permutation_indices_for_a_new(
         #     self.n_temporal_nodes,
@@ -524,7 +524,7 @@ class CoregionalModel(Model):
             # Permute matrix
             # Qprior_st_perm = Qprior_st[self.permutation_Qst, :][:, self.permutation_Qst]
 
-            if self.permutation_indices_Q_prior is None:
+            if self.permutation_vector_Q_prior is None:
                 self.Qprior_re_perm = sp.sparse.csc_matrix(
                     (self.n_models * n_re, self.n_models * n_re),
                     dtype=self.data_Qprior_re.dtype,
@@ -548,9 +548,10 @@ class CoregionalModel(Model):
             # print("\nAfter computing Qprior permutation indices...")     
             free_unused_gpu_memory(verbose=False) 
       
-            self.Qprior_re_perm.data = self.data_Qprior_re[
-                self.permutation_vector_Q_prior
-            ]
+            # self.Qprior_re_perm.data = self.data_Qprior_re[
+            #     self.permutation_vector_Q_prior
+            # ]
+            self.data_Qprior_re = self.data_Qprior_re[self.permutation_vector_Q_prior]
                         
         else:
             # Qprior_st_perm = Qprior_st
@@ -561,8 +562,17 @@ class CoregionalModel(Model):
 
         if Q_r != []:
             if self.Q_prior is None:
+                self.Qprior_re_perm.data = self.data_Qprior_re
+                
                 Qprior_reg = bdiag_tiling(Q_r).tocsc()
                 self.Q_prior = bdiag_tiling([self.Qprior_re_perm, Qprior_reg]).tocsc()
+                self.nnz_Qprior_re_perm = self.Qprior_re_perm.nnz
+                #print("nnz Qprior: ", self.nnz_Qprior_re_perm)
+                
+                # free all memory not needed anymore
+                self.Qprior_re_perm = None
+                self.permutation_indices_Q_prior = None
+                self.permutation_indptr_Q_prior = None
 
                 #self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
             else:                
@@ -570,7 +580,8 @@ class CoregionalModel(Model):
                
                 self.Q_prior.tocsc()
                 self.Q_prior.sort_indices()
-                self.Q_prior.data[: self.Qprior_re_perm.nnz] = self.Qprior_re_perm.data
+                #self.Q_prior.data[: self.nnz_Qprior_re_perm] = self.Qprior_re_perm.data
+                self.Q_prior.data[:self.nnz_Qprior_re_perm] = self.data_Qprior_re
                 
                 # Qprior_reg = bdiag_tiling(Q_r).tocsc()
                 # self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
@@ -953,11 +964,13 @@ class CoregionalModel(Model):
         free_unused_gpu_memory(verbose=False) 
         
         a_perm = a[permutation, :][:, permutation]
-        free_unused_gpu_memory(verbose=False) 
         
         self.permutation_vector_Q_prior = a_perm.data.astype(xp.int32)
         self.permutation_indices_Q_prior = a_perm.indices
         self.permutation_indptr_Q_prior = a_perm.indptr
+        
+        free_unused_gpu_memory(verbose=False) 
+
                 
 
     def get_solver_parameters(self) -> dict:

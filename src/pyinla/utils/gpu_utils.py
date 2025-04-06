@@ -3,6 +3,7 @@
 import inspect
 
 from pyinla import NDArray, backend_flags, xp
+from pyinla.utils import print_msg
 
 if backend_flags["cupy_avail"]:
     import cupy as cp
@@ -116,8 +117,8 @@ def free_unused_gpu_memory(verbose: bool = False) -> int:
         mempool = cp.get_default_memory_pool()
 
         if verbose:
-            print("memory used    : ", format_size(mempool.used_bytes()))
-            print("mem total bytes: ", format_size(mempool.total_bytes()))
+            print_msg("memory used    : ", format_size(mempool.used_bytes()))
+            print_msg("mem total bytes: ", format_size(mempool.total_bytes()))
         
         mempool.free_all_blocks()    
 
