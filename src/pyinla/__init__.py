@@ -83,6 +83,10 @@ try:
     backend_flags["mpi_avail"] = True
     if backend_flags["cupy_avail"] and os.environ.get("MPI_CUDA_AWARE", "0") == "1":
         backend_flags["mpi_cuda_aware"] = True
+    if backend_flags["cupy_avail"] and os.environ.get("USE_NCCL", "0") == "1":
+        backend_flags["use_nccl"] = True
+    else:
+        backend_flags["use_nccl"] = False
 
 except (ImportError, ImportWarning, ModuleNotFoundError) as w:
     warn(f"No 'MPI' backend detected. ({e})")

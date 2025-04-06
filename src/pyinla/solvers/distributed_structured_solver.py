@@ -127,6 +127,7 @@ class DistSerinvSolver(Solver):
             comm=self.comm,
             array_module=xp.__name__,
             strategy="allgather",
+            nccl_comm=self.nccl_comm,
         )
 
         # Initialize the caching strategy
@@ -173,6 +174,7 @@ class DistSerinvSolver(Solver):
                 pobtars=self.pobtars,
                 comm=self.comm,
                 strategy="allgather",
+                nccl_comm=self.nccl_comm,
             )
         elif sparsity == "bt":
             ppobtf(
@@ -182,6 +184,7 @@ class DistSerinvSolver(Solver):
                 pobtrs=self.pobtars,
                 comm=self.comm,
                 strategy="allgather",
+                nccl_comm=self.nccl_comm,
             )
         else:
             raise ValueError(
@@ -196,6 +199,7 @@ class DistSerinvSolver(Solver):
         """Solve linear system using Cholesky factor."""
         self._slice_rhs(rhs, sparsity)
 
+
         if sparsity == "bta":
             ppobtas(
                 L_diagonal_blocks=self.A_diagonal_blocks,
@@ -207,6 +211,7 @@ class DistSerinvSolver(Solver):
                 pobtars=self.pobtars,
                 comm=self.comm,
                 strategy="allgather",
+                nccl_comm=self.nccl_comm,
             )
         elif sparsity == "bt":
             ppobts(
@@ -217,6 +222,7 @@ class DistSerinvSolver(Solver):
                 pobtars=self.pobtars,
                 comm=self.comm,
                 strategy="allgather",
+                nccl_comm=self.nccl_comm,
             )
         else:
             raise ValueError(
@@ -224,6 +230,7 @@ class DistSerinvSolver(Solver):
             )
         
         self._gather_rhs(rhs, sparsity)
+
         return rhs
 
     def logdet(
@@ -280,6 +287,7 @@ class DistSerinvSolver(Solver):
                 pobtars=self.pobtars,
                 comm=self.comm,
                 strategy="allgather",
+                nccl_comm=self.nccl_comm,
             )
         elif sparsity == "bt":
             ppobtsi(
@@ -289,6 +297,7 @@ class DistSerinvSolver(Solver):
                 pobtrs=self.pobtars,
                 comm=self.comm,
                 strategy="allgather",
+                nccl_comm=self.nccl_comm,
             )
         else:
             raise ValueError(

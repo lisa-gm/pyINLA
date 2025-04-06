@@ -127,19 +127,23 @@ class PyINLA:
                     raise ValueError(
                         f"Not enough diagonal blocks ({n_diag_blocks}) to use the distributed solver with {n_processes_solver} processes."
                     )
-                
-                if self.qeval_world.rank == 0:
-                    nccl_id = cp.cuda.nccl.get_unique_id()
-                    self.qeval_world.bcast(nccl_id, root=0)
-                else:
-                    nccl_id = self.qeval_world.bcast(None, root=0)
 
-                self.nccl_comm = cp.cuda.nccl.NcclCommunicator(
-                    self.qeval_world.Get_size(),
-                    nccl_id,
-                    self.qeval_world.rank,
-                )
-                cp.cuda.runtime.deviceSynchronize()
+                self.nccl_comm = None
+                if backend_flags["use_nccl"]:      
+                    # --- Initialize NCCL communicator
+                    print(f"rank {comm_rank} initializing NCCL communicator.")          
+                    if self.qeval_world.rank == 0:
+                        nccl_id = cp.cuda.nccl.get_unique_id()
+                        self.qeval_world.bcast(nccl_id, root=0)
+                    else:
+                        nccl_id = self.qeval_world.bcast(None, root=0)
+
+                    self.nccl_comm = cp.cuda.nccl.NcclCommunicator(
+                        self.qeval_world.Get_size(),
+                        nccl_id,
+                        self.qeval_world.rank,
+                    )
+                    cp.cuda.runtime.deviceSynchronize()
 
                 self.solver = DistSerinvSolver(
                     config=self.config.solver,
@@ -402,6 +406,7 @@ class PyINLA:
         objective_function_evalutation : tuple
             Function value f(theta) evaluated at theta_i and its gradient.
         """
+        synchronize(comm=self.comm_world)
         tic = time.perf_counter()
         # Generate theta matrix with different theta's to evaluate
         # currently central difference scheme is used for gradient
@@ -441,7 +446,7 @@ class PyINLA:
             factor=1 / self.comm_feval.Get_size(),
             comm=self.comm_world,
         )
-        # synchronize(comm=self.comm_world)
+        synchronize(comm=self.comm_world)
 
         # Compute gradient using central difference scheme
         for i in range(self.model.n_hyperparameters):
@@ -453,11 +458,15 @@ class PyINLA:
         f_0 = get_host(self.f_values_i[0])
         grad_f = get_host(self.gradient_f)
 
-        # synchronize(comm=self.comm_world)
-
+        synchronize(comm=self.comm_world)
         toc = time.perf_counter()
         self.objective_function_time.append(toc - tic)
-        print_msg("evaluated objective function at theta_i:", theta_i, ", f = ", f_0, ", time: ", toc - tic, flush=True)
+        # print_msg("evaluated objective function at theta_i:", theta_i, ", f = ", f_0, ", time: ", toc - tic, flush=True)
+
+        if self.iter > 0:
+            print(
+                f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}"
+            ) 
 
         return (f_0, grad_f)
 
@@ -550,7 +559,7 @@ class PyINLA:
                     factor=1 / self.comm_qeval.Get_size(),
                     comm=self.comm_feval,
                 )
-                # synchronize(comm=self.comm_feval)
+                synchronize(comm=self.comm_qeval)
         else:
             self.model.construct_Q_prior()
 
@@ -583,7 +592,7 @@ class PyINLA:
                 - conditional_latent_parameters
             )
             
-        print(f"it: {self.iter}, rank: {self.comm_world.rank} evaluated f(theta): {f_theta[0]}, lp hp: {log_prior_hyperparameters}, lp x: {prior_latent_parameters}, likelihood: {likelihood} cond x: {conditional_latent_parameters}", flush=True)
+        # print(f"it: {self.iter}, rank: {self.comm_world.rank} evaluated f(theta): {f_theta[0]}, lp hp: {log_prior_hyperparameters}, lp x: {prior_latent_parameters}, likelihood: {likelihood} cond x: {conditional_latent_parameters}", flush=True)
             
         if xp.isnan(f_theta[0]):
             raise ValueError(
@@ -730,7 +739,7 @@ class PyINLA:
             comm=self.comm_world,
             factor=1 / self.comm_feval.Get_size(),
         )
-        # synchronize(comm=self.comm_world)
+        synchronize(comm=self.comm_feval)
 
         # compute hessian
         for k in range(loop_dim):
@@ -989,7 +998,7 @@ class PyINLA:
         """
         # Compute the log determinant of Q_conditional
         logdet_Q_conditional = self.solver.logdet(sparsity="bta")
-        print(f"it: {self.iter}, rank: {self.comm_world.rank} logdet Q_conditional: {logdet_Q_conditional}", flush=True)
+        # print(f"it: {self.iter}, rank: {self.comm_world.rank} logdet Q_conditional: {logdet_Q_conditional}", flush=True)
 
         # Compute the quadratic form (x - x_mean).T @ Q_conditional @ (x - x_mean)
         if x is None and x_mean is not None:

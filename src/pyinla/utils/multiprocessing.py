@@ -1,6 +1,7 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import numpy as np
+import cupy as cp
 
 from pyinla import ArrayLike, backend_flags, comm_rank
 from pyinla.utils.gpu_utils import get_array_module_name, get_host, get_device
@@ -24,7 +25,7 @@ def print_msg(*args, **kwargs):
         print(*args, **kwargs)
 
 
-def synchronize(comm=None):
+def synchronize(comm):
     """
     Synchronize all processes within the given communication group.
 
@@ -34,8 +35,7 @@ def synchronize(comm=None):
         The communication group to synchronize. Default is MPI.COMM_WORLD.
     """
     if backend_flags["mpi_avail"]:
-        if comm is None:
-            comm = MPI.COMM_WORLD
+        cp.cuda.runtime.deviceSynchronize()
         comm.Barrier()
 
 
@@ -125,6 +125,8 @@ def allgatherv(
             recvbuf=[recvbuf_comm, recv_counts_comm, displacements_comm, MPI.DOUBLE],
         )
 
+        # recvbug[:] = comm.allgather(sendbuf)
+
         if (
             get_array_module_name(recvbuf) == "cupy"
             and not backend_flags["mpi_cuda_aware"]
@@ -150,8 +152,6 @@ def bcast(
         The communication group. Default is MPI.COMM_WORLD.
     """
     if backend_flags["mpi_avail"]:
-        if comm is None:
-            comm = MPI.COMM_WORLD
         comm.Bcast(data, root=root)
 
 
