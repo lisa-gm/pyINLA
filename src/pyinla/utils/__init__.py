@@ -6,13 +6,13 @@ from pyinla.utils.gpu_utils import (
     get_device,
     get_host,
     set_device,
+    free_unused_gpu_memory,
 )
 from pyinla.utils.host import get_host_configuration
 from pyinla.utils.link_functions import cloglog, scaled_logit, sigmoid
 from pyinla.utils.multiprocessing import (
     allreduce,
     allgather,
-    allgatherv,
     bcast,
     get_active_comm,
     print_msg,
@@ -37,9 +37,10 @@ __all__ = [
     "smartsplit",
     "allreduce",
     "allgather",
-    "allgatherv",
     "bcast",
     "bdiag_tiling",
     "extract_diagonal",
     "memory_footprint",
+    "free_unused_gpu_memory",
+    
 ]

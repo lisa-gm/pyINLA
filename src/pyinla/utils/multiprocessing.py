@@ -1,6 +1,7 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import numpy as np
+import cupy as cp
 
 from pyinla import ArrayLike, backend_flags, comm_rank
 from pyinla.utils.gpu_utils import get_array_module_name, get_host, get_device
@@ -24,7 +25,7 @@ def print_msg(*args, **kwargs):
         print(*args, **kwargs)
 
 
-def synchronize(comm=None):
+def synchronize(comm):
     """
     Synchronize all processes within the given communication group.
 
@@ -34,8 +35,7 @@ def synchronize(comm=None):
         The communication group to synchronize. Default is MPI.COMM_WORLD.
     """
     if backend_flags["mpi_avail"]:
-        if comm is None:
-            comm = MPI.COMM_WORLD
+        cp.cuda.runtime.deviceSynchronize()
         comm.Barrier()
 
 
@@ -98,40 +98,6 @@ def allgather(
             return comm.allgather(obj)
 
 
-def allgatherv(
-    sendbuf: ArrayLike,
-    recvbuf: ArrayLike,
-    recv_counts: ArrayLike,
-    displacements: ArrayLike,
-    comm: MPI.Comm,
-):
-    if backend_flags["mpi_avail"]:
-        if (
-            get_array_module_name(recvbuf) == "cupy"
-            and not backend_flags["mpi_cuda_aware"]
-        ):
-            sendbuf_comm = get_host(sendbuf)
-            recvbuf_comm = get_host(recvbuf)
-            recv_counts_comm = get_host(recv_counts)
-            displacements_comm = get_host(displacements)
-        else:
-            sendbuf_comm = sendbuf
-            recvbuf_comm = recvbuf
-            recv_counts_comm = recv_counts
-            displacements_comm = displacements
-
-        comm.Allgatherv(
-            sendbuf=sendbuf_comm,
-            recvbuf=[recvbuf_comm, recv_counts_comm, displacements_comm, MPI.DOUBLE],
-        )
-
-        if (
-            get_array_module_name(recvbuf) == "cupy"
-            and not backend_flags["mpi_cuda_aware"]
-        ):
-            recvbuf[:] = get_device(recvbuf_comm)
-
-
 def bcast(
     data: ArrayLike,
     root: int = 0,
@@ -150,8 +116,6 @@ def bcast(
         The communication group. Default is MPI.COMM_WORLD.
     """
     if backend_flags["mpi_avail"]:
-        if comm is None:
-            comm = MPI.COMM_WORLD
         comm.Bcast(data, root=root)
 
 
@@ -208,6 +172,8 @@ def smartsplit(
         rank = active_comm.Get_rank()
         size = active_comm.Get_size()
 
+        # print(f"Rank: {rank}, size: {size} at '{tag}' level", flush=True)
+
         # Compute the group size, given its minimum
         group_size = size // n_parallelizable_evaluations
         if group_size < min_group_size:
@@ -217,6 +183,7 @@ def smartsplit(
         color_new_group = rank // group_size
         key_new_group = rank
         comm_new_group = active_comm.Split(color_new_group, key_new_group)
+        # print(f"FLG2: new group rank: {comm_new_group.rank}, new group size: {comm_new_group.size} at '{tag}' level", flush=True)
     else:
         active_comm = comm
         comm_new_group = comm

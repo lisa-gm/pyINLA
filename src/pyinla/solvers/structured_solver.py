@@ -6,7 +6,7 @@ from pyinla import NDArray, sp, xp, xp_host, backend_flags
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 from pyinla.kernels.blockmapping import compute_block_slice, compute_block_sort_index
-from pyinla.utils import print_msg
+from pyinla.utils import print_msg, free_unused_gpu_memory
 
 try:
     from serinv.algs import pobtaf, pobtas, pobtasi, pobtf, pobts, pobtsi
@@ -15,6 +15,7 @@ except ImportError as e:
 
 if backend_flags["cupy_avail"]:
     from cupyx.profiler import time_range
+    import cupy as cp
 
 
 class SerinvSolver(Solver):
@@ -31,7 +32,7 @@ class SerinvSolver(Solver):
     ) -> None:
         """Initializes the SerinV solver."""
         super().__init__(config)
-
+                
         self.diagonal_blocksize: int = diagonal_blocksize
         self.arrowhead_blocksize: int = arrowhead_blocksize
         self.n_diag_blocks: int = n_diag_blocks
@@ -160,6 +161,9 @@ class SerinvSolver(Solver):
 
         if sparsity == "bta":
             logdet += xp.sum(xp.log(self.A_arrow_tip_block.diagonal()))
+            
+        if xp.isnan(logdet):
+            raise ValueError("Logdet is NaN. Check the input matrix.")
 
         return 2 * logdet
 
