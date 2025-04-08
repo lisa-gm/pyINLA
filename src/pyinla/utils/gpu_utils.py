@@ -1,9 +1,9 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import inspect
+from mpi4py import MPI
 
 from pyinla import NDArray, backend_flags, xp
-from pyinla.utils import print_msg
 
 if backend_flags["cupy_avail"]:
     import cupy as cp
@@ -112,14 +112,22 @@ def format_size(size_bytes):
 # query memory usage GPU and free unused memory
 def free_unused_gpu_memory(verbose: bool = False) -> int:
     """Free unused memory on the GPU."""
+
     
     if backend_flags["cupy_avail"]:
         mempool = cp.get_default_memory_pool()
 
         if verbose:
-            print_msg("memory used    : ", format_size(mempool.used_bytes()))
-            print_msg("mem total bytes: ", format_size(mempool.total_bytes()))
-        
+            if backend_flags["mpi_avail"]:
+                comm = MPI.COMM_WORLD
+                rank = comm.Get_rank()
+                if rank == 0:
+                    print("memory used    : ", format_size(mempool.used_bytes()))
+                    print("mem total bytes: ", format_size(mempool.total_bytes()))
+            else:
+                print("memory used    : ", format_size(mempool.used_bytes()))
+                print("mem total bytes: ", format_size(mempool.total_bytes()))
+            
         mempool.free_all_blocks()    
 
         return mempool.total_bytes()

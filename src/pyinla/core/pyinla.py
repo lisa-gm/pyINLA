@@ -72,7 +72,7 @@ class PyINLA:
         self.n_f_evaluations = 2 * self.model.n_hyperparameters + 1
 
         # Create the appropriate communicators
-        min_q_parallel = 1
+        min_q_parallel = 2
         min_solver_size = self.config.solver.min_processes
         self.comm_world, self.comm_feval, self.color_feval = smartsplit(
             comm=MPI.COMM_WORLD,
@@ -300,6 +300,7 @@ class PyINLA:
         else:
             print_msg("Starting optimization.")
             self.iter = 0
+            self.accepted_iter = 0
 
             # Define a custom exception to signal early exit
             class OptimizationConvergedEarlyExit(Exception):
@@ -309,7 +310,7 @@ class PyINLA:
             def callback(intermediate_result: optimize.OptimizeResult):
                 theta_i = intermediate_result.x.copy()
                 fun_i = intermediate_result.fun
-                current_iter = intermediate_result.nit
+                self.accepted_iter += 1
 
                 # Format the output
                 theta_str = ", ".join(f"{theta: .6f}" for theta in theta_i)
@@ -319,7 +320,7 @@ class PyINLA:
 
                 print(
                     f"comm_rank: {comm_rank} | "
-                    f"Iteration: {current_iter:2d} (took: {self.objective_function_time[-1]:.2f}) | "
+                    f"Iteration: {self.accepted_iter:2d} (took: {self.objective_function_time[-1]:.2f}) | "
                     f"Theta: [{theta_str}] | "
                     f"Function Value: {fun_i: .6f} | "
                     f"Gradient: [{gradient_str}] | ",
@@ -331,15 +332,15 @@ class PyINLA:
                 self.f_values.append(fun_i)
 
                 # check if f_values have been decreasing over last iterations
-                if current_iter > self.config.f_reduction_lag:
+                if self.accepted_iter > self.config.f_reduction_lag:
                     if (
                         xp.abs(self.f_values[-self.config.f_reduction_lag] - fun_i)
                         < self.config.f_reduction_tol
                     ):
                         print_msg(
                             f"Optimization converged!  "
-                            f"|| f({current_iter - self.config.f_reduction_lag}) - f({current_iter}) || = "
-                            f"{self.f_values[current_iter - self.config.f_reduction_lag] - self.f_values[current_iter-1]:.6f} "
+                            f"|| f({self.accepted_iter - self.config.f_reduction_lag}) - f({self.accepted_iter}) || = "
+                            f"{self.f_values[self.accepted_iter - self.config.f_reduction_lag] - self.f_values[self.accepted_iter-1]:.6f} "
                             f"< {self.config.f_reduction_tol}. Function value: {fun_i:.6f}\n",
                             flush=True,
                         )
@@ -360,17 +361,17 @@ class PyINLA:
 
                         raise OptimizationConvergedEarlyExit()
                     
-                if current_iter > self.config.theta_reduction_lag:
+                if self.accepted_iter > self.config.theta_reduction_lag:
                     if (
                        xp.linalg.norm(self.theta_values[-self.config.theta_reduction_lag] - theta_i)
                         < self.config.theta_reduction_tol
                     ):
                         norm_diff = xp.linalg.norm(
-                            self.theta_values[current_iter - self.config.theta_reduction_lag] - theta_i
+                            self.theta_values[self.accepted_iter - self.config.theta_reduction_lag] - theta_i
                         )
                         print_msg(
                             f"Optimization converged!  "
-                            f"|| theta({current_iter - self.config.theta_reduction_lag}) - theta({current_iter}) || = "
+                            f"|| theta({self.accepted_iter - self.config.theta_reduction_lag}) - theta({self.accepted_iter}) || = "
                             f"{norm_diff:.6f} "
                             f"< {self.config.theta_reduction_tol}. Function value: {fun_i:.6f}\n",
                             flush=True,

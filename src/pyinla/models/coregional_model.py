@@ -284,8 +284,12 @@ class CoregionalModel(Model):
         
         self.Q_prior: spmatrix = None # need this otherwise the construct will fail
         print_msg("Calling construct_Q_prior in the init...")
-        self.construct_Q_prior()
 
+        self.counter = 0
+        print("self.counter : ", self.counter)
+        
+        self.construct_Q_prior()
+        
 
     def construct_Q_prior(self) -> spmatrix:
         # number of random effects per model
@@ -517,7 +521,7 @@ class CoregionalModel(Model):
             #     [[q11, q12, q13], [q21, q22, q23], [q31, q32, q33]]
             # ).tocsc()
             
-            # Qprior_re = sp.sparse.coo_matrix((self.data_Qprior_re, (self.rows_Qprior_re, self.columns_Qprior_re)), shape=( self.n_models * n_re,  self.n_models * n_re))
+            #Qprior_re = sp.sparse.coo_matrix((self.data_Qprior_re, (self.rows_Qprior_re, self.columns_Qprior_re)), shape=( self.n_models * n_re,  self.n_models * n_re))
 
         # Apply the permutation to the Qprior_st
         if self.coregionalization_type == "spatio_temporal":
@@ -548,10 +552,26 @@ class CoregionalModel(Model):
             # print("\nAfter computing Qprior permutation indices...")     
             free_unused_gpu_memory(verbose=False) 
       
-            # self.Qprior_re_perm.data = self.data_Qprior_re[
-            #     self.permutation_vector_Q_prior
-            # ]
             self.data_Qprior_re = self.data_Qprior_re[self.permutation_vector_Q_prior]
+            
+            ## check if two matrices are the same
+            # construct the two matrices and then check if they are the same
+            # Qprior_st_perm.tocsc()
+            # Qprior_st_perm.sort_indices()
+            
+            # check1 = self.compare_matrices(self.data_Qprior_re, self.permutation_indices_Q_prior, self.permutation_indptr_Q_prior, Qprior_st_perm.data, Qprior_st_perm.indices, Qprior_st_perm.indptr)
+            # print("\nCheck if the two matrices are the same: ", check1)
+
+            # # compare if they are the same 
+            # tmp1 = sp.sparse.csc_matrix((self.data_Qprior_re, self.Qprior_re_perm.indices, self.Qprior_re_perm.indptr), shape = (self.n_models * n_re, self.n_models * n_re))
+            # tmp1.sort_indices()
+            # check2 = self.compare_matrices(tmp1.data, tmp1.indices, tmp1.indptr, Qprior_st_perm.data, Qprior_st_perm.indices, Qprior_st_perm.indptr)
+            # print("\nCheck if the two matrices are the same: ", check2)
+            
+            # self.counter += 1
+            
+            # if self.counter == 2:
+            #     exit()          
                         
         else:
             # Qprior_st_perm = Qprior_st
@@ -559,6 +579,8 @@ class CoregionalModel(Model):
                 (self.data_Qprior_re, (self.rows_Qprior_re, self.columns_Qprior_re)),
                 shape=(self.n_models * n_re, self.n_models * n_re),
             ).tocsc()
+            
+            self.Qprior_re_perm.sort_indices()
 
         if Q_r != []:
             if self.Q_prior is None:
@@ -574,7 +596,17 @@ class CoregionalModel(Model):
                 self.permutation_indices_Q_prior = None
                 self.permutation_indptr_Q_prior = None
 
-                #self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
+                # Q_prior_ref = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
+                
+                # # check if the Qprior is the same as the Qprior_ref
+                # self.Q_prior.sort_indices()
+                # Q_prior_ref.sort_indices()
+                
+                # check1 = self.compare_matrices(self.Q_prior.data, self.Q_prior.indices, self.Q_prior.indptr, Q_prior_ref.data, Q_prior_ref.indices, Q_prior_ref.indptr)
+                # if check1 is False:
+                #     # print("\nQprior_ref: ", Q_prior_ref)
+                #     # print("\nQprior: ", self.Q_prior)
+                #     raise ValueError("Check 1: Qprior is not the same as Qprior_ref")
             else:                
                 free_unused_gpu_memory(verbose=False) 
                
@@ -584,11 +616,18 @@ class CoregionalModel(Model):
                 self.Q_prior.data[:self.nnz_Qprior_re_perm] = self.data_Qprior_re
                 
                 # Qprior_reg = bdiag_tiling(Q_r).tocsc()
-                # self.Q_prior = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
+                # Q_prior_ref = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
+                # Q_prior_ref.sort_indices()
+                
+                # check2 = self.compare_matrices(self.Q_prior.data, self.Q_prior.indices, self.Q_prior.indptr, Q_prior_ref.data, Q_prior_ref.indices, Q_prior_ref.indptr)
+                # if check2 is False:
+                #     # print("\nQprior_ref: ", Q_prior_ref)
+                #     # print("\nQprior: ", self.Q_prior)
+                #     raise ValueError("Check 2: Qprior is not the same as Qprior_ref")
 
         else:
-            # self.Q_prior = self.Qprior_re_perm
-            self.Q_prior = Qprior_st_perm
+            self.Q_prior = self.Qprior_re_perm
+            #self.Q_prior = Qprior_st_perm
                          
         free_unused_gpu_memory(verbose=False) 
 
@@ -961,16 +1000,48 @@ class CoregionalModel(Model):
         a = sp.sparse.csc_matrix(
             sp.sparse.coo_matrix((a_data_placeholder, (a_rows, a_cols)), shape=(n, n), dtype=xp.float64)
         )
-        free_unused_gpu_memory(verbose=False) 
-        
+
         a_perm = a[permutation, :][:, permutation]
+        a_perm.sort_indices() ## new
         
         self.permutation_vector_Q_prior = a_perm.data.astype(xp.int32)
         self.permutation_indices_Q_prior = a_perm.indices
         self.permutation_indptr_Q_prior = a_perm.indptr
         
-        free_unused_gpu_memory(verbose=False) 
 
+    def compare_matrices(self, a1_data_vec, a1_indices, a1_indptr, a2_data_vec, a2_indices, a2_indptr):
+        """
+        Compare two sparse matrices represented by their data vectors, indices, and indptr arrays.
+        """
+        # Check if the shapes of the matrices are the same
+        # if len(a1_data_vec) != len(a2_data_vec):
+        #     return False
+        
+        # Check if the indices arrays are equal
+        if not xp.array_equal(a1_indices, a2_indices):
+            print("indices arrays are not equal")
+            for i, (idx1, idx2) in enumerate(zip(a1_indices, a2_indices)):
+                if idx1 != idx2:
+                    print(f"Indices differ at index {i}: {idx1} != {idx2}")
+            return False
+
+        # Check if the indptr arrays are equal
+        if not xp.array_equal(a1_indptr, a2_indptr):
+            print("indptr arrays are not equal")
+            for i, (ptr1, ptr2) in enumerate(zip(a1_indptr, a2_indptr)):
+                if ptr1 != ptr2:
+                    print(f"Indptr arrays differ at index {i}: {ptr1} != {ptr2}")
+            return False
+        
+        if not xp.array_equal(a1_data_vec, a2_data_vec):
+            print("data vectors are not equal")
+            print("theta: ", self.theta)
+            for i, (val1, val2) in enumerate(zip(a1_data_vec, a2_data_vec)):
+                if val1 != val2:
+                    print(f"Data vectors differ at index {i}: {val1} != {val2}")
+            return False
+
+        return True
                 
 
     def get_solver_parameters(self) -> dict:
