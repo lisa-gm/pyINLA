@@ -13,13 +13,13 @@ from pyinla.solvers import DenseSolver, DistSerinvSolver, SerinvSolver, SparseSo
 from pyinla.utils import (  # memory_footprint,
     allreduce,
     extract_diagonal,
+    free_unused_gpu_memory,
     get_device,
     get_host,
     print_msg,
     set_device,
     smartsplit,
     synchronize,
-    free_unused_gpu_memory,
 )
 
 if backend_flags["cupy_avail"]:
@@ -72,13 +72,13 @@ class PyINLA:
         self.n_f_evaluations = 2 * self.model.n_hyperparameters + 1
 
         # Create the appropriate communicators
-        min_q_parallel = 2
+        min_q_parallel = 1
         min_solver_size = self.config.solver.min_processes
         self.comm_world, self.comm_feval, self.color_feval = smartsplit(
             comm=MPI.COMM_WORLD,
             n_parallelizable_evaluations=self.n_f_evaluations,
             tag="feval",
-            min_group_size=min_solver_size*min_q_parallel,
+            min_group_size=min_solver_size * min_q_parallel,
         )
         self.world_size = self.comm_world.Get_size()
 
@@ -92,11 +92,12 @@ class PyINLA:
             tag="qeval",
             min_group_size=min_solver_size,
         )
-        
+
         free_unused_gpu_memory(verbose=True)
 
         if comm_rank == 0:
-            print(f"""
+            print(
+                f"""
             ------------- HPC HEADER --------------------
             Total number of ranks: {MPI.COMM_WORLD.size}, ({MPI.COMM_WORLD.size - self.world_size} won't participate)
                 Parallelization through F(): {self.world_size // self.comm_feval.size}
@@ -108,7 +109,8 @@ class PyINLA:
                 MPI_AVAIL: {backend_flags["mpi_avail"]}
                 CUDA_AWARE_MPI: {backend_flags["mpi_cuda_aware"]}
                 USE_NCCL: {backend_flags["use_nccl"]}
-            """)
+            """
+            )
 
         # print(f"Rank: {self.comm_world.rank} | feval color: {self.color_feval} | feval_rank: {self.comm_feval.rank} | qeval color: {self.color_qeval} | qeval_rank: {self.comm_qeval.rank} |", flush=True)
 
@@ -152,10 +154,13 @@ class PyINLA:
                         f"Not enough diagonal blocks ({n_diag_blocks}) to use the distributed solver with {n_processes_solver} processes."
                     )
                 self.nccl_comm = None
-                if backend_flags["use_nccl"]:      
+                if backend_flags["use_nccl"]:
                     # --- Initialize NCCL communicator
                     if self.comm_qeval.rank == 0:
-                        print(f"rank {MPI.COMM_WORLD.rank} initializing NCCL communicator.", flush=True)   
+                        print(
+                            f"rank {MPI.COMM_WORLD.rank} initializing NCCL communicator.",
+                            flush=True,
+                        )
                         nccl_id = cp.cuda.nccl.get_unique_id()
                         self.comm_qeval.bcast(nccl_id, root=0)
                     else:
@@ -179,7 +184,6 @@ class PyINLA:
                 #     flag = self.comm_qeval.bcast(None, root=0)
                 # print(f"Rank {MPI.COMM_WORLD.rank}, mpi flag: {flag}", flush=True)
 
-
                 # nccl_flag = xp.zeros(1, dtype=xp.int32)
                 # nccl_flag[0] = -1
                 # if self.comm_qeval.rank == 0:
@@ -201,8 +205,6 @@ class PyINLA:
                 #     )
                 # synchronize(comm=self.comm_qeval)
                 # print(f"Rank {MPI.COMM_WORLD.rank}, nccl_flag: {nccl_flag}", flush=True)
-
-
 
                 self.solver = DistSerinvSolver(
                     config=self.config.solver,
@@ -233,7 +235,6 @@ class PyINLA:
 
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
-
 
     def run(self) -> dict:
         """Run the PyINLA"""
@@ -360,14 +361,20 @@ class PyINLA:
                         }
 
                         raise OptimizationConvergedEarlyExit()
-                    
+
                 if self.accepted_iter > self.config.theta_reduction_lag:
                     if (
-                       xp.linalg.norm(self.theta_values[-self.config.theta_reduction_lag] - theta_i)
+                        xp.linalg.norm(
+                            self.theta_values[-self.config.theta_reduction_lag]
+                            - theta_i
+                        )
                         < self.config.theta_reduction_tol
                     ):
                         norm_diff = xp.linalg.norm(
-                            self.theta_values[self.accepted_iter - self.config.theta_reduction_lag] - theta_i
+                            self.theta_values[
+                                self.accepted_iter - self.config.theta_reduction_lag
+                            ]
+                            - theta_i
                         )
                         print_msg(
                             f"Optimization converged!  "
@@ -501,7 +508,7 @@ class PyINLA:
                 self.f_values_i[feval_i] = self._evaluate_f(
                     theta_i=self.theta_mat[:, feval_i], comm=self.comm_feval
                 )
-                #print("rank", self.comm_world.rank, "evaluated ", feval_i, ", where f(theta_i):", self.f_values_i[feval_i])
+                # print("rank", self.comm_world.rank, "evaluated ", feval_i, ", where f(theta_i):", self.f_values_i[feval_i])
 
         # Here carefull on the reduction as it's gonna add the values from all ranks and not only the root of the groups - TODO
         allreduce(
@@ -529,8 +536,9 @@ class PyINLA:
 
         if self.iter > 0:
             print(
-                f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}", flush=True
-            ) 
+                f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}",
+                flush=True,
+            )
         self.iter += 1
 
         return (f_0, grad_f)
@@ -561,7 +569,6 @@ class PyINLA:
         hyperparameters, log likelihood, log prior of the latent parameters,
         and log conditional of the latent parameters.
         """
-
 
         self.model.theta[:] = theta_i
         f_theta = xp.zeros(1, dtype=xp.float64)
@@ -667,9 +674,9 @@ class PyINLA:
                 + prior_latent_parameters
                 - conditional_latent_parameters
             )
-            
+
         # print(f"it: {self.iter}, rank: {self.comm_world.rank} evaluated f(theta): {f_theta[0]}, lp hp: {log_prior_hyperparameters}, lp x: {prior_latent_parameters}, likelihood: {likelihood} cond x: {conditional_latent_parameters}", flush=True)
-            
+
         # if xp.isnan(f_theta[0]):
         #     raise ValueError(
         #         f"f(theta) is NaN. Check what is happening."
