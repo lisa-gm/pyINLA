@@ -20,6 +20,7 @@ from pyinla.utils import (  # memory_footprint,
     set_device,
     smartsplit,
     synchronize,
+    synchronize_gpu,
 )
 
 if backend_flags["cupy_avail"]:
@@ -112,7 +113,10 @@ class PyINLA:
             """
             )
 
-        # print(f"Rank: {self.comm_world.rank} | feval color: {self.color_feval} | feval_rank: {self.comm_feval.rank} | qeval color: {self.color_qeval} | qeval_rank: {self.comm_qeval.rank} |", flush=True)
+        # print(
+        #     f"Rank: {self.comm_world.rank} | feval color: {self.color_feval} | feval_rank: {self.comm_feval.rank} | feval_size: {self.comm_feval.size} | qeval color: {self.color_qeval} | qeval_rank: {self.comm_qeval.rank} | qeval_size: {self.comm_qeval.size}",
+        #     flush=True,
+        # )
 
         # --- Initialize solver
         if self.config.solver.type == "dense":
@@ -171,40 +175,7 @@ class PyINLA:
                         nccl_id,
                         self.comm_qeval.rank,
                     )
-                    # print(f"Rank: {self.comm_world.rank} @Barrier() | feval color: {self.color_feval} | feval_rank: {self.comm_feval.rank} | qeval color: {self.color_qeval} | qeval_rank: {self.comm_qeval.rank} |", flush=True)
                     synchronize(comm=self.comm_world)
-
-                # print(f"Rank: {self.comm_world.rank} comm_qeval.size {self.comm_qeval.size}", flush=True)
-
-                # flag = -1
-                # if self.comm_qeval.rank == 0:
-                #     flag = self.comm_world.rank
-                #     self.comm_qeval.bcast(flag, root=0)
-                # else:
-                #     flag = self.comm_qeval.bcast(None, root=0)
-                # print(f"Rank {MPI.COMM_WORLD.rank}, mpi flag: {flag}", flush=True)
-
-                # nccl_flag = xp.zeros(1, dtype=xp.int32)
-                # nccl_flag[0] = -1
-                # if self.comm_qeval.rank == 0:
-                #     nccl_flag[0] = self.comm_world.rank
-                #     self.nccl_comm.bcast(
-                #         buff=nccl_flag.data.ptr,
-                #         count=1,
-                #         datatype=cp.cuda.nccl.NCCL_INT32,
-                #         root=0,
-                #         stream=cp.cuda.Stream.null.ptr,
-                #     )
-                # else:
-                #     self.nccl_comm.bcast(
-                #         buff=nccl_flag.data.ptr,
-                #         count=1,
-                #         datatype=cp.cuda.nccl.NCCL_INT32,
-                #         root=0,
-                #         stream=cp.cuda.Stream.null.ptr,
-                #     )
-                # synchronize(comm=self.comm_qeval)
-                # print(f"Rank {MPI.COMM_WORLD.rank}, nccl_flag: {nccl_flag}", flush=True)
 
                 self.solver = DistSerinvSolver(
                     config=self.config.solver,
@@ -232,6 +203,8 @@ class PyINLA:
         self.f_values: ArrayLike = []
         self.theta_values: ArrayLike = []
         self.objective_function_time: ArrayLike = []
+        self.solver_time: ArrayLike = []
+        self.construction_time: ArrayLike = []
 
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
@@ -474,6 +447,12 @@ class PyINLA:
         objective_function_evalutation : tuple
             Function value f(theta) evaluated at theta_i and its gradient.
         """
+
+        self.t_construction_qprior = 0.0
+        self.t_construction_qconditional = 0.0
+        self.solver.t_cholesky = 0.0
+        self.solver.t_solve = 0.0
+
         synchronize(comm=self.comm_world)
         tic = time.perf_counter()
         # Generate theta matrix with different theta's to evaluate
@@ -485,8 +464,6 @@ class PyINLA:
         task_mapping = []
         for i in range(self.n_f_evaluations):
             task_mapping.append(i % n_feval_comm)
-        # if comm_rank == 0:
-        #     print(f"DEBUG: rank {self.comm_world.rank} feval task mapping: {task_mapping}", flush=True)
 
         # Initialize central difference scheme matrix
         self.eps_mat[:] = self.eps_gradient_f * xp.eye(self.model.n_hyperparameters)
@@ -503,14 +480,12 @@ class PyINLA:
             # Perform the evaluation in reverse order so that the stored and returned
             # self.x value matches the "bare" hyperparameters evaluation
             if self.color_feval == task_mapping[feval_i]:
-                # if self.comm_feval.rank == 0:
-                #     print(f"DEBUG: Feval group: {self.color_feval}, evaluating {feval_i}/{self.n_f_evaluations - 1}", flush=True)
                 self.f_values_i[feval_i] = self._evaluate_f(
                     theta_i=self.theta_mat[:, feval_i], comm=self.comm_feval
                 )
-                # print("rank", self.comm_world.rank, "evaluated ", feval_i, ", where f(theta_i):", self.f_values_i[feval_i])
 
         # Here carefull on the reduction as it's gonna add the values from all ranks and not only the root of the groups - TODO
+        synchronize(comm=self.comm_world)
         allreduce(
             self.f_values_i,
             op="sum",
@@ -532,11 +507,14 @@ class PyINLA:
         synchronize(comm=self.comm_world)
         toc = time.perf_counter()
         self.objective_function_time.append(toc - tic)
-        # print_msg("evaluated objective function at theta_i:", theta_i, ", f = ", f_0, ", time: ", toc - tic, flush=True)
+        self.solver_time.append(self.solver.t_cholesky + self.solver.t_solve)
+        self.construction_time.append(
+            self.t_construction_qprior + self.t_construction_qconditional
+        )
 
         if self.iter > 0:
             print(
-                f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}",
+                f"rank {comm_rank} | objfunc_time: {self.objective_function_time[1:]} | solver_time: {self.solver_time[1:]} | construction_time: {self.construction_time[1:]}",
                 flush=True,
             )
         self.iter += 1
@@ -569,31 +547,33 @@ class PyINLA:
         hyperparameters, log likelihood, log prior of the latent parameters,
         and log conditional of the latent parameters.
         """
-
         self.model.theta[:] = theta_i
         f_theta = xp.zeros(1, dtype=xp.float64)
 
         # --- Optimize x and evaluate the conditional of the latent parameters
         if self.model.is_likelihood_gaussian():
             # Done by both processes
+            tic = time.perf_counter()
+            synchronize_gpu()
             self.model.construct_Q_prior()
-
-            # Qprior_temp = self.model.Qprior.copy().toarray()
-            # Lprior_temp = self.model.Lprior.copy().toarray()
+            synchronize_gpu()
+            toc = time.perf_counter()
+            self.t_construction_qprior += toc - tic
 
             eta = xp.zeros_like(self.model.y, dtype=xp.float64)
             x = xp.zeros_like(self.model.x, dtype=xp.float64)
 
             n_qeval_comm = self.qeval_world.size // self.comm_qeval.size
             task_mapping = [i % n_qeval_comm for i in range(2)]
-            # print(f"rank {self.comm_world.rank} task mapping: {task_mapping}, colors: {self.color_feval}, {self.color_qeval}", flush=True)
-            # exit()
 
             if task_mapping[0] == self.color_qeval:
-                # if self.comm_qeval.rank == 0:
-                #     print(f"DEBUG: Qeval group: {self.color_qeval}, evaluating Qconditional // branch.", flush=True)
                 # Done by processes "even"
+                tic = time.perf_counter()
+                synchronize_gpu()
                 Q_conditional = self.model.construct_Q_conditional(eta)
+                synchronize_gpu()
+                toc = time.perf_counter()
+                self.t_construction_qconditional += toc - tic
 
                 self.solver.cholesky(A=Q_conditional, sparsity="bta")
 
@@ -602,7 +582,6 @@ class PyINLA:
                     x,
                 )
 
-                # print(f"Rank {self.comm_world.rank}, Color: {self.color_qeval}, FLAG 4", flush=True)
                 self.model.x[:] = self.solver.solve(
                     rhs=rhs,
                     sparsity="bta",
@@ -616,10 +595,8 @@ class PyINLA:
                     )
                 )
 
-                # print(f"Rank {self.comm_world.rank}, Color: {self.color_qeval}, is done with Q_conditional", flush=True)
                 f_theta[0] += conditional_latent_parameters
             if task_mapping[1] == self.color_qeval:
-                # print(f"Rank {self.comm_world.rank} DOING Qprior, Color: {self.color_qeval}", flush=True)
                 # Done by processes "odd"
                 log_prior_hyperparameters: float = (
                     self.model.evaluate_log_prior_hyperparameters()
@@ -632,10 +609,9 @@ class PyINLA:
                 f_theta[0] -= (
                     log_prior_hyperparameters + likelihood + prior_latent_parameters
                 )
-                # print(f"Rank {self.comm_world.rank}, Color: {self.color_qeval}, is done with Q_prior", flush=True)
 
             if task_mapping[0] != task_mapping[1]:
-                # print(f"Rank {self.comm_world.rank}, Color: {self.color_qeval}, Going into allreduce", flush=True)
+                synchronize(comm=self.comm_qeval)
                 allreduce(
                     f_theta,
                     op="sum",
@@ -675,12 +651,19 @@ class PyINLA:
                 - conditional_latent_parameters
             )
 
-        # print(f"it: {self.iter}, rank: {self.comm_world.rank} evaluated f(theta): {f_theta[0]}, lp hp: {log_prior_hyperparameters}, lp x: {prior_latent_parameters}, likelihood: {likelihood} cond x: {conditional_latent_parameters}", flush=True)
+        if xp.isnan(f_theta[0]):
+            raise ValueError(
+                f"Rank: {comm_rank} (theta) is NaN. Check what is happening."
+            )
 
-        # if xp.isnan(f_theta[0]):
-        #     raise ValueError(
-        #         f"f(theta) is NaN. Check what is happening."
-        #     )
+        synchronize(comm=self.comm_feval)
+        allreduce(
+            f_theta,
+            op="sum",
+            factor=1 / self.comm_feval.size,
+            comm=self.comm_feval,
+        )
+        synchronize(comm=self.comm_feval)
 
         return f_theta[0]
 
@@ -1081,9 +1064,19 @@ class PyINLA:
         """
         # Compute the log determinant of Q_conditional
         logdet_Q_conditional = self.solver.logdet(sparsity="bta")
-        # print(f"it: {self.iter}, rank: {self.comm_world.rank} logdet Q_conditional: {logdet_Q_conditional}", flush=True)
 
-        # Compute the quadratic form (x - x_mean).T @ Q_conditional @ (x - x_mean)
+        # Symmetrizing (averaging the tip of the arrow to tame down numerical innaccuracies)
+        tip_accu = x_mean[-3:].copy()
+        synchronize(comm=self.comm_qeval)
+        allreduce(
+            tip_accu,
+            op="sum",
+            factor=1 / self.comm_qeval.Get_size(),
+            comm=self.comm_qeval,
+        )
+        synchronize(comm=self.comm_qeval)
+        x_mean[-3:] = tip_accu
+
         if x is None and x_mean is not None:
             quadratic_form = x_mean.T @ Q_conditional @ x_mean
         elif x is None and x_mean is None:

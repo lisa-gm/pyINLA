@@ -1,12 +1,13 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from warnings import warn
+import time
 
-from pyinla import NDArray, sp, xp, xp_host, backend_flags
+from pyinla import NDArray, backend_flags, comm_rank, sp, xp, xp_host
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 from pyinla.kernels.blockmapping import compute_block_slice, compute_block_sort_index
-from pyinla.utils import print_msg, free_unused_gpu_memory
+from pyinla.utils import free_unused_gpu_memory, print_msg, synchronize_gpu
 
 try:
     from serinv.algs import pobtaf, pobtas, pobtasi, pobtf, pobts, pobtsi
@@ -14,8 +15,8 @@ except ImportError as e:
     warn(f"The serinv package is required to use the SerinvSolver: {e}")
 
 if backend_flags["cupy_avail"]:
-    from cupyx.profiler import time_range
     import cupy as cp
+    from cupyx.profiler import time_range
 
 
 class SerinvSolver(Solver):
@@ -32,7 +33,7 @@ class SerinvSolver(Solver):
     ) -> None:
         """Initializes the SerinV solver."""
         super().__init__(config)
-                
+
         self.diagonal_blocksize: int = diagonal_blocksize
         self.arrowhead_blocksize: int = arrowhead_blocksize
         self.n_diag_blocks: int = n_diag_blocks
@@ -73,7 +74,13 @@ class SerinvSolver(Solver):
             + self.A_arrow_bottom_blocks.nbytes
             + self.A_arrow_tip_block.nbytes
         )
-        print_msg(f"Allocated memory for SerinvSolver: {self.total_bytes / (1024**3):.2f} GB", flush=True)
+        print_msg(
+            f"Allocated memory for SerinvSolver: {self.total_bytes / (1024**3):.2f} GB",
+            flush=True,
+        )
+
+        self.t_cholesky = 0.0
+        self.t_solve = 0.0
 
     @time_range()
     def cholesky(
@@ -84,6 +91,8 @@ class SerinvSolver(Solver):
         """Compute Cholesky factor of input matrix."""
         self._spmatrix_to_structured(A, sparsity)
 
+        tic = time.perf_counter()
+        synchronize_gpu()
         if sparsity == "bta":
             with time_range("pobtaf"):
                 pobtaf(
@@ -102,6 +111,9 @@ class SerinvSolver(Solver):
             raise ValueError(
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
+        synchronize_gpu()
+        toc = time.perf_counter()
+        self.t_cholesky += toc - tic
 
     @time_range()
     def solve(
@@ -110,6 +122,9 @@ class SerinvSolver(Solver):
         sparsity: str,
     ) -> NDArray:
         """Solve linear system using Cholesky factor."""
+
+        tic = time.perf_counter()
+        synchronize_gpu()
         if sparsity == "bta":
             with time_range("pobtas"):
                 pobtas(
@@ -146,6 +161,9 @@ class SerinvSolver(Solver):
             raise ValueError(
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
+        synchronize_gpu()
+        toc = time.perf_counter()
+        self.t_solve += toc - tic
 
         return rhs
 
@@ -161,7 +179,7 @@ class SerinvSolver(Solver):
 
         if sparsity == "bta":
             logdet += xp.sum(xp.log(self.A_arrow_tip_block.diagonal()))
-            
+
         if xp.isnan(logdet):
             raise ValueError("Logdet is NaN. Check the input matrix.")
 
@@ -249,7 +267,9 @@ class SerinvSolver(Solver):
                 block_slice = A_csc[
                     -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
                 ].tocoo()
-                self.A_arrow_tip_block[block_slice.row, block_slice.col] = block_slice.data
+                self.A_arrow_tip_block[
+                    block_slice.row, block_slice.col
+                ] = block_slice.data
 
     @time_range()
     def _spmatrix_to_bta(
@@ -342,8 +362,12 @@ class SerinvSolver(Solver):
             self.bta_diag_cols = xp.array(self.bta_diag_cols, dtype=xp.int32)
             self.bta_lower_rows = xp.array(self.bta_lower_rows, dtype=xp.int32)
             self.bta_lower_cols = xp.array(self.bta_lower_cols, dtype=xp.int32)
-            self.bta_arrow_bottom_rows = xp.array(self.bta_arrow_bottom_rows, dtype=xp.int32)
-            self.bta_arrow_bottom_cols = xp.array(self.bta_arrow_bottom_cols, dtype=xp.int32)
+            self.bta_arrow_bottom_rows = xp.array(
+                self.bta_arrow_bottom_rows, dtype=xp.int32
+            )
+            self.bta_arrow_bottom_cols = xp.array(
+                self.bta_arrow_bottom_cols, dtype=xp.int32
+            )
             self.bta_arrow_tip_rows = xp.array(self.bta_arrow_tip_rows, dtype=xp.int32)
             self.bta_arrow_tip_cols = xp.array(self.bta_arrow_tip_cols, dtype=xp.int32)
 
@@ -359,7 +383,9 @@ class SerinvSolver(Solver):
                 + self.bta_arrow_tip_cols.nbytes
             )
             self.total_bytes += total_bta_bytes
-            print_msg(f"Allocated an extra {total_bta_bytes / (1024**3):.2f} GB for BTA_mapping caching (total: {self.total_bytes / (1024**3):.2f})")
+            print_msg(
+                f"Allocated an extra {total_bta_bytes / (1024**3):.2f} GB for BTA_mapping caching (total: {self.total_bytes / (1024**3):.2f})"
+            )
 
         # Sort the data:
         data = coo.data[self.bta_cache_block_sort_index]
@@ -385,7 +411,7 @@ class SerinvSolver(Solver):
             self.bta_arrow_tip_rows,
             self.bta_arrow_tip_cols,
         ] = data[self.bta_arrow_tip_slice]
-            
+
     @time_range()
     def _spmatrix_to_bt(
         self,
@@ -447,7 +473,9 @@ class SerinvSolver(Solver):
                 + self.bt_lower_cols.nbytes
             )
             self.total_bytes += total_bt_bytes
-            print_msg(f"Allocated an extra {total_bt_bytes / (1024**3):.2f} GB for BT_mapping caching (total: {self.total_bytes / (1024**3):.2f})")
+            print_msg(
+                f"Allocated an extra {total_bt_bytes / (1024**3):.2f} GB for BT_mapping caching (total: {self.total_bytes / (1024**3):.2f})"
+            )
 
         # Sort the data:
         data = coo.data[self.bt_cache_block_sort_index]
@@ -462,8 +490,6 @@ class SerinvSolver(Solver):
                     self.bt_lower_rows[i],
                     self.bt_lower_cols[i],
                 ] = data[self.bt_lower_slice[i]]
-
-
 
     @time_range()
     def _structured_to_spmatrix(

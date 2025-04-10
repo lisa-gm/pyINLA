@@ -173,3 +173,4 @@ settings.json
 *.nsys-rep
 *.qdstrm
 *.sqlite
+*.png
