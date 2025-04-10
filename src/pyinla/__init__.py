@@ -14,6 +14,7 @@ backend_flags = {
     "cupy_avail": False,
     "mpi_avail": False,
     "mpi_cuda_aware": False,
+    "use_nccl": False,
 }
 
 # Allows user to specify the array module via an environment variable.
@@ -23,6 +24,7 @@ if backend_flags["array_module"] is not None:
     if backend_flags["array_module"] == "numpy":
         import numpy as xp
         import scipy as sp
+
         xp_host = xp
 
     elif backend_flags["array_module"] == "cupy":
@@ -39,6 +41,7 @@ if backend_flags["array_module"] is not None:
             warn(f"'CuPy' is unavailable, defaulting to 'NumPy'. ({e})")
             import numpy as xp
             import scipy as sp
+
             xp_host = xp
     else:
         raise ValueError(f"Unrecognized ARRAY_MODULE '{backend_flags['array_module']}'")
@@ -47,6 +50,7 @@ else:
     warn("No `ARRAY_MODULE` specified, pyINLA.core defaulting to 'NumPy'.")
     import numpy as xp
     import scipy as sp
+
     xp_host = xp
 
 # In any case, check if CuPy is available.

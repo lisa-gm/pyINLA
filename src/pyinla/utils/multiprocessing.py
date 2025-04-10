@@ -1,10 +1,10 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
-import numpy as np
 import cupy as cp
+import numpy as np
 
 from pyinla import ArrayLike, backend_flags, comm_rank
-from pyinla.utils.gpu_utils import get_array_module_name, get_host, get_device
+from pyinla.utils.gpu_utils import get_array_module_name, get_device, get_host
 
 if backend_flags["mpi_avail"]:
     from mpi4py import MPI
@@ -35,7 +35,8 @@ def synchronize(comm):
         The communication group to synchronize. Default is MPI.COMM_WORLD.
     """
     if backend_flags["mpi_avail"]:
-        cp.cuda.runtime.deviceSynchronize()
+        if backend_flags["cupy_avail"]:
+            cp.cuda.runtime.deviceSynchronize()
         comm.Barrier()
 
 
