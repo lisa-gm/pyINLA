@@ -40,6 +40,14 @@ def synchronize(comm):
         comm.Barrier()
 
 
+def synchronize_gpu():
+    """
+    Synchronize GPU operations.
+    """
+    if backend_flags["cupy_avail"]:
+        cp.cuda.runtime.deviceSynchronize()
+
+
 def allreduce(
     recvbuf: ArrayLike,
     comm: MPI.Comm,

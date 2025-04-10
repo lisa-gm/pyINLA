@@ -2,7 +2,7 @@
 
 from warnings import warn
 
-import numpy as np
+import time
 
 from pyinla import NDArray, backend_flags, sp, xp, xp_host
 from pyinla.configs.pyinla_config import SolverConfig
@@ -198,6 +198,9 @@ class DistSerinvSolver(Solver):
             flush=True,
         )
 
+        self.t_cholesky = 0.0
+        self.t_solve = 0.0
+
     def cholesky(
         self,
         A: sp.sparse.spmatrix,
@@ -208,6 +211,8 @@ class DistSerinvSolver(Solver):
         # print(f"WorldRank {self.rank} ENTERING {sparsity} cholesky.", flush=True)
         self._spmatrix_to_structured(A, sparsity)
 
+        tic = time.perf_counter()
+        synchronize(comm=self.comm)
         if sparsity == "bta":
             ppobtaf(
                 self.A_diagonal_blocks,
@@ -235,6 +240,8 @@ class DistSerinvSolver(Solver):
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
         synchronize(comm=self.comm)
+        toc = time.perf_counter()
+        self.t_cholesky += toc - tic
 
     def solve(
         self,
@@ -244,6 +251,8 @@ class DistSerinvSolver(Solver):
         """Solve linear system using Cholesky factor."""
         self._slice_rhs(rhs, sparsity)
 
+        tic = time.perf_counter()
+        synchronize(comm=self.comm)
         if sparsity == "bta":
             ppobtas(
                 L_diagonal_blocks=self.A_diagonal_blocks,
@@ -273,6 +282,8 @@ class DistSerinvSolver(Solver):
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
         synchronize(comm=self.comm)
+        toc = time.perf_counter()
+        self.t_solve += toc - tic
 
         self._gather_rhs(rhs, sparsity)
 

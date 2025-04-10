@@ -18,6 +18,7 @@ from pyinla.utils.multiprocessing import (
     print_msg,
     smartsplit,
     synchronize,
+    synchronize_gpu,
 )
 from pyinla.utils.spmatrix_utils import bdiag_tiling, extract_diagonal, memory_footprint
 
@@ -33,6 +34,7 @@ __all__ = [
     "scaled_logit",
     "print_msg",
     "synchronize",
+    "synchronize_gpu",
     "get_active_comm",
     "smartsplit",
     "allreduce",
@@ -42,5 +44,4 @@ __all__ = [
     "extract_diagonal",
     "memory_footprint",
     "free_unused_gpu_memory",
-    
 ]

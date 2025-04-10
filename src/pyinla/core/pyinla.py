@@ -20,6 +20,7 @@ from pyinla.utils import (  # memory_footprint,
     set_device,
     smartsplit,
     synchronize,
+    synchronize_gpu,
 )
 
 if backend_flags["cupy_avail"]:
@@ -202,6 +203,8 @@ class PyINLA:
         self.f_values: ArrayLike = []
         self.theta_values: ArrayLike = []
         self.objective_function_time: ArrayLike = []
+        self.solver_time: ArrayLike = []
+        self.construction_time: ArrayLike = []
 
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
@@ -444,6 +447,12 @@ class PyINLA:
         objective_function_evalutation : tuple
             Function value f(theta) evaluated at theta_i and its gradient.
         """
+
+        self.t_construction_qprior = 0.0
+        self.t_construction_qconditional = 0.0
+        self.solver.t_cholesky = 0.0
+        self.solver.t_solve = 0.0
+
         synchronize(comm=self.comm_world)
         tic = time.perf_counter()
         # Generate theta matrix with different theta's to evaluate
@@ -498,10 +507,14 @@ class PyINLA:
         synchronize(comm=self.comm_world)
         toc = time.perf_counter()
         self.objective_function_time.append(toc - tic)
+        self.solver_time.append(self.solver.t_cholesky + self.solver.t_solve)
+        self.construction_time.append(
+            self.t_construction_qprior + self.t_construction_qconditional
+        )
 
         if self.iter > 0:
             print(
-                f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}",
+                f"rank {comm_rank} | objfunc_time: {self.objective_function_time[1:]} | solver_time: {self.solver_time[1:]} | construction_time: {self.construction_time[1:]}",
                 flush=True,
             )
         self.iter += 1
@@ -540,7 +553,12 @@ class PyINLA:
         # --- Optimize x and evaluate the conditional of the latent parameters
         if self.model.is_likelihood_gaussian():
             # Done by both processes
+            tic = time.perf_counter()
+            synchronize_gpu()
             self.model.construct_Q_prior()
+            synchronize_gpu()
+            toc = time.perf_counter()
+            self.t_construction_qprior += toc - tic
 
             eta = xp.zeros_like(self.model.y, dtype=xp.float64)
             x = xp.zeros_like(self.model.x, dtype=xp.float64)
@@ -550,7 +568,12 @@ class PyINLA:
 
             if task_mapping[0] == self.color_qeval:
                 # Done by processes "even"
+                tic = time.perf_counter()
+                synchronize_gpu()
                 Q_conditional = self.model.construct_Q_conditional(eta)
+                synchronize_gpu()
+                toc = time.perf_counter()
+                self.t_construction_qconditional += toc - tic
 
                 self.solver.cholesky(A=Q_conditional, sparsity="bta")
 

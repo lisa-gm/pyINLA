@@ -1,12 +1,13 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 from warnings import warn
+import time
 
 from pyinla import NDArray, backend_flags, comm_rank, sp, xp, xp_host
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 from pyinla.kernels.blockmapping import compute_block_slice, compute_block_sort_index
-from pyinla.utils import free_unused_gpu_memory, print_msg
+from pyinla.utils import free_unused_gpu_memory, print_msg, synchronize_gpu
 
 try:
     from serinv.algs import pobtaf, pobtas, pobtasi, pobtf, pobts, pobtsi
@@ -78,6 +79,9 @@ class SerinvSolver(Solver):
             flush=True,
         )
 
+        self.t_cholesky = 0.0
+        self.t_solve = 0.0
+
     @time_range()
     def cholesky(
         self,
@@ -87,6 +91,8 @@ class SerinvSolver(Solver):
         """Compute Cholesky factor of input matrix."""
         self._spmatrix_to_structured(A, sparsity)
 
+        tic = time.perf_counter()
+        synchronize_gpu()
         if sparsity == "bta":
             with time_range("pobtaf"):
                 pobtaf(
@@ -105,6 +111,9 @@ class SerinvSolver(Solver):
             raise ValueError(
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
+        synchronize_gpu()
+        toc = time.perf_counter()
+        self.t_cholesky += toc - tic
 
     @time_range()
     def solve(
@@ -114,6 +123,8 @@ class SerinvSolver(Solver):
     ) -> NDArray:
         """Solve linear system using Cholesky factor."""
 
+        tic = time.perf_counter()
+        synchronize_gpu()
         if sparsity == "bta":
             with time_range("pobtas"):
                 pobtas(
@@ -150,6 +161,9 @@ class SerinvSolver(Solver):
             raise ValueError(
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
+        synchronize_gpu()
+        toc = time.perf_counter()
+        self.t_solve += toc - tic
 
         return rhs
 
