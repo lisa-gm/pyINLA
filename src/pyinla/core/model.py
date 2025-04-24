@@ -10,6 +10,8 @@ from scipy.sparse import spmatrix
 from pyinla import ArrayLike, NDArray, sp, xp
 from pyinla.configs.likelihood_config import LikelihoodConfig
 from pyinla.configs.priorhyperparameters_config import (
+    BetaPriorHyperparametersConfig,
+    GaussianMVNPriorHyperparametersConfig,
     GaussianPriorHyperparametersConfig,
     PenalizedComplexityPriorHyperparametersConfig,
 )
@@ -18,10 +20,18 @@ from pyinla.core.prior_hyperparameters import PriorHyperparameters
 from pyinla.core.submodel import SubModel
 from pyinla.likelihoods import BinomialLikelihood, GaussianLikelihood, PoissonLikelihood
 from pyinla.prior_hyperparameters import (
+    BetaPriorHyperparameters,
+    GaussianMVNPriorHyperparameters,
     GaussianPriorHyperparameters,
     PenalizedComplexityPriorHyperparameters,
 )
-from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
+from pyinla.submodels import (
+    BrainiacSubModel,
+    RegressionSubModel,
+    SpatialSubModel,
+    SpatioTemporalSubModel,
+)
+from pyinla.utils import scaled_logit
 
 
 class Model(ABC):
@@ -51,9 +61,7 @@ class Model(ABC):
 
         for submodel in self.submodels:
             # ...initialize their prior hyperparameters matching their hyperparameters
-            if isinstance(submodel, RegressionSubModel):
-                ...
-            elif isinstance(submodel, SpatioTemporalSubModel):
+            if isinstance(submodel, SpatioTemporalSubModel):
                 # Spatial hyperparameters
                 if isinstance(submodel.config.ph_s, GaussianPriorHyperparametersConfig):
                     self.prior_hyperparameters.append(
@@ -106,6 +114,61 @@ class Model(ABC):
                             hyperparameter_type="sigma_st",
                         )
                     )
+            elif isinstance(submodel, SpatialSubModel):
+                # spatial range
+                if isinstance(submodel.config.ph_s, GaussianPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_s,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_s, PenalizedComplexityPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_s,
+                            hyperparameter_type="r_s",
+                        )
+                    )
+
+                # spatial variation
+                if isinstance(submodel.config.ph_e, GaussianPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_e,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_e, PenalizedComplexityPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_e,
+                            hyperparameter_type="sigma_e",
+                        )
+                    )
+            elif isinstance(submodel, RegressionSubModel):
+                ...
+
+            elif isinstance(submodel, BrainiacSubModel):
+                # h2 hyperparameters
+                if isinstance(submodel.config.ph_h2, BetaPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        BetaPriorHyperparameters(
+                            config=submodel.config.ph_h2,
+                        )
+                    )
+
+                # alpha hyperparameters
+                if isinstance(
+                    submodel.config.ph_alpha, GaussianMVNPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        GaussianMVNPriorHyperparameters(
+                            config=submodel.config.ph_alpha,
+                        )
+                    )
             else:
                 raise ValueError("Unknown submodel type")
 
@@ -135,7 +198,7 @@ class Model(ABC):
 
         # --- Initialize the latent parameters and the design matrix
         self.n_latent_parameters: int = 0
-        self.latent_parameters_idx: int = [0]
+        self.latent_parameters_idx: list[int] = [0]
 
         for submodel in self.submodels:
             self.n_latent_parameters += submodel.n_latent_parameters
@@ -166,6 +229,10 @@ class Model(ABC):
             shape=(submodel.a.shape[0], self.n_latent_parameters),
         )
 
+        # TODO: not so efficient ...
+        self.permutation_latent_variables = xp.arange(self.n_latent_parameters)
+        self.inverse_permutation_latent_variables = xp.arange(self.n_latent_parameters)
+
         # --- Load observation vector
         input_dir = Path(
             kwargs.get("input_dir", os.path.dirname(submodels[0].config.input_dir))
@@ -177,17 +244,25 @@ class Model(ABC):
         else:
             self.y: NDArray = xp.asarray(y)
 
+        self.y = self.y.flatten()
+
         self.n_observations: int = self.y.shape[0]
 
         # --- Initialize likelihood
+        # TODO: clean this -> so that for brainiac model we don't add additional hyperperameter
         if likelihood_config.type == "gaussian":
             self.likelihood: Likelihood = GaussianLikelihood(
                 n_observations=self.n_observations,
                 config=likelihood_config,
             )
 
+            if self.submodels[0] == BrainiacSubModel:
+                # skip setting prior as it's already set in the submodel
+                print(
+                    "Brainiac model detected. Skipping setting prior hyperparameters as already set."
+                )
             # Instantiate the prior hyperparameters for the likelihood
-            if isinstance(
+            elif isinstance(
                 likelihood_config.prior_hyperparameters,
                 GaussianPriorHyperparametersConfig,
             ):
@@ -236,13 +311,23 @@ class Model(ABC):
             data = []
 
             for i, submodel in enumerate(self.submodels):
-                if isinstance(submodel, RegressionSubModel):
-                    ...
-                elif isinstance(submodel, SpatioTemporalSubModel):
+                if isinstance(submodel, SpatioTemporalSubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
                         kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, SpatialSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, BrainiacSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, RegressionSubModel):
+                    ...
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
 
@@ -270,6 +355,16 @@ class Model(ABC):
                 if isinstance(submodel, RegressionSubModel):
                     ...
                 elif isinstance(submodel, SpatioTemporalSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, SpatialSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, BrainiacSubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
@@ -311,9 +406,16 @@ class Model(ABC):
             kwargs = {
                 "eta": eta,
             }
-        hessian_likelihood = self.likelihood.evaluate_hessian_likelihood(**kwargs)
 
-        self.Q_conditional = self.Q_prior - self.a.T @ hessian_likelihood @ self.a
+        if isinstance(self.submodels[0], BrainiacSubModel):
+            # Brainiac specific rule
+            kwargs["h2"] = float(self.theta[0])
+            d_matrix = self.submodels[0].evaluate_d_matrix(**kwargs)
+        else:
+            # General rules
+            d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
+
+        self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
 
         return self.Q_conditional
 
@@ -324,15 +426,19 @@ class Model(ABC):
     ) -> NDArray:
         """Construct the information vector."""
 
-        # TODO: need to vectorize !!
-        # gradient_likelihood = gradient_finite_difference_5pt(
-        #     self.likelihood.evaluate_likelihood, eta, self.y, theta_likelihood
-        # )
-        gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
-            eta=eta,
-            y=self.y,
-            theta=self.theta[self.hyperparameters_idx[-1] :],
-        )
+        if isinstance(self.submodels[0], BrainiacSubModel):
+            kwargs = {"h2": float(self.theta[0])}
+            # print("kwargs: ", kwargs)
+            gradient_likelihood = self.submodels[0].evaluate_gradient_likelihood(
+                eta=eta, y=self.y, **kwargs
+            )
+
+        else:
+            gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
+                eta=eta,
+                y=self.y,
+                theta=self.theta[self.hyperparameters_idx[-1] :],
+            )
 
         information_vector: NDArray = (
             -1 * self.Q_prior @ x_i + self.a.T @ gradient_likelihood
@@ -340,18 +446,62 @@ class Model(ABC):
 
         return information_vector
 
+    def is_likelihood_gaussian(self) -> bool:
+        """Check if the likelihood is Gaussian."""
+        return self.likelihood_config.type == "gaussian"
+
     def evaluate_log_prior_hyperparameters(self) -> float:
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0
 
-        for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-            log_prior += prior_hyperparameter.evaluate_log_prior(self.theta[i])
+        # if BFGS and model scale differ: rescale -- generalize
+        if isinstance(self.submodels[0], BrainiacSubModel):
+            #
+            theta_interpret = self.theta.copy()
+            # print("in evaluate log prior: theta_interpret unscaled: ", theta_interpret)
+            theta_interpret[0] = scaled_logit(self.theta[0], direction="backward")
+            # print("theta_interpret scaled: ", theta_interpret)
+            # TODO: multivariate prior for a ... need to generalize for now:
+            log_prior += self.prior_hyperparameters[0].evaluate_log_prior(
+                theta_interpret[0]
+            )
+
+            log_prior += self.prior_hyperparameters[1].evaluate_log_prior(
+                theta_interpret[1:]
+            )
+        else:
+            theta_interpret = self.theta
+
+            for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
+                log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
 
         return log_prior
 
+    def get_theta_likelihood(self) -> NDArray:
+        """Return the likelihood hyperparameters."""
+
+        if isinstance(self.submodels[0], BrainiacSubModel):
+            theta_likelihood = 1 - scaled_logit(self.theta[0], direction="backward")
+        else:
+            theta_likelihood = self.theta[self.hyperparameters_idx[-1] :]
+
+        return theta_likelihood
+
+    def evaluate_likelihood(self, eta: NDArray, **kwargs) -> float:
+        """Evaluate the likelihood."""
+
+        if isinstance(self.submodels[0], BrainiacSubModel):
+            kwargs["h2"] = float(self.theta[0])
+            likelihood = self.submodels[0].evaluate_likelihood(eta, self.y, **kwargs)
+        else:
+            likelihood = self.likelihood.evaluate_likelihood(
+                eta, self.y, theta=self.theta[self.hyperparameters_idx[-1] :]
+            )
+
+        return likelihood
+
     def __str__(self) -> str:
         """String representation of the model."""
-        # Collect general information about the model
         # Collect general information about the model
         model_info = [
             " --- Model ---",
@@ -366,3 +516,24 @@ class Model(ABC):
 
         # Combine model information and submodel information
         return "\n".join(model_info + submodel_info)
+
+    def get_solver_parameters(self) -> dict:
+        """Get the solver parameters."""
+        diagonal_blocksize = None
+        n_diag_blocks = None
+        arrowhead_blocksize = 0
+        if isinstance(self.submodels[0], SpatioTemporalSubModel):
+            diagonal_blocksize = self.submodels[0].ns
+            n_diag_blocks = self.submodels[0].nt
+
+        for i in range(1, len(self.submodels)):
+            if isinstance(self.submodels[i], RegressionSubModel):
+                arrowhead_blocksize += self.submodels[i].n_latent_parameters
+
+        param = {
+            "diagonal_blocksize": diagonal_blocksize,
+            "n_diag_blocks": n_diag_blocks,
+            "arrowhead_blocksize": arrowhead_blocksize,
+        }
+
+        return param

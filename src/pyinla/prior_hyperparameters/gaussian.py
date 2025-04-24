@@ -1,4 +1,8 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
+from pyinla import NDArray
+from scipy.sparse import spmatrix
+
+import numpy as np
 
 from pyinla.configs.priorhyperparameters_config import (
     GaussianPriorHyperparametersConfig,

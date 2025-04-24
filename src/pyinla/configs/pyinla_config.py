@@ -12,17 +12,23 @@ class SolverConfig(BaseModel):
 
     type: Literal["dense", "scipy", "serinv"] = "scipy"
 
+    min_processes: PositiveInt = 1
+
 
 class BFGSConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_iter: PositiveInt = 100
     jac: bool = True
+    
+    maxcor: PositiveInt = 10 # maximum number of past gradient vectors to store -> good default: dim(theta)
+    maxls: PositiveInt = 20 # maximum number of line search iterations
 
     gtol: float = 1e-1
-    c1: float = 1e-4  # Default value from the scipy documentation
-    c2: float = 0.9  # Default value from the scipy documentation
+    # c1: float = 1e-4  # only relevant for BFGS not for L-BFGS-B
+    # c2: float = 0.9  # only relevant for BFGS not for L-BFGS-B
     disp: bool = False
+    
 
 
 class PyinlaConfig(BaseModel):
@@ -32,9 +38,18 @@ class PyinlaConfig(BaseModel):
     solver: SolverConfig = SolverConfig()
     minimize: BFGSConfig = BFGSConfig()
 
+    # exit BFGS early if the reduction in the objective function is less than f_reduction_tol after f_reduction_lag iterations
+    f_reduction_lag: int = 3
+    f_reduction_tol: float = 1e-4
+    
+    # exit BFGS early if the change in theta is less than theta_reduction_tol after theta_reduction_lag iterations
+    theta_reduction_lag: int = 3
+    theta_reduction_tol: float = 1e-4
+
     inner_iteration_max_iter: PositiveInt = 50
     eps_inner_iteration: float = 1e-3
     eps_gradient_f: float = 1e-3
+    eps_hessian_f: float = 5 * 1e-3
 
     # --- Directory paths ------------------------------------------------------
     simulation_dir: Path = Path("./pyinla/")

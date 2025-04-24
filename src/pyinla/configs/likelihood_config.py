@@ -19,6 +19,8 @@ class LikelihoodConfig(BaseModel, ABC):
 
     type: Literal["gaussian", "poisson", "binomial"] = None
 
+    # TODO: cleaner way to let user fix hyperparameters
+    fix_hyperparameters: bool = False
     prior_hyperparameters: PriorHyperparametersConfig = None
 
     @abstractmethod
@@ -29,10 +31,12 @@ class GaussianLikelihoodConfig(LikelihoodConfig):
     prec_o: float = None  # Observation precision
 
     def read_hyperparameters(self):
-        theta = xp.array([self.prec_o])
-        theta_keys = ["prec_o"]
-
-        return theta, theta_keys
+        if self.fix_hyperparameters:
+            return xp.array([]), []
+        else:
+            theta = xp.array([self.prec_o])
+            theta_keys = ["prec_o"]
+            return theta, theta_keys
 
 
 class PoissonLikelihoodConfig(LikelihoodConfig):

@@ -53,7 +53,6 @@ class GaussianLikelihood(Likelihood):
             raise ValueError("theta must be provided to evaluate gaussian likelihood.")
 
         yEta = eta - y
-
         # print("xp.exp(theta) in lh:", xp.exp(theta))
 
         likelihood: float = (

@@ -4,6 +4,7 @@ import os
 from typing import Any, TypeAlias, TypeVar
 from warnings import warn
 
+import numpy as np
 from numpy.typing import ArrayLike
 
 from pyinla.__about__ import __version__
@@ -12,6 +13,8 @@ backend_flags = {
     "array_module": None,
     "cupy_avail": False,
     "mpi_avail": False,
+    "mpi_cuda_aware": False,
+    "use_nccl": False,
 }
 
 # Allows user to specify the array module via an environment variable.
@@ -22,10 +25,13 @@ if backend_flags["array_module"] is not None:
         import numpy as xp
         import scipy as sp
 
+        xp_host = xp
+
     elif backend_flags["array_module"] == "cupy":
         try:
             import cupy as xp
             import cupyx.scipy as sp
+            import numpy as xp_host
 
             # Check if cupy is actually working. This could still raise
             # a cudaErrorInsufficientDriver error or something.
@@ -35,6 +41,8 @@ if backend_flags["array_module"] is not None:
             warn(f"'CuPy' is unavailable, defaulting to 'NumPy'. ({e})")
             import numpy as xp
             import scipy as sp
+
+            xp_host = xp
     else:
         raise ValueError(f"Unrecognized ARRAY_MODULE '{backend_flags['array_module']}'")
 else:
@@ -42,6 +50,8 @@ else:
     warn("No `ARRAY_MODULE` specified, pyINLA.core defaulting to 'NumPy'.")
     import numpy as xp
     import scipy as sp
+
+    xp_host = xp
 
 # In any case, check if CuPy is available.
 try:
@@ -57,13 +67,32 @@ except (ImportError, ImportWarning, ModuleNotFoundError) as e:
 
 
 try:
+    # Check if mpi4py is available
     from mpi4py import MPI
 
-    comm_rank = MPI.COMM_WORLD.Get_rank()
-    comm_size = MPI.COMM_WORLD.Get_size()
+    comm = MPI.COMM_WORLD
+    comm_rank = comm.Get_rank()
+    comm_size = comm.Get_size()
+
+    # Create a small GPU array
+    array = np.array([comm_rank], dtype=np.float32)
+
+    # Perform an MPI operation to check working
+    if comm_size > 1:
+        if comm_rank == 0:
+            comm.Send([array, MPI.FLOAT], dest=1)
+        elif comm_rank == 1:
+            comm.Recv([array, MPI.FLOAT], source=0)
 
     backend_flags["mpi_avail"] = True
-except (ImportError, ImportWarning, ModuleNotFoundError) as e:
+    if backend_flags["cupy_avail"] and os.environ.get("MPI_CUDA_AWARE", "0") == "1":
+        backend_flags["mpi_cuda_aware"] = True
+    if backend_flags["cupy_avail"] and os.environ.get("USE_NCCL", "0") == "1":
+        backend_flags["use_nccl"] = True
+    else:
+        backend_flags["use_nccl"] = False
+
+except (ImportError, ImportWarning, ModuleNotFoundError) as w:
     warn(f"No 'MPI' backend detected. ({e})")
 
     comm_rank = 0
@@ -79,6 +108,7 @@ NDArray: TypeAlias = xp.ndarray[Any, _DType]
 __all__ = [
     "__version__",
     "xp",
+    "xp_host",
     "sp",
     "ArrayLike",
     "NDArray",

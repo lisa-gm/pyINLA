@@ -20,6 +20,8 @@ class SpatioTemporalSubModel(SubModel):
         """Initializes the model."""
         super().__init__(config)
 
+        self.sigma_st: float = config.sigma_st
+
         # Load spatial_matrices
         c0: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("c0.npz")))
         g1: spmatrix = csc_matrix(load_npz(self.input_path.joinpath("g1.npz")))
@@ -52,6 +54,7 @@ class SpatioTemporalSubModel(SubModel):
 
         self._check_dimensions_spatial_matrices()
         self._check_dimensions_temporal_matrices()
+        self._check_matrix_symmetry()
 
         self.ns: int = self.c0.shape[0]  # Number of spatial nodes in the mesh
         self.nt: int = self.m0.shape[0]  # Number of temporal nodes in the mesh
@@ -84,16 +87,38 @@ class SpatioTemporalSubModel(SubModel):
             self.m0.shape == self.m1.shape == self.m2.shape
         ), "Dimensions of temporal matrices do not match."
 
+    def _check_matrix_symmetry(self) -> None:
+        """Check the symmetry of the matrices."""
+        diff = self.c0 - self.c0.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
+
+        diff = self.g1 - self.g1.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
+
+        diff = self.g2 - self.g2.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
+
+        diff = self.g3 - self.g3.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
+
+        diff = self.m0 - self.m0.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Temporal matrix m0 is not symmetric."
+
+        diff = self.m1 - self.m1.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Temporal matrix m1 is not symmetric."
+
+        diff = self.m2 - self.m2.T
+        assert np.all(np.abs(diff.data) < 1e-10), "Temporal matrix m2 is not symmetric."
+
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
 
         gamma_s, gamma_t, gamma_st = self._interpretable2compute(
             r_s=kwargs.get("r_s"),
             r_t=kwargs.get("r_t"),
-            sigma_st=kwargs.get("sigma_st"),
+            sigma_st=kwargs.get("sigma_st", self.sigma_st),
             dim_spatial_domain=2,
         )
-
         # print(f"Thetas used in Qprior construction: gamma_s: {gamma_s}, gamma_t: {gamma_t}, gamma_st: {gamma_st}")
 
         exp_gamma_s = xp.exp(gamma_s)
@@ -120,7 +145,7 @@ class SpatioTemporalSubModel(SubModel):
                 + pow(exp_gamma_t, 2) * sp.sparse.kron(self.m2, q1s)
             )
         )
-
+        # TODO: csc()
         return Q_prior.tocoo()
 
     def _interpretable2compute(

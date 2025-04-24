@@ -1,5 +1,8 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
+import numpy as np
+from scipy.sparse import random
+
 from pyinla import NDArray, sp, xp
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
@@ -41,8 +44,10 @@ class DenseSolver(Solver):
         rhs: NDArray,
         **kwargs,
     ) -> NDArray:
-        sp.linalg.solve_triangular(self.L, rhs, lower=True, overwrite_b=True)
-        sp.linalg.solve_triangular(self.L.T, rhs, lower=False, overwrite_b=True)
+        rhs[:] = sp.linalg.solve_triangular(self.L, rhs, lower=True, overwrite_b=True)
+        rhs[:] = sp.linalg.solve_triangular(
+            self.L.T, rhs, lower=False, overwrite_b=True
+        )
 
         return rhs
 
@@ -51,3 +56,22 @@ class DenseSolver(Solver):
         **kwargs,
     ) -> float:
         return 2 * xp.sum(xp.log(xp.diag(self.L)))
+
+    # TODO: optimize for memory??
+    def selected_inversion(self, A: NDArray, **kwargs) -> None:
+        self.L[:] = A.todense()
+        self.L = xp.linalg.cholesky(self.L)
+
+        L_inv = xp.eye(self.L.shape[0])
+        L_inv[:] = sp.linalg.solve_triangular(
+            self.L, L_inv, lower=True, overwrite_b=True
+        )
+        self.A_inv = L_inv.T @ L_inv
+
+        return self.A_inv
+
+    def _structured_to_spmatrix(self, A: sp.sparse.spmatrix, **kwargs) -> None:
+        B = A.tocoo()
+        B.data = self.A_inv[B.row, B.col]
+
+        return B
