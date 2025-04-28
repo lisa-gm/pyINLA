@@ -49,7 +49,6 @@ class GaussianLikelihood(Likelihood):
         """
 
         theta: NDArray = kwargs.get("theta", None)
-        print("theta in lh:", theta)
         if theta is None:
             raise ValueError("theta must be provided to evaluate gaussian likelihood.")
 

@@ -139,6 +139,7 @@ class PyINLA:
             # internal order and parametrization
             minimization_result: dict = {
                 "theta": self.model.theta,
+                "theta_interpret": self.model.get_theta_interpret(),
                 "x": self.model.x,
                 "f": self.f_value,
             }
@@ -203,6 +204,7 @@ class PyINLA:
 
             minimization_result: dict = {
                 "theta": scipy_result.x,
+                "theta_interpret": self.model.get_theta_interpret(),
                 "x": self.model.x,
                 "f": scipy_result.fun,
                 "grad_f": self.gradient_f,
@@ -290,6 +292,7 @@ class PyINLA:
         hyperparameters, log likelihood, log prior of the latent parameters,
         and log conditional of the latent parameters.
         """
+
         self.model.theta[:] = theta_i
 
         # --- Evaluate the log prior of the hyperparameters

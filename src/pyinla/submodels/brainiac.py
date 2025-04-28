@@ -50,13 +50,12 @@ class BrainiacSubModel(SubModel):
             self.z.shape[0] == self.a.shape[1]
         ), f"Numbers rows in z ({self.z.shape[0]}) must match number of columns in a ({self.a.shape[1]})."
 
-    def rescale_hyperparameters_to_interpret(self, **kwargs) -> NDArray:
-        h2_scaled = kwargs.get("h2")
+    def rescale_hyperparameters_to_interpret(self, theta: NDArray) -> NDArray:
+        h2_scaled = theta[0]
         # rescale h2 to (0,1) as it's currently between -INF:+INF
         h2 = scaled_logit(h2_scaled, direction="backward")
 
-        theta_interpret = np.array([h2, *kwargs["alpha"]])
-        print("theta_interpret: ", theta_interpret)
+        theta_interpret = np.concatenate(([h2], theta[1:]))
         return theta_interpret
 
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
