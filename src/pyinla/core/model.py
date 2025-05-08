@@ -537,3 +537,31 @@ class Model(ABC):
         }
 
         return param
+    
+    
+    def construct_a_predict(self) -> spmatrix:
+        """Construct the design matrix for prediction."""
+        
+        data = []
+        rows = []
+        cols = []
+                
+        rows_a_predict = 0
+        for i, submodel in enumerate(self.submodels):
+            # Convert csc_matrix to coo_matrix to allow slicing
+            coo_submodel_a_predict = submodel.load_a_predict().tocoo()
+            data.append(coo_submodel_a_predict.data)
+            rows.append(coo_submodel_a_predict.row)
+            cols.append(
+                coo_submodel_a_predict.col
+                + self.latent_parameters_idx[i]
+                * xp.ones(coo_submodel_a_predict.col.size, dtype=int)
+            )
+            
+            # the number of rows in all of them is the same
+            rows_a_predict = coo_submodel_a_predict.shape[0]
+                    
+        self.a_predict: spmatrix = sp.sparse.coo_matrix(
+            (xp.concatenate(data), (xp.concatenate(rows), xp.concatenate(cols))),
+            shape=(rows_a_predict, self.n_latent_parameters),
+        )

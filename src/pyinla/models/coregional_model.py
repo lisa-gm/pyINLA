@@ -649,7 +649,7 @@ class CoregionalModel(Model):
                 
         free_unused_gpu_memory(verbose=False) 
 
-        return C
+        return C.tocsc()
     
     @time_range()
     def custom_Q_ATDA(self, Q: sp.sparse.csc_matrix, A: sp.sparse.csc_matrix, D_diag: xp.ndarray) -> sp.sparse.csr_matrix:
@@ -1007,6 +1007,25 @@ class CoregionalModel(Model):
         self.permutation_vector_Q_prior = a_perm.data.astype(xp.int32)
         self.permutation_indices_Q_prior = a_perm.indices
         self.permutation_indptr_Q_prior = a_perm.indptr
+        
+    
+    def construct_a_predict(self) -> spmatrix:
+        
+        # iterate through the models to load their respective a_predict
+        for i, model in enumerate(self.models):
+            model.construct_a_predict()
+            print("model.a_predict.shape: ", model.a_predict.shape)
+        
+        self.a_predict: spmatrix = bdiag_tiling([model.a_predict for model in self.models]).tocsc()
+        
+        print("self.a_predict.shape: ", self.a_predict.shape)
+        
+        # reorder a_predict in the same way as a
+        self.a_predict = self.a_predict[:, self.permutation_latent_variables]
+        
+        print("self.a_predict.shape: ", self.a_predict.shape)
+        
+        return self.a_predict
         
 
     def compare_matrices(self, a1_data_vec, a1_indices, a1_indptr, a2_data_vec, a2_indices, a2_indptr):

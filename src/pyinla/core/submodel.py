@@ -46,3 +46,25 @@ class SubModel(ABC):
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
         ...
+        
+    def load_a_predict(self) -> sp.sparse.csc_matrix:
+        """Load the design matrix for prediction."""
+        a_predict: sp.sparse.csc_matrix = csc_matrix(
+            load_npz(self.input_path.joinpath("apr.npz"))
+        )
+        
+        if xp == np:
+            self.a_predict: sp.sparse.spmatrix = a_predict
+        else:
+            self.a_predict: sp.sparse.spmatrix = sp.sparse.csc_matrix(a_predict)
+        
+        # check that number of columns is the same as in a
+        if self.a_predict.shape[1] != self.a.shape[1]:
+            raise ValueError(
+                f"Number of columns in a_predict ({self.a_predict.shape[1]}) "
+                f"does not match number of columns in a ({self.a.shape[1]})."
+            )
+        
+        return self.a_predict
+
+        
