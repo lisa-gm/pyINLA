@@ -292,6 +292,8 @@ class PyINLA:
         hyperparameters, log likelihood, log prior of the latent parameters,
         and log conditional of the latent parameters.
         """
+        import time 
+        tic = time.time()
 
         self.model.theta[:] = theta_i
 
@@ -333,6 +335,9 @@ class PyINLA:
             + prior_latent_parameters
             - conditional_latent_parameters
         )
+
+        toc = time.time()
+        print("Elapsed time for f(theta): ", toc - tic)
 
         return f_theta
 
