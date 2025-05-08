@@ -55,7 +55,7 @@ class BrainiacSubModel(SubModel):
         # rescale h2 to (0,1) as it's currently between -INF:+INF
         h2 = scaled_logit(h2_scaled, direction="backward")
 
-        theta_interpret = np.concatenate(([h2], theta[1:]))
+        theta_interpret = np.concatenate((xp.array([h2]), theta[1:]))
         return theta_interpret
 
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
