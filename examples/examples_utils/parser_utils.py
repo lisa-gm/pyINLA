@@ -1,7 +1,5 @@
 import argparse
 
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description="PyINLA example parameters")
     parser.add_argument(

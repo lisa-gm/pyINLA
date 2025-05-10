@@ -32,10 +32,16 @@ conda activate allin
 export ARRAY_MODULE=cupy
 export MPI_CUDA_AWARE=0
 
+# --- Run Spatio-temporal Examples ---
 # srun python /users/vmaillou/repositories/pyINLA/examples/gst_small/run.py
 # srun python /users/vmaillou/repositories/pyINLA/examples/gst_medium/run.py
 # srun python /users/vmaillou/repositories/pyINLA/examples/gst_large/run.py
-srun python /users/vmaillou/repositories/pyINLA/examples/coreg_small/run.py
+
+# --- Run Coregional Examples ---
+# srun python /users/vmaillou/repositories/pyINLA/examples/gs_coreg2_small/run.py
+# srun python /users/vmaillou/repositories/pyINLA/examples/gs_coreg3_small/run.py
+# srun python /users/vmaillou/repositories/pyINLA/examples/gst_coreg2_small/run.py
+srun python /users/vmaillou/repositories/pyINLA/examples/gst_coreg3_small/run.py
 
 
 

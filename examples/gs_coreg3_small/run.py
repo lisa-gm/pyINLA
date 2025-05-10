@@ -1,4 +1,8 @@
+import sys
 import os
+
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(parent_dir)
 
 import numpy as np
 
@@ -13,7 +17,7 @@ from pyinla.core.model import Model
 from pyinla.core.pyinla import PyINLA
 from pyinla.models import CoregionalModel
 from pyinla.submodels import RegressionSubModel, SpatialSubModel
-from examples.examples_utils.parser_utils import parse_args
+from examples_utils.parser_utils import parse_args
 
 SEED = 63
 np.random.seed(SEED)

@@ -1,4 +1,8 @@
+import sys
 import os
+
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(parent_dir)
 
 import numpy as np
 from mpi4py import MPI
@@ -16,8 +20,8 @@ from pyinla.core.pyinla import PyINLA
 from pyinla.models import CoregionalModel
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
 from pyinla.utils import get_host, print_msg
-from examples.examples_utils.parser_utils import parse_args
-from examples.examples_utils.infos_utils import summarize_sparse_matrix
+from examples_utils.parser_utils import parse_args
+from examples_utils.infos_utils import summarize_sparse_matrix
 
 SEED = 63
 np.random.seed(SEED)
