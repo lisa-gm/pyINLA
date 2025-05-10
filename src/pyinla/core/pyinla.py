@@ -205,6 +205,13 @@ class PyINLA:
         self.objective_function_time: ArrayLike = []
         self.solver_time: ArrayLike = []
         self.construction_time: ArrayLike = []
+        
+        
+        # --- Timers
+        self.t_construction_qprior = 0.0
+        self.t_construction_qconditional = 0.0
+        self.solver.t_cholesky = 0.0
+        self.solver.t_solve = 0.0
 
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
@@ -853,6 +860,8 @@ class PyINLA:
         self.model.x[:] = x_star
 
         eta = self.model.a @ self.model.x
+        
+        print("in compute marginal variances latent parameters. theta:  ", theta)
 
         self.model.construct_Q_conditional(eta)
         self.solver.cholesky(self.model.Q_conditional, sparsity="bta")
@@ -872,7 +881,7 @@ class PyINLA:
             raise ValueError(
                 "BOTH or NEITHER theta and x_star must be provided to compute the marginal variances."
             )
-
+            
         # check order x_star ... -> potentially need to reorder marginal variances
         self._compute_covariance_latent_parameters(theta, x_star)
 
@@ -1066,7 +1075,7 @@ class PyINLA:
         logdet_Q_conditional = self.solver.logdet(sparsity="bta")
 
         # Symmetrizing (averaging the tip of the arrow to tame down numerical innaccuracies)
-        tip_accu = x_mean[-3:].copy()
+        tip_accu = x_mean[-(self.model.n_fixed_effects_per_model * self.model.n_models):].copy()
         synchronize(comm=self.comm_qeval)
         allreduce(
             tip_accu,
@@ -1075,7 +1084,7 @@ class PyINLA:
             comm=self.comm_qeval,
         )
         synchronize(comm=self.comm_qeval)
-        x_mean[-3:] = tip_accu
+        x_mean[-(self.model.n_fixed_effects_per_model * self.model.n_models):] = tip_accu
 
         if x is None and x_mean is not None:
             quadratic_form = x_mean.T @ Q_conditional @ x_mean

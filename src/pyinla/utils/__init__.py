@@ -21,6 +21,7 @@ from pyinla.utils.multiprocessing import (
     synchronize_gpu,
 )
 from pyinla.utils.spmatrix_utils import bdiag_tiling, extract_diagonal, memory_footprint
+from pyinla.utils.sparse_diagABAt import compute_diagABAt, sparse_diag_product
 
 __all__ = [
     "get_available_devices",
@@ -44,4 +45,6 @@ __all__ = [
     "extract_diagonal",
     "memory_footprint",
     "free_unused_gpu_memory",
+    "compute_diagABAt",
+    "sparse_diag_product",
 ]

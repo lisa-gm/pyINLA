@@ -1,1 +1,4 @@
-examples/** filter=lfs diff=lfs merge=lfs -text
+# Track only input files with LFS
+examples/**/*.npz filter=lfs diff=lfs merge=lfs -text
+examples/**/*.npy filter=lfs diff=lfs merge=lfs -text
+examples/**/*.dat filter=lfs diff=lfs merge=lfs -text
