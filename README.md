@@ -158,3 +158,9 @@ pytest .
 cd /path/to/pyinla/
 python -m pip install -e .
 ```
+
+### Known Installation Issues
+The `sqlite` module might not work properly. Forcing the following version of `sqlite` might help:
+```bash
+conda install conda-forge::sqlite=3.45.3
+```
