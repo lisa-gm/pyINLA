@@ -55,6 +55,8 @@ class Model(ABC):
 
         self.submodels: list[SubModel] = submodels
 
+        self.n_fixed_effects: int = 0
+
         # For each submodel...
         theta: ArrayLike = []
         theta_keys: ArrayLike = []
@@ -151,7 +153,7 @@ class Model(ABC):
                         )
                     )
             elif isinstance(submodel, RegressionSubModel):
-                ...
+                self.n_fixed_effects += submodel.n_fixed_effects
 
             elif isinstance(submodel, BrainiacSubModel):
                 # h2 hyperparameters
@@ -585,3 +587,7 @@ class Model(ABC):
             (xp.concatenate(data), (xp.concatenate(rows), xp.concatenate(cols))),
             shape=(rows_a_predict, self.n_latent_parameters),
         )
+
+    def total_number_fixed_effects(self) -> int:
+        """Get the number of fixed effects."""
+        return self.n_fixed_effects

@@ -1126,7 +1126,7 @@ class PyINLA:
         logdet_Q_conditional = self.solver.logdet(sparsity="bta")
 
         # Symmetrizing (averaging the tip of the arrow to tame down numerical innaccuracies)
-        tip_accu = x_mean[-(self.model.n_fixed_effects_per_model * self.model.n_models):].copy()
+        tip_accu = x_mean[-self.model.total_number_fixed_effects():].copy()
         synchronize(comm=self.comm_qeval)
         allreduce(
             tip_accu,
@@ -1135,7 +1135,7 @@ class PyINLA:
             comm=self.comm_qeval,
         )
         synchronize(comm=self.comm_qeval)
-        x_mean[-(self.model.n_fixed_effects_per_model * self.model.n_models):] = tip_accu
+        x_mean[-self.model.total_number_fixed_effects():] = tip_accu
 
         if x is None and x_mean is not None:
             quadratic_form = x_mean.T @ Q_conditional @ x_mean

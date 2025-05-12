@@ -1018,3 +1018,7 @@ class CoregionalModel(Model):
         }
 
         return param
+
+    def total_number_fixed_effects(self) -> int:
+        """Get the number of fixed effects."""
+        return self.n_fixed_effects_per_model * self.n_models
