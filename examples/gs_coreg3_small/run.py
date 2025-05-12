@@ -16,6 +16,7 @@ from pyinla.configs import (
 from pyinla.core.model import Model
 from pyinla.core.pyinla import PyINLA
 from pyinla.models import CoregionalModel
+from pyinla.utils import print_msg
 from pyinla.submodels import RegressionSubModel, SpatialSubModel
 from examples_utils.parser_utils import parse_args
 
@@ -25,12 +26,10 @@ np.random.seed(SEED)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
-    print("--- Example: Gaussian Coregional (3 variates) spatial model with regression ---")
+    print_msg("--- Example: Gaussian Coregional (3 variates) spatial model with regression ---")
 
     # Check for parsed parameters
     args = parse_args()
-    print("Parsed parameters:")
-    print(f"  max_iter: {args.max_iter}")
 
     nv = 3
     ns = 1092
@@ -47,7 +46,7 @@ if __name__ == "__main__":
 
     x_ref_file = f"{BASE_DIR}/inputs_nv{nv}_ns{ns}_nt{nt}_nb{nb}/reference_outputs/x_ref_{n}_1.dat"
     x_ref = xp.loadtxt(x_ref_file)
-    print(f"Reference x[-5:]: {x_ref[-5:]}")
+    print_msg(f"Reference x[-5:]: {x_ref[-5:]}")
 
     fixed_effects_ref = xp.array([3.0, -8.0, -12.0])
 
@@ -193,7 +192,7 @@ if __name__ == "__main__":
         models=[model_1, model_2, model_3],
         coregional_model_config=models_config.parse_config(coreg_dict),
     )
-    print(coreg_model)
+    print_msg(coreg_model)
 
     # Configurations of PyINLA
     pyinla_dict = {
@@ -231,55 +230,55 @@ if __name__ == "__main__":
     rhs_copy = rhs.copy()
     pyinla.solver.cholesky(Qcond)
     x_est = pyinla.solver.solve(rhs_copy)
-    print("x_est: ", x_est[-nb:])
-    print("fixed effects ref: ", fixed_effects_ref)
+    print_msg("x_est: ", x_est[-nb:])
+    print_msg("fixed effects ref: ", fixed_effects_ref)
 
     exit()
     minimization_result = pyinla.minimize()
 
-    print("\n--- PyINLA results ---")
+    print_msg("\n--- PyINLA results ---")
 
-    # print("theta keys: ", coreg_model.theta_keys)
-    print("theta ref: ", theta_ref)
-    print("minimization_result: ", minimization_result["theta"])
+    # print_msg("theta keys: ", coreg_model.theta_keys)
+    print_msg("theta ref: ", theta_ref)
+    print_msg("minimization_result: ", minimization_result["theta"])
 
-    print("x[-nb:]: ", pyinla.model.x[-nb:])
-    print("fixed effects ref: ", fixed_effects_ref)
+    print_msg("x[-nb:]: ", pyinla.model.x[-nb:])
+    print_msg("fixed effects ref: ", fixed_effects_ref)
 
     # cov_theta = pyinla.compute_covariance_hp(coreg_model.theta)
-    # print("covariance hyperparameters(coreg_model.theta): \n", cov_theta)
+    # print_msg("covariance hyperparameters(coreg_model.theta): \n", cov_theta)
 
     # # compute marginals latent parameters
     # theta_ref = xp.array(theta_ref)
-    # print("mean latent parameters[-5:]: ", pyinla.model.x[-5:])
+    # print_msg("mean latent parameters[-5:]: ", pyinla.model.x[-5:])
     # marginals = pyinla.get_marginal_variances_latent_parameters(
     #     theta=theta_ref, x_star=pyinla.model.x
     # )
-    # print("sd latent[-5:]: ", xp.sqrt(marginals[-5:]))
+    # print_msg("sd latent[-5:]: ", xp.sqrt(marginals[-5:]))
 
     # marginals_obs = pyinla.get_marginal_variances_observations(
     #     theta=coreg_model.theta, x_star=pyinla.model.x
     # )
-    # print("sd obs[:5]: ", xp.sqrt(marginals_obs[:5]))
-    # print("mean obs[:5]: ", (coreg_model.a @ pyinla.model.x)[:5])
-    # print("y[:5]: ", pyinla.model.y[:5])
+    # print_msg("sd obs[:5]: ", xp.sqrt(marginals_obs[:5]))
+    # print_msg("mean obs[:5]: ", (coreg_model.a @ pyinla.model.x)[:5])
+    # print_msg("y[:5]: ", pyinla.model.y[:5])
 
     # # call everything
     # results = pyinla.run()
 
-    # print("results['theta']: ", results["theta"])
-    # # print("results['f']: ", results["f"])
-    # # print("results['grad_f']: ", results["grad_f"])
-    # print("cov_theta: \n", results["cov_theta"])
-    # print("mean of the fixed effects: ", results["x"][-nb:])
-    # print(
+    # print_msg("results['theta']: ", results["theta"])
+    # # print_msg("results['f']: ", results["f"])
+    # # print_msg("results['grad_f']: ", results["grad_f"])
+    # print_msg("cov_theta: \n", results["cov_theta"])
+    # print_msg("mean of the fixed effects: ", results["x"][-nb:])
+    # print_msg(
     #     "marginal variances of the fixed effects: ",
     #     results["marginal_variances_latent"][-nb:],
     # )
 
-    # print(
+    # print_msg(
     #     "norm(theta - theta_ref): ",
     #     np.linalg.norm(results["theta"] - get_host(theta_ref)),
     # )
-    # print("results['x'][-5:]: ", results["x"][-5:])
-    # print("norm(x - x_ref): ", np.linalg.norm(results["x"] - get_host(x_ref)))
+    # print_msg("results['x'][-5:]: ", results["x"][-5:])
+    # print_msg("norm(x - x_ref): ", np.linalg.norm(results["x"] - get_host(x_ref)))

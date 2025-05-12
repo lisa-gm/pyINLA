@@ -3,10 +3,7 @@
 import re
 from tabulate import tabulate
 
-
-
 import numpy as np
-from scipy.sparse import spmatrix
 
 from pyinla import ArrayLike, NDArray, sp, xp, backend_flags
 from pyinla.configs.models_config import CoregionalModelConfig
@@ -19,13 +16,6 @@ from pyinla.prior_hyperparameters import (
 from pyinla.submodels import RegressionSubModel, SpatialSubModel, SpatioTemporalSubModel
 from pyinla.utils import bdiag_tiling, free_unused_gpu_memory
 from pyinla.utils import add_str_header, align_tables_side_by_side, boxify
-
-
-import cupy as cp
-from cupyx.profiler import time_range
-
-
-
 
 class CoregionalModel(Model):
     """Core class for statistical models."""
@@ -215,7 +205,7 @@ class CoregionalModel(Model):
                 self.n_observations_idx[i] : self.n_observations_idx[i + 1]
             ] = model.y
 
-        self.a: spmatrix = bdiag_tiling([model.a for model in self.models]).tocsc()
+        self.a: sp.sparse.spmatrix = bdiag_tiling([model.a for model in self.models]).tocsc()
     
         for model in self.models:
             model.a = None
@@ -276,21 +266,15 @@ class CoregionalModel(Model):
         self.Q_conditional = None
         self.Q_conditional_data_mapping = [0]
         
-        self.Q_prior: spmatrix = None # need this otherwise the construct will fail
+        self.Q_prior: sp.sparse.spmatrix = None # need this otherwise the construct will fail
 
         self.construct_Q_prior()
         
 
-    def construct_Q_prior(self) -> spmatrix:
+    def construct_Q_prior(self) -> sp.sparse.spmatrix:
         # number of random effects per model
         n_re = self.n_spatial_nodes * self.n_temporal_nodes
         
-        mempool = cp.get_default_memory_pool()
-        pinned_mempool = cp.get_default_pinned_memory_pool()
-
-        # Qu_list: list = []
-        # Q_r: list = []
-
         Qu_list: list = [None] * self.n_models          
         Q_r: list = [None] * self.n_models
 
@@ -570,7 +554,6 @@ class CoregionalModel(Model):
 
         return self.Q_prior
     
-    @time_range()
     def spgemm(self, A, B, rows: int = 5408):
         
         free_unused_gpu_memory()  
@@ -582,13 +565,12 @@ class CoregionalModel(Model):
             if C is None:
                 C = C_block
             else:
-                C = cp.sparse.vstack([C, C_block], format="csr")
+                C = sp.sparse.vstack([C, C_block], format="csr")
                 
         free_unused_gpu_memory() 
 
         return C.tocsc()
     
-    @time_range()
     def custom_Q_ATDA(self, Q: sp.sparse.csc_matrix, A: sp.sparse.csc_matrix, D_diag: xp.ndarray) -> sp.sparse.csr_matrix:
         """
         Computes A^T * D * A with minimal memory and maximum speed.
@@ -626,9 +608,6 @@ class CoregionalModel(Model):
         The negative hessian is required, therefore the minus in front.
 
         """
-        mempool = cp.get_default_memory_pool()
-        
-        #d_list = [None] * self.n_models
         d_vec = xp.zeros(self.n_observations)
         
         for i, model in enumerate(self.models):
@@ -956,13 +935,13 @@ class CoregionalModel(Model):
         self.permutation_indptr_Q_prior = a_perm.indptr
         
     
-    def construct_a_predict(self) -> spmatrix:
+    def construct_a_predict(self) -> sp.sparse.spmatrix:
         
         # iterate through the models to load their respective a_predict
         for i, model in enumerate(self.models):
             model.construct_a_predict()
         
-        self.a_predict: spmatrix = bdiag_tiling([model.a_predict for model in self.models]).tocsc()
+        self.a_predict: sp.sparse.spmatrix = bdiag_tiling([model.a_predict for model in self.models]).tocsc()
         
         # Reorder a_predict in the same way as a
         self.a_predict = self.a_predict[:, self.permutation_latent_variables]

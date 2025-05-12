@@ -1,6 +1,6 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
-
 import numpy as np
+from dataclasses import dataclass
 
 from pyinla import ArrayLike, backend_flags, comm_rank
 from pyinla.utils.gpu_utils import get_array_module_name, get_device, get_host
@@ -10,6 +10,14 @@ if backend_flags["mpi_avail"]:
 
 if backend_flags["cupy_avail"]:
     import cupy as cp
+
+@dataclass
+class DummyCommunicator:
+    """Communicator class to handle MPI communication when
+    MPI is not available.
+    """
+    size: int = 1
+    rank: int = 0
 
 
 def print_msg(*args, **kwargs):
@@ -52,7 +60,7 @@ def synchronize_gpu():
 
 def allreduce(
     recvbuf: ArrayLike,
-    comm: MPI.Comm,
+    comm,
     op: str = "sum",
     factor: int = 1,
 ):
@@ -67,7 +75,7 @@ def allreduce(
         The buffer to receive.
     op ():
         The reduction operation.
-    comm (MPI.Comm), optional:
+    comm (CommunicatorType), optional:
         The communication group. Default is MPI.COMM_WORLD.
     """
     if backend_flags["mpi_avail"]:
@@ -99,7 +107,7 @@ def allreduce(
 
 def allgather(
     obj: ArrayLike,
-    comm: MPI.Comm,
+    comm,
 ):
     if backend_flags["mpi_avail"]:
         if get_array_module_name(obj) == "cupy" and not backend_flags["mpi_cuda_aware"]:
@@ -123,7 +131,7 @@ def bcast(
         The data to broadcast.
     root (int), optional:
         The root process. Default is 0.
-    comm (MPI.Comm), optional:
+    comm (CommunicatorType), optional:
         The communication group. Default is MPI.COMM_WORLD.
     """
     if backend_flags["mpi_avail"]:
@@ -131,15 +139,15 @@ def bcast(
 
 
 def get_active_comm(
-    comm: MPI.Comm,
+    comm,
     n_parallelizable_evaluations: int,
     tag: str,
-) -> MPI.Comm:
-    """Return a communicator made out of all the processes that can be active
+):
+    """Return a CommunicatorType made out of all the processes that can be active
     given the number of parallelizable evaluations."""
     if backend_flags["mpi_avail"]:
         rank = comm.Get_rank()
-        size = comm.Get_size()
+        size = comm.size
         group_size = size // n_parallelizable_evaluations
 
         if size > n_parallelizable_evaluations and rank >= (
@@ -164,15 +172,15 @@ def get_active_comm(
 
 
 def smartsplit(
-    comm: MPI.Comm,
+    comm,
     n_parallelizable_evaluations: int,
     tag: str,
     min_group_size: int = 1,
-) -> tuple[MPI.Comm, MPI.Comm, int]:
+) -> tuple:
     if backend_flags["mpi_avail"]:
-        if comm.Get_size() < min_group_size:
+        if comm.size < min_group_size:
             raise ValueError(
-                f"Initial communicator size must be at least {min_group_size} to fullfill the split requirements."
+                f"Initial CommunicatorType size must be at least {min_group_size} to fullfill the split requirements."
             )
 
         # Checks for compatibility of given comm sizes
@@ -181,7 +189,7 @@ def smartsplit(
             min_comm, n_parallelizable_evaluations * min_group_size, tag
         )
         rank = active_comm.Get_rank()
-        size = active_comm.Get_size()
+        size = active_comm.size
 
         # print(f"Rank: {rank}, size: {size} at '{tag}' level", flush=True)
 
@@ -190,7 +198,7 @@ def smartsplit(
         if group_size < min_group_size:
             group_size = min_group_size
 
-        # Split the communicator
+        # Split the CommunicatorType
         color_new_group = rank // group_size
         key_new_group = rank
         comm_new_group = active_comm.Split(color_new_group, key_new_group)

@@ -72,7 +72,7 @@ try:
 
     comm = MPI.COMM_WORLD
     comm_rank = comm.Get_rank()
-    comm_size = comm.Get_size()
+    comm_size = comm.size
 
     # Create a small GPU array
     array = np.array([comm_rank], dtype=np.float32)
@@ -92,7 +92,7 @@ try:
     else:
         backend_flags["nccl_avail"] = False
 
-except (ImportError, ImportWarning, ModuleNotFoundError) as w:
+except (ImportError, ImportWarning, ModuleNotFoundError) as e:
     warn(f"No 'MPI' backend detected. ({e})")
 
     comm_rank = 0

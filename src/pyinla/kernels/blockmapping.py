@@ -1,39 +1,71 @@
+# Copyright 2024-2025 pyINLA authors. All rights reserved.
 
-import cupy as cp
 import numpy as host_xp
+
+from pyinla import backend_flags, xp
 
 THREADS_PER_BLOCK = 1024
 
-_compute_coo_block_mask_kernel = cp.RawKernel(
-    r"""
-        extern "C" __global__
-        void _compute_coo_block_mask_kernel(
-            int *rows,
-            int *cols,
-            int row_start,
-            int row_stop,
-            int col_start,
-            int col_stop,
-            bool *mask,
-            int rows_len
-        ){
-            int tid = blockDim.x * blockIdx.x + threadIdx.x;
-            if (tid < rows_len) {
-                mask[tid] = (
-                    (rows[tid] >= row_start)
-                    && (rows[tid] < row_stop)
-                    && (cols[tid] >= col_start)
-                    && (cols[tid] < col_stop)
-                );
+if backend_flags["cupy_avail"]:
+    import cupy as cp
+
+    _compute_coo_block_mask_kernel = cp.RawKernel(
+        r"""
+            extern "C" __global__
+            void _compute_coo_block_mask_kernel(
+                int *rows,
+                int *cols,
+                int row_start,
+                int row_stop,
+                int col_start,
+                int col_stop,
+                bool *mask,
+                int rows_len
+            ){
+                int tid = blockDim.x * blockIdx.x + threadIdx.x;
+                if (tid < rows_len) {
+                    mask[tid] = (
+                        (rows[tid] >= row_start)
+                        && (rows[tid] < row_stop)
+                        && (cols[tid] >= col_start)
+                        && (cols[tid] < col_stop)
+                    );
+                }
             }
-        }
-    """,
-    "_compute_coo_block_mask_kernel",
-)
+        """,
+        "_compute_coo_block_mask_kernel",
+    )
+
+    _compute_coo_block_mask_kernel = cp.RawKernel(
+        r"""
+            extern "C" __global__
+            void _compute_coo_block_mask_kernel(
+                int *rows,
+                int *cols,
+                int row_start,
+                int row_stop,
+                int col_start,
+                int col_stop,
+                bool *mask,
+                int rows_len
+            ){
+                int tid = blockDim.x * blockIdx.x + threadIdx.x;
+                if (tid < rows_len) {
+                    mask[tid] = (
+                        (rows[tid] >= row_start)
+                        && (rows[tid] < row_stop)
+                        && (cols[tid] >= col_start)
+                        && (cols[tid] < col_stop)
+                    );
+                }
+            }
+        """,
+        "_compute_coo_block_mask_kernel",
+    )
 
 def compute_block_sort_index(
-    coo_rows: cp.ndarray, coo_cols: cp.ndarray, block_sizes: cp.ndarray
-) -> cp.ndarray:
+    coo_rows: xp.ndarray, coo_cols: xp.ndarray, block_sizes: xp.ndarray
+) -> xp.ndarray:
     """Computes the block-sorting index for a sparse matrix.
 
     Note
@@ -94,39 +126,10 @@ def compute_block_sort_index(
 
     return sort_index
 
-
-_compute_coo_block_mask_kernel = cp.RawKernel(
-    r"""
-        extern "C" __global__
-        void _compute_coo_block_mask_kernel(
-            int *rows,
-            int *cols,
-            int row_start,
-            int row_stop,
-            int col_start,
-            int col_stop,
-            bool *mask,
-            int rows_len
-        ){
-            int tid = blockDim.x * blockIdx.x + threadIdx.x;
-            if (tid < rows_len) {
-                mask[tid] = (
-                    (rows[tid] >= row_start)
-                    && (rows[tid] < row_stop)
-                    && (cols[tid] >= col_start)
-                    && (cols[tid] < col_stop)
-                );
-            }
-        }
-    """,
-    "_compute_coo_block_mask_kernel",
-)
-
-
 def compute_block_slice(
-    rows: cp.ndarray,
-    cols: cp.ndarray,
-    block_offsets: cp.ndarray,
+    rows: xp.ndarray,
+    cols: xp.ndarray,
+    block_offsets: xp.ndarray,
     block_row: int,
     block_col: int,
 ) -> slice:

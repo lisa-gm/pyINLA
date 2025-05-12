@@ -32,9 +32,6 @@ except ImportError as e:
 
 if backend_flags["cupy_avail"]:
     import cupyx as cpx
-    from cupyx.profiler import time_range
-
-import matplotlib.pyplot as plt
 
 
 class DistSerinvSolver(Solver):
@@ -58,7 +55,7 @@ class DistSerinvSolver(Solver):
         self.n_diag_blocks: int = n_diag_blocks
         self.comm: mpi_comm = comm
         self.rank: int = self.comm.Get_rank()
-        self.comm_size: int = self.comm.Get_size()
+        self.comm_size: int = self.comm.size
         self.nccl_comm = nccl_comm
 
         # Allocating the local slices of the system matrix
@@ -415,7 +412,6 @@ class DistSerinvSolver(Solver):
                     block_slice.row, block_slice.col
                 ] = block_slice.data
 
-    @time_range()
     def _spmatrix_to_bta(
         self,
         A: sp.sparse.spmatrix,
@@ -562,7 +558,6 @@ class DistSerinvSolver(Solver):
             self.bta_arrow_tip_cols,
         ] = data[self.bta_arrow_tip_slice]
 
-    @time_range()
     def _spmatrix_to_bt(
         self,
         A: sp.sparse.spmatrix,

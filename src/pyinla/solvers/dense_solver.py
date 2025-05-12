@@ -1,8 +1,5 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
-import numpy as np
-from scipy.sparse import random
-
 from pyinla import NDArray, sp, xp
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver

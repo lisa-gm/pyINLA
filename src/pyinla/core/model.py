@@ -6,7 +6,6 @@ from pathlib import Path
 from tabulate import tabulate
 
 import numpy as np
-from scipy.sparse import spmatrix
 
 from pyinla import ArrayLike, NDArray, sp, xp
 from pyinla.configs.likelihood_config import LikelihoodConfig
@@ -228,7 +227,7 @@ class Model(ABC):
                 self.latent_parameters_idx[i] : self.latent_parameters_idx[i + 1]
             ] = submodel.x_initial
 
-        self.a: spmatrix = sp.sparse.coo_matrix(
+        self.a: sp.sparse.spmatrix = sp.sparse.coo_matrix(
             (xp.concatenate(data), (xp.concatenate(rows), xp.concatenate(cols))),
             shape=(submodel.a.shape[0], self.n_latent_parameters),
         )
@@ -304,7 +303,7 @@ class Model(ABC):
         self.Q_conditional = None
         self.Q_conditional_data_mapping = [0]
 
-    def construct_Q_prior(self) -> spmatrix:
+    def construct_Q_prior(self) -> sp.sparse.spmatrix:
         kwargs = {}
 
         if self.Q_prior is None:
@@ -561,7 +560,7 @@ class Model(ABC):
         return param
     
     
-    def construct_a_predict(self) -> spmatrix:
+    def construct_a_predict(self) -> sp.sparse.spmatrix:
         """Construct the design matrix for prediction."""
         
         data = []
@@ -583,7 +582,7 @@ class Model(ABC):
             # the number of rows in all of them is the same
             rows_a_predict = coo_submodel_a_predict.shape[0]
                     
-        self.a_predict: spmatrix = sp.sparse.coo_matrix(
+        self.a_predict: sp.sparse.spmatrix = sp.sparse.coo_matrix(
             (xp.concatenate(data), (xp.concatenate(rows), xp.concatenate(cols))),
             shape=(rows_a_predict, self.n_latent_parameters),
         )

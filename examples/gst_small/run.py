@@ -11,14 +11,14 @@ from pyinla.configs import likelihood_config, pyinla_config, submodels_config
 from pyinla.core.model import Model
 from pyinla.core.pyinla import PyINLA
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
-from pyinla.utils import get_host
+from pyinla.utils import get_host, print_msg
 from examples_utils.parser_utils import parse_args
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 if __name__ == "__main__":
-    print("--- Example: Gaussian spatio-temporal model with regression ---")
+    print_msg("--- Example: Gaussian spatio-temporal model with regression ---")
     args = parse_args()
 
     # Configurations of the submodels
@@ -66,14 +66,13 @@ if __name__ == "__main__":
         submodels=[regression, spatio_temporal],
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
-    print(model)
+    print_msg(model)
 
     # Configurations of PyINLA
     pyinla_dict = {
         "solver": {"type": "serinv"},
-        # "solver": {"type": "dense"},
         "minimize": {
-            "max_iter": 200,
+            "max_iter": args.max_iter,
             "gtol": 1e-3,
             "disp": True,
             "maxcor": len(model.theta),
@@ -98,41 +97,41 @@ if __name__ == "__main__":
 
 
 
-    # print("\n--- PyINLA results ---")
-    # print("Final theta: ", minimization_result["theta"])
-    # print("Final f:", minimization_result["f"])
-    # print("final grad_f:", minimization_result["grad_f"])
+    # print_msg("\n--- PyINLA results ---")
+    # print_msg("Final theta: ", minimization_result["theta"])
+    # print_msg("Final f:", minimization_result["f"])
+    # print_msg("final grad_f:", minimization_result["grad_f"])
 
-    # print("\n--- References ---")
+    # print_msg("\n--- References ---")
     theta_ref = xp.array(np.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy"))
     x_ref = xp.array(np.load(f"{BASE_DIR}/reference_outputs/x_ref.npy"))
 
-    # print("theta_ref: ", theta_ref)
-    # print(
+    # print_msg("theta_ref: ", theta_ref)
+    # print_msg(
     #     "Norm between thetas and theta_ref: ",
     #     np.linalg.norm(minimization_result["theta"] - theta_ref),
     # )
-    # print(
+    # print_msg(
     #     "Norm between x and x_ref: ", np.linalg.norm(minimization_result["x"] - x_ref)
     # )
-    # print("theta_ref: ", theta_ref)
+    # print_msg("theta_ref: ", theta_ref)
 
     # Q = model.construct_Q_conditional(theta_ref)
     # Qinv = xp.linalg.inv(Q.todense())
-    # # print("Qinv : \n", Qinv)
+    # # print_msg("Qinv : \n", Qinv)
 
-    # print("marginal variances latent parameters: ", var_latent_params[:10])
-    # print("ref: marginal variances latent param: ", np.diag(Qinv)[:10])
-    # print(
+    # print_msg("marginal variances latent parameters: ", var_latent_params[:10])
+    # print_msg("ref: marginal variances latent param: ", np.diag(Qinv)[:10])
+    # print_msg(
     #     "norm(var_latent_params - np.diag(Qinv)): ",
     #     np.linalg.norm(var_latent_params - np.diag(Qinv)),
     # )
 
     # var_obs = pyinla.get_marginal_variances_observations(theta=theta_ref, x_star=x_ref)
-    # print("marginal variances observations:      ", var_obs[:10])
+    # print_msg("marginal variances observations:      ", var_obs[:10])
     # var_obs_ref = extract_diagonal(model.a @ Qinv @ model.a.T)
-    # print("ref: marginal variances observations: ", var_obs_ref[:10])
-    # print("norm(var_obs - var_obs_ref): ", np.linalg.norm(var_obs - var_obs_ref))
+    # print_msg("ref: marginal variances observations: ", var_obs_ref[:10])
+    # print_msg("norm(var_obs - var_obs_ref): ", np.linalg.norm(var_obs - var_obs_ref))
 
     # # call everything
     results = pyinla.run()
@@ -142,28 +141,28 @@ if __name__ == "__main__":
 
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
-        size = comm.Get_size()
+        size = comm.size
     else:
         rank = 0
         size = 1
 
-    print("results['theta']: ", results["theta"])
-    # print("results['f']: ", results["f"])
-    # print("results['grad_f']: ", results["grad_f"])
-    print("cov_theta: \n", results["cov_theta"])
-    print(
+    print_msg("results['theta']: ", results["theta"])
+    # print_msg("results['f']: ", results["f"])
+    # print_msg("results['grad_f']: ", results["grad_f"])
+    print_msg("cov_theta: \n", results["cov_theta"])
+    print_msg(
         "mean of the fixed effects: ",
         results["x"][-model.submodels[-1].n_fixed_effects :],
     )
-    print(
+    print_msg(
         "marginal variances of the fixed effects: ",
         results["marginal_variances_latent"][-model.submodels[-1].n_fixed_effects :],
     )
 
-    print(
+    print_msg(
         f"rank: {rank} norm(theta - theta_ref): {np.linalg.norm(results["theta"] - get_host(theta_ref))}",
     )
-    print(
+    print_msg(
         f"rank: {rank} norm(x - x_ref): ",
         np.linalg.norm(results["x"] - get_host(x_ref)),
     )

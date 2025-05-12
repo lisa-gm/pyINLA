@@ -1,9 +1,6 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import inspect
-import os
-import psutil
-from mpi4py import MPI
 
 from pyinla import NDArray, backend_flags, xp
 
@@ -44,8 +41,7 @@ def set_device(comm_rank: int, comm_size: int) -> None:
         available_devices = get_available_devices()
         device_id = comm_rank % len(available_devices)
         cp.cuda.Device(device_id).use()
-        # TOLOG: COMPUTE INFOS
-        print(f"Rank {comm_rank} is using device {device_id}.")
+        # TOLOG: print(f"Rank {comm_rank} is using device {device_id}.")
 
 
 def get_array_module_name(arr: NDArray) -> str:
@@ -112,7 +108,7 @@ def format_size(size_bytes):
 
 
 # query memory usage GPU and free unused memory
-def free_unused_gpu_memory(verbose: bool = False) -> int:
+def free_unused_gpu_memory() -> int:
     """Free unused memory on the GPU."""
     
     if backend_flags["cupy_avail"]:

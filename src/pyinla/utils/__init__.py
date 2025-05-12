@@ -21,6 +21,7 @@ from pyinla.utils.multiprocessing import (
     smartsplit,
     synchronize,
     synchronize_gpu,
+    DummyCommunicator,
 )
 from pyinla.utils.spmatrix_utils import bdiag_tiling, extract_diagonal, memory_footprint
 from pyinla.utils.sparse_diagABAt import compute_diagABAt, sparse_diag_product
@@ -56,4 +57,5 @@ __all__ = [
     "ascii_logo",
     "memory_report",
     "format_size",
+    "DummyCommunicator",
 ]

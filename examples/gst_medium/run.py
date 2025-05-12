@@ -7,6 +7,7 @@ sys.path.append(parent_dir)
 from pyinla.configs import likelihood_config, pyinla_config, submodels_config
 from pyinla.core.model import Model
 from pyinla.core.pyinla import PyINLA
+from pyinla.utils import print_msg
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
 from examples_utils.parser_utils import parse_args
 
@@ -14,7 +15,7 @@ from examples_utils.parser_utils import parse_args
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
-    print("--- Example: Gaussian spatio-temporal model with regression ---")
+    print_msg("--- Example: Gaussian spatio-temporal model with regression ---")
     args = parse_args()
 
     # Configurations of the submodels
@@ -57,7 +58,7 @@ if __name__ == "__main__":
         submodels=[regression, spatio_temporal],
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
-    print(model)
+    print_msg(model)
 
     # Configurations of PyINLA
     pyinla_dict = {
@@ -88,17 +89,17 @@ if __name__ == "__main__":
     exit()
 
 
-    # print("Final theta: ", minimization_result["theta"])
-    # print("Final f:", minimization_result["f"])
-    # print("final grad_f:", minimization_result["grad_f"])
+    # print_msg("Final theta: ", minimization_result["theta"])
+    # print_msg("Final f:", minimization_result["f"])
+    # print_msg("final grad_f:", minimization_result["grad_f"])
     # results = pyinla.run()
-    # print("results['theta']: ", results["theta"])
-    # print("cov_theta: \n", results["cov_theta"])
-    # print(
+    # print_msg("results['theta']: ", results["theta"])
+    # print_msg("cov_theta: \n", results["cov_theta"])
+    # print_msg(
     #     "mean of the fixed effects: ",
     #     results["x"][-model.submodels[-1].n_fixed_effects :],
     # )
-    # print(
+    # print_msg(
     #     "marginal variances of the fixed effects: ",
     #     results["marginal_variances_latent"][-model.submodels[-1].n_fixed_effects :],
     # )

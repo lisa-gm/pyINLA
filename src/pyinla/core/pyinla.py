@@ -3,11 +3,9 @@
 import logging
 from tabulate import tabulate
 
-from mpi4py import MPI
 from scipy import optimize
-from scipy.sparse import eye
 
-from pyinla import ArrayLike, NDArray, backend_flags, comm_rank, comm_size, xp
+from pyinla import ArrayLike, NDArray, backend_flags, comm_rank, comm_size, xp, sp
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, DistSerinvSolver, SerinvSolver, SparseSolver
@@ -27,10 +25,13 @@ from pyinla.utils import (
     boxify,
     memory_report,
     format_size,
+    DummyCommunicator,
 )
 
+if backend_flags["mpi_avail"]:
+    from mpi4py import MPI
+
 if backend_flags["cupy_avail"]:
-    from cupyx.profiler import time_range
     import cupy as cp
 
 import time
@@ -43,7 +44,6 @@ class PyINLA:
     Laplace Approximation (INLA) method.
     """
 
-    @time_range()
     def __init__(
         self,
         model: Model,
@@ -81,25 +81,43 @@ class PyINLA:
         # Create the appropriate communicators
         min_q_parallel = 1
         min_solver_size = self.config.solver.min_processes
-        self.comm_world, self.comm_feval, self.color_feval = smartsplit(
-            comm=MPI.COMM_WORLD,
-            n_parallelizable_evaluations=self.n_f_evaluations,
-            tag="feval",
-            min_group_size=min_solver_size * min_q_parallel,
-        )
-        self.world_size = self.comm_world.Get_size()
 
         if self.model.is_likelihood_gaussian():
             self.n_qeval = 2
         else:
             self.n_qeval = 1
-        self.qeval_world, self.comm_qeval, self.color_qeval = smartsplit(
-            comm=self.comm_feval,
-            n_parallelizable_evaluations=self.n_qeval,
-            tag="qeval",
-            min_group_size=min_solver_size,
-        )
-        free_unused_gpu_memory(verbose=True)
+
+        if backend_flags["mpi_avail"]:
+            self.initial_comm_world = MPI.COMM_WORLD
+
+            self.comm_world, self.comm_feval, self.color_feval = smartsplit(
+                comm=self.initial_comm_world,
+                n_parallelizable_evaluations=self.n_f_evaluations,
+                tag="feval",
+                min_group_size=min_solver_size * min_q_parallel,
+            )
+            self.world_size = self.comm_world.size
+            
+            self.qeval_world, self.comm_qeval, self.color_qeval = smartsplit(
+                comm=self.comm_feval,
+                n_parallelizable_evaluations=self.n_qeval,
+                tag="qeval",
+                min_group_size=min_solver_size,
+            )
+        else:
+            self.initial_comm_world = DummyCommunicator
+
+            self.comm_world = DummyCommunicator()
+            self.comm_feval = DummyCommunicator()
+            self.comm_qeval = DummyCommunicator()
+            self.qeval_world = DummyCommunicator()
+
+            self.color_feval = 0
+            self.color_qeval = 0
+
+            self.world_size = 1
+
+        free_unused_gpu_memory()
 
         # --- Initialize solver
         if self.config.solver.type == "dense":
@@ -124,10 +142,8 @@ class PyINLA:
                     "Serinv solver is not made for non spatio-temporal models."
                 )
 
-            n_processes_solver = self.comm_qeval.Get_size()
-            # print(f"WorldRank {comm_rank}, qeval size: {n_processes_solver}", flush=True)
+            n_processes_solver = self.comm_qeval.size
             if n_processes_solver == 1:
-                # print(f"WorldRank {comm_rank} using sequential solver !!!.", flush=True)
                 self.solver = SerinvSolver(
                     config=self.config.solver,
                     diagonal_blocksize=diagonal_blocksize,
@@ -135,17 +151,22 @@ class PyINLA:
                     n_diag_blocks=n_diag_blocks,
                 )
             else:
-                # print(f"WorldRank {comm_rank} using distributed solver....", flush=True)
+                # Distributed solver checks
+                if not backend_flags["mpi_avail"]:
+                    raise ValueError(
+                        "Distributed solver is requested but MPI is not available."
+                    )
                 if n_diag_blocks < n_processes_solver * 3:
                     raise ValueError(
                         f"Not enough diagonal blocks ({n_diag_blocks}) to use the distributed solver with {n_processes_solver} processes."
                     )
+                
                 self.nccl_comm = None
                 if backend_flags["nccl_avail"]:
                     # --- Initialize NCCL communicator
                     if self.comm_qeval.rank == 0:
                         print(
-                            f"rank {MPI.COMM_WORLD.rank} initializing NCCL communicator.",
+                            f"rank {self.initial_comm_world.rank} initializing NCCL communicator.",
                             flush=True,
                         )
                         nccl_id = cp.cuda.nccl.get_unique_id()
@@ -211,7 +232,7 @@ class PyINLA:
 
         # Parallelization strategies header
         parallel_strategies_values = [
-            ["Participating Processes / Total Processes", f"{self.world_size} / {MPI.COMM_WORLD.size}"], 
+            ["Participating Processes / Total Processes", f"{self.world_size} / {self.initial_comm_world.size}"], 
             ["Parallelization through F()", f"{self.world_size // self.comm_feval.size}"],
             ["Parallelization through Q()", f"{self.comm_feval.size // self.comm_qeval.size}"],
             ["Parallelization through S()", f"{self.comm_qeval.size}"],
@@ -488,7 +509,6 @@ class PyINLA:
 
         return self.minimization_result
 
-    @time_range()
     def _objective_function(
         self,
         theta_i: NDArray,
@@ -547,7 +567,7 @@ class PyINLA:
         allreduce(
             self.f_values_i,
             op="sum",
-            factor=1 / self.comm_feval.Get_size(),
+            factor=1 / self.comm_feval.size,
             comm=self.comm_world,
         )
         synchronize(comm=self.comm_world)
@@ -579,11 +599,10 @@ class PyINLA:
 
         return (f_0, grad_f)
 
-    @time_range()
     def _evaluate_f(
         self,
         theta_i: NDArray,
-        comm: MPI.Comm,
+        comm,
     ) -> float:
         """Evaluate the objective function f(theta) = log(p(theta|y)).
 
@@ -673,7 +692,7 @@ class PyINLA:
                 allreduce(
                     f_theta,
                     op="sum",
-                    factor=1 / self.comm_qeval.Get_size(),
+                    factor=1 / self.comm_qeval.size,
                     comm=self.comm_feval,
                 )
                 synchronize(comm=self.comm_qeval)
@@ -855,13 +874,13 @@ class PyINLA:
             f_ii_loc,
             op="sum",
             comm=self.comm_world,
-            factor=1 / self.comm_feval.Get_size(),
+            factor=1 / self.comm_feval.size,
         )
         allreduce(
             f_ij_loc,
             op="sum",
             comm=self.comm_world,
-            factor=1 / self.comm_feval.Get_size(),
+            factor=1 / self.comm_feval.size,
         )
         synchronize(comm=self.comm_feval)
 
@@ -938,7 +957,7 @@ class PyINLA:
 
         # now only extract diagonal elements corresponding to marginal variances of the latent parameters
         marginal_variances_sp = self.solver._structured_to_spmatrix(
-            eye(self.model.n_latent_parameters, dtype=xp.float64),
+            sp.sparse.eye(self.model.n_latent_parameters, dtype=xp.float64),
             sparsity="bta",
         )
         marginal_variances = extract_diagonal(marginal_variances_sp)
@@ -1054,7 +1073,6 @@ class PyINLA:
 
         return Q_conditional, x_star, eta
 
-    @time_range()
     def _evaluate_prior_latent_parameters(
         self,
         x: NDArray = None,
@@ -1091,7 +1109,6 @@ class PyINLA:
 
         return log_prior_latent_parameters
 
-    @time_range()
     def _evaluate_conditional_latent_parameters(
         self,
         Q_conditional: NDArray,
@@ -1131,7 +1148,7 @@ class PyINLA:
         allreduce(
             tip_accu,
             op="sum",
-            factor=1 / self.comm_qeval.Get_size(),
+            factor=1 / self.comm_qeval.size,
             comm=self.comm_qeval,
         )
         synchronize(comm=self.comm_qeval)

@@ -9,11 +9,12 @@ from pyinla.core.model import Model
 from pyinla.core.pyinla import PyINLA
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
 from examples_utils.parser_utils import parse_args
+from pyinla.utils import print_msg
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
-    print("--- Example: Gaussian spatio-temporal model with regression ---")
+    print_msg("--- Example: Gaussian spatio-temporal model with regression ---")
     args = parse_args()
 
     # Configurations of the submodels
@@ -56,7 +57,7 @@ if __name__ == "__main__":
         submodels=[regression, spatio_temporal],
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
-    print(model)
+    print_msg(model)
 
     # Configurations of PyINLA
     pyinla_dict = {
@@ -78,6 +79,6 @@ if __name__ == "__main__":
 
 
 
-    print("Final theta: ", minimization_result["theta"])
-    print("Final f:", minimization_result["f"])
-    print("final grad_f:", minimization_result["grad_f"])
+    print_msg("Final theta: ", minimization_result["theta"])
+    print_msg("Final f:", minimization_result["f"])
+    print_msg("final grad_f:", minimization_result["grad_f"])
