@@ -1,36 +1,21 @@
+import sys
 import os
-import argparse
+
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(parent_dir)
 
 from pyinla.configs import likelihood_config, pyinla_config, submodels_config
 from pyinla.core.model import Model
 from pyinla.core.pyinla import PyINLA
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
-from examples.examples_utils.parser_utils import parse_args
+from examples_utils.parser_utils import parse_args
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
     print("--- Example: Gaussian spatio-temporal model with regression ---")
-
-    # Check for parsed parameters
-    parser = argparse.ArgumentParser(description="PyINLA example parameters")
-    parser.add_argument(
-        "--max_iter",
-        type=int,
-        default=100,
-        help="Maximum number of iterations in the optimization process.",
-    )
-    parser.add_argument(
-        "--solver_min_p",
-        type=int,
-        default=1,
-        help="Minimum number of processes for the solver. If greater than 1 a distributed solver is used.",
-    )
-    args = parser.parse_args()
-    print("Parsed parameters:")
-    print(f"  max_iter: {args.max_iter}")
-    print(f"  solver_min_p: {args.solver_min_p}")
+    args = parse_args()
 
     # Configurations of the submodels
     # . Spatio-temporal submodel
@@ -100,7 +85,7 @@ if __name__ == "__main__":
     # Run the optimization
     minimization_result = pyinla.minimize()
 
-
+    exit()
 
 
     # print("Final theta: ", minimization_result["theta"])

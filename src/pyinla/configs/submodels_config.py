@@ -12,7 +12,7 @@ from pyinla.configs.priorhyperparameters_config import PriorHyperparametersConfi
 from pyinla.configs.priorhyperparameters_config import (
     parse_config as parse_priorhyperparameters_config,
 )
-from pyinla.utils import scaled_logit, print_msg
+from pyinla.utils import scaled_logit
 
 
 class SubModelConfig(BaseModel, ABC):
@@ -102,7 +102,6 @@ def parse_config(config: dict | str) -> SubModelConfig:
             config = tomllib.load(f)
 
     type = config.get("type")
-    print_msg("type: ", type)
     if type == "spatio_temporal":
         config["ph_s"] = parse_priorhyperparameters_config(config["ph_s"])
         config["ph_t"] = parse_priorhyperparameters_config(config["ph_t"])
@@ -115,8 +114,6 @@ def parse_config(config: dict | str) -> SubModelConfig:
     elif type == "regression":
         return RegressionSubModelConfig(**config)
     elif type == "brainiac":
-        print_msg("in brainiac parse config")
-        print_msg("config: ", config)
         config["ph_h2"] = parse_priorhyperparameters_config(config["ph_h2"])
         config["ph_alpha"] = parse_priorhyperparameters_config(config["ph_alpha"])
         return BrainiacSubModelConfig(**config)

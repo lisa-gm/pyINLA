@@ -67,17 +67,8 @@ class SerinvSolver(Solver):
         self.bta_cache_block_sort_index = None
         self.bt_cache_block_sort_index = None
 
-        # Print the allocated memory for the BTA-array
-        self.total_bytes: int = (
-            self.A_diagonal_blocks.nbytes
-            + self.A_lower_diagonal_blocks.nbytes
-            + self.A_arrow_bottom_blocks.nbytes
-            + self.A_arrow_tip_block.nbytes
-        )
-        print_msg(
-            f"Allocated memory for SerinvSolver: {self.total_bytes / (1024**3):.2f} GB",
-            flush=True,
-        )
+        # Solver Metrics
+        self.total_bytes: int = 0
 
         self.t_cholesky = 0.0
         self.t_solve = 0.0
@@ -561,3 +552,15 @@ class SerinvSolver(Solver):
         B_out = B_out + sp.sparse.tril(B_out, k=-1).T
 
         return B_out
+
+    def get_solver_memory(self) -> int:
+        """Return the memory used by the solver in number of bytes"""
+        bytes_pobtars: int = (
+            self.A_diagonal_blocks.nbytes
+            + self.A_lower_diagonal_blocks.nbytes
+            + self.A_arrow_bottom_blocks.nbytes
+            + self.A_arrow_tip_block.nbytes
+        )
+        self.total_bytes += bytes_pobtars
+
+        return self.total_bytes

@@ -59,3 +59,10 @@ class SparseSolver(Solver):
     def selected_inversion(self, **kwargs):
         # Placeholder for the selected inversion method.
         return super().selected_inversion(**kwargs)
+
+    def get_solver_memory(self) -> int:
+        """Return the memory used by the solver in number of bytes"""
+        if self.L is None:
+            return 0
+
+        return self.L.data.nbytes + self.L.indptr.nbytes + self.L.indices.nbytes

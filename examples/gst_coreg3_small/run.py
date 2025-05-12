@@ -30,12 +30,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
     print("--- Example: Gaussian Coregional (3 variates) spatio-temporal model with regression ---")
-
-    # Check for parsed parameters
     args = parse_args()
-    print("Parsed parameters:")
-    print(f"  max_iter: {args.max_iter}")
-    print(f"  solver_min_p: {args.solver_min_p}")
 
     comm = MPI.COMM_WORLD
 
@@ -52,11 +47,6 @@ if __name__ == "__main__":
         # f"{BASE_DIR}/inputs_nv{nv}_ns{ns}_nt{nt}_nb{nb}/reference_outputs/theta_interpretS_original_pyINLA_perm_{dim_theta}_1.npy"
     )
     theta_ref = np.loadtxt(theta_ref_file)
-    print("theta_ref: ", theta_ref)
-
-    theta_initial = None
-
-    print(f"theta_ref: {theta_ref}")
 
     perturbation = [
         0.18197867,
@@ -84,13 +74,9 @@ if __name__ == "__main__":
     # else:
     #     theta_initial = comm.bcast(theta_initial, root=0)
 
-    print(f"mpi rank: {comm.rank}, theta_initial: {theta_initial}")
-
     # x_ref_file = f"{BASE_DIR}/inputs_nv{nv}_ns{ns}_nt{nt}_nb{nb}/reference_outputs/x_original_{n}_1.dat"
     # x_ref = np.loadtxt(x_ref_file)
     # print(f"Reference x[-5:]: {x_ref[-5:]}")
-
-    fixed_effects_ref = xp.array([3.0, -8.0, -12.0])
 
     # Configurations of the submodels for the first model
     # . Spatio-temporal submodel 1
@@ -281,6 +267,7 @@ if __name__ == "__main__":
     )
     print(coreg_model)
 
+
     pyinla_dict = {
         "solver": {
             "type": "serinv",
@@ -334,7 +321,7 @@ if __name__ == "__main__":
     # )
 
     # print(f"mpi rank: {comm.rank}, theta: {results['theta']}")
-
+    fixed_effects_ref = xp.array([3.0, -8.0, -12.0])
     print_msg("FE ref:  ", fixed_effects_ref)
     print(f"mpi rank: {comm.rank}, x[-nb:]: , {pyinla.model.x[-nb:]}")
 

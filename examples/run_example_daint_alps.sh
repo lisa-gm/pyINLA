@@ -3,9 +3,9 @@
 #SBATCH --output=%x.%j.out
 #SBATCH --error=%x.%j.err
 #SBATCH --account=sm96
-#SBATCH --time=00:29:00
+#SBATCH --time=00:05:00
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=2
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=64
 #SBATCH --gpus-per-task=1
 ####SBATCH --partition=normal
@@ -31,22 +31,24 @@ export MPI_CUDA_AWARE=0
 
 # --- How to Run ---
 # This run script is designed to run on the Daint supercomputer at CSCS.
-# -> It uses SLURM for job scheduling and assumes that the user has a working 
-# installation of pyINLA and its dependencies.
-# -> By default, PyINLA will exploit job parallelism at the parallel function evaluation level.
-# -> When running spatio-temporal examples, the structured sparse solver can be distributed across multiple GPUs,
-#    which is controlled by the --solver_min_p argument. The default value is 1, which means that the solver will
-#    be run on a single GPU. To use multiple GPUs, set --solver_min_p to the number of GPUs needed to fit the  
-#    problem in memory.
+# It uses SLURM for job scheduling and assumes that the user has a working 
+# installation of pyINLA and its dependencies. By default, PyINLA will exploit  
+# job parallelism at the parallel function evaluation level.
+# --- Parameters ---
+# `--solver_min_p` : The minimum number of Processes(/GPUs) to use for the structured 
+#                    solver. The default is 1. The maximum number of processes is
+# `--max_iter` : The maximum number of iterations of the minimization.
 
 # --- Run Spatio-temporal Examples ---
 # srun python /users/vmaillou/repositories/pyINLA/examples/gst_small/run.py --solver_min_p 1
-# srun python /users/vmaillou/repositories/pyINLA/examples/gst_medium/run.py --solver_min_p 1
+srun python /users/vmaillou/repositories/pyINLA/examples/gst_medium/run.py --solver_min_p 1 --max_iter 1
 # srun python /users/vmaillou/repositories/pyINLA/examples/gst_large/run.py --solver_min_p 1
 
-# --- Run Coregional Examples ---
+# --- Run Coregional (Spatial) Examples ---
 # srun python /users/vmaillou/repositories/pyINLA/examples/gs_coreg2_small/run.py
 # srun python /users/vmaillou/repositories/pyINLA/examples/gs_coreg3_small/run.py
+
+# --- Run Coregional (Spatio-temporal) Examples ---
 # srun python /users/vmaillou/repositories/pyINLA/examples/gst_coreg2_small/run.py --solver_min_p 1
-srun python /users/vmaillou/repositories/pyINLA/examples/gst_coreg3_small/run.py --solver_min_p 2
+# srun python /users/vmaillou/repositories/pyINLA/examples/gst_coreg3_small/run.py --solver_min_p 1 --max_iter 1
 

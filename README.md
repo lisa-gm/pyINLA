@@ -38,7 +38,7 @@ conda install -c conda-forge cupy-core
 conda install blas=*=*mkl
 conda install libblas=*=*mkl
 conda install numpy scipy
-conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib numba -y
+conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib tabulate numba -y
 
 cd /path/to/serinv/
 python -m pip install -e .
@@ -63,7 +63,7 @@ conda activate fritz
 conda install blas=*=*mkl
 conda install libblas=*=*mkl
 conda install numpy scipy
-conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib numba -y
+conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib tabulate numba -y
 
 cd /path/to/serinv/
 python -m pip install -e .
@@ -83,7 +83,7 @@ conda activate bare
 conda install blas=*=*mkl
 conda install libblas=*=*mkl
 conda install numpy scipy
-conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib numba -y
+conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib tabulate numba -y
 
 cd /path/to/serinv/
 python -m pip install -e .
@@ -141,7 +141,7 @@ conda install python=3.12
 conda install numpy scipy
 MPICC=$(which mpicc) python -m pip install --no-cache-dir mpi4py
 pip install cupy --no-dependencies --no-cache-dir
-conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib numba -y
+conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib tabulate numba -y
 # Test the NCCL/CuPy installation
 python -c "from cupy.cuda.nccl import *"
 ```

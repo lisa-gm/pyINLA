@@ -136,7 +136,7 @@ class DistSerinvSolver(Solver):
         if (
             backend_flags["array_module"] == "cupy"
             and not backend_flags["mpi_cuda_aware"]
-            and not backend_flags["use_nccl"]
+            and not backend_flags["nccl_avail"]
         ):
             # Allocate pinned_memory communciation array
             self.send_rhs = cpx.zeros_pinned(
@@ -177,26 +177,8 @@ class DistSerinvSolver(Solver):
         self.bta_cache_block_sort_index = None
         self.bt_cache_block_sort_index = None
 
-        # Print the allocated memory for the BTA-array
-        bytes_pobtars: int = (
-            self.buffer.nbytes
-            + self.pobtars["A_diagonal_blocks"].nbytes
-            + self.pobtars["A_lower_diagonal_blocks"].nbytes
-            + self.pobtars["A_lower_arrow_blocks"].nbytes
-            + self.pobtars["A_arrow_tip_block"].nbytes
-            + self.pobtars["B"].nbytes
-        )
-        bytes_local_system: int = (
-            self.A_diagonal_blocks.nbytes
-            + self.A_lower_diagonal_blocks.nbytes
-            + self.A_arrow_bottom_blocks.nbytes
-            + self.A_arrow_tip_block.nbytes
-        )
-        self.total_bytes: int = bytes_pobtars + bytes_local_system
-        print_msg(
-            f"Local allocated memory for DistSerinvSolver: {self.total_bytes / (1024**3):.2f} GB",
-            flush=True,
-        )
+        # Solver Metrics
+        self.total_bytes: int = 0
 
         self.t_cholesky = 0.0
         self.t_solve = 0.0
@@ -790,7 +772,7 @@ class DistSerinvSolver(Solver):
         if (
             backend_flags["array_module"] == "cupy"
             and not backend_flags["mpi_cuda_aware"]
-            and not backend_flags["use_nccl"]
+            and not backend_flags["nccl_avail"]
         ):
             self.dist_rhs[: -self.arrowhead_blocksize].flatten().get(
                 out=self.send_rhs[
@@ -812,7 +794,7 @@ class DistSerinvSolver(Solver):
         if (
             backend_flags["array_module"] == "cupy"
             and not backend_flags["mpi_cuda_aware"]
-            and not backend_flags["use_nccl"]
+            and not backend_flags["nccl_avail"]
         ):
             for i in range(self.comm_size):
                 start_idx = int(xp.cumsum(n_idx)[i])
@@ -850,3 +832,23 @@ class DistSerinvSolver(Solver):
             rhs[-self.arrowhead_blocksize :] = self.dist_rhs[
                 -self.arrowhead_blocksize :
             ].flatten()
+
+    def get_solver_memory(self) -> int:
+        """Return the memory used by the solver in number of bytes"""
+        bytes_pobtars: int = (
+            self.buffer.nbytes
+            + self.pobtars["A_diagonal_blocks"].nbytes
+            + self.pobtars["A_lower_diagonal_blocks"].nbytes
+            + self.pobtars["A_lower_arrow_blocks"].nbytes
+            + self.pobtars["A_arrow_tip_block"].nbytes
+            + self.pobtars["B"].nbytes
+        )
+        bytes_local_system: int = (
+            self.A_diagonal_blocks.nbytes
+            + self.A_lower_diagonal_blocks.nbytes
+            + self.A_arrow_bottom_blocks.nbytes
+            + self.A_arrow_tip_block.nbytes
+        )
+        self.total_bytes += bytes_pobtars + bytes_local_system
+
+        return self.total_bytes

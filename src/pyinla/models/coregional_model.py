@@ -1,8 +1,9 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import re
+from tabulate import tabulate
 
-import cupy as cp
+
 
 import numpy as np
 from scipy.sparse import spmatrix
@@ -16,11 +17,14 @@ from pyinla.prior_hyperparameters import (
     PenalizedComplexityPriorHyperparameters,
 )
 from pyinla.submodels import RegressionSubModel, SpatialSubModel, SpatioTemporalSubModel
-from pyinla.utils import bdiag_tiling, get_host, free_unused_gpu_memory, print_msg
+from pyinla.utils import bdiag_tiling, free_unused_gpu_memory
+from pyinla.utils import add_str_header, align_tables_side_by_side, boxify
 
-if backend_flags["cupy_avail"]:
-    from cupyx.profiler import time_range
-    import cupy as cp
+
+import cupy as cp
+from cupyx.profiler import time_range
+
+
 
 
 class CoregionalModel(Model):
@@ -33,7 +37,6 @@ class CoregionalModel(Model):
         **kwargs,
     ) -> None:
         """Initializes the model."""
-
         self.models: list[Model] = models
 
         # Check the coregionalization type (Spacial or SpatioTemporal)
@@ -55,7 +58,6 @@ class CoregionalModel(Model):
                     self.coregionalization_type = "spatial"
                     self.n_spatial_nodes = model.submodels[0].ns
                 else:
-                    print("model.submodels[0]: ", model.submodels[0])
                     raise ValueError(
                         "Invalid model type. Must be 'spatial' or 'spatio-temporal'."
                     )
@@ -157,9 +159,6 @@ class CoregionalModel(Model):
         self.n_hyperparameters = self.theta.size
         self.theta_keys: NDArray = theta_keys
 
-        print_msg("theta: ", self.theta)
-        print_msg("theta_keys: ", self.theta_keys)
-
         # Initialize the Coregional Prior Hyperparameters
         for ph in coregional_model_config.ph_sigmas:
             if ph.type == "gaussian":
@@ -218,17 +217,12 @@ class CoregionalModel(Model):
 
         self.a: spmatrix = bdiag_tiling([model.a for model in self.models]).tocsc()
     
-        # print_msg("memory used when model.a is assigned.")
-        # free_unused_gpu_memory(verbose=True) 
-        
-        # free memory -> delete model.a for all models
         for model in self.models:
             model.a = None
             model.y = None
             model.x = None
             
-        #print_msg("memory used after model.a is deleted.")
-        free_unused_gpu_memory(verbose=False) 
+        free_unused_gpu_memory() 
         
 
         if self.coregionalization_type == "spatio_temporal":
@@ -283,11 +277,7 @@ class CoregionalModel(Model):
         self.Q_conditional_data_mapping = [0]
         
         self.Q_prior: spmatrix = None # need this otherwise the construct will fail
-        print_msg("Calling construct_Q_prior in the init...")
 
-        self.counter = 0
-        print("self.counter : ", self.counter)
-        
         self.construct_Q_prior()
         
 
@@ -313,8 +303,6 @@ class CoregionalModel(Model):
             ):
                 kwargs_st[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
 
-            # print("in construct Qprior: kwargs_st: ", kwargs_st)
-            #Qu_list.append(submodel_st.construct_Q_prior(**kwargs_st).tocsc())
             Qu_list[i] = submodel_st.construct_Q_prior(**kwargs_st).tocsc()
 
             if len(model.submodels) > 1:
@@ -322,12 +310,10 @@ class CoregionalModel(Model):
                 submodel_r = model.submodels[1]
                 # Get the spatio-temporal submodel idx
                 kwargs_r = {}
-                #Q_r.append(submodel_r.construct_Q_prior(**kwargs_r).tocsc())
                 Q_r[i] = submodel_r.construct_Q_prior(**kwargs_r).tocsc()
 
         sigma_0 = xp.exp(self.theta[self.theta_keys.index("sigma_0")])
         sigma_1 = xp.exp(self.theta[self.theta_keys.index("sigma_1")])
-        # print("sigma_0: ", sigma_0, "sigma_1: ", sigma_1)
 
         lambda_0_1 = self.theta[self.theta_keys.index("lambda_0_1")]
 
@@ -437,13 +423,11 @@ class CoregionalModel(Model):
             if not q23.has_canonical_format:
                 q23.sum_duplicates() 
                             
-            free_unused_gpu_memory(verbose=False) 
+            free_unused_gpu_memory() 
 
             # we only need these indices once in the beginning
             # then they can be none again and we can only collect data array
             if self.data_Qprior_re is None:
-                print_msg("\nBefore concatenate calls... first time...")
-                
                 q11_rows = q11.row
                 q11_columns = q11.col
                 
@@ -515,7 +499,7 @@ class CoregionalModel(Model):
                 ]
             ) 
             
-            free_unused_gpu_memory(verbose=False) 
+            free_unused_gpu_memory() 
 
             # Qprior_st = sp.sparse.bmat(
             #     [[q11, q12, q13], [q21, q22, q23], [q31, q32, q33]]
@@ -549,30 +533,9 @@ class CoregionalModel(Model):
                 self.rows_Qprior_re = None
                 self.columns_Qprior_re = None
                 
-            # print("\nAfter computing Qprior permutation indices...")     
-            free_unused_gpu_memory(verbose=False) 
+            free_unused_gpu_memory() 
       
             self.data_Qprior_re = self.data_Qprior_re[self.permutation_vector_Q_prior]
-            
-            ## check if two matrices are the same
-            # construct the two matrices and then check if they are the same
-            # Qprior_st_perm.tocsc()
-            # Qprior_st_perm.sort_indices()
-            
-            # check1 = self.compare_matrices(self.data_Qprior_re, self.permutation_indices_Q_prior, self.permutation_indptr_Q_prior, Qprior_st_perm.data, Qprior_st_perm.indices, Qprior_st_perm.indptr)
-            # print("\nCheck if the two matrices are the same: ", check1)
-
-            # # compare if they are the same 
-            # tmp1 = sp.sparse.csc_matrix((self.data_Qprior_re, self.Qprior_re_perm.indices, self.Qprior_re_perm.indptr), shape = (self.n_models * n_re, self.n_models * n_re))
-            # tmp1.sort_indices()
-            # check2 = self.compare_matrices(tmp1.data, tmp1.indices, tmp1.indptr, Qprior_st_perm.data, Qprior_st_perm.indices, Qprior_st_perm.indptr)
-            # print("\nCheck if the two matrices are the same: ", check2)
-            
-            # self.counter += 1
-            
-            # if self.counter == 2:
-            #     exit()          
-                        
         else:
             # Qprior_st_perm = Qprior_st
             self.Qprior_re_perm = sp.sparse.coo_matrix(
@@ -589,54 +552,28 @@ class CoregionalModel(Model):
                 Qprior_reg = bdiag_tiling(Q_r).tocsc()
                 self.Q_prior = bdiag_tiling([self.Qprior_re_perm, Qprior_reg]).tocsc()
                 self.nnz_Qprior_re_perm = self.Qprior_re_perm.nnz
-                #print("nnz Qprior: ", self.nnz_Qprior_re_perm)
                 
                 # free all memory not needed anymore
                 self.Qprior_re_perm = None
                 self.permutation_indices_Q_prior = None
                 self.permutation_indptr_Q_prior = None
-
-                # Q_prior_ref = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
-                
-                # # check if the Qprior is the same as the Qprior_ref
-                # self.Q_prior.sort_indices()
-                # Q_prior_ref.sort_indices()
-                
-                # check1 = self.compare_matrices(self.Q_prior.data, self.Q_prior.indices, self.Q_prior.indptr, Q_prior_ref.data, Q_prior_ref.indices, Q_prior_ref.indptr)
-                # if check1 is False:
-                #     # print("\nQprior_ref: ", Q_prior_ref)
-                #     # print("\nQprior: ", self.Q_prior)
-                #     raise ValueError("Check 1: Qprior is not the same as Qprior_ref")
             else:                
-                free_unused_gpu_memory(verbose=False) 
+                free_unused_gpu_memory() 
                
                 self.Q_prior.tocsc()
                 self.Q_prior.sort_indices()
-                #self.Q_prior.data[: self.nnz_Qprior_re_perm] = self.Qprior_re_perm.data
                 self.Q_prior.data[:self.nnz_Qprior_re_perm] = self.data_Qprior_re
-                
-                # Qprior_reg = bdiag_tiling(Q_r).tocsc()
-                # Q_prior_ref = bdiag_tiling([Qprior_st_perm, Qprior_reg]).tocsc()
-                # Q_prior_ref.sort_indices()
-                
-                # check2 = self.compare_matrices(self.Q_prior.data, self.Q_prior.indices, self.Q_prior.indptr, Q_prior_ref.data, Q_prior_ref.indices, Q_prior_ref.indptr)
-                # if check2 is False:
-                #     # print("\nQprior_ref: ", Q_prior_ref)
-                #     # print("\nQprior: ", self.Q_prior)
-                #     raise ValueError("Check 2: Qprior is not the same as Qprior_ref")
-
         else:
             self.Q_prior = self.Qprior_re_perm
-            #self.Q_prior = Qprior_st_perm
                          
-        free_unused_gpu_memory(verbose=False) 
+        free_unused_gpu_memory() 
 
         return self.Q_prior
     
     @time_range()
     def spgemm(self, A, B, rows: int = 5408):
         
-        free_unused_gpu_memory(verbose=False)  
+        free_unused_gpu_memory()  
         
         C = None
         for i in range(0, A.shape[0], rows):
@@ -647,7 +584,7 @@ class CoregionalModel(Model):
             else:
                 C = cp.sparse.vstack([C, C_block], format="csr")
                 
-        free_unused_gpu_memory(verbose=False) 
+        free_unused_gpu_memory() 
 
         return C.tocsc()
     
@@ -661,7 +598,7 @@ class CoregionalModel(Model):
         
         DA = A.multiply(D_diag[:, xp.newaxis]).T.tocsr() 
         
-        mem_used_bytes = free_unused_gpu_memory(verbose=False) 
+        mem_used_bytes = free_unused_gpu_memory() 
  
         # use batched spgemm if mempool is full
         if mem_used_bytes > 80 * 1024**3:
@@ -669,12 +606,11 @@ class CoregionalModel(Model):
         else:
             batch_size = A.shape[0]
 
-        #print("Calling custom spgemm... with rows: ", batch_size)
         ATDA = self.spgemm(DA, A, rows=batch_size)
-        free_unused_gpu_memory(verbose=False) 
+        free_unused_gpu_memory() 
         
         self.Qconditional = Q - ATDA  
-        free_unused_gpu_memory(verbose=False) 
+        free_unused_gpu_memory() 
     
         return self.Qconditional
 
@@ -723,7 +659,7 @@ class CoregionalModel(Model):
             D_diag=d_vec,
         )
         self.Q_conditional = self.Qconditional.tocsc()
-        free_unused_gpu_memory(verbose=False) 
+        free_unused_gpu_memory() 
         
         return self.Q_conditional
 
@@ -770,7 +706,6 @@ class CoregionalModel(Model):
                 y=self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
                 theta=float(self.theta[self.hyperparameters_idx[i + 1] - 1]),
             )
-            # print("theta: ", float(self.theta[self.hyperparameters_idx[i+1]-1]))
 
         return likelihood
 
@@ -780,28 +715,40 @@ class CoregionalModel(Model):
 
         theta_interpret = self.theta
 
-        # print("\nin evaluate_log_prior_hyperparameters")
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-            # print(f"theta_interpret{i}: {theta_interpret[i]}, log prior: ", prior_hyperparameter.evaluate_log_prior(theta_interpret[i]))
             log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
 
         return log_prior
 
     def __str__(self) -> str:
         """String representation of the model."""
-        # Collect general information about the model
-        coregional_model_info = [
-            " --- Coregional Model ---",
-            f"n_hyperparameters: {self.n_hyperparameters}",
-            f"n_latent_parameters: {self.n_latent_parameters}",
-            f"n_observations: {self.n_observations}",
-        ]
+        str_representation = ""
 
-        # Collect each submodel's information
-        model_info = [str(model) for model in self.models]
+        # --- Make the Coregional Model() table ---
+        headers = ["Number of Hyperparameters", "Number of Latent Parameters", "Number of Observations"]
+        values = [self.n_hyperparameters, self.n_latent_parameters, self.n_observations]
 
-        # Combine model information and submodel information
-        return "\n".join(coregional_model_info + model_info)
+        model_table = tabulate([headers, values], tablefmt="fancy_grid", colalign=("center", "center", "center"))
+
+        # Add the header title
+        model_table = add_str_header(f"Coregional Model ({self.n_models} variates)", model_table)
+
+        # --- Add the model information ---
+        # Create headers and values for the model table
+        models_str_representation = []
+        for model in self.models:
+            models_str_representation.append(str(model))
+
+        # Create the model table
+        model_jointed_representation = align_tables_side_by_side(models_str_representation)
+
+        # Add the model header title
+        model_jointed_representation = add_str_header("Models", model_jointed_representation)
+
+        # Combine the model and model tables
+        str_representation = model_table + "\n" + boxify(model_jointed_representation)
+
+        return str_representation
 
     def _generate_permutation_indices_spatial(
         self, n_spatial_nodes: int, n_fixed_effects_per_model: int, n_models: int
@@ -1014,16 +961,11 @@ class CoregionalModel(Model):
         # iterate through the models to load their respective a_predict
         for i, model in enumerate(self.models):
             model.construct_a_predict()
-            print("model.a_predict.shape: ", model.a_predict.shape)
         
         self.a_predict: spmatrix = bdiag_tiling([model.a_predict for model in self.models]).tocsc()
         
-        print("self.a_predict.shape: ", self.a_predict.shape)
-        
-        # reorder a_predict in the same way as a
+        # Reorder a_predict in the same way as a
         self.a_predict = self.a_predict[:, self.permutation_latent_variables]
-        
-        print("self.a_predict.shape: ", self.a_predict.shape)
         
         return self.a_predict
         

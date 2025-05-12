@@ -57,3 +57,8 @@ class Solver(ABC):
     def _structured_to_spmatrix(self, **kwargs) -> None:
         """Convert structured matrix to sparse matrix."""
         ...
+
+    @abstractmethod
+    def get_solver_memory(self) -> int:
+        """Return the memory used by the solver in number of bytes"""
+        ...

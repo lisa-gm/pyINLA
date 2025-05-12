@@ -1,6 +1,7 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import logging
+from tabulate import tabulate
 
 from mpi4py import MPI
 from scipy import optimize
@@ -10,7 +11,7 @@ from pyinla import ArrayLike, NDArray, backend_flags, comm_rank, comm_size, xp
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, DistSerinvSolver, SerinvSolver, SparseSolver
-from pyinla.utils import (  # memory_footprint,
+from pyinla.utils import (
     allreduce,
     extract_diagonal,
     free_unused_gpu_memory,
@@ -21,6 +22,11 @@ from pyinla.utils import (  # memory_footprint,
     smartsplit,
     synchronize,
     synchronize_gpu,
+    ascii_logo,
+    add_str_header,
+    boxify,
+    memory_report,
+    format_size,
 )
 
 if backend_flags["cupy_avail"]:
@@ -93,30 +99,7 @@ class PyINLA:
             tag="qeval",
             min_group_size=min_solver_size,
         )
-
         free_unused_gpu_memory(verbose=True)
-
-        if comm_rank == 0:
-            print(
-                f"""
-            ------------- HPC HEADER --------------------
-            Total number of ranks: {MPI.COMM_WORLD.size}, ({MPI.COMM_WORLD.size - self.world_size} won't participate)
-                Parallelization through F(): {self.world_size // self.comm_feval.size}
-                Parallelization through Q(): {self.comm_feval.size // self.comm_qeval.size}
-                Parallelization through S(): {self.comm_qeval.size}
-            ---------------------------------------------
-                ARRAY_MODULE: {xp.__name__}
-            ---------------------------------------------
-                MPI_AVAIL: {backend_flags["mpi_avail"]}
-                CUDA_AWARE_MPI: {backend_flags["mpi_cuda_aware"]}
-                USE_NCCL: {backend_flags["use_nccl"]}
-            """
-            )
-
-        # print(
-        #     f"Rank: {self.comm_world.rank} | feval color: {self.color_feval} | feval_rank: {self.comm_feval.rank} | feval_size: {self.comm_feval.size} | qeval color: {self.color_qeval} | qeval_rank: {self.comm_qeval.rank} | qeval_size: {self.comm_qeval.size}",
-        #     flush=True,
-        # )
 
         # --- Initialize solver
         if self.config.solver.type == "dense":
@@ -158,7 +141,7 @@ class PyINLA:
                         f"Not enough diagonal blocks ({n_diag_blocks}) to use the distributed solver with {n_processes_solver} processes."
                     )
                 self.nccl_comm = None
-                if backend_flags["use_nccl"]:
+                if backend_flags["nccl_avail"]:
                     # --- Initialize NCCL communicator
                     if self.comm_qeval.rank == 0:
                         print(
@@ -206,15 +189,83 @@ class PyINLA:
         self.solver_time: ArrayLike = []
         self.construction_time: ArrayLike = []
         
-        
         # --- Timers
         self.t_construction_qprior = 0.0
         self.t_construction_qconditional = 0.0
         self.solver.t_cholesky = 0.0
         self.solver.t_solve = 0.0
+        
+        self._print_init()
 
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
+
+    def _print_init(self) -> None:
+        """
+        Print informations about the PyINLA solver.
+        """
+        str_representation = ""
+
+        # PyINLA Header
+        str_representation += ascii_logo()
+
+        # Parallelization strategies header
+        parallel_strategies_values = [
+            ["Participating Processes / Total Processes", f"{self.world_size} / {MPI.COMM_WORLD.size}"], 
+            ["Parallelization through F()", f"{self.world_size // self.comm_feval.size}"],
+            ["Parallelization through Q()", f"{self.comm_feval.size // self.comm_qeval.size}"],
+            ["Parallelization through S()", f"{self.comm_qeval.size}"],
+        ]
+        parallel_strategies_table = tabulate(
+            parallel_strategies_values,
+            tablefmt="fancy_grid",
+            colalign=("left", "center"),
+        )
+        parallel_strategies_table = add_str_header(
+            title="Parallelization strategies",
+            table=parallel_strategies_table,
+        )
+        str_representation += "\n" + boxify(parallel_strategies_table)
+
+        # HPC modules header
+        hpc_modules_values = [
+            ["Array module", xp.__name__], 
+            ["MPI available", backend_flags["mpi_avail"]], 
+            ["Is MPI CUDA aware", backend_flags["mpi_cuda_aware"]], 
+            ["Is NCCL available", backend_flags["nccl_avail"]], 
+        ]
+        hpc_modules_table = tabulate(
+            hpc_modules_values,
+            tablefmt="fancy_grid",
+            colalign=("left", "center"),
+        )
+        hpc_modules_table = add_str_header(
+            title="Enabled Performance modules",
+            table=hpc_modules_table,
+        )
+        str_representation += "\n" + boxify(hpc_modules_table)
+
+        # Memory usage header
+        used_memory, available_memory = memory_report()
+        memory_usage_values = [
+            ["Solver memory", format_size(self.solver.get_solver_memory())], 
+            ["Total memory used", format_size(used_memory)], 
+            ["Total memory available", format_size(available_memory)], 
+        ]
+        memory_usage_table = tabulate(
+            memory_usage_values,
+            tablefmt="fancy_grid",
+            colalign=("left", "center"),
+        )
+        memory_usage_table = add_str_header(
+            title="Memory Report",
+            table=memory_usage_table,
+        )
+        str_representation += "\n" + boxify(memory_usage_table)
+
+        print_msg(str_representation, flush=True)
+        
+
 
     def run(self) -> dict:
         """Run the PyINLA"""

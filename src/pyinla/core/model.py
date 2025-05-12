@@ -3,6 +3,7 @@
 import os
 from abc import ABC
 from pathlib import Path
+from tabulate import tabulate
 
 import numpy as np
 from scipy.sparse import spmatrix
@@ -31,7 +32,7 @@ from pyinla.submodels import (
     SpatialSubModel,
     SpatioTemporalSubModel,
 )
-from pyinla.utils import scaled_logit
+from pyinla.utils import scaled_logit, add_str_header, boxify
 
 
 class Model(ABC):
@@ -44,6 +45,7 @@ class Model(ABC):
         **kwargs,
     ) -> None:
         """Initializes the model."""
+        self.modeltype = kwargs.get("modeltype", "Default Model")
 
         # Check the order of the submodels, we want the SpatioTemporalSubModel first
         # as this will decide the sparsity pattern of the precision matrix.
@@ -428,7 +430,6 @@ class Model(ABC):
 
         if isinstance(self.submodels[0], BrainiacSubModel):
             kwargs = {"h2": float(self.theta[0])}
-            # print("kwargs: ", kwargs)
             gradient_likelihood = self.submodels[0].evaluate_gradient_likelihood(
                 eta=eta, y=self.y, **kwargs
             )
@@ -458,9 +459,7 @@ class Model(ABC):
         if isinstance(self.submodels[0], BrainiacSubModel):
             #
             theta_interpret = self.theta.copy()
-            # print("in evaluate log prior: theta_interpret unscaled: ", theta_interpret)
             theta_interpret[0] = scaled_logit(self.theta[0], direction="backward")
-            # print("theta_interpret scaled: ", theta_interpret)
             # TODO: multivariate prior for a ... need to generalize for now:
             log_prior += self.prior_hyperparameters[0].evaluate_log_prior(
                 theta_interpret[0]
@@ -502,20 +501,41 @@ class Model(ABC):
 
     def __str__(self) -> str:
         """String representation of the model."""
-        # Collect general information about the model
-        model_info = [
-            " --- Model ---",
-            f"n_hyperparameters: {self.n_hyperparameters}",
-            f"n_latent_parameters: {self.n_latent_parameters}",
-            f"n_observations: {self.n_observations}",
-            f"likelihood: {self.likelihood_config.type}",
-        ]
+        str_representation = ""
 
-        # Collect each submodel's information
-        submodel_info = [str(submodel) for submodel in self.submodels]
+        # --- Make the Model() table ---
+        headers = ["Number of Hyperparameters", "Number of Latent Parameters", "Number of Observations", "Type of Likelihood"]
+        values = [self.n_hyperparameters, self.n_latent_parameters, self.n_observations, self.likelihood_config.type.capitalize()]
 
-        # Combine model information and submodel information
-        return "\n".join(model_info + submodel_info)
+        model_table = tabulate([headers, values], tablefmt="fancy_grid", colalign=("center", "center", "center", "center"))
+
+        # Add the header title
+        model_table = add_str_header("Default Model", model_table)
+
+        # --- Add the submodel information ---
+        # Create headers and values for the submodel table
+        submodels_str_representation = []
+        for submodel in self.submodels:
+            submodels_str_representation.append(str(submodel))
+
+        lines_list = [s.splitlines() for s in submodels_str_representation]
+        max_len = max(len(lines) for lines in lines_list)
+
+        # Pad each list of lines to the same length
+        for lines in lines_list:
+            lines += [''] * (max_len - len(lines))
+
+        # Concatenate corresponding lines
+        result_lines = ['  '.join(parts) for parts in zip(*lines_list)]
+        submodel_jointed_representation = '\n'.join(result_lines)
+
+        # Add the submodel header title
+        submodel_jointed_representation = add_str_header("Submodels", submodel_jointed_representation)
+
+        # Combine the model and submodel tables
+        str_representation = model_table + "\n" + submodel_jointed_representation
+
+        return boxify(str_representation)
 
     def get_solver_parameters(self) -> dict:
         """Get the solver parameters."""

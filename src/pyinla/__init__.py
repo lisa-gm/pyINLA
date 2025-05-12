@@ -14,7 +14,7 @@ backend_flags = {
     "cupy_avail": False,
     "mpi_avail": False,
     "mpi_cuda_aware": False,
-    "use_nccl": False,
+    "nccl_avail": False,
 }
 
 # Allows user to specify the array module via an environment variable.
@@ -88,9 +88,9 @@ try:
     if backend_flags["cupy_avail"] and os.environ.get("MPI_CUDA_AWARE", "0") == "1":
         backend_flags["mpi_cuda_aware"] = True
     if backend_flags["cupy_avail"] and os.environ.get("USE_NCCL", "0") == "1":
-        backend_flags["use_nccl"] = True
+        backend_flags["nccl_avail"] = True
     else:
-        backend_flags["use_nccl"] = False
+        backend_flags["nccl_avail"] = False
 
 except (ImportError, ImportWarning, ModuleNotFoundError) as w:
     warn(f"No 'MPI' backend detected. ({e})")

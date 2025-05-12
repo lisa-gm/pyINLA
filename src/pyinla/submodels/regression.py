@@ -1,9 +1,10 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
+from tabulate import tabulate
 
 from pyinla import sp
 from pyinla.configs.submodels_config import RegressionSubModelConfig
 from pyinla.core.submodel import SubModel
-
+from pyinla.utils import add_str_header
 
 class RegressionSubModel(SubModel):
     """Fit a regression model."""
@@ -35,8 +36,24 @@ class RegressionSubModel(SubModel):
 
     def __str__(self) -> str:
         """String representation of the submodel."""
-        return (
-            " --- RegressionSubModel ---\n"
-            f"  n_fixed_effects: {self.n_fixed_effects}\n"
-            f"  fixed_effects_prior_precision: {self.fixed_effects_prior_precision}"
+        str_representation = ""
+
+        # --- Make the Submodel table ---
+        values = [
+            ["Number of Fixed Effects", self.n_fixed_effects], 
+            ["Prior Precision of Fixed Effects", self.fixed_effects_prior_precision], 
+        ]
+        submodel_table = tabulate(
+            values,
+            tablefmt="fancy_grid",
+            colalign=("left", "center"),
         )
+        
+        # Add the header title
+        submodel_table = add_str_header(
+            title=self.submodel_type.replace("_", " ").title(),
+            table=submodel_table,
+        )
+        str_representation += submodel_table
+
+        return str_representation

@@ -1,6 +1,7 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import math
+from tabulate import tabulate
 
 import numpy as np
 from scipy.sparse import csc_matrix, load_npz, spmatrix
@@ -8,7 +9,7 @@ from scipy.sparse import csc_matrix, load_npz, spmatrix
 from pyinla import sp, xp
 from pyinla.configs.submodels_config import SpatioTemporalSubModelConfig
 from pyinla.core.submodel import SubModel
-
+from pyinla.utils import add_str_header
 
 class SpatioTemporalSubModel(SubModel):
     """Fit a spatio-temporal model."""
@@ -119,7 +120,6 @@ class SpatioTemporalSubModel(SubModel):
             sigma_st=kwargs.get("sigma_st", self.sigma_st),
             dim_spatial_domain=2,
         )
-        # print(f"Thetas used in Qprior construction: gamma_s: {gamma_s}, gamma_t: {gamma_t}, gamma_st: {gamma_st}")
 
         exp_gamma_s = xp.exp(gamma_s)
         exp_gamma_t = xp.exp(gamma_t)
@@ -264,9 +264,29 @@ class SpatioTemporalSubModel(SubModel):
 
     def __str__(self) -> str:
         """String representation of the submodel."""
-        return (
-            " --- SpatioTemporalSubModel ---\n"
-            f"  ns: {self.ns}\n"
-            f"  nt: {self.nt}\n"
-            f"  manifold: {self.manifold}"
+        str_representation = ""
+
+        # --- Make the Submodel table ---
+        values = [
+            ["Number of Spatial Nodes", self.ns], 
+            ["Number of Temporal Nodes", self.nt], 
+            ["Manifold", self.manifold.capitalize()], 
+            ["Spatial Range (r_s)", f"{self.config.r_s:.3f}"],
+            ["Temporal Range (r_t)", f"{self.config.r_t:.3f}"],
+            ["Spatio-temporal Variation (sigma_st)", f"{self.sigma_st:.3f}"],
+        ]
+        submodel_table = tabulate(
+            values,
+            tablefmt="fancy_grid",
+            colalign=("left", "center"),
         )
+        
+        # Add the header title
+        submodel_table = add_str_header(
+            title=self.submodel_type.replace("_", " ").title(),
+            table=submodel_table,
+        )
+        str_representation += submodel_table
+
+        return str_representation
+

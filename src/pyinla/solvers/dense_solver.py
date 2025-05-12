@@ -75,3 +75,7 @@ class DenseSolver(Solver):
         B.data = self.A_inv[B.row, B.col]
 
         return B
+
+    def get_solver_memory(self) -> int:
+        """Return the memory used by the solver in number of bytes."""
+        return self.L.nbytes + self.A_inv.nbytes

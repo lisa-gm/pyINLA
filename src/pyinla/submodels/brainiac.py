@@ -1,9 +1,10 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
+from tabulate import tabulate
 
 from pyinla import sp, NDArray
 from pyinla.configs.submodels_config import BrainiacSubModelConfig
 from pyinla.core.submodel import SubModel
-from pyinla.utils import scaled_logit
+from pyinla.utils import scaled_logit, add_str_header
 
 import numpy as np
 from pyinla import sp, xp
@@ -128,17 +129,26 @@ class BrainiacSubModel(SubModel):
 
         return d_matrix
 
-    # def get_theta_likelihood(self) -> NDArray:
-    #     print("in get_theta_likelihood brainiac")
-    #     raise NotImplementedError
-    #     # theta likelihood is 1-h2 (in correct scaling)
-
-    #     return
-
     def __str__(self) -> str:
         """String representation of the submodel."""
-        return (
-            " --- BrainiacSubModel ---\n"
-            f"  z shape: [{self.z.shape[0]}, {self.z.shape[1]}]\n"
-            f"  a shape: [{self.a.shape[0]}, {self.a.shape[1]}]\n"
+        str_representation = ""
+
+        # --- Make the Submodel table ---
+        values = [
+            ["h2", f"{self.config.h2:.3f}"], 
+            ["alpha", f"{self.config.alpha:.3f}"], 
+        ]
+        submodel_table = tabulate(
+            values,
+            tablefmt="fancy_grid",
+            colalign=("left", "center"),
         )
+        
+        # Add the header title
+        submodel_table = add_str_header(
+            title=self.submodel_type.replace("_", " ").title(),
+            table=submodel_table,
+        )
+        str_representation += submodel_table
+        
+        return str_representation
