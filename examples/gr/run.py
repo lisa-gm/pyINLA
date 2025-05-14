@@ -37,7 +37,7 @@ if __name__ == "__main__":
     print_msg("Submodules initialized.")
     pyinla_dict = {
         "solver": {"type": "dense"},
-        "minimize": {"max_iter": 50, "gtol": 1e-3, "c1": 1e-4, "c2": 0.9, "disp": True},
+        "minimize": {"max_iter": 50, "gtol": 1e-3, "disp": True},
         "inner_iteration_max_iter": 50,
         "eps_inner_iteration": 1e-3,
         "eps_gradient_f": 1e-3,
