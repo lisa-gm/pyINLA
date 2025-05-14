@@ -6,7 +6,8 @@ from pyinla.configs import likelihood_config, pyinla_config, submodels_config
 from pyinla.core.model import Model
 from pyinla.core.pyinla import PyINLA
 from pyinla.submodels import RegressionSubModel, SpatioTemporalSubModel
-from pyinla.utils import print_msg
+from pyinla.utils import print_msg, get_host
+from pyinla import xp
 
 path = os.path.dirname(__file__)
 
@@ -57,8 +58,6 @@ if __name__ == "__main__":
         "minimize": {
             "max_iter": 100,
             "gtol": 1e-3,
-            "c1": 1e-4,
-            "c2": 0.9,
             "disp": True,
         },
         "inner_iteration_max_iter": 50,
@@ -73,20 +72,27 @@ if __name__ == "__main__":
 
     minimization_result = pyinla.minimize()
 
-    print_msg("\n--- PyINLA results ---")
-    print_msg("Final theta: ", minimization_result["theta"])
-    print_msg("Final f:", minimization_result["f"])
-    print_msg("final grad_f:", minimization_result["grad_f"])
+    print_msg("\n--- Results ---")
+    print_msg("Theta values:\n", minimization_result["theta"])
+    print_msg(
+        "Mean of the fixed effects:\n",
+        minimization_result["x"][-model.submodels[-1].n_fixed_effects:],
+    )
 
-    print_msg("\n--- References ---")
+    print_msg("\n--- Comparisons ---")
     theta_ref = np.load(f"{base_dir}/reference_outputs/theta_ref.npy")
     x_ref = np.load(f"{base_dir}/reference_outputs/x_ref.npy")
 
-    print_msg("theta_ref: ", theta_ref)
+    # Compare hyperparameters
     print_msg(
-        "Norm between thetas and theta_ref: ",
-        np.linalg.norm(minimization_result["theta"] - theta_ref),
+        "Norm (theta - theta_ref):        ",
+        f"{np.linalg.norm(minimization_result['theta'] - get_host(theta_ref)):.4e}",
     )
+
+    # Compare latent parameters
     print_msg(
-        "Norm between x and x_ref: ", np.linalg.norm(minimization_result["x"] - x_ref)
+        "Norm (x - x_ref):                ",
+        f"{np.linalg.norm(minimization_result['x'] - x_ref):.4e}",
     )
+
+    print_msg("\n--- Finished ---")

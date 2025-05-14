@@ -1,7 +1,5 @@
 import os
 
-import numpy as np
-
 from pyinla.configs import likelihood_config, pyinla_config, submodels_config
 from pyinla.core.model import Model
 from pyinla.core.pyinla import PyINLA
@@ -65,5 +63,7 @@ if __name__ == "__main__":
     # Compare latent parameters
     print_msg(
         "Norm (x - x_ref):                ",
-        f"{np.linalg.norm(minimization_result['x'] - x_ref):.4e}",
+        f"{xp.linalg.norm(minimization_result['x'] - x_ref):.4e}",
     )
+
+    print_msg("\n--- Finished ---")

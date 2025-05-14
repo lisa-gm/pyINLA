@@ -1144,12 +1144,9 @@ class PyINLA:
         if x is None and x_mean is None:
             quadratic_form = 0.0
         # TODO: there is probably a cleaner way to formulate these statements ...
+        # the else fails if x_mean is None
         else:
             # Symmetrizing (averaging the tip of the arrow to tame down numerical innaccuracies)
-            print("model.total_number_fixed_effects(): ")
-            print(self.model.total_number_fixed_effects())
-            print("x_mean: ")
-            print(x_mean)
             tip_accu = x_mean[-self.model.total_number_fixed_effects():].copy()
             synchronize(comm=self.comm_qeval)
             allreduce(
