@@ -32,6 +32,7 @@ if __name__ == "__main__":
         submodels=[regression],
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
+
     print_msg(model)
 
     print_msg("Submodules initialized.")
@@ -48,74 +49,51 @@ if __name__ == "__main__":
         config=pyinla_config.parse_config(pyinla_dict),
     )
 
-    # minimization_result = pyinla.minimize()
-
-    # print_msg("\n--- PyINLA results ---")
-    # print_msg("Final theta: ", minimization_result["theta"])
-    # print_msg("Final f:", minimization_result["f"])
-    # print_msg("final grad_f:", minimization_result["grad_f"])
-
-    # print_msg("\n--- References ---")
-    theta_ref = np.load(f"{base_dir}/reference_outputs/theta_ref.npy")
-    x_ref = np.load(f"{base_dir}/reference_outputs/x_ref.npy")
+    theta_ref = xp.load(f"{base_dir}/reference_outputs/theta_ref.npy")
+    x_ref = xp.load(f"{base_dir}/reference_outputs/x_ref.npy")
 
     theta_ref = xp.array(theta_ref)
     x_ref = xp.array(x_ref)
-    # print_msg("theta_ref: ", theta_ref)
-    # print_msg(
-    #     "Norm between thetas and theta_ref: ",
-    #     np.linalg.norm(minimization_result["theta"] - theta_ref),
-    # )
-    # print_msg(
-    #     "Norm between x and x_ref: ", np.linalg.norm(minimization_result["x"] - x_ref)
-    # )
 
-    # test hessian
-    hess = pyinla._evaluate_hessian_f(theta_ref)
-    print_msg("hessian: \n", hess)
-
-    cov = pyinla.compute_covariance_hp(theta_ref)
-    print_msg("covariance: \n", cov)
-
-    # theta_ref = theta_ref + 1
-    # compute marginal covariances latent parameters
-    var_latent_params = pyinla.get_marginal_variances_latent_parameters(
-        theta=theta_ref, x_star=x_ref
-    )
-
-    Q = model.construct_Q_conditional(theta_ref)
-    Qinv = xp.linalg.inv(Q.todense())
-    # print_msg("Qinv : \n", Qinv)
-
-    print_msg("marginal variances latent parameters: ", var_latent_params)
-    print_msg("ref: marginal variances latent param: ", np.diag(Qinv))
-
-    var_obs = pyinla.get_marginal_variances_observations(theta=theta_ref, x_star=x_ref)
-    print_msg("marginal variances observations: ", var_obs[:10])
-    var_obs_ref = extract_diagonal(model.a @ Qinv @ model.a.T)
-    print_msg("shape var_obs_ref: ", var_obs_ref.shape)
-    print_msg("ref: marginal variances observations: ", var_obs_ref[:10])
-    print_msg("norm(var_obs - var_obs_ref): ", np.linalg.norm(var_obs - var_obs_ref))
-
-    # call everything
     results = pyinla.run()
-
-    print_msg("results['theta']: ", results["theta"])
-    # print_msg("results['f']: ", results["f"])
-    # print_msg("results['grad_f']: ", results["grad_f"])
-    print_msg("cov_theta: ", results["cov_theta"])
+    
+    print_msg("\n--- Results ---")
+    print_msg("Theta values:\n", results["theta"])
+    print_msg("Covariance of theta:\n", results["cov_theta"])
     print_msg(
-        "mean of the fixed effects: ",
-        results["x"][-model.submodels[-1].n_fixed_effects :],
-    )
-    print_msg(
-        "marginal variances of the fixed effects: ",
-        results["marginal_variances_latent"][-model.submodels[-1].n_fixed_effects :],
+        "Mean of the fixed effects:\n",
+        results["x"][-model.submodels[-1].n_fixed_effects:],
     )
 
+    print_msg("\n--- Comparisons ---")
+
+    # Compare hyperparameters
     print_msg(
-        "norm(theta - theta_ref): ",
-        np.linalg.norm(results["theta"] - get_host(theta_ref)),
+        "Norm (theta - theta_ref):        ",
+        f"{np.linalg.norm(results['theta'] - get_host(theta_ref)):.4e}",
     )
-    print_msg("norm(x - x_ref): ", np.linalg.norm(results["x"] - get_host(x_ref)))
-    print_msg("Finished.")
+
+    # Compare latent parameters
+    print_msg(
+        "Norm (x - x_ref):                ",
+        f"{np.linalg.norm(results['x'] - get_host(x_ref)):.4e}",
+    )
+
+    # Compare marginal variances of latent parameters
+    var_latent_params = results["marginal_variances_latent"]
+    Qconditional = pyinla.model.construct_Q_conditional(eta=model.a @ model.x)
+    Qinv_ref = xp.linalg.inv(Qconditional.toarray())
+    print_msg(
+        "Norm (marg var latent - ref):    ",
+        f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
+    )
+
+    # Compare marginal variances of observations
+    var_obs = pyinla.get_marginal_variances_observations(theta=theta_ref, x_star=x_ref)
+    var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
+    print_msg(
+        "Norm (var_obs - var_obs_ref):    ",
+        f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
+    )
+
+    print_msg("\n--- Finished ---")

@@ -7,6 +7,7 @@ from pyinla.core.model import Model
 from pyinla.core.pyinla import PyINLA
 from pyinla.submodels import RegressionSubModel
 from pyinla.utils import print_msg
+from pyinla import xp
 
 path = os.path.dirname(__file__)
 
@@ -38,7 +39,7 @@ if __name__ == "__main__":
 
     pyinla_dict = {
         "solver": {"type": "dense"},
-        "minimize": {"max_iter": 50, "gtol": 1e-1, "c1": 1e-4, "c2": 0.9, "disp": True},
+        "minimize": {"max_iter": 50, "gtol": 1e-1, "disp": True},
         "inner_iteration_max_iter": 50,
         "eps_inner_iteration": 1e-3,
         "eps_gradient_f": 1e-3,
@@ -51,13 +52,18 @@ if __name__ == "__main__":
 
     minimization_result = pyinla.minimize()
 
-    print_msg("\n--- PyINLA results ---")
-    print_msg("Final theta: ", minimization_result["theta"])
-    print_msg("Final x: ", minimization_result["x"])
-
-    print_msg("\n--- References ---")
-    x_ref = np.load(f"{base_dir}/reference_outputs/x_ref.npy")
-    print_msg("x_ref: ", x_ref)
+    print_msg("\n--- Results ---")
+    print_msg("Theta values:\n", minimization_result["theta"])
     print_msg(
-        "Norm between x and x_ref: ", np.linalg.norm(minimization_result["x"] - x_ref)
+        "Mean of the fixed effects:\n",
+        minimization_result["x"][-model.submodels[-1].n_fixed_effects:],
+    )
+
+    print_msg("\n--- Comparisons ---")
+    x_ref = xp.load(f"{base_dir}/reference_outputs/x_ref.npy")
+
+    # Compare latent parameters
+    print_msg(
+        "Norm (x - x_ref):                ",
+        f"{np.linalg.norm(minimization_result['x'] - x_ref):.4e}",
     )
