@@ -337,7 +337,7 @@ class PyINLA:
         )
 
         toc = time.time()
-        print("Elapsed time for f(theta): ", toc - tic)
+        #print("Elapsed time for f(theta): ", toc - tic)
 
         return f_theta
 
