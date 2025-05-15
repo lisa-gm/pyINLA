@@ -14,7 +14,7 @@ backend_flags = {
     "cupy_avail": False,
     "mpi_avail": False,
     "mpi_cuda_aware": False,
-    "use_nccl": False,
+    "nccl_avail": False,
 }
 
 # Allows user to specify the array module via an environment variable.
@@ -72,7 +72,7 @@ try:
 
     comm = MPI.COMM_WORLD
     comm_rank = comm.Get_rank()
-    comm_size = comm.Get_size()
+    comm_size = comm.size
 
     # Create a small GPU array
     array = np.array([comm_rank], dtype=np.float32)
@@ -88,11 +88,11 @@ try:
     if backend_flags["cupy_avail"] and os.environ.get("MPI_CUDA_AWARE", "0") == "1":
         backend_flags["mpi_cuda_aware"] = True
     if backend_flags["cupy_avail"] and os.environ.get("USE_NCCL", "0") == "1":
-        backend_flags["use_nccl"] = True
+        backend_flags["nccl_avail"] = True
     else:
-        backend_flags["use_nccl"] = False
+        backend_flags["nccl_avail"] = False
 
-except (ImportError, ImportWarning, ModuleNotFoundError) as w:
+except (ImportError, ImportWarning, ModuleNotFoundError) as e:
     warn(f"No 'MPI' backend detected. ({e})")
 
     comm_rank = 0

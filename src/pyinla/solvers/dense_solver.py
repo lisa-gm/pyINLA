@@ -1,8 +1,5 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
-import numpy as np
-from scipy.sparse import random
-
 from pyinla import NDArray, sp, xp
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
@@ -75,3 +72,7 @@ class DenseSolver(Solver):
         B.data = self.A_inv[B.row, B.col]
 
         return B
+
+    def get_solver_memory(self) -> int:
+        """Return the memory used by the solver in number of bytes."""
+        return self.L.nbytes + self.A_inv.nbytes

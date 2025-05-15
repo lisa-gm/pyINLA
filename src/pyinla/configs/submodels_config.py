@@ -12,7 +12,7 @@ from pyinla.configs.priorhyperparameters_config import PriorHyperparametersConfi
 from pyinla.configs.priorhyperparameters_config import (
     parse_config as parse_priorhyperparameters_config,
 )
-from pyinla.utils import scaled_logit, print_msg
+from pyinla.utils import scaled_logit
 
 
 class SubModelConfig(BaseModel, ABC):
@@ -75,56 +75,6 @@ class SpatialSubModelConfig(SubModelConfig):
 class TemporalSubModelConfig(SubModelConfig): ...
 
 
-""" class CoregionalizationSubModelConfig(SubModelConfig):
-
-    submodel_type: Literal["spatial", "spatio-temporal"] = None
-    num_vars: PositiveInt = 2
-
-    if num_vars != 2 or num_vars != 3:
-        raise ValueError("Invalid number of variables. Must be 1,2 or 3.")
-
-    submodel_config_list = []
-    if submodel_type == "spatial":
-        for i in range(num_vars):
-            submodel_config_list.append(SpatialSubModelConfig)
-
-    elif submodel_type == "spatio-temporal":
-        for i in range(num_vars):
-            submodel_config_list.append(SpatioTemporalSubModelConfig)
-
-    # import quantities from submodels
-
-    # scaling parameter
-    sigma_z1: float = None
-    sigma_z2: float = None
-    lambda1: float = None
-
-    ph_sigma_z1: PriorHyperparametersConfig = None
-    ph_sigma_z2: PriorHyperparametersConfig = None
-    ph_lambda1: PriorHyperparametersConfig = None
-
-    if num_vars == 3:
-        sigma_z3: float = None
-        lambda2: float = None
-        lambda3: float = None
-
-        ph_sigma_z3: PriorHyperparametersConfig = None
-        ph_lambda2: PriorHyperparametersConfig = None
-        ph_lambda3: PriorHyperparametersConfig = None
-
-    def read_hyperparameters(self):
-
-        for i in range(self.num_vars):
-
-            theta_1, theta_keys_1 = self.submodel_config_1.read_hyperparameters()
-            theta_2, theta_keys_2 = self.submodel_config_2.read_hyperparameters()
-
-        theta = xp.concatenate([theta_1, theta_2])
-        theta_keys = theta_keys_1 + theta_keys_2
-
-        return theta, theta_keys """
-
-
 class BrainiacSubModelConfig(SubModelConfig):
     # --- Hyperparameters ---
     h2: float = None
@@ -152,7 +102,6 @@ def parse_config(config: dict | str) -> SubModelConfig:
             config = tomllib.load(f)
 
     type = config.get("type")
-    print_msg("type: ", type)
     if type == "spatio_temporal":
         config["ph_s"] = parse_priorhyperparameters_config(config["ph_s"])
         config["ph_t"] = parse_priorhyperparameters_config(config["ph_t"])
@@ -165,8 +114,6 @@ def parse_config(config: dict | str) -> SubModelConfig:
     elif type == "regression":
         return RegressionSubModelConfig(**config)
     elif type == "brainiac":
-        print_msg("in brainiac parse config")
-        print_msg("config: ", config)
         config["ph_h2"] = parse_priorhyperparameters_config(config["ph_h2"])
         config["ph_alpha"] = parse_priorhyperparameters_config(config["ph_alpha"])
         return BrainiacSubModelConfig(**config)

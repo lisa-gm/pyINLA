@@ -3,26 +3,22 @@
 from warnings import warn
 import time
 
-from pyinla import NDArray, backend_flags, comm_rank, sp, xp, xp_host
+from pyinla import NDArray, sp, xp, xp_host
 from pyinla.configs.pyinla_config import SolverConfig
 from pyinla.core.solver import Solver
 from pyinla.kernels.blockmapping import compute_block_slice, compute_block_sort_index
-from pyinla.utils import free_unused_gpu_memory, print_msg, synchronize_gpu
+from pyinla.utils import print_msg, synchronize_gpu
 
 try:
     from serinv.algs import pobtaf, pobtas, pobtasi, pobtf, pobts, pobtsi
 except ImportError as e:
     warn(f"The serinv package is required to use the SerinvSolver: {e}")
 
-if backend_flags["cupy_avail"]:
-    import cupy as cp
-    from cupyx.profiler import time_range
 
 
 class SerinvSolver(Solver):
     """Serinv Solver class."""
 
-    @time_range()
     def __init__(
         self,
         config: SolverConfig,
@@ -67,22 +63,12 @@ class SerinvSolver(Solver):
         self.bta_cache_block_sort_index = None
         self.bt_cache_block_sort_index = None
 
-        # Print the allocated memory for the BTA-array
-        self.total_bytes: int = (
-            self.A_diagonal_blocks.nbytes
-            + self.A_lower_diagonal_blocks.nbytes
-            + self.A_arrow_bottom_blocks.nbytes
-            + self.A_arrow_tip_block.nbytes
-        )
-        print_msg(
-            f"Allocated memory for SerinvSolver: {self.total_bytes / (1024**3):.2f} GB",
-            flush=True,
-        )
+        # Solver Metrics
+        self.total_bytes: int = 0
 
         self.t_cholesky = 0.0
         self.t_solve = 0.0
 
-    @time_range()
     def cholesky(
         self,
         A: sp.sparse.spmatrix,
@@ -94,7 +80,6 @@ class SerinvSolver(Solver):
         tic = time.perf_counter()
         synchronize_gpu()
         if sparsity == "bta":
-            with time_range("pobtaf"):
                 pobtaf(
                     self.A_diagonal_blocks,
                     self.A_lower_diagonal_blocks,
@@ -102,7 +87,6 @@ class SerinvSolver(Solver):
                     self.A_arrow_tip_block,
                 )
         elif sparsity == "bt":
-            with time_range("pobtf"):
                 pobtf(
                     self.A_diagonal_blocks,
                     self.A_lower_diagonal_blocks,
@@ -115,7 +99,6 @@ class SerinvSolver(Solver):
         toc = time.perf_counter()
         self.t_cholesky += toc - tic
 
-    @time_range()
     def solve(
         self,
         rhs: NDArray,
@@ -126,7 +109,6 @@ class SerinvSolver(Solver):
         tic = time.perf_counter()
         synchronize_gpu()
         if sparsity == "bta":
-            with time_range("pobtas"):
                 pobtas(
                     self.A_diagonal_blocks,
                     self.A_lower_diagonal_blocks,
@@ -144,7 +126,6 @@ class SerinvSolver(Solver):
                     trans="C",
                 )
         elif sparsity == "bt":
-            with time_range("pobts"):
                 pobts(
                     self.A_diagonal_blocks,
                     self.A_lower_diagonal_blocks,
@@ -167,7 +148,6 @@ class SerinvSolver(Solver):
 
         return rhs
 
-    @time_range()
     def logdet(
         self,
         sparsity: str,
@@ -185,7 +165,6 @@ class SerinvSolver(Solver):
 
         return 2 * logdet
 
-    @time_range()
     def selected_inversion(
         self,
         sparsity: str,
@@ -210,7 +189,6 @@ class SerinvSolver(Solver):
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
 
-    @time_range()
     def _spmatrix_to_structured(
         self,
         A: sp.sparse.spmatrix,
@@ -271,7 +249,6 @@ class SerinvSolver(Solver):
                     block_slice.row, block_slice.col
                 ] = block_slice.data
 
-    @time_range()
     def _spmatrix_to_bta(
         self,
         A: sp.sparse.spmatrix,
@@ -412,7 +389,6 @@ class SerinvSolver(Solver):
             self.bta_arrow_tip_cols,
         ] = data[self.bta_arrow_tip_slice]
 
-    @time_range()
     def _spmatrix_to_bt(
         self,
         A: sp.sparse.spmatrix,
@@ -491,7 +467,6 @@ class SerinvSolver(Solver):
                     self.bt_lower_cols[i],
                 ] = data[self.bt_lower_slice[i]]
 
-    @time_range()
     def _structured_to_spmatrix(
         self,
         A: sp.sparse.spmatrix,
@@ -561,3 +536,15 @@ class SerinvSolver(Solver):
         B_out = B_out + sp.sparse.tril(B_out, k=-1).T
 
         return B_out
+
+    def get_solver_memory(self) -> int:
+        """Return the memory used by the solver in number of bytes"""
+        bytes_pobtars: int = (
+            self.A_diagonal_blocks.nbytes
+            + self.A_lower_diagonal_blocks.nbytes
+            + self.A_arrow_bottom_blocks.nbytes
+            + self.A_arrow_tip_block.nbytes
+        )
+        self.total_bytes += bytes_pobtars
+
+        return self.total_bytes

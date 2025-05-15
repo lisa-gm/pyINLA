@@ -1,7 +1,6 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import inspect
-from mpi4py import MPI
 
 from pyinla import NDArray, backend_flags, xp
 
@@ -42,8 +41,7 @@ def set_device(comm_rank: int, comm_size: int) -> None:
         available_devices = get_available_devices()
         device_id = comm_rank % len(available_devices)
         cp.cuda.Device(device_id).use()
-        # TOLOG: COMPUTE INFOS
-        print(f"Rank {comm_rank} is using device {device_id}.")
+        # TOLOG: print(f"Rank {comm_rank} is using device {device_id}.")
 
 
 def get_array_module_name(arr: NDArray) -> str:
@@ -110,23 +108,11 @@ def format_size(size_bytes):
 
 
 # query memory usage GPU and free unused memory
-def free_unused_gpu_memory(verbose: bool = False) -> int:
+def free_unused_gpu_memory() -> int:
     """Free unused memory on the GPU."""
-
     
     if backend_flags["cupy_avail"]:
         mempool = cp.get_default_memory_pool()
-
-        if verbose:
-            if backend_flags["mpi_avail"]:
-                comm = MPI.COMM_WORLD
-                rank = comm.Get_rank()
-                if rank == 0:
-                    print("memory used    : ", format_size(mempool.used_bytes()))
-                    print("mem total bytes: ", format_size(mempool.total_bytes()))
-            else:
-                print("memory used    : ", format_size(mempool.used_bytes()))
-                print("mem total bytes: ", format_size(mempool.total_bytes()))
             
         mempool.free_all_blocks()    
 
@@ -136,7 +122,22 @@ def free_unused_gpu_memory(verbose: bool = False) -> int:
         # return dummy value for numpy
         return 1
 
+def memory_report() -> int:
+    """Free unused memory on the GPU."""
+    used_memory = 0
+    total_memory = 0
 
+    if backend_flags["cupy_avail"] and backend_flags["array_module"] == "cupy":
+        # Get GPU memory usage
+        mempool = cp.get_default_memory_pool()
+        used_memory = mempool.used_bytes()
+        total_memory = mempool.total_bytes()
+    else:
+        # TODO: Implement on the host
+        used_memory = -1
+        total_memory = -1
+
+    return used_memory, total_memory
 
 
 

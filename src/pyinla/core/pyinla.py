@@ -1,16 +1,15 @@
 # Copyright 2024-2025 pyINLA authors. All rights reserved.
 
 import logging
+from tabulate import tabulate
 
-from mpi4py import MPI
 from scipy import optimize
-from scipy.sparse import eye
 
-from pyinla import ArrayLike, NDArray, backend_flags, comm_rank, comm_size, xp
+from pyinla import ArrayLike, NDArray, backend_flags, comm_rank, comm_size, xp, sp
 from pyinla.configs.pyinla_config import PyinlaConfig
 from pyinla.core.model import Model
 from pyinla.solvers import DenseSolver, DistSerinvSolver, SerinvSolver, SparseSolver
-from pyinla.utils import (  # memory_footprint,
+from pyinla.utils import (
     allreduce,
     extract_diagonal,
     free_unused_gpu_memory,
@@ -21,10 +20,18 @@ from pyinla.utils import (  # memory_footprint,
     smartsplit,
     synchronize,
     synchronize_gpu,
+    ascii_logo,
+    add_str_header,
+    boxify,
+    memory_report,
+    format_size,
+    DummyCommunicator,
 )
 
+if backend_flags["mpi_avail"]:
+    from mpi4py import MPI
+
 if backend_flags["cupy_avail"]:
-    from cupyx.profiler import time_range
     import cupy as cp
 
 import time
@@ -37,7 +44,6 @@ class PyINLA:
     Laplace Approximation (INLA) method.
     """
 
-    @time_range()
     def __init__(
         self,
         model: Model,
@@ -75,48 +81,43 @@ class PyINLA:
         # Create the appropriate communicators
         min_q_parallel = 1
         min_solver_size = self.config.solver.min_processes
-        self.comm_world, self.comm_feval, self.color_feval = smartsplit(
-            comm=MPI.COMM_WORLD,
-            n_parallelizable_evaluations=self.n_f_evaluations,
-            tag="feval",
-            min_group_size=min_solver_size * min_q_parallel,
-        )
-        self.world_size = self.comm_world.Get_size()
 
         if self.model.is_likelihood_gaussian():
             self.n_qeval = 2
         else:
             self.n_qeval = 1
-        self.qeval_world, self.comm_qeval, self.color_qeval = smartsplit(
-            comm=self.comm_feval,
-            n_parallelizable_evaluations=self.n_qeval,
-            tag="qeval",
-            min_group_size=min_solver_size,
-        )
 
-        free_unused_gpu_memory(verbose=True)
+        if backend_flags["mpi_avail"]:
+            self.initial_comm_world = MPI.COMM_WORLD
 
-        if comm_rank == 0:
-            print(
-                f"""
-            ------------- HPC HEADER --------------------
-            Total number of ranks: {MPI.COMM_WORLD.size}, ({MPI.COMM_WORLD.size - self.world_size} won't participate)
-                Parallelization through F(): {self.world_size // self.comm_feval.size}
-                Parallelization through Q(): {self.comm_feval.size // self.comm_qeval.size}
-                Parallelization through S(): {self.comm_qeval.size}
-            ---------------------------------------------
-                ARRAY_MODULE: {xp.__name__}
-            ---------------------------------------------
-                MPI_AVAIL: {backend_flags["mpi_avail"]}
-                CUDA_AWARE_MPI: {backend_flags["mpi_cuda_aware"]}
-                USE_NCCL: {backend_flags["use_nccl"]}
-            """
+            self.comm_world, self.comm_feval, self.color_feval = smartsplit(
+                comm=self.initial_comm_world,
+                n_parallelizable_evaluations=self.n_f_evaluations,
+                tag="feval",
+                min_group_size=min_solver_size * min_q_parallel,
             )
+            self.world_size = self.comm_world.size
+            
+            self.qeval_world, self.comm_qeval, self.color_qeval = smartsplit(
+                comm=self.comm_feval,
+                n_parallelizable_evaluations=self.n_qeval,
+                tag="qeval",
+                min_group_size=min_solver_size,
+            )
+        else:
+            self.initial_comm_world = DummyCommunicator
 
-        # print(
-        #     f"Rank: {self.comm_world.rank} | feval color: {self.color_feval} | feval_rank: {self.comm_feval.rank} | feval_size: {self.comm_feval.size} | qeval color: {self.color_qeval} | qeval_rank: {self.comm_qeval.rank} | qeval_size: {self.comm_qeval.size}",
-        #     flush=True,
-        # )
+            self.comm_world = DummyCommunicator()
+            self.comm_feval = DummyCommunicator()
+            self.comm_qeval = DummyCommunicator()
+            self.qeval_world = DummyCommunicator()
+
+            self.color_feval = 0
+            self.color_qeval = 0
+
+            self.world_size = 1
+
+        free_unused_gpu_memory()
 
         # --- Initialize solver
         if self.config.solver.type == "dense":
@@ -141,10 +142,8 @@ class PyINLA:
                     "Serinv solver is not made for non spatio-temporal models."
                 )
 
-            n_processes_solver = self.comm_qeval.Get_size()
-            # print(f"WorldRank {comm_rank}, qeval size: {n_processes_solver}", flush=True)
+            n_processes_solver = self.comm_qeval.size
             if n_processes_solver == 1:
-                # print(f"WorldRank {comm_rank} using sequential solver !!!.", flush=True)
                 self.solver = SerinvSolver(
                     config=self.config.solver,
                     diagonal_blocksize=diagonal_blocksize,
@@ -152,17 +151,22 @@ class PyINLA:
                     n_diag_blocks=n_diag_blocks,
                 )
             else:
-                # print(f"WorldRank {comm_rank} using distributed solver....", flush=True)
+                # Distributed solver checks
+                if not backend_flags["mpi_avail"]:
+                    raise ValueError(
+                        "Distributed solver is requested but MPI is not available."
+                    )
                 if n_diag_blocks < n_processes_solver * 3:
                     raise ValueError(
                         f"Not enough diagonal blocks ({n_diag_blocks}) to use the distributed solver with {n_processes_solver} processes."
                     )
+                
                 self.nccl_comm = None
-                if backend_flags["use_nccl"]:
+                if backend_flags["nccl_avail"]:
                     # --- Initialize NCCL communicator
                     if self.comm_qeval.rank == 0:
                         print(
-                            f"rank {MPI.COMM_WORLD.rank} initializing NCCL communicator.",
+                            f"rank {self.initial_comm_world.rank} initializing NCCL communicator.",
                             flush=True,
                         )
                         nccl_id = cp.cuda.nccl.get_unique_id()
@@ -205,9 +209,84 @@ class PyINLA:
         self.objective_function_time: ArrayLike = []
         self.solver_time: ArrayLike = []
         self.construction_time: ArrayLike = []
+        
+        # --- Timers
+        self.t_construction_qprior = 0.0
+        self.t_construction_qconditional = 0.0
+        self.solver.t_cholesky = 0.0
+        self.solver.t_solve = 0.0
+        
+        self._print_init()
 
         logging.info("PyINLA initialized.")
         print_msg("PyINLA initialized.", flush=True)
+
+    def _print_init(self) -> None:
+        """
+        Print informations about the PyINLA solver.
+        """
+        str_representation = ""
+
+        # PyINLA Header
+        str_representation += ascii_logo()
+
+        # Parallelization strategies header
+        parallel_strategies_values = [
+            ["Participating Processes / Total Processes", f"{self.world_size} / {self.initial_comm_world.size}"], 
+            ["Parallelization through F()", f"{self.world_size // self.comm_feval.size}"],
+            ["Parallelization through Q()", f"{self.comm_feval.size // self.comm_qeval.size}"],
+            ["Parallelization through S()", f"{self.comm_qeval.size}"],
+        ]
+        parallel_strategies_table = tabulate(
+            parallel_strategies_values,
+            tablefmt="fancy_grid",
+            colalign=("left", "center"),
+        )
+        parallel_strategies_table = add_str_header(
+            title="Parallelization strategies",
+            table=parallel_strategies_table,
+        )
+        str_representation += "\n" + boxify(parallel_strategies_table)
+
+        # HPC modules header
+        hpc_modules_values = [
+            ["Array module", xp.__name__], 
+            ["MPI available", backend_flags["mpi_avail"]], 
+            ["Is MPI CUDA aware", backend_flags["mpi_cuda_aware"]], 
+            ["Is NCCL available", backend_flags["nccl_avail"]], 
+        ]
+        hpc_modules_table = tabulate(
+            hpc_modules_values,
+            tablefmt="fancy_grid",
+            colalign=("left", "center"),
+        )
+        hpc_modules_table = add_str_header(
+            title="Enabled Performance modules",
+            table=hpc_modules_table,
+        )
+        str_representation += "\n" + boxify(hpc_modules_table)
+
+        # Memory usage header
+        used_memory, available_memory = memory_report()
+        memory_usage_values = [
+            ["Solver memory", format_size(self.solver.get_solver_memory())], 
+            ["Total memory used", format_size(used_memory)], 
+            ["Total memory available", format_size(available_memory)], 
+        ]
+        memory_usage_table = tabulate(
+            memory_usage_values,
+            tablefmt="fancy_grid",
+            colalign=("left", "center"),
+        )
+        memory_usage_table = add_str_header(
+            title="Memory Report",
+            table=memory_usage_table,
+        )
+        str_representation += "\n" + boxify(memory_usage_table)
+
+        print_msg(str_representation, flush=True)
+        
+
 
     def run(self) -> dict:
         """Run the PyINLA"""
@@ -430,7 +509,6 @@ class PyINLA:
 
         return self.minimization_result
 
-    @time_range()
     def _objective_function(
         self,
         theta_i: NDArray,
@@ -489,7 +567,7 @@ class PyINLA:
         allreduce(
             self.f_values_i,
             op="sum",
-            factor=1 / self.comm_feval.Get_size(),
+            factor=1 / self.comm_feval.size,
             comm=self.comm_world,
         )
         synchronize(comm=self.comm_world)
@@ -521,11 +599,10 @@ class PyINLA:
 
         return (f_0, grad_f)
 
-    @time_range()
     def _evaluate_f(
         self,
         theta_i: NDArray,
-        comm: MPI.Comm,
+        comm,
     ) -> float:
         """Evaluate the objective function f(theta) = log(p(theta|y)).
 
@@ -615,7 +692,7 @@ class PyINLA:
                 allreduce(
                     f_theta,
                     op="sum",
-                    factor=1 / self.comm_qeval.Get_size(),
+                    factor=1 / self.comm_qeval.size,
                     comm=self.comm_feval,
                 )
                 synchronize(comm=self.comm_qeval)
@@ -797,13 +874,13 @@ class PyINLA:
             f_ii_loc,
             op="sum",
             comm=self.comm_world,
-            factor=1 / self.comm_feval.Get_size(),
+            factor=1 / self.comm_feval.size,
         )
         allreduce(
             f_ij_loc,
             op="sum",
             comm=self.comm_world,
-            factor=1 / self.comm_feval.Get_size(),
+            factor=1 / self.comm_feval.size,
         )
         synchronize(comm=self.comm_feval)
 
@@ -853,6 +930,8 @@ class PyINLA:
         self.model.x[:] = x_star
 
         eta = self.model.a @ self.model.x
+        
+        print("in compute marginal variances latent parameters. theta:  ", theta)
 
         self.model.construct_Q_conditional(eta)
         self.solver.cholesky(self.model.Q_conditional, sparsity="bta")
@@ -872,13 +951,13 @@ class PyINLA:
             raise ValueError(
                 "BOTH or NEITHER theta and x_star must be provided to compute the marginal variances."
             )
-
+            
         # check order x_star ... -> potentially need to reorder marginal variances
         self._compute_covariance_latent_parameters(theta, x_star)
 
         # now only extract diagonal elements corresponding to marginal variances of the latent parameters
         marginal_variances_sp = self.solver._structured_to_spmatrix(
-            eye(self.model.n_latent_parameters, dtype=xp.float64),
+            sp.sparse.eye(self.model.n_latent_parameters, dtype=xp.float64),
             sparsity="bta",
         )
         marginal_variances = extract_diagonal(marginal_variances_sp)
@@ -994,7 +1073,6 @@ class PyINLA:
 
         return Q_conditional, x_star, eta
 
-    @time_range()
     def _evaluate_prior_latent_parameters(
         self,
         x: NDArray = None,
@@ -1031,7 +1109,6 @@ class PyINLA:
 
         return log_prior_latent_parameters
 
-    @time_range()
     def _evaluate_conditional_latent_parameters(
         self,
         Q_conditional: NDArray,
@@ -1066,16 +1143,16 @@ class PyINLA:
         logdet_Q_conditional = self.solver.logdet(sparsity="bta")
 
         # Symmetrizing (averaging the tip of the arrow to tame down numerical innaccuracies)
-        tip_accu = x_mean[-3:].copy()
+        tip_accu = x_mean[-self.model.total_number_fixed_effects():].copy()
         synchronize(comm=self.comm_qeval)
         allreduce(
             tip_accu,
             op="sum",
-            factor=1 / self.comm_qeval.Get_size(),
+            factor=1 / self.comm_qeval.size,
             comm=self.comm_qeval,
         )
         synchronize(comm=self.comm_qeval)
-        x_mean[-3:] = tip_accu
+        x_mean[-self.model.total_number_fixed_effects():] = tip_accu
 
         if x is None and x_mean is not None:
             quadratic_form = x_mean.T @ Q_conditional @ x_mean
