@@ -128,11 +128,11 @@ if __name__ == "__main__":
     )
 
     # Compare marginal variances of observations
-    var_obs = pyinla.get_marginal_variances_observations(theta=theta_ref, x_star=x_ref)
-    var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
-    print_msg(
-        "Norm (var_obs - var_obs_ref):    ",
-        f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
-    )
+    # var_obs = pyinla.get_marginal_variances_observations(theta=theta_ref, x_star=x_ref)
+    # var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
+    # print_msg(
+    #     "Norm (var_obs - var_obs_ref):    ",
+    #     f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
+    # )
 
     print_msg("\n--- Finished ---")
