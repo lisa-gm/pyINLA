@@ -73,12 +73,14 @@ if __name__ == "__main__":
         config=pyinla_config.parse_config(pyinla_dict),
     )
 
-    # Run the optimization
-    minimization_result = pyinla.minimize()
+    results = pyinla.run()
+    
+    print_msg("\n--- Results ---")
+    print_msg("Theta values:\n", results["theta"])
+    print_msg("Covariance of theta:\n", results["cov_theta"])
+    print_msg(
+        "Mean of the fixed effects:\n",
+        results["x"][-model.submodels[-1].n_fixed_effects:],
+    )
 
-
-
-
-    print_msg("Final theta: ", minimization_result["theta"])
-    print_msg("Final f:", minimization_result["f"])
-    print_msg("final grad_f:", minimization_result["grad_f"])
+    print_msg("\n--- Finished ---")

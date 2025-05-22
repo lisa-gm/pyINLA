@@ -1,7 +1,7 @@
 import sys
 import os
 
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
 
 import numpy as np
@@ -26,7 +26,9 @@ np.random.seed(SEED)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
-    print_msg("--- Example: Gaussian Coregional (2 variates) spatial model with regression ---")
+    print_msg(
+        "--- Example: Gaussian Coregional (2 variates) spatial model with regression ---"
+    )
 
     # Check for parsed parameters
     args = parse_args()
@@ -174,8 +176,6 @@ if __name__ == "__main__":
 
     exit()
     # TODO: From here, to be curated
-
-
 
     pyinla.model.theta = xp.array(theta_ref)
     x = xp.zeros_like(pyinla.model.x)

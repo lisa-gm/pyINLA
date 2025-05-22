@@ -30,6 +30,7 @@ class DenseSolver(Solver):
         assert self.n is not None, "The size of the matrix must be provided."
 
         self.L: NDArray = xp.zeros((self.n, self.n), dtype=xp.float64)
+        self.A_inv = None
 
     def cholesky(self, A: NDArray, **kwargs) -> None:
         self.L[:] = A.todense()
@@ -55,9 +56,7 @@ class DenseSolver(Solver):
         return 2 * xp.sum(xp.log(xp.diag(self.L)))
 
     # TODO: optimize for memory??
-    def selected_inversion(self, A: NDArray, **kwargs) -> None:
-        self.L[:] = A.todense()
-        self.L = xp.linalg.cholesky(self.L)
+    def selected_inversion(self, **kwargs) -> None:
 
         L_inv = xp.eye(self.L.shape[0])
         L_inv[:] = sp.linalg.solve_triangular(
@@ -75,4 +74,7 @@ class DenseSolver(Solver):
 
     def get_solver_memory(self) -> int:
         """Return the memory used by the solver in number of bytes."""
-        return self.L.nbytes + self.A_inv.nbytes
+        if self.A_inv == None:
+            return self.L.nbytes
+        else:
+            return self.L.nbytes + self.A_inv.nbytes
