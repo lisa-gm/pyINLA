@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for helping us improve performance! 
+        Thank you for helping us improve performance!
 
   - type: textarea
     id: performance_issue
@@ -13,17 +13,6 @@ body:
       label: Describe the performance issue
       description: What part of the code or workflow seems slow or could be improved even further? Please describe the context and what you observed.
       placeholder: Describe the operation, function, or workflow...
-      render: text
-      rows: 4
-    validations:
-      required: true
-
-  - type: textarea
-    id: steps_to_reproduce
-    attributes:
-      label: Steps to reproduce
-      description: Please provide a minimal example or steps to reproduce the behavior.
-      placeholder: List the steps or provide a code snippet...
       render: text
       rows: 4
     validations:
@@ -41,7 +30,6 @@ body:
     validations:
       required: true
 
-      
 
   - type: textarea
     id: profiling
@@ -53,7 +41,6 @@ body:
       rows: 4
     validations:
       required: false
-
 
   - type: textarea
     id: hardware_env
@@ -87,7 +74,7 @@ body:
     validations:
       required: true
 
-  - type: input
+  - type: textarea
     id: other_packages
     attributes:
       label: Other packages
@@ -96,7 +83,7 @@ body:
       render: text
       rows: 2
     validations:
-      required: true
+      required: false
 
   - type: input
     id: run_command
