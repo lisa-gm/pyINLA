@@ -1,0 +1,80 @@
+name: "🐞 Bug Report"
+description: Create a report to help us improve
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to file a bug report.
+
+  - type: input
+    id: bug_description
+    attributes:
+      label: Describe the Bug
+      description: Please provide a short but precise description of the issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproducing the Issue
+      description: |
+        Please provide a short self-contained example that reproduces the issue.
+        You can use the code block below as a starting point.
+      value: |
+        ```python
+        import dalia
+        # your code here
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: error_message
+    attributes:
+      label: Error Message or Unexpected Behavior
+      description: |
+        Please include the full error message, if there is one. Otherwise, describe what you expected as output as well as what you obtained.
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      description: e.g. macOS, Windows, Linux
+    validations:
+      required: true
+
+  - type: input
+    id: python_version
+    attributes:
+      label: Python version
+      description: e.g. 3.11
+    validations:
+      required: true
+
+  - type: input
+    id: package_version
+    attributes:
+      label: Package version
+      description: e.g. 1.0.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Any other relevant environment details
+      description: Please add any other relevant environment details here.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Please add any other relevant context about the problem here.
+    validations:
+      required: false
