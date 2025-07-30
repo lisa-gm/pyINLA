@@ -14,7 +14,6 @@ body:
       description: What part of the code or workflow seems slow or could be improved even further? Please describe the context and what you observed.
       placeholder: Describe the operation, function, or workflow...
       render: text
-      rows: 4
     validations:
       required: true
 
@@ -30,7 +29,6 @@ body:
     validations:
       required: true
 
-
   - type: textarea
     id: profiling
     attributes:
@@ -38,7 +36,6 @@ body:
       description: If available, please include any profiling output or timing measurements.
       placeholder: Paste profiling output or timing results here...
       render: text
-      rows: 4
     validations:
       required: false
 
@@ -54,7 +51,6 @@ body:
         - RAM: 32GB
         - OS: Ubuntu 22.04
       render: text
-      rows: 4
     validations:
       required: true
 
@@ -81,7 +77,6 @@ body:
       description: List any other relevant packages and their versions that might affect performance.
       placeholder: e.g. numpy 1.21.0, scipy 1.3.0
       render: text
-      rows: 2
     validations:
       required: false
 
@@ -100,6 +95,5 @@ body:
       label: Additional context
       description: Add any other relevant context or suggestions for optimization.
       render: text
-      rows: 4
     validations:
       required: false
