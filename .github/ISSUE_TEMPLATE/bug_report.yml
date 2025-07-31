@@ -21,7 +21,8 @@ body:
     attributes:
       label: Reproducing the Issue
       description: |
-        Please provide a short self-contained example that reproduces the issue.
+        Please provide a short self-contained example that reproduces the issue,
+        if not possible, please provide a gist script that reproduces the issue.
       placeholder: |
         import dalia
         << your code here >>
@@ -35,14 +36,6 @@ body:
       label: Error Message or Unexpected Behavior
       description: |
         Please include the full error message, if there is one. Otherwise, describe what you expected as output as well as what you obtained.
-    validations:
-      required: true
-
-  - type: input
-    id: os
-    attributes:
-      label: OS
-      description: e.g. macOS, Windows, Linux
     validations:
       required: true
 

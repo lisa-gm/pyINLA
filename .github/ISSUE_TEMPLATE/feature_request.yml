@@ -5,7 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        You would like to request a new feature or change in functionality? Please explain your idea below. You might also open a pull request if you already have a solution in mind. Please check our Contributor guide for more information.
+        You would like to request a new feature or change in functionality? After
+        checking the open issues, please explain your idea below. 
 
   - type: textarea
     id: proposed_feature

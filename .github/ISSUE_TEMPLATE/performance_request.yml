@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for helping us improve performance!
+        Thank you for helping us improve DALIA performances!
 
   - type: textarea
     id: performance_issue
@@ -22,7 +22,8 @@ body:
     attributes:
       label: Steps to reproduce
       description: |
-       Please provide a minimal example or steps to reproduce the behavior.
+       Please provide a minimal example or steps to reproduce the behavior, 
+       if not possible, please provide a gist script that reproduces the issue.
       placeholder: |
         #List the steps or provide a code snippet...
       render: python
@@ -47,7 +48,7 @@ body:
       placeholder: |
         Example:
         - CPU: Intel i7-12700K
-        - GPU: NVIDIA RTX 3080
+        - GPU: NVIDIA A100
         - RAM: 32GB
         - OS: Ubuntu 22.04
       render: text
