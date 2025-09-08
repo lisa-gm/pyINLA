@@ -215,8 +215,6 @@ class DALIA:
         self.t_construction_qconditional = 0.0
         self.solver.t_cholesky = 0.0
         self.solver.t_solve = 0.0
-        self.t_covariance_hp = 0.0
-
         self._print_init()
 
         logging.info("DALIA initialized.")
@@ -788,20 +786,18 @@ class DALIA:
             flush=True,
         )
 
-        synchronize_gpu()
+        synchronize(comm=self.comm_world)
         tic = time.perf_counter()
-
         hess_theta = self._evaluate_hessian_f(theta_i)
         # print_msg(
         #     f"hessian_f: \n {hess_theta}",
         #     flush=True,
         # )
         cov_theta = xp.linalg.inv(hess_theta)
-
-        synchronize_gpu()
+        synchronize(comm=self.comm_world)     
         toc = time.perf_counter()
-        self.t_covariance_hp += toc - tic
-        print_msg("Time to compute covariance of hyperparameters:", self.t_covariance_hp, flush=True)
+        t_covariance_hp = toc - tic
+        print_msg("Time to compute covariance of hyperparameters:", t_covariance_hp, flush=True)
         
         return cov_theta
 
