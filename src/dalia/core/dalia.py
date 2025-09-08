@@ -297,6 +297,8 @@ class DALIA:
 
     def run(self) -> dict:
         """Run the DALIA"""
+        synchronize(comm=self.comm_world)
+        tic = time.perf_counter()
 
         # compute mode of the hyperparameters theta
         minimization_result = self.minimize()
@@ -333,7 +335,9 @@ class DALIA:
             #     marginal_variances_observations
             # ),
         }
-
+        synchronize(comm=self.comm_world)
+        toc = time.perf_counter()
+        print_msg(f"DALIA inference took: {toc - tic:0.4f} (s)", flush = True)
         return results
 
     def minimize(self) -> optimize.OptimizeResult:
