@@ -39,6 +39,19 @@ class RegressionSubModelConfig(SubModelConfig):
         return xp.array([]), []
 
 
+class AR1SubModelConfig(SubModelConfig):
+
+    ## prior (in log-scale or not?) on k (marginal precision) or s2 marginal variance
+    s2: float = None  # Marginal variance
+    ph_s2: PriorHyperparametersConfig = None
+
+    ## prior on phi
+    phi: float = None  # AR(1) coefficient
+    ph_phi: PriorHyperparametersConfig = None
+    ## check that phi is between -1 and 1 (use pc prior)
+    # check inla.doc("pc.cor1")
+
+
 class SpatioTemporalSubModelConfig(SubModelConfig):
     spatial_domain_dimension: PositiveInt = 2
 
