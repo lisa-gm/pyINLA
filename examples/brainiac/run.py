@@ -17,10 +17,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if __name__ == "__main__":
     print_msg("--- Example: Brainiac Submodel ---")
 
-    base_dir_data = BASE_DIR + "/inputs_brainiac_cmPRS"
+    base_dir_data = BASE_DIR + "/inputs_brainiac"
 
     m = 2  # number of annotations per feature
-    b = 1000  # number of latent variables / number of features
+    b = 20000  # number of latent variables / number of features
     sigma_a2 = 1.0 / 1.0
     precision_mat = sigma_a2 * scsp.eye(m)
 

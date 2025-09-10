@@ -31,7 +31,8 @@ from dalia.submodels import (
     SpatialSubModel,
     SpatioTemporalSubModel,
 )
-from dalia.utils import add_str_header, boxify, scaled_logit
+from dalia.utils import add_str_header, boxify, scaled_logit, free_unused_gpu_memory
+from dalia.utils.gpu_utils import debug_gpu_memory_usage
 
 
 class Model(ABC):
@@ -239,13 +240,17 @@ class Model(ABC):
                 if sp.sparse.issparse(submodel.a):
                     data.append(submodel.a.toarray())
                 else:
+                    print(f"Submodel {i}: a shape is {submodel.a.shape}")
                     data.append(submodel.a)
+                submodel.a = None
 
                 self.x[
                     self.latent_parameters_idx[i] : self.latent_parameters_idx[i + 1]
                 ] = submodel.x_initial
 
+            debug_gpu_memory_usage("Before concatenating submodel data", sync=False)
             self.a: NDArray = xp.concatenate(data, axis=1)
+            debug_gpu_memory_usage("After concatenating submodel data", sync=False)
 
         self.permutation_latent_variables = xp.arange(0, self.n_latent_parameters, 1)
         self.inverse_permutation_latent_variables = xp.arange(
@@ -353,26 +358,33 @@ class Model(ABC):
                 elif isinstance(submodel, RegressionSubModel):
                     ...
 
+                debug_gpu_memory_usage(f"Before constructing Q prior for submodel {i}", sync=False)
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
+                debug_gpu_memory_usage(f"After constructing Q prior for submodel {i}", sync=False)
 
                 rows.append(
                     submodel_Q_prior.row
                     + self.latent_parameters_idx[i] * xp.ones(len(submodel_Q_prior.row))
                 )
+                debug_gpu_memory_usage(f"After appending rows for submodel {i}", sync=False)
                 cols.append(
                     submodel_Q_prior.col
                     + self.latent_parameters_idx[i] * xp.ones(len(submodel_Q_prior.col))
                 )
+                debug_gpu_memory_usage(f"After appending cols for submodel {i}", sync=False)
                 data.append(submodel_Q_prior.data)
+                debug_gpu_memory_usage(f"After appending data for submodel {i}", sync=False)
 
                 self.Q_prior_data_mapping.append(
                     self.Q_prior_data_mapping[i] + len(submodel_Q_prior.data)
                 )
+                debug_gpu_memory_usage(f"After appending data mapping for submodel {i}", sync=False)
 
             self.Q_prior: sp.sparse.csc_matrix = sp.sparse.csc_matrix(
                 (xp.concatenate(data), (xp.concatenate(rows), xp.concatenate(cols))),
                 shape=(self.n_latent_parameters, self.n_latent_parameters),
             )
+            debug_gpu_memory_usage("After constructing full Q prior", sync=False)
 
         else:
             for i, submodel in enumerate(self.submodels):
@@ -394,11 +406,14 @@ class Model(ABC):
                     ):
                         kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
 
+                debug_gpu_memory_usage(f"Before constructing Q prior for submodel {i}", sync=False)
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
+                debug_gpu_memory_usage(f"After constructing Q prior for submodel {i}", sync=False)
 
                 self.Q_prior.data[
                     self.Q_prior_data_mapping[i] : self.Q_prior_data_mapping[i + 1]
                 ] = submodel_Q_prior.data
+                debug_gpu_memory_usage(f"After setting Q prior data for submodel {i}", sync=False)
 
         return self.Q_prior
 
@@ -428,6 +443,8 @@ class Model(ABC):
         if isinstance(self.submodels[0], BrainiacSubModel):
             # Brainiac specific rule
             kwargs["h2"] = float(self.theta[0])
+            for k, v in kwargs.items():
+                assert not xp.isnan(v).any(), f"Keyword argument {k} is NaN."
             d_matrix = self.submodels[0].evaluate_d_matrix(**kwargs)
         else:
             # General rules
@@ -442,9 +459,36 @@ class Model(ABC):
             # self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
         else:
             if self.aTa is not None:
-                self.Q_conditional = (
-                    self.Q_prior.toarray() - d_matrix.diagonal()[0] * self.aTa
-                )
+                # self.Q_conditional = (
+                #     self.Q_prior.toarray() - d_matrix.diagonal()[0] * self.aTa
+                # )
+                debug_gpu_memory_usage("Before constructing dense Q conditional", sync=False)
+                if isinstance(self.aTa, str) and self.aTa == "host":
+                    if hasattr(self, "_host_aTa") and self._host_aTa is None:
+                        raise KeyError("aTa is missing")
+                    self.aTa = xp.asarray(self._host_aTa)
+                elif xp.__name__ == "cupy":
+                    import cupyx as cpx
+                    if not hasattr(self, "_host_aTa") or self._host_aTa is None:
+                        self._host_aTa = cpx.empty_like_pinned(self.aTa)
+                    self.aTa.get(out=self._host_aTa, stream=None, blocking=False)
+                self.Q_conditional = (-(d_matrix.diagonal()[0])) * self.aTa
+                debug_gpu_memory_usage("After constructing dense part of Q conditional", sync=False)
+                if xp.__name__ == "cupy":
+                    xp.cuda.runtime.deviceSynchronize()
+                    assert not xp.isnan(self.aTa).any()
+                    assert not np.isnan(self._host_aTa).any()
+                    assert not xp.isnan(-(d_matrix.diagonal()[0]))
+                    assert not xp.isnan(self.Q_conditional).any()
+                    self.aTa = "host"
+                    free_unused_gpu_memory()
+                debug_gpu_memory_usage("After moving aTa to host", sync=False)
+                self.Q_conditional += self.Q_prior.toarray()
+                if xp.__name__ == "cupy":
+                    xp.cuda.runtime.deviceSynchronize()
+                    assert not xp.isnan(self.Q_conditional).any()
+                    free_unused_gpu_memory()
+                debug_gpu_memory_usage("After constructing dense Q conditional", sync=False)
             else:
                 self.Q_conditional = (
                     self.Q_prior.toarray() - self.a.T @ d_matrix @ self.a

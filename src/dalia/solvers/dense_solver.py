@@ -38,7 +38,8 @@ class DenseSolver(Solver):
         self.n: int = kwargs.get("n", None)
         assert self.n is not None, "The size of the matrix must be provided."
 
-        self.L: NDArray = xp.zeros((self.n, self.n), dtype=xp.float64)
+        # self.L: NDArray = xp.zeros((self.n, self.n), dtype=xp.float64)
+        self.L = None
         self.A_inv = None
 
         # Solver Metrics
@@ -63,17 +64,22 @@ class DenseSolver(Solver):
         if sp.sparse.issparse(A):
             # if A is diagonal, we can use the diagonal directly
             if is_diagonal(A):
-                self.L[:] = 0
+                if self.L is None:
+                    self.L = xp.zeros((self.n, self.n), dtype=xp.float64)
+                else:
+                    self.L[:] = 0
                 # self.L.diagonal()[:] = xp.sqrt(A.diagonal())
                 self.L[xp.arange(self.n), xp.arange(self.n)] = xp.sqrt(A.diagonal())
                 return
 
             else:
-                self.L[:] = A.todense()
+                # self.L[:] = A.todense()
+                tmp = A.todense()
         else:
-            self.L[:] = A
+            # self.L[:] = A
+            tmp = A
 
-        self.L = xp.linalg.cholesky(self.L)
+        self.L = xp.linalg.cholesky(tmp)
 
         synchronize_gpu()
         toc = time.perf_counter()

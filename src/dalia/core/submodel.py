@@ -41,6 +41,7 @@ class SubModel(ABC):
                 )
 
         self.n_latent_parameters: int = self.a.shape[1]
+        self.n_observations: int = self.a.shape[0]
 
         # --- Load latent parameters vector
         try:

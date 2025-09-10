@@ -151,3 +151,36 @@ def memory_report() -> int:
         total_memory = psutil.virtual_memory().total
 
     return used_memory, total_memory
+
+
+def debug_gpu_memory_usage(msg: str = "", sync: bool = True) -> None:
+    """Prints the GPU memory usage."""
+    if xp.__name__ == "cupy":
+
+        import numpy as np
+        from mpi4py import MPI
+        from mpi4py.MPI import COMM_WORLD as global_comm
+
+        free_memory, total_memory = xp.cuda.Device().mem_info
+        usage = np.array((total_memory - free_memory) / total_memory)
+
+        if sync:
+            average_usage = np.empty(1)
+            max_usage = np.empty(1)
+            global_comm.Allreduce(usage, average_usage, op=MPI.SUM)
+            global_comm.Allreduce(usage, max_usage, op=MPI.MAX)
+            average_usage /= global_comm.size
+
+            if global_comm.rank == 0:
+                print(
+                    f"{msg} | Rank-average device memory usage: {average_usage[0] * 100:.4f}%",
+                    flush=True,
+                )
+                print(
+                    f"{msg} | Max device memory usage: {max_usage[0] * 100:.4f}%",
+                    flush=True,
+                )
+        else:
+            print(f"{msg} | Rank {global_comm.rank} device memory usage: {usage * 100:.4f}%", flush=True)
+
+

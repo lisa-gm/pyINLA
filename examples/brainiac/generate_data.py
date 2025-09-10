@@ -16,8 +16,8 @@ if __name__ == "__main__":
 
     # dim(\Phi) = (b,b)
 
-    no = 1000  # number of observations
-    b = 2  # number of latent variables (number of features)
+    no = 50000  # number of observations
+    b = 50000  # number of latent variables (number of features)
     m = 2  # number of annotations per feature
 
     # generate random Z -> needs to be loaded with the model
@@ -68,9 +68,10 @@ if __name__ == "__main__":
     # sample full model: Y = a \beta + \epsilon
     # X random covariates of dimension (no, b)
     a = np.random.rand(no, b)
-    # np.save("a.npy", a)
-    a_sp = sp.csc_matrix(a)
-    sp.save_npz("inputs_brainiac/a.npz", a_sp)
+    np.save("inputs_brainiac/a.npy", a)
+    # a_sp = sp.csc_matrix(a)
+    # sp.save_npz("inputs_brainiac/a.npz", a_sp)
+    # exit()
 
     # beta ~ N(0, (h^2 \Phi)^-1)
     var = 1 / Qprior.diagonal()
@@ -84,9 +85,14 @@ if __name__ == "__main__":
     y = a @ beta + eps
     np.save("y.npy", y)
 
+    print("y saved.", flush=True)
+    exit()
+
     # construct Qconditional
     Qconditional = Qprior + 1 / (1 - h2) * a_sp.T @ a_sp
     sp.save_npz("inputs_brainiac/Qconditional_original.npz", Qconditional)
+
+    print("Qconditional saved.", flush=True)
 
     # recover beta
     # beta_initial = beta

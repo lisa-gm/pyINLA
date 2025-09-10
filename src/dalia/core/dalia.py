@@ -27,6 +27,7 @@ from dalia.utils import (
     synchronize,
     synchronize_gpu,
 )
+from dalia.utils.gpu_utils import debug_gpu_memory_usage
 
 if backend_flags["mpi_avail"]:
     from mpi4py import MPI
@@ -117,7 +118,9 @@ class DALIA:
 
             self.world_size = 1
 
+        debug_gpu_memory_usage("After initializing communicators (1/2)")
         free_unused_gpu_memory()
+        debug_gpu_memory_usage("After initializing communicators (2/2)")
 
         # --- Initialize solver
         if self.config.solver.type == "dense":
@@ -190,6 +193,8 @@ class DALIA:
                     nccl_comm=self.nccl_comm,
                 )
 
+        debug_gpu_memory_usage("After initializing solver (1/1)")
+
         # --- Set up recurrent variables
         self.gradient_f = xp.zeros(self.model.n_hyperparameters, dtype=xp.float64)
         self.f_values_i = xp.zeros(self.n_f_evaluations, dtype=xp.float64)
@@ -215,6 +220,8 @@ class DALIA:
         self.t_construction_qconditional = 0.0
         self.solver.t_cholesky = 0.0
         self.solver.t_solve = 0.0
+
+        debug_gpu_memory_usage("After initializing variables (1/1)")
         self._print_init()
 
         logging.info("DALIA initialized.")
@@ -374,6 +381,7 @@ class DALIA:
 
             # Start the minimization procedure
             def callback(intermediate_result: optimize.OptimizeResult):
+                debug_gpu_memory_usage(f"Before checking optimization step {self.accepted_iter+1}")
                 theta_i = intermediate_result.x.copy()
                 fun_i = intermediate_result.fun
                 self.accepted_iter += 1
@@ -551,6 +559,8 @@ class DALIA:
         self.solver.t_cholesky = 0.0
         self.solver.t_solve = 0.0
 
+        debug_gpu_memory_usage("Before evaluating objective function")
+
         synchronize(comm=self.comm_world)
         tic = time.perf_counter()
         # Generate theta matrix with different theta's to evaluate
@@ -573,6 +583,8 @@ class DALIA:
             :, self.model.n_hyperparameters + 1 : self.n_f_evaluations
         ] -= self.eps_mat
 
+        debug_gpu_memory_usage("After initializing central difference scheme matrix")
+
         # Proceed to the parallel function evaluation
         for feval_i in range(self.n_f_evaluations - 1, -1, -1):
             # Perform the evaluation in reverse order so that the stored and returned
@@ -581,6 +593,8 @@ class DALIA:
                 self.f_values_i[feval_i] = self._evaluate_f(
                     theta_i=self.theta_mat[:, feval_i]
                 )
+                print(f"Task {feval_i} / {self.n_f_evaluations} done by rank {comm_rank}.", flush=True)
+        debug_gpu_memory_usage(f"After evaluating {self.n_f_evaluations} tasks.")
 
         # Here carefull on the reduction as it's gonna add the values from all ranks and not only the root of the groups - TODO
         synchronize(comm=self.comm_world)
@@ -660,6 +674,8 @@ class DALIA:
             toc = time.perf_counter()
             self.t_construction_qprior += toc - tic
 
+            debug_gpu_memory_usage("After constructing Q prior", sync=False)
+
             eta = xp.zeros_like(self.model.y, dtype=xp.float64)
             x = xp.zeros_like(self.model.x, dtype=xp.float64)
 
@@ -675,18 +691,58 @@ class DALIA:
                 toc = time.perf_counter()
                 self.t_construction_qconditional += toc - tic
 
+                debug_gpu_memory_usage("After constructing Q conditional", sync=False)
+
                 self.solver.cholesky(A=Q_conditional, sparsity="bta")
+
+                if xp.__name__ == "cupy":
+                    if not hasattr(self.model, "_host_Q_conditional"):
+                        import cupyx as cpx
+                        self.model._host_Q_conditional = cpx.empty_like_pinned(
+                            Q_conditional
+                        )
+                    self.model.Q_conditional.get(
+                        out=self.model._host_Q_conditional,
+                        stream=None,
+                        blocking=False
+                    )
+                    xp.cuda.runtime.deviceSynchronize()
+                    import numpy as np
+                    assert not xp.isnan(self.model.Q_conditional).any()
+                    assert not xp.isnan(Q_conditional).any()
+                    assert not np.isnan(self.model._host_Q_conditional).any()
+                    self.model.Q_conditional = None
+                    Q_conditional = None
+                    free_unused_gpu_memory()
+                    # self.solver.L = xp.array(self.solver.L, order="F", copy=False)
+                    # free_unused_gpu_memory()
+
+                debug_gpu_memory_usage("After solving Cholesky decomposition", sync=False)
 
                 rhs: NDArray = self.model.construct_information_vector(
                     eta,
                     x,
                 )
 
+                debug_gpu_memory_usage("After constructing RHS vector", sync=False)
+
                 self.model.x[:] = self.solver.solve(
                     rhs=rhs,
                     sparsity="bta",
                 )
 
+                debug_gpu_memory_usage("After solving linear system", sync=False)
+
+                if Q_conditional is None:
+                    print("Copying Q conditional to device.", flush=True)
+                    self.model.Q_conditional = xp.asarray(
+                        self.model._host_Q_conditional
+                    )
+                    Q_conditional = self.model.Q_conditional
+                    xp.cuda.runtime.deviceSynchronize()
+                    assert not np.isnan(self.model._host_Q_conditional).any()
+                    assert not xp.isnan(self.model.Q_conditional).any()
+                    assert not xp.isnan(Q_conditional).any()
                 conditional_latent_parameters = (
                     self._evaluate_conditional_latent_parameters(
                         Q_conditional=Q_conditional,
@@ -695,20 +751,43 @@ class DALIA:
                     )
                 )
 
+                if xp.isnan(conditional_latent_parameters):
+                    raise ValueError(
+                        f"Rank: {comm_rank} conditional latent parameters is NaN. Check what is happening."
+                    )
+
                 f_theta[0] += conditional_latent_parameters
+                debug_gpu_memory_usage("After evaluating conditional latent parameters", sync=False)
             if task_mapping[1] == self.color_qeval:
                 # Done by processes "odd"
                 log_prior_hyperparameters: float = (
                     self.model.evaluate_log_prior_hyperparameters()
                 )
+                debug_gpu_memory_usage("After evaluating log prior hyperparameters", sync=False)
                 likelihood: float = float(self.model.evaluate_likelihood(eta=eta))
+                debug_gpu_memory_usage("After evaluating likelihood", sync=False)
                 prior_latent_parameters: float = (
                     self._evaluate_prior_latent_parameters()
                 )
+                debug_gpu_memory_usage("After evaluating prior latent parameters", sync=False)
+
+                if xp.isnan(log_prior_hyperparameters):
+                    raise ValueError(
+                        f"Rank: {comm_rank} log prior hyperparameters is NaN. Check what is happening."
+                    )
+                if xp.isnan(likelihood):
+                    raise ValueError(
+                        f"Rank: {comm_rank} likelihood is NaN. Check what is happening."
+                    )
+                if xp.isnan(prior_latent_parameters):
+                    raise ValueError(
+                        f"Rank: {comm_rank} prior latent parameters is NaN. Check what is happening."
+                    )
 
                 f_theta[0] -= (
                     log_prior_hyperparameters + likelihood + prior_latent_parameters
                 )
+                debug_gpu_memory_usage("After evaluating f_theta", sync=False)
 
             if task_mapping[0] != task_mapping[1]:
                 synchronize(comm=self.comm_qeval)
@@ -726,12 +805,15 @@ class DALIA:
             synchronize_gpu()
             toc = time.perf_counter()
             self.t_construction_qprior += toc - tic
+            debug_gpu_memory_usage("After constructing Q prior", sync=False)
 
             log_prior_hyperparameters: float = (
                 self.model.evaluate_log_prior_hyperparameters()
             )
+            debug_gpu_memory_usage("After evaluating log prior hyperparameters", sync=False)
 
             Q_conditional, self.model.x[:], eta = self._inner_iteration()
+            debug_gpu_memory_usage("After inner iteration", sync=False)
 
             conditional_latent_parameters = (
                 self._evaluate_conditional_latent_parameters(
@@ -740,14 +822,34 @@ class DALIA:
                     x_mean=None,
                 )
             )
+            debug_gpu_memory_usage("After evaluating conditional latent parameters", sync=False)
 
             prior_latent_parameters: float = self._evaluate_prior_latent_parameters(
                 x=self.model.x,
             )
+            debug_gpu_memory_usage("After evaluating prior latent parameters", sync=False)
 
             likelihood: float = self.model.evaluate_likelihood(
                 eta=eta,
             )
+            debug_gpu_memory_usage("After evaluating likelihood", sync=False)
+
+            if xp.isnan(log_prior_hyperparameters):
+                raise ValueError(
+                    f"Rank: {comm_rank} log prior hyperparameters is NaN. Check what is happening."
+                )
+            if xp.isnan(likelihood):
+                raise ValueError(
+                    f"Rank: {comm_rank} likelihood is NaN. Check what is happening."
+                )
+            if xp.isnan(prior_latent_parameters):
+                raise ValueError(
+                    f"Rank: {comm_rank} prior latent parameters is NaN. Check what is happening."
+                )
+            if xp.isnan(conditional_latent_parameters):
+                raise ValueError(
+                    f"Rank: {comm_rank} conditional latent parameters is NaN. Check what is happening."
+                )
 
             f_theta[0] -= (
                 log_prior_hyperparameters
@@ -755,6 +857,9 @@ class DALIA:
                 + prior_latent_parameters
                 - conditional_latent_parameters
             )
+            debug_gpu_memory_usage("After evaluating f_theta", sync=False)
+        
+        self.solver.L = None
 
         if xp.isnan(f_theta[0]):
             raise ValueError(

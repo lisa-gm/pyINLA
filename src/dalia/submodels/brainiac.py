@@ -119,7 +119,7 @@ class BrainiacSubModel(SubModel):
 
         if h2 == 1:
             raise ValueError("h2 is 1. Will lead to division by zero.")
-        d_matrix = -1 / (1 - h2) * sp.sparse.eye(self.a.shape[0])
+        d_matrix = -1 / (1 - h2) * sp.sparse.eye(self.n_observations)
 
         return d_matrix
 
