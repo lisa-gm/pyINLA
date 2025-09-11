@@ -8,7 +8,6 @@ class GradientMethodConfig(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     # Input folder for this specific submodel
-    input_dir: str = None
     type: Literal["vanilla_gradient", "smart_gradient"] = None
 
     finite_difference_epsilon: float = 1e-3

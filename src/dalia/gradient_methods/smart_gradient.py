@@ -57,21 +57,6 @@ class SmartGradient(GradientMethod):
         self.count = 0
         self.rng = rand.default_rng()
 
-    def _transformed_fun(self, phi) -> xp.ndarray:
-        """Transform the input using the current theta and basis.
-
-        Parameters
-        ----------
-        phi : xp.ndarray
-            The input to transform.
-
-        Returns
-        -------
-        xp.ndarray
-            The transformed output.
-        """
-        return (self.curr_theta + self.basis @ phi).T
-
     def _scale(self, x) -> xp.ndarray:
         """Scale the input vector.
 
@@ -162,14 +147,15 @@ class SmartGradient(GradientMethod):
         # Next basis_size columns are + epsilon * e_i
         direction_matrix[
             :, 1 : 1 + self.basis_size
-        ] += self.finite_difference_epsilon * xp.eye(self.basis_size)
+        ] += self.finite_difference_epsilon * self.basis + xp.repeat(
+            theta_dev.reshape(-1, 1), self.basis_size, 1
+        )
         # Next basis_size columns are - epsilon * e_i
         direction_matrix[
             :, self.basis_size + 1 :
-        ] -= self.finite_difference_epsilon * xp.eye(self.basis_size)
-
-        for i in range(1, direction_matrix.shape[1]):
-            direction_matrix[:, i] = self._transformed_fun(phi=direction_matrix[:, i])
+        ] -= self.finite_difference_epsilon * self.basis - xp.repeat(
+            theta_dev.reshape(-1, 1), self.basis_size, 1
+        )
 
     def compute_gradient(self, function_evaluations, gradient) -> None:
         """Compute the gradient using finite differences.
