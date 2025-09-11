@@ -632,7 +632,7 @@ class CoregionalModel(Model):
             # d_list[i] = model.likelihood.evaluate_hessian_likelihood(**kwargs)
             d_vec[
                 self.n_observations_idx[i] : self.n_observations_idx[i + 1]
-            ] = model.likelihood.evaluate_hessian_likelihood(**kwargs).diagonal()
+            ] = model.likelihood.hessian_likelihood(**kwargs).diagonal()
 
         self.Qconditional = self.custom_Q_ATDA(
             Q=self.Q_prior,
@@ -653,7 +653,7 @@ class CoregionalModel(Model):
 
         gradient_vector_list = []
         for i, model in enumerate(self.models):
-            gradient_likelihood = model.likelihood.evaluate_gradient_likelihood(
+            gradient_likelihood = model.likelihood.gradient_likelihood(
                 eta=eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
                 y=self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
                 theta=float(self.theta[self.hyperparameters_idx[i + 1] - 1]),

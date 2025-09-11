@@ -431,7 +431,7 @@ class Model(ABC):
             d_matrix = self.submodels[0].evaluate_d_matrix(**kwargs)
         else:
             # General rules
-            d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
+            d_matrix = self.likelihood.hessian_likelihood(**kwargs)
 
         # if self.a is sparse -> Q_conditional should be sparse, else dense
         if sp.sparse.issparse(self.a):
@@ -467,7 +467,7 @@ class Model(ABC):
             )
 
         else:
-            gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
+            gradient_likelihood = self.likelihood.gradient_likelihood(
                 eta=eta,
                 y=self.y,
                 theta=self.theta[self.hyperparameters_idx[-1] :],

@@ -18,6 +18,7 @@ class LikelihoodConfig(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["gaussian", "poisson", "binomial"] = None
+    method: Literal["exact", "finite_difference"] = "exact"
 
     # TODO: cleaner way to let user fix hyperparameters
     fix_hyperparameters: bool = False
