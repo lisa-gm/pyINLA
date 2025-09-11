@@ -70,7 +70,7 @@ class SmartGradient(GradientMethod):
         xp.ndarray
             The transformed output.
         """
-        return self.curr_theta + self.basis @ phi
+        return (self.curr_theta + self.basis @ phi).T
 
     def _scale(self, x) -> xp.ndarray:
         """Scale the input vector.
@@ -125,7 +125,9 @@ class SmartGradient(GradientMethod):
             Q, R = xp.linalg.qr(self.basis)
             self.basis = Q
         except xp.linalg.LinAlgError:
-            print("Warning: QR decomposition failed. Resetting G to identity.")
+            print(
+                "Warning: QR decomposition failed. Resetting G to identity.", flush=True
+            )
             self.basis = xp.identity(self.basis_size)
 
     def get_evaluation_directions(self, direction_matrix, theta) -> None:
@@ -158,16 +160,16 @@ class SmartGradient(GradientMethod):
         # First column is the current theta
         direction_matrix[:, 0] = theta_dev
         # Next basis_size columns are + epsilon * e_i
-        direction_matrix[:, 1 : 1 + self.basis_size] += (
-            self.finite_difference_epsilon * self.basis
-        )
+        direction_matrix[
+            :, 1 : 1 + self.basis_size
+        ] += self.finite_difference_epsilon * xp.eye(self.basis_size)
         # Next basis_size columns are - epsilon * e_i
-        direction_matrix[:, self.basis_size + 1 :] -= (
-            self.finite_difference_epsilon * self.basis
-        )
+        direction_matrix[
+            :, self.basis_size + 1 :
+        ] -= self.finite_difference_epsilon * xp.eye(self.basis_size)
 
         for i in range(1, direction_matrix.shape[1]):
-            direction_matrix[:, i] = self._transformed_fun(phi=direction_matrix[:, i]).T
+            direction_matrix[:, i] = self._transformed_fun(phi=direction_matrix[:, i])
 
     def compute_gradient(self, function_evaluations, gradient) -> None:
         """Compute the gradient using finite differences.

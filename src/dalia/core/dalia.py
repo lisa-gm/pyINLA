@@ -587,8 +587,6 @@ class DALIA:
             direction_matrix=self.theta_mat, theta=theta_i
         )
 
-        print(self.theta_mat)
-
         # Proceed to the parallel function evaluation
         for feval_i in range(self.n_f_evaluations - 1, -1, -1):
             # Perform the evaluation in reverse order so that the stored and returned
@@ -630,14 +628,6 @@ class DALIA:
                 flush=True,
             )
         self.iter += 1
-
-        print(f"self.f_values_i: {self.f_values_i}")
-        print(f"self.gradient_f: {self.gradient_f}")
-        print(f"f_0: {f_0}")
-        print(f"grad_f: {grad_f}")
-
-        """ if self.iter == 2:
-            exit() """
 
         return (f_0, grad_f)
 
