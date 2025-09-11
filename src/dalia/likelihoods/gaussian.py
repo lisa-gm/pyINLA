@@ -21,7 +21,7 @@ class GaussianLikelihood(Likelihood):
         eta: NDArray,
         y: NDArray,
         **kwargs,
-    ) -> float:
+    ) -> NDArray:
         """Evaluate a Gaussian likelihood.
 
         Notes
@@ -55,9 +55,8 @@ class GaussianLikelihood(Likelihood):
         yEta = eta - y
         # print("xp.exp(theta) in lh:", xp.exp(theta))
 
-        likelihood: float = (
-            0.5 * theta * self.n_observations - 0.5 * xp.exp(theta) * yEta.T @ yEta
-        )
+        likelihood = 0.5 * theta - 0.5 * xp.exp(theta) * yEta * yEta
+        
 
         return likelihood
 
