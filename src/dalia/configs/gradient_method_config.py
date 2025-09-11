@@ -9,14 +9,19 @@ class GradientMethodConfig(BaseModel, ABC):
 
     # Input folder for this specific submodel
     input_dir: str = None
-    type: Literal["vanilla_gradient", "smart_gradient"] = "smart_gradient"
+    type: Literal["vanilla_gradient", "smart_gradient"] = None
 
     finite_difference_epsilon: float = 1e-3
 
-class VanillaGradientConfig(GradientMethodConfig): ...
+
+class VanillaGradientConfig(GradientMethodConfig):
+    type: Literal["vanilla_gradient"] = "vanilla_gradient"
+
 
 class SmartGradientConfig(GradientMethodConfig):
+    type: Literal["smart_gradient"] = "smart_gradient"
+
     # The diagonal noise ensure to avoid singularities in the QR decomposition
     diagonal_noise: float = 1e-8
     # Threshold below which scaling is not performed
-    scaling_threashold: float = 1e-12
+    scaling_threshold: float = 1e-12

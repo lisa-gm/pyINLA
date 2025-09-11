@@ -9,7 +9,7 @@ from dalia import ArrayLike, NDArray, backend_flags, comm_rank, comm_size, sp, x
 from dalia.configs.dalia_config import DaliaConfig
 from dalia.core.model import Model
 from dalia.solvers import DenseSolver, DistSerinvSolver, SerinvSolver, SparseSolver
-from dalia.gradient_methods import VanillaGradient
+from dalia.gradient_methods import VanillaGradient, SmartGradient
 from dalia.utils import (
     DummyCommunicator,
     add_str_header,
@@ -192,9 +192,22 @@ class DALIA:
                 )
 
         # --- Initialize Gradient Method
-        self.gradient_method = VanillaGradient(
-            basis_size=self.model.n_hyperparameters, finite_difference_epsilon=1e-3
-        )
+        if self.config.gradient_method.type == "vanilla_gradient":
+            self.gradient_method = VanillaGradient(
+                basis_size=self.model.n_hyperparameters,
+                finite_difference_epsilon=self.config.gradient_method.finite_difference_epsilon,
+            )
+        elif self.config.gradient_method.type == "smart_gradient":
+            self.gradient_method = SmartGradient(
+                basis_size=self.model.n_hyperparameters,
+                finite_difference_epsilon=self.config.gradient_method.finite_difference_epsilon,
+                diagonal_noise=self.config.gradient_method.diagonal_noise,
+                scaling_threshold=self.config.gradient_method.scaling_threshold,
+            )
+        else:
+            raise ValueError(
+                f"Unknown gradient method type: {self.config.gradient_method.type}"
+            )
 
         # --- Set up recurrent variables
         self.gradient_f = xp.zeros(self.model.n_hyperparameters, dtype=xp.float64)
