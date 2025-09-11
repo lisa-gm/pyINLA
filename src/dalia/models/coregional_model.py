@@ -630,9 +630,19 @@ class CoregionalModel(Model):
                 }
 
             # d_list[i] = model.likelihood.evaluate_hessian_likelihood(**kwargs)
+            kwargs["y"] = self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]]
+            hessian = model.likelihood.hessian_likelihood(**kwargs)
+            if hessian.ndim == 1:
+                diag = hessian
+            elif hessian.ndim == 2:
+                diag = hessian.diagonal()
+            else:
+                raise ValueError(
+                    "Hessian of the likelihood must be either 1D or 2D array."
+                )
             d_vec[
                 self.n_observations_idx[i] : self.n_observations_idx[i + 1]
-            ] = model.likelihood.hessian_likelihood(**kwargs).diagonal()
+            ] = diag
 
         self.Qconditional = self.custom_Q_ATDA(
             Q=self.Q_prior,
@@ -682,7 +692,7 @@ class CoregionalModel(Model):
     ) -> float:
         likelihood: float = 0.0
         for i, model in enumerate(self.models):
-            likelihood += model.likelihood.evaluate_likelihood(
+            likelihood += model.likelihood.evaluate_sum_likelihood(
                 eta=eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
                 y=self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
                 theta=float(self.theta[self.hyperparameters_idx[i + 1] - 1]),
