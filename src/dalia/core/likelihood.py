@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from dalia import ArrayLike, NDArray
+from dalia import ArrayLike, NDArray, xp,sp
 from dalia.configs.likelihood_config import LikelihoodConfig
 
 
@@ -27,15 +27,30 @@ class Likelihood(ABC):
             return grad
         else:
             raise NotImplementedError(f"Method {self.config.method} not implemented.")
-    
-    def hessian_likelihood(self, eta, y, h=1e-4, **kwargs):
+        # ref = self.evaluate_gradient_likelihood(eta, y, **kwargs)
+        # grad = self.finite_difference_gradient_likelihood(eta, y, h, **kwargs)
+        # assert xp.allclose(ref, grad), f"Gradient mismatch: {ref} vs {grad}"
+        # return grad
+
+    def hessian_likelihood(self, h: float = 1e-2, **kwargs):
         if self.config.method == "exact":
-            return self.evaluate_hessian_likelihood(eta, y, **kwargs)
+            return self.evaluate_hessian_likelihood(**kwargs)
         elif self.config.method == "finite_difference":
-            hess = self.finite_difference_hessian_likelihood(eta, y, h, **kwargs)
+            kwargs = kwargs or {}
+            kwargs["h"] = h
+            hess = self.finite_difference_hessian_likelihood(**kwargs)
             return hess
         else:
             raise NotImplementedError(f"Method {self.config.method} not implemented.")
+        # ref = self.evaluate_hessian_likelihood(**kwargs)
+        # ref_diag = ref.diagonal()
+        # kwargs = kwargs or {}
+        # kwargs["h"] = 1e-3
+        # hess = self.finite_difference_hessian_likelihood(**kwargs)
+        # rel_error = xp.linalg.norm(ref_diag - hess) / xp.linalg.norm(ref_diag)
+        # if not xp.allclose(ref_diag, hess):
+        #     print(f"Hessian mismatch: {rel_error}")
+        # return hess
 
     @abstractmethod
     def evaluate_likelihood(
@@ -43,7 +58,7 @@ class Likelihood(ABC):
         eta: NDArray,
         y: NDArray,
         **kwargs,
-    ) -> float:
+    ) -> NDArray:
         """Evaluate the likelihood.
 
         Parameters
@@ -62,6 +77,33 @@ class Likelihood(ABC):
             Likelihood.
         """
         pass
+     
+    def evaluate_sum_likelihood(
+        self,
+        eta: NDArray,
+        y: NDArray,
+        **kwargs,
+    ) -> float:
+        """Evaluate the sum of the likelihood over all observations.
+
+        Parameters
+        ----------
+        eta : NDArray
+            Vector of the linear predictor.
+        y : NDArray
+            Vector of the observations.
+        kwargs :
+            theta : float
+                Specific parameter for the likelihood calculation.
+
+        Returns
+        -------
+        sum_likelihood : float
+            Sum of the likelihood over all observations.
+        """
+        likelihood = self.evaluate_likelihood(eta, y, **kwargs)
+        sum_likelihood = float(likelihood.sum())
+        return sum_likelihood
 
     @abstractmethod
     def evaluate_gradient_likelihood(
@@ -150,7 +192,7 @@ class Likelihood(ABC):
             self,
             eta: NDArray,
             y: NDArray,
-            h: float = 1e-4,
+            h: float = 1e-2,
             **kwargs,
     ) -> NDArray:
         """Evaluate the finite difference Hessian of the likelihood wrt to eta = Ax.
