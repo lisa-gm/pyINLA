@@ -135,7 +135,7 @@ def bcast(
         The communication group. Default is MPI.COMM_WORLD.
     """
 
-    print("Broadcasting data from root:", root, "to all processes. data :", data)
+    # print("Broadcasting data from root:", root, "to all processes.")
 
     if backend_flags["mpi_avail"]:
         comm.Bcast(data, root=root)
@@ -249,13 +249,12 @@ def check_vector_consistency(
     else:
         norm_diff = np.linalg.norm(theta - theta_ref)
 
-
     if norm_diff > 1e-10:
         raise ValueError(
             f"Process {comm.Get_rank()} has a different theta than the reference process."
             f" Expected: {theta_ref}, but got:  {theta}. diff = {norm_diff:.4e}"
         )
-    
+
 
 if __name__ == "__main__":
 
