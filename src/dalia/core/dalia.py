@@ -336,7 +336,7 @@ class DALIA:
         }
         synchronize(comm=self.comm_world)
         toc = time.perf_counter()
-        print_msg(f"DALIA inference took: {toc - tic:0.4f} (s)", flush = True)
+        print_msg(f"DALIA inference took: {toc - tic:0.4f} (s)", flush=True)
         return results
 
     def minimize(self) -> optimize.OptimizeResult:
@@ -653,8 +653,8 @@ class DALIA:
         # --- Optimize x and evaluate the conditional of the latent parameters
         if self.model.is_likelihood_gaussian():
             # Done by both processes
-            tic = time.perf_counter()
             synchronize_gpu()
+            tic = time.perf_counter()
             self.model.construct_Q_prior()
             synchronize_gpu()
             toc = time.perf_counter()
@@ -794,11 +794,15 @@ class DALIA:
         #     flush=True,
         # )
         cov_theta = xp.linalg.inv(hess_theta)
-        synchronize(comm=self.comm_world)     
+        synchronize(comm=self.comm_world)
         toc = time.perf_counter()
         t_covariance_hp = toc - tic
-        print_msg("Time to compute covariance of hyperparameters:", t_covariance_hp, flush=True)
-        
+        print_msg(
+            "Time to compute covariance of hyperparameters:",
+            t_covariance_hp,
+            flush=True,
+        )
+
         return cov_theta
 
     def _evaluate_hessian_f(

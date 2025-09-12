@@ -1,8 +1,11 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
+import time
+
 from dalia import NDArray, sp, xp
 from dalia.configs.dalia_config import SolverConfig
 from dalia.core.solver import Solver
+from dalia.utils import synchronize_gpu
 
 
 class SparseSolver(Solver):
@@ -17,7 +20,19 @@ class SparseSolver(Solver):
         self.L: sp.sparse.spmatrix = None
 
     def cholesky(self, A: sp.sparse.spmatrix, **kwargs) -> None:
-        """Compute Cholesky factor of input matrix."""
+        """Compute the Cholesky decomposition of a matrix.
+
+        Parameters
+        ----------
+        A : sp.sparse.spmatrix
+            The input matrix to decompose.
+
+        Returns
+        -------
+        None
+        """
+        synchronize_gpu()
+        tic = time.perf_counter()
 
         A = sp.sparse.csc_matrix(A)
 
@@ -27,6 +42,10 @@ class SparseSolver(Solver):
             self.L = LU.L.dot(sp.sparse.diags(LU.U.diagonal() ** 0.5))
         else:
             raise ValueError("The matrix is not positive definite")
+
+        synchronize_gpu()
+        toc = time.perf_counter()
+        self.t_cholesky += toc - tic
 
     def solve(
         self,
@@ -49,7 +68,13 @@ class SparseSolver(Solver):
         self,
         **kwargs,
     ) -> float:
-        """Compute logdet of input matrix using Cholesky factor."""
+        """Compute the log determinant of the matrix.
+
+        Returns
+        -------
+        float
+            The log determinant of the matrix.
+        """
 
         if self.L is None:
             raise ValueError("Cholesky factor not computed")

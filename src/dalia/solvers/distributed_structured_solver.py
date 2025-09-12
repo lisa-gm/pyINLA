@@ -1,8 +1,7 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
-from warnings import warn
-
 import time
+from warnings import warn
 
 from dalia import NDArray, backend_flags, sp, xp, xp_host
 from dalia.configs.dalia_config import SolverConfig
@@ -185,13 +184,26 @@ class DistSerinvSolver(Solver):
         A: sp.sparse.spmatrix,
         sparsity: str,
     ) -> None:
-        """Compute Cholesky factor of input matrix."""
+        """Compute the Cholesky decomposition of a matrix.
+
+        Parameters
+        ----------
+        A : sp.sparse.spmatrix
+            The input matrix to decompose.
+        sparsity : str
+            The sparsity pattern of the matrix. Either 'bt' or 'bta'.
+
+        Returns
+        -------
+        None
+        """
+        synchronize(comm=self.comm)
+        tic = time.perf_counter()
+
         # Reset the tip block for reccurrent calls
         # print(f"WorldRank {self.rank} ENTERING {sparsity} cholesky.", flush=True)
         self._spmatrix_to_structured(A, sparsity)
 
-        tic = time.perf_counter()
-        synchronize(comm=self.comm)
         if sparsity == "bta":
             ppobtaf(
                 self.A_diagonal_blocks,
@@ -218,6 +230,7 @@ class DistSerinvSolver(Solver):
             raise ValueError(
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
+
         synchronize(comm=self.comm)
         toc = time.perf_counter()
         self.t_cholesky += toc - tic
@@ -227,11 +240,30 @@ class DistSerinvSolver(Solver):
         rhs: NDArray,
         sparsity: str,
     ) -> NDArray:
-        """Solve linear system using Cholesky factor."""
+        """Solve linear system using Cholesky factor.
+
+        Parameters
+        ----------
+        rhs : NDArray
+            Right-hand side of the linear system.
+        sparsity : str
+            The sparsity pattern of the matrix. Either 'bt' or 'bta'.
+
+        Returns
+        -------
+        NDArray
+            Solution of the linear system.
+
+        Raises
+        ------
+        ValueError
+            If the sparsity pattern is unknown.
+        """
+        synchronize(comm=self.comm)
+        tic = time.perf_counter()
+
         self._slice_rhs(rhs, sparsity)
 
-        tic = time.perf_counter()
-        synchronize(comm=self.comm)
         if sparsity == "bta":
             ppobtas(
                 L_diagonal_blocks=self.A_diagonal_blocks,
@@ -260,11 +292,12 @@ class DistSerinvSolver(Solver):
             raise ValueError(
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
+
+        self._gather_rhs(rhs, sparsity)
+
         synchronize(comm=self.comm)
         toc = time.perf_counter()
         self.t_solve += toc - tic
-
-        self._gather_rhs(rhs, sparsity)
 
         return rhs
 
@@ -272,7 +305,18 @@ class DistSerinvSolver(Solver):
         self,
         sparsity: str,
     ) -> float:
-        """Compute logdet of input matrix using Cholesky factor."""
+        """Compute the log determinant of the matrix.
+
+        Parameters
+        ----------
+        sparsity : str
+            The sparsity pattern of the matrix. Either 'bt' or 'bta'.
+
+        Returns
+        -------
+        float
+            The log determinant of the matrix.
+        """
         logdet = xp.array(0.0, dtype=xp.float64)
 
         if self.rank == 0:
@@ -408,9 +452,9 @@ class DistSerinvSolver(Solver):
                 block_slice = A_csc[
                     -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
                 ].tocoo()
-                self.A_arrow_tip_block[
-                    block_slice.row, block_slice.col
-                ] = block_slice.data
+                self.A_arrow_tip_block[block_slice.row, block_slice.col] = (
+                    block_slice.data
+                )
 
     def _spmatrix_to_bta(
         self,
@@ -775,9 +819,9 @@ class DistSerinvSolver(Solver):
                 ]
             )
         else:
-            self.send_rhs[
-                self.remainders[self.rank] * self.diagonal_blocksize :
-            ] = self.dist_rhs[: -self.arrowhead_blocksize].flatten()
+            self.send_rhs[self.remainders[self.rank] * self.diagonal_blocksize :] = (
+                self.dist_rhs[: -self.arrowhead_blocksize].flatten()
+            )
 
         synchronize(comm=self.comm)
         self.comm.Allgather(

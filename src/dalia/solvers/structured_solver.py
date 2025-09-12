@@ -1,7 +1,7 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
-from warnings import warn
 import time
+from warnings import warn
 
 from dalia import NDArray, sp, xp, xp_host
 from dalia.configs.dalia_config import SolverConfig
@@ -13,7 +13,6 @@ try:
     from serinv.algs import pobtaf, pobtas, pobtasi, pobtf, pobts, pobtsi
 except ImportError as e:
     warn(f"The serinv package is required to use the SerinvSolver: {e}")
-
 
 
 class SerinvSolver(Solver):
@@ -74,27 +73,40 @@ class SerinvSolver(Solver):
         A: sp.sparse.spmatrix,
         sparsity: str,
     ) -> None:
-        """Compute Cholesky factor of input matrix."""
-        self._spmatrix_to_structured(A, sparsity)
+        """Compute the Cholesky decomposition of a matrix.
 
-        tic = time.perf_counter()
+        Parameters
+        ----------
+        A : sp.sparse.spmatrix
+            The input matrix to decompose.
+        sparsity : str
+            The sparsity pattern of the matrix. Either 'bt' or 'bta'.
+
+        Returns
+        -------
+        None
+        """
         synchronize_gpu()
+        tic = time.perf_counter()
+
+        self._spmatrix_to_structured(A, sparsity)
         if sparsity == "bta":
-                pobtaf(
-                    self.A_diagonal_blocks,
-                    self.A_lower_diagonal_blocks,
-                    self.A_arrow_bottom_blocks,
-                    self.A_arrow_tip_block,
-                )
+            pobtaf(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                self.A_arrow_bottom_blocks,
+                self.A_arrow_tip_block,
+            )
         elif sparsity == "bt":
-                pobtf(
-                    self.A_diagonal_blocks,
-                    self.A_lower_diagonal_blocks,
-                )
+            pobtf(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+            )
         else:
             raise ValueError(
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
+
         synchronize_gpu()
         toc = time.perf_counter()
         self.t_cholesky += toc - tic
@@ -104,44 +116,63 @@ class SerinvSolver(Solver):
         rhs: NDArray,
         sparsity: str,
     ) -> NDArray:
-        """Solve linear system using Cholesky factor."""
+        """Solve linear system using Cholesky factor.
 
-        tic = time.perf_counter()
+        Parameters
+        ----------
+        rhs : NDArray
+            Right-hand side of the linear system.
+        sparsity : str
+            The sparsity pattern of the matrix. Either 'bt' or 'bta'.
+
+        Returns
+        -------
+        NDArray
+            Solution of the linear system.
+
+        Raises
+        ------
+        ValueError
+            If the sparsity pattern is unknown.
+        """
         synchronize_gpu()
+        tic = time.perf_counter()
+
         if sparsity == "bta":
-                pobtas(
-                    self.A_diagonal_blocks,
-                    self.A_lower_diagonal_blocks,
-                    self.A_arrow_bottom_blocks,
-                    self.A_arrow_tip_block,
-                    rhs,
-                    trans="N",
-                )
-                pobtas(
-                    self.A_diagonal_blocks,
-                    self.A_lower_diagonal_blocks,
-                    self.A_arrow_bottom_blocks,
-                    self.A_arrow_tip_block,
-                    rhs,
-                    trans="C",
-                )
+            pobtas(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                self.A_arrow_bottom_blocks,
+                self.A_arrow_tip_block,
+                rhs,
+                trans="N",
+            )
+            pobtas(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                self.A_arrow_bottom_blocks,
+                self.A_arrow_tip_block,
+                rhs,
+                trans="C",
+            )
         elif sparsity == "bt":
-                pobts(
-                    self.A_diagonal_blocks,
-                    self.A_lower_diagonal_blocks,
-                    rhs,
-                    trans="N",
-                )
-                pobts(
-                    self.A_diagonal_blocks,
-                    self.A_lower_diagonal_blocks,
-                    rhs,
-                    trans="C",
-                )
+            pobts(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                rhs,
+                trans="N",
+            )
+            pobts(
+                self.A_diagonal_blocks,
+                self.A_lower_diagonal_blocks,
+                rhs,
+                trans="C",
+            )
         else:
             raise ValueError(
                 f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
             )
+
         synchronize_gpu()
         toc = time.perf_counter()
         self.t_solve += toc - tic
@@ -152,7 +183,18 @@ class SerinvSolver(Solver):
         self,
         sparsity: str,
     ) -> float:
-        """Compute logdet of input matrix using Cholesky factor."""
+        """Compute the log determinant of the matrix.
+
+        Parameters
+        ----------
+        sparsity : str
+            The sparsity pattern of the matrix. Either 'bt' or 'bta'.
+
+        Returns
+        -------
+        float
+            The log determinant of the matrix.
+        """
         logdet: float = 0.0
         for i in range(self.n_diag_blocks):
             logdet += xp.sum(xp.log(self.A_diagonal_blocks[i].diagonal()))
@@ -245,9 +287,9 @@ class SerinvSolver(Solver):
                 block_slice = A_csc[
                     -self.arrowhead_blocksize :, -self.arrowhead_blocksize :
                 ].tocoo()
-                self.A_arrow_tip_block[
-                    block_slice.row, block_slice.col
-                ] = block_slice.data
+                self.A_arrow_tip_block[block_slice.row, block_slice.col] = (
+                    block_slice.data
+                )
 
     def _spmatrix_to_bta(
         self,
