@@ -30,6 +30,7 @@ from dalia.submodels import (
     RegressionSubModel,
     SpatialSubModel,
     SpatioTemporalSubModel,
+    AR1SubModel,
 )
 from dalia.utils import add_str_header, boxify, scaled_logit
 
@@ -153,6 +154,36 @@ class Model(ABC):
                     )
             elif isinstance(submodel, RegressionSubModel):
                 self.n_fixed_effects += submodel.n_fixed_effects
+
+            elif isinstance(submodel, AR1SubModel):
+
+                if isinstance(submodel.config.ph_phi, BetaPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        BetaPriorHyperparameters(
+                            config=submodel.config.ph_phi,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_phi,
+                    PenalizedComplexityPriorHyperparametersConfig,
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_phi,
+                            hyperparameter_type="phi",
+                        )
+                    )
+
+                if isinstance(
+                    submodel.config.ph_tau, GaussianPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_tau,
+                        )
+                    )
+                else:
+                    raise ValueError("Unknown prior hyperparameter type for ph_tau")
 
             elif isinstance(submodel, BrainiacSubModel):
                 # h2 hyperparameters
@@ -334,6 +365,7 @@ class Model(ABC):
             cols = []
             data = []
 
+            ## TODO: improve the if / elif statements
             for i, submodel in enumerate(self.submodels):
                 if isinstance(submodel, SpatioTemporalSubModel):
                     for hp_idx in range(
@@ -346,6 +378,11 @@ class Model(ABC):
                     ):
                         kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
                 elif isinstance(submodel, BrainiacSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, AR1SubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
@@ -374,6 +411,13 @@ class Model(ABC):
                 shape=(self.n_latent_parameters, self.n_latent_parameters),
             )
 
+            # print("in Qprior is none.")
+            # print("submodel.data: ", submodel_Q_prior.data)
+            # print("row indices: ", self.Q_prior.indices)
+            # print("col indptr: ", self.Q_prior.indptr)
+            # print("self.Q_prior.data: ", self.Q_prior.data)
+            # print("data mapping: ", self.Q_prior_data_mapping)
+
         else:
             for i, submodel in enumerate(self.submodels):
                 if isinstance(submodel, RegressionSubModel):
@@ -393,12 +437,38 @@ class Model(ABC):
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
                         kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                elif isinstance(submodel, AR1SubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
+
+                # print(
+                #     "In model.py. submodel_Q_prior[:6, :6] : \n",
+                #     submodel_Q_prior.toarray()[:6, :6],
+                # )
+
+                # print(
+                #     "self.Q_prior_data_mapping[i] : self.Q_prior_data_mapping[i + 1]: ",
+                #     self.Q_prior_data_mapping[i],
+                #     ":",
+                #     self.Q_prior_data_mapping[i + 1],
+                # )
+
+                # print("submodel.data: ", submodel_Q_prior.data)
 
                 self.Q_prior.data[
                     self.Q_prior_data_mapping[i] : self.Q_prior_data_mapping[i + 1]
                 ] = submodel_Q_prior.data
+
+                # print("row indices: ", self.Q_prior.indices)
+                # print("col indptr: ", self.Q_prior.indptr)
+                # print("self.Q_prior.data: ", self.Q_prior.data)
+                # print("data mapping: ", self.Q_prior_data_mapping)
+
+        # print("In model.py. Q_prior[:6, :6] : \n", self.Q_prior.toarray()[:6, :6])
 
         return self.Q_prior
 
@@ -487,23 +557,34 @@ class Model(ABC):
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0
 
+        theta_interpret = self.theta
+
+        for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
+
+            if isinstance(prior_hyperparameter, BetaPriorHyperparameters):
+                theta_interpret[i] = scaled_logit(
+                    theta_interpret[i], direction="backward"
+                )
+
+            log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
+
         # if BFGS and model scale differ: rescale -- generalize
-        if isinstance(self.submodels[0], BrainiacSubModel):
-            #
-            theta_interpret = self.theta.copy()
-            theta_interpret[0] = scaled_logit(self.theta[0], direction="backward")
-            log_prior += self.prior_hyperparameters[0].evaluate_log_prior(
-                theta_interpret[0]
-            )
+        # if isinstance(self.submodels[0], BrainiacSubModel):
+        #     #
+        #     theta_interpret = self.theta.copy()
+        #     theta_interpret[0] = scaled_logit(self.theta[0], direction="backward")
+        #     log_prior += self.prior_hyperparameters[0].evaluate_log_prior(
+        #         theta_interpret[0]
+        #     )
 
-            log_prior += self.prior_hyperparameters[1].evaluate_log_prior(
-                theta_interpret[1:]
-            )
-        else:
-            theta_interpret = self.theta
+        #     log_prior += self.prior_hyperparameters[1].evaluate_log_prior(
+        #         theta_interpret[1:]
+        #     )
+        # else:
+        #     theta_interpret = self.theta
 
-            for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-                log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
+        #     for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
+        #         log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
 
         return log_prior
 
