@@ -2,22 +2,17 @@
 
 This directory contains the comprehensive test suite for the DALIA framework, organized according to the **testing pyramid** principle.
 
-## 🏗️ **Test Architecture Overview**
+## 1. **Test Architecture Overview**
 
 ```
-                    🔺
-                   /   \
-              integration/     ← Few, expensive, end-to-end tests
-                 /       \
-        component_integration/  ← Medium, component interaction tests
-               /           \
-              /    unit/    \   ← Many, fast, isolated tests
-             /_______________\
+integration/                ← Few, expensive, end-to-end tests
+component_integration/      ← Medium, component interaction tests
+unit/                       ← Many, fast, isolated tests
 ```
 
-## 📁 **Directory Structure**
+## 2. **Testing Suite Structure**
 
-### [`unit/`](unit/README.md) - **Fast, Isolated Tests**
+### 2.1 [`unit/`](unit/README.md) - **Fast, Isolated Tests**
 - **Purpose**: Test individual components in isolation
 - **Speed**: < 100ms per test (typically)
 - **Dependencies**: Minimal (mocked when needed)
@@ -25,7 +20,14 @@ This directory contains the comprehensive test suite for the DALIA framework, or
 
 **Examples**: Configuration validation, utility functions, error handling
 
-### [`component_integration/`](component_integration/README.md) - **Component Interaction Tests**  
+#### Add to `unit/` when:
+- Testing pure logic without external dependencies
+- Validating configuration and input parsing
+- Testing error conditions and edge cases
+- Verifying utility functions and calculations
+
+
+### 2.2 [`component_integration/`](component_integration/README.md) - **Component Interaction Tests**  
 - **Purpose**: Test interactions within or between closely related components
 - **Speed**: 100ms - 5s per test
 - **Dependencies**: Real system resources (MPI, GPU, files)
@@ -33,7 +35,17 @@ This directory contains the comprehensive test suite for the DALIA framework, or
 
 **Examples**: MPI communication, GPU kernels, backend compatibility
 
-### [`integration/`](integration/README.md) - **End-to-End Workflow Tests**
+**Note**: These tests need workflows specific to testing cluster with enabled GPU and multiprocessing (multi-node) capabilities.
+
+#### Add to `component_integration/` when:
+- Testing real MPI communication
+- Testing actual GPU operations
+- Testing file I/O and data persistence
+- Testing cross-backend compatibility
+- Testing hardware detection and initialization
+
+
+### 2.3 [`integration/`](integration/README.md) - **End-to-End Workflow Tests**
 - **Purpose**: Test complete user workflows and multi-component interactions
 - **Speed**: Minutes to hours per test
 - **Dependencies**: Full system setup + datasets
@@ -41,7 +53,18 @@ This directory contains the comprehensive test suite for the DALIA framework, or
 
 **Examples**: Complete Gaussian Process workflows, performance benchmarks, scientific accuracy
 
-## 🚀 **Running Tests**
+**Note**: These tests need workflows specific to testing cluster with enabled GPU and multiprocessing (multi-node) capabilities.
+
+#### Add to `integration/` when:
+- Testing complete user workflows
+- Validating scientific accuracy end-to-end
+- Testing performance and scalability
+- Verifying multiple components working together
+- Testing example code and documentation
+
+
+
+## 3. **Running Tests**
 
 ### Quick Development Testing
 ```bash
@@ -50,9 +73,6 @@ python -m pytest tests/unit/ -v
 
 # Run tests for specific component
 python -m pytest tests/unit/communicator/ -v
-
-# Use standalone runner for rapid iteration
-python tests/unit/communicator/runner.py
 ```
 
 ### Comprehensive Testing
@@ -67,50 +87,11 @@ python -m pytest tests/unit/ tests/component_integration/ -v
 python -m pytest tests/unit/ --cov=src/dalia --cov-report=html
 ```
 
-### CI/CD Pipeline Testing
-```bash
-# Fast feedback loop (< 30 seconds)
-python -m pytest tests/unit/ -x
+### CI/CD Testing Pipeline
 
-# Medium verification (< 5 minutes)  
-python -m pytest tests/unit/ tests/component_integration/ -x
+Todo: ...
 
-# Full verification (nightly, pre-release)
-python -m pytest tests/ --timeout=3600
-```
-
-## 🎯 **When to Add Tests Where**
-
-### Add to `unit/` when:
-- ✅ Testing pure logic without external dependencies
-- ✅ Validating configuration and input parsing
-- ✅ Testing error conditions and edge cases
-- ✅ Verifying utility functions and calculations
-
-### Add to `component_integration/` when:
-- ✅ Testing real MPI communication
-- ✅ Testing actual GPU operations
-- ✅ Testing file I/O and data persistence
-- ✅ Testing cross-backend compatibility
-- ✅ Testing hardware detection and initialization
-
-### Add to `integration/` when:
-- ✅ Testing complete user workflows
-- ✅ Validating scientific accuracy end-to-end
-- ✅ Testing performance and scalability
-- ✅ Verifying multiple components working together
-- ✅ Testing example code and documentation
-
-## 📊 **Current Test Status**
-
-| Component | Unit Tests | Component Integration | Integration |
-|-----------|------------|----------------------|-------------|
-| Communicator | ✅ Complete | ✅ Complete | 🚧 Planned |
-| Solvers | 🚧 Planned | 🚧 Planned | 🚧 Planned |
-| Kernels | 🚧 Planned | 🚧 Planned | 🚧 Planned |
-| Models | 🚧 Planned | 🚧 Planned | 🚧 Planned |
-
-## 🛠️ **Development Guidelines**
+## 4. **Testing Guidelines**
 
 1. **Follow the pyramid**: More unit tests, fewer integration tests
 2. **Start with unit tests** when adding new functionality
@@ -123,7 +104,42 @@ python -m pytest tests/ --timeout=3600
 6. **Clean up resources** (files, GPU memory, MPI communicators)
 7. **Use descriptive test names** that explain what's being tested
 
-## 🔧 **Test Configuration**
+
+### 4.1 **Contributing New Tests**
+
+When adding new functionality:
+
+1. **Start with unit tests** in `tests/unit/[component]/`
+2. **Add component integration tests** if using real system resources
+3. **Consider integration tests** for user-facing workflows
+4. **Update relevant README files** when adding new test categories
+5. **Use appropriate pytest markers** for test categorization
+
+### 4.2 **Example Component Test Structure**
+
+Here is a suggested test structure for a hypothetical DALIA new component `new_component`:
+
+```
+tests/
+├── unit/
+│   └── new_component/
+│       ├── conftest.py
+│       ├── test_basic.py
+│       └── test_config.py
+│       
+├── component_integration/
+│   └── new_component/
+│       ├── conftest.py
+│       ├── test_hardware_integration.py
+│       └── test_cross_backend.py
+│
+└── integration/
+    └── test_new_component_workflows.py
+```
+
+In the case of the implementation of a new feature to an existing component, add/adapt tests to the existing component test directories.
+
+## 5. **Test Configuration**
 
 ### Pytest Configuration (`pyproject.toml` or `pytest.ini`)
 ```ini
@@ -144,33 +160,4 @@ export USE_NCCL=1          # Enable NCCL testing
 export ARRAY_MODULE=cupy   # Use CuPy for GPU tests
 ```
 
-## 📈 **Contributing New Tests**
 
-When adding new functionality:
-
-1. **Start with unit tests** in `tests/unit/[component]/`
-2. **Add component integration tests** if using real system resources
-3. **Consider integration tests** for user-facing workflows
-4. **Update relevant README files** when adding new test categories
-5. **Use appropriate pytest markers** for test categorization
-
-## 🎪 **Example Component Test Structure**
-
-```
-tests/
-├── unit/
-│   └── new_component/
-│       ├── conftest.py
-│       ├── test_basic.py
-│       ├── test_config.py
-│       └── runner.py
-├── component_integration/
-│   └── new_component/
-│       ├── conftest.py
-│       ├── test_hardware_integration.py
-│       └── test_cross_backend.py
-└── integration/
-    └── test_new_component_workflows.py
-```
-
-This structure ensures comprehensive testing while maintaining fast development feedback loops! 🎯
