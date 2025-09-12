@@ -98,6 +98,8 @@ class BrainiacSubModel(SubModel):
 
         return likelihood
 
+    # TODO/NOTE: Maybe specialize the Gaussian likelihood in its own class
+    # and have BrainiacSubModel use it as its likelihood?
     def evaluate_gradient_likelihood(
         self, eta: NDArray, y: NDArray, **kwargs
     ) -> NDArray:

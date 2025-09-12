@@ -431,19 +431,30 @@ class Model(ABC):
             d_matrix = self.submodels[0].evaluate_d_matrix(**kwargs)
         else:
             # General rules
-            d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
+            kwargs["y"] = self.y
+            d_matrix = self.likelihood.hessian_likelihood(**kwargs)
+        
+        if d_matrix.ndim == 1:
+            d_matrix_diagonal_0 = d_matrix[0]
+            d_matrix = sp.sparse.diags(d_matrix)
+        elif d_matrix.ndim == 2:
+            d_matrix_diagonal_0 = d_matrix.diagonal()[0]
+        else:
+            raise ValueError("d_matrix must be 1D or 2D array.")
 
         # if self.a is sparse -> Q_conditional should be sparse, else dense
         if sp.sparse.issparse(self.a):
             if self.aTa is not None:
-                self.Q_conditional = self.Q_prior - d_matrix.diagonal()[0] * self.aTa
+                # self.Q_conditional = self.Q_prior - d_matrix.diagonal()[0] * self.aTa
+                self.Q_conditional = self.Q_prior - d_matrix_diagonal_0 * self.aTa
             else:
                 self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
             # self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
         else:
             if self.aTa is not None:
                 self.Q_conditional = (
-                    self.Q_prior.toarray() - d_matrix.diagonal()[0] * self.aTa
+                    # self.Q_prior.toarray() - d_matrix.diagonal()[0] * self.aTa
+                    self.Q_prior.toarray() - d_matrix_diagonal_0 * self.aTa
                 )
             else:
                 self.Q_conditional = (
@@ -467,7 +478,7 @@ class Model(ABC):
             )
 
         else:
-            gradient_likelihood = self.likelihood.evaluate_gradient_likelihood(
+            gradient_likelihood = self.likelihood.gradient_likelihood(
                 eta=eta,
                 y=self.y,
                 theta=self.theta[self.hyperparameters_idx[-1] :],
@@ -540,7 +551,7 @@ class Model(ABC):
             kwargs["h2"] = float(self.theta[0])
             likelihood = self.submodels[0].evaluate_likelihood(eta, self.y, **kwargs)
         else:
-            likelihood = self.likelihood.evaluate_likelihood(
+            likelihood = self.likelihood.evaluate_sum_likelihood(
                 eta, self.y, theta=self.theta[self.hyperparameters_idx[-1] :]
             )
 

@@ -18,7 +18,7 @@ class PoissonLikelihood(Likelihood):
         config: PoissonLikelihoodConfig,
     ) -> None:
         """Initializes the Poisson likelihood."""
-        super().__init__(config, n_observations)
+        super().__init__(n_observations, config)
 
         # Load the extra coeficients for Poisson likelihood
         try:
@@ -37,8 +37,9 @@ class PoissonLikelihood(Likelihood):
         eta: NDArray,
         y: NDArray,
         **kwargs,
-    ) -> float:
-        likelihood: float = xp.dot(eta, y) - xp.sum(self.e * xp.exp(eta))
+    ) -> NDArray:
+        # likelihood: float = xp.dot(eta, y) - xp.sum(self.e * xp.exp(eta))
+        likelihood = eta * y - self.e * xp.exp(eta)
 
         return likelihood
 

@@ -43,7 +43,7 @@ class BinomialLikelihood(Likelihood):
         eta: NDArray,
         y: NDArray,
         **kwargs,
-    ) -> float:
+    ) -> NDArray:
         """Evalutate the a binomial likelihood.
 
         Parameters
@@ -64,9 +64,10 @@ class BinomialLikelihood(Likelihood):
         """
         linkEta: NDArray = self.link_function(eta)
 
-        likelihood: float = xp.dot(y, xp.log(linkEta)) + xp.dot(
-            self.n_trials - y, xp.log(1 - linkEta)
-        )
+        # likelihood: float = xp.dot(y, xp.log(linkEta)) + xp.dot(
+        #     self.n_trials - y, xp.log(1 - linkEta)
+        # )
+        likelihood = y * xp.log(linkEta) + (self.n_trials - y) * xp.log(1 - linkEta)
 
         return likelihood
 
