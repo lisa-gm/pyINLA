@@ -1,5 +1,5 @@
 # Copyright 2023-2025 ETH Zurich. All rights reserved.
-# Global pytest fixtures for the communicator component integration tests.
+# Global pytest fixtures for the Serinv tests.
 
 import os
 import pytest
@@ -15,6 +15,8 @@ if backend_flags["cupy_avail"]:
             pytest.param("cupy", id="cupy"),
         ]
     )
+
+
 @pytest.fixture(params=ARRAY_MODULE, autouse=True)
 def ARRAY_MODULE(request: pytest.FixtureRequest) -> str:
     return request.param
@@ -35,6 +37,8 @@ if backend_flags["mpi_avail"]:
         COMM_LIB.append(
             pytest.param("nccl", id="nccl"),
         )
+
+
 @pytest.fixture(params=COMM_LIB, autouse=True)
 def COMM_LIB(request: pytest.FixtureRequest) -> str:
     return request.param

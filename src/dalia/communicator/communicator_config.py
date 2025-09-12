@@ -31,7 +31,8 @@ class CommunicatorConfig(BaseModel):
     # Collectives that are not supported by NCCL
     allgatherv: Literal["default", "host_mpi", "device_mpi", "none"] = "default"
     alltoall: Literal["default", "host_mpi", "device_mpi", "none"] = "default"
-    
+
+
 class FCommunicatorConfig(CommunicatorConfig):
     """
     Configuration for the communicator using the default backend.
@@ -71,9 +72,9 @@ class DALIACommunicatorConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     base: CommunicatorConfig
-    f: FCommunicatorConfig
-    q: QCommunicatorConfig
-    s: SCommunicatorConfig
+    feval: FCommunicatorConfig
+    qeval: QCommunicatorConfig
+    solver: SCommunicatorConfig
 
 
 def parse_dalia_communicator_config(
@@ -112,7 +113,7 @@ def parse_dalia_communicator_config(
     comm_config = config_dict.get("communicator", {})
 
     # Check if this is a simple config (no nested sections)
-    has_nested = any(key in comm_config for key in ["base", "f", "q", "s"])
+    has_nested = any(key in comm_config for key in ["base", "feval", "qeval", "solver"])
 
     if not has_nested:
         # Simple config - use the same config for all
@@ -121,9 +122,9 @@ def parse_dalia_communicator_config(
 
         return DALIACommunicatorConfig(
             base=base_config,
-            f=FCommunicatorConfig(**base_dict),
-            q=QCommunicatorConfig(**base_dict),
-            s=SCommunicatorConfig(**base_dict),
+            feval=FCommunicatorConfig(**base_dict),
+            qeval=QCommunicatorConfig(**base_dict),
+            solver=SCommunicatorConfig(**base_dict),
         )
     else:
         # Advanced config with inheritance
@@ -131,13 +132,13 @@ def parse_dalia_communicator_config(
         base_config = CommunicatorConfig(**base_config_dict)
         base_dict = base_config.model_dump()
 
-        f_dict = {**base_dict, **comm_config.get("f", {})}
-        q_dict = {**base_dict, **comm_config.get("q", {})}
-        s_dict = {**base_dict, **comm_config.get("s", {})}
+        feval_dict = {**base_dict, **comm_config.get("feval", {})}
+        qeval_dict = {**base_dict, **comm_config.get("qeval", {})}
+        solver_dict = {**base_dict, **comm_config.get("solver", {})}
 
         return DALIACommunicatorConfig(
             base=base_config,
-            f=FCommunicatorConfig(**f_dict),
-            q=QCommunicatorConfig(**q_dict),
-            s=SCommunicatorConfig(**s_dict),
+            feval=FCommunicatorConfig(**feval_dict),
+            qeval=QCommunicatorConfig(**qeval_dict),
+            solver=SCommunicatorConfig(**solver_dict),
         )

@@ -1,3 +1,5 @@
+# Copyright 2024-2025 DALIA authors. All rights reserved.
+
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
