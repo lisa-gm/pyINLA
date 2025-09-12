@@ -11,7 +11,9 @@ body:
     id: performance_issue
     attributes:
       label: Describe the performance issue
-      description: What part of the code or workflow seems slow or could be improved even further? Please describe the context and what you observed.
+      description: | 
+        What part of the code or workflow seems slow or could be improved 
+        further? Please describe the context and what you observed.
       placeholder: Describe the operation, function, or workflow...
       render: text
     validations:
@@ -24,9 +26,20 @@ body:
       description: |
        Please provide a minimal example or steps to reproduce the behavior, 
        if not possible, please provide a gist script that reproduces the issue.
-      placeholder: |
-        #List the steps or provide a code snippet...
+      placeholder: List the steps or provide a code snippet...
       render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: how_to_fix
+    attributes:
+      label: How to fix or optimize
+      description: |
+        If you have suggestions on how to solve this performance issue or
+        optimize the code, please describe them here.
+      placeholder: Describe your suggestions here...
+      render: text
     validations:
       required: true
 
@@ -34,7 +47,8 @@ body:
     id: profiling
     attributes:
       label: Profiling or timing information (optional)
-      description: If available, please include any profiling output or timing measurements.
+      description: | 
+        If available, please include any profiling output or timing measurements.
       placeholder: Paste profiling output or timing results here...
       render: text
     validations:
@@ -44,7 +58,9 @@ body:
     id: hardware_env
     attributes:
       label: Hardware and Environment Details
-      description: Please specify your hardware (CPU, GPU, RAM, etc.), environment configuration, and relevant package versions.
+      description: | 
+        Please specify your hardware (CPU, GPU, RAM, etc.), environment 
+        configuration, and relevant package versions.
       placeholder: |
         Example:
         - CPU: Intel i7-12700K
@@ -67,7 +83,7 @@ body:
     id: dalia_version
     attributes:
       label: Dalia version
-      description: e.g. 1.0.0
+      description: e.g. 0.1.0
     validations:
       required: true
 
@@ -75,7 +91,9 @@ body:
     id: other_packages
     attributes:
       label: Other packages
-      description: List any other relevant packages and their versions that might affect performance.
+      description: | 
+        List any other relevant packages and their versions that might affect 
+        performance.
       placeholder: e.g. numpy 1.21.0, scipy 1.3.0
       render: text
     validations:
@@ -85,8 +103,12 @@ body:
     id: run_command
     attributes:
       label: How did you run the code? (command or bash script)
-      description: Please specify the exact command, script, or notebook cell you used to execute the code.
-      placeholder: e.g. python run.py, mpiexec -n 4 python run.py, or provide the bash script you used.
+      description: | 
+        Please specify the exact command, script, or notebook cell you used to 
+        execute the code.
+      placeholder: | 
+        e.g. python run.py, mpiexec -n 4 python run.py, or provide the bash 
+        script you used.
     validations:
       required: true
 
@@ -94,7 +116,8 @@ body:
     id: additional_context
     attributes:
       label: Additional context
-      description: Add any other relevant context or suggestions for optimization.
+      description: | 
+        Add any other relevant context or suggestions for optimization.
       render: text
     validations:
       required: false
