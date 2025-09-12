@@ -11,7 +11,7 @@ body:
     id: bug_description
     attributes:
       label: Describe the Bug
-      description: Please provide a short but precise description of the issue.
+      description: Please provide a short, but precise, description of the issue.
       render: text
     validations:
       required: true
@@ -39,6 +39,23 @@ body:
     validations:
       required: true
 
+  - type: textarea
+    id: hardware_env
+    attributes:
+      label: Hardware and Environment Details
+      description: | 
+        Please specify your hardware (CPU, GPU, RAM, etc.), environment 
+        configuration, and relevant package versions.
+      placeholder: |
+        Example:
+        - CPU: Intel i7-12700K
+        - GPU: NVIDIA A100
+        - RAM: 32GB
+        - OS: Ubuntu 22.04
+      render: text
+    validations:
+      required: true
+
   - type: input
     id: python_version
     attributes:
@@ -48,18 +65,10 @@ body:
       required: true
 
   - type: input
-    id: package_version
+    id: dalia_version
     attributes:
-      label: Package version
-      description: e.g. 1.0.0
-    validations:
-      required: true
-
-  - type: textarea
-    id: environment
-    attributes:
-      label: Any other relevant environment details
-      description: Please add any other relevant environment details here.
+      label: Dalia version
+      description: e.g. 0.1.0
     validations:
       required: true
 

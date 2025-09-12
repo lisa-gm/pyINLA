@@ -5,7 +5,6 @@
 
 ## Submission Checklist
 - [ ] I have read the [CONTRIBUTING.md](../CONTRIBUTING.md) file
-- [ ] I have read the [CODEOWNERS](../CODEOWNERS) file
 - [ ] My code follows the project's coding style (NumPy/CuPy guidelines)
 - [ ] I have run `pre-commit` hooks and fixed any issues
 - [ ] My branch is created from the `dev` branch (not `main`)
@@ -18,15 +17,15 @@
 ## Type of Change
 Please select the type of change this PR introduces:
 
-- [ ] 🐛 Bug fix (non-breaking change that fixes an issue)
-- [ ] ✨ New feature (non-breaking change that adds functionality)
-- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to change)
-- [ ] 📚 Documentation update
-- [ ] 🧪 Test improvement or addition
-- [ ] 🔧 Code refactoring (no functional changes)
-- [ ] ⚡ Performance improvement
-- [ ] 🎨 Style/formatting changes
-- [ ] 🏗️ Build system or dependency changes
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to change)
+- [ ] Documentation update
+- [ ] Test improvement or addition
+- [ ] Code refactoring (no functional changes)
+- [ ] Performance improvement
+- [ ] Style/formatting changes
+- [ ] Build system or dependency changes
 
 ## Summary of Changes
 <!--- Provide a general summary of your changes in the Title above -->
@@ -41,6 +40,7 @@ Please select the type of change this PR introduces:
 ## How Has This Been Tested?
 <!--- Please describe in detail how you tested your changes -->
 <!--- Include details of your testing environment and the tests you ran -->
+<!--- Include hardware details relevant to the tests you conducted -->
 
 
 ### Tests Performed (and passed)
@@ -108,10 +108,10 @@ By making a contribution to this project, I certify that:
 ---
 
 ## Additional Resources
-- 📖 [Contributing Guidelines](../CONTRIBUTING.md)
+- 📖 [Contributing Guidelines](./CONTRIBUTING.md)
 - 🧪 [Testing Documentation](../tests/README.md)
-- 📋 [Code Owners](../CODEOWNERS)
-- 🏷️ [Commit Message Guidelines](../CONTRIBUTING.md#guidelines-for-commit-messages)
+- 📋 [Code Owners](./CODEOWNERS)
+- 🏷️ [Commit Message Guidelines](./CONTRIBUTING.md#guidelines-for-commit-messages)
 
 **Thank you for contributing to DALIA!**
 
