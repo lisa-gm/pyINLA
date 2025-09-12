@@ -25,12 +25,12 @@ class Solver(ABC):
 
     @abstractmethod
     def cholesky(self, A: ArrayLike, **kwargs) -> None:
-        """Compute Cholesky factor of input matrix.
+        """Compute the Cholesky decomposition of a matrix.
 
         Parameters
         ----------
-        A : ArrayLike
-            Input matrix.
+        A : NDArray | sp.sparse.spmatrix
+            The input matrix to decompose.
 
         Returns
         -------
@@ -40,12 +40,29 @@ class Solver(ABC):
 
     @abstractmethod
     def solve(self, rhs: NDArray, **kwargs) -> NDArray:
-        """Solve linear system using Cholesky factor."""
+        """Solve linear system using Cholesky factor.
+
+        Parameters
+        ----------
+        rhs : NDArray
+            Right-hand side of the linear system.
+
+        Returns
+        -------
+        NDArray
+            Solution of the linear system.
+        """
         ...
 
     @abstractmethod
     def logdet(self, **kwargs) -> float:
-        """Compute logdet of input matrix using Cholesky factor."""
+        """Compute the log determinant of the matrix.
+
+        Returns
+        -------
+        float
+            The log determinant of the matrix.
+        """
         ...
 
     @abstractmethod
