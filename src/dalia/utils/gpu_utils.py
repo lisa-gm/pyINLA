@@ -148,6 +148,6 @@ def memory_report() -> int:
         # Get (CPU) memory usage
         pid = os.getpid()
         used_memory = psutil.Process(pid).memory_info().rss
-        total_memory = dict(psutil.virtual_memory()._asdict())["total"]
+        total_memory = psutil.virtual_memory().total
 
     return used_memory, total_memory
