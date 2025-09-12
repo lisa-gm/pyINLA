@@ -9,6 +9,7 @@ from dalia import ArrayLike, NDArray, backend_flags, comm_rank, comm_size, sp, x
 from dalia.configs.dalia_config import DaliaConfig
 from dalia.core.model import Model
 from dalia.solvers import DenseSolver, DistSerinvSolver, SerinvSolver, SparseSolver
+from dalia.gradient_methods import VanillaGradient, SmartGradient
 from dalia.utils import (
     DummyCommunicator,
     add_str_header,
@@ -190,9 +191,28 @@ class DALIA:
                     nccl_comm=self.nccl_comm,
                 )
 
+        # --- Initialize Gradient Method
+        if self.config.gradient_method.type == "vanilla_gradient":
+            self.gradient_method = VanillaGradient(
+                basis_size=self.model.n_hyperparameters,
+                finite_difference_epsilon=self.config.gradient_method.finite_difference_epsilon,
+            )
+        elif self.config.gradient_method.type == "smart_gradient":
+            self.gradient_method = SmartGradient(
+                basis_size=self.model.n_hyperparameters,
+                finite_difference_epsilon=self.config.gradient_method.finite_difference_epsilon,
+                diagonal_noise=self.config.gradient_method.diagonal_noise,
+                scaling_threshold=self.config.gradient_method.scaling_threshold,
+            )
+        else:
+            raise ValueError(
+                f"Unknown gradient method type: {self.config.gradient_method.type}"
+            )
+
         # --- Set up recurrent variables
         self.gradient_f = xp.zeros(self.model.n_hyperparameters, dtype=xp.float64)
         self.f_values_i = xp.zeros(self.n_f_evaluations, dtype=xp.float64)
+        self.gradient_basis = xp.eye(self.model.n_hyperparameters, dtype=xp.float64)
         self.eps_mat = xp.zeros(
             (self.model.n_hyperparameters, self.model.n_hyperparameters),
             dtype=xp.float64,
@@ -336,7 +356,7 @@ class DALIA:
         }
         synchronize(comm=self.comm_world)
         toc = time.perf_counter()
-        print_msg(f"DALIA inference took: {toc - tic:0.4f} (s)", flush = True)
+        print_msg(f"DALIA inference took: {toc - tic:0.4f} (s)", flush=True)
         return results
 
     def minimize(self) -> optimize.OptimizeResult:
@@ -563,15 +583,9 @@ class DALIA:
         for i in range(self.n_f_evaluations):
             task_mapping.append(i % n_feval_comm)
 
-        # Initialize central difference scheme matrix
-        self.eps_mat[:] = self.eps_gradient_f * xp.eye(self.model.n_hyperparameters)
-        self.theta_mat[:] = xp.repeat(
-            get_device(theta_i).reshape(-1, 1), self.n_f_evaluations, axis=1
+        self.gradient_method.get_evaluation_directions(
+            direction_matrix=self.theta_mat, theta=theta_i
         )
-        self.theta_mat[:, 1 : 1 + self.model.n_hyperparameters] += self.eps_mat
-        self.theta_mat[
-            :, self.model.n_hyperparameters + 1 : self.n_f_evaluations
-        ] -= self.eps_mat
 
         # Proceed to the parallel function evaluation
         for feval_i in range(self.n_f_evaluations - 1, -1, -1):
@@ -593,11 +607,9 @@ class DALIA:
         synchronize(comm=self.comm_world)
 
         # Compute gradient using central difference scheme
-        for i in range(self.model.n_hyperparameters):
-            self.gradient_f[i] = (
-                self.f_values_i[i + 1]
-                - self.f_values_i[self.model.n_hyperparameters + i + 1]
-            ) / (2 * self.eps_gradient_f)
+        self.gradient_method.compute_gradient(
+            function_evaluations=self.f_values_i, gradient=self.gradient_f
+        )
 
         f_0 = get_host(self.f_values_i[0])
         grad_f = get_host(self.gradient_f)
@@ -794,11 +806,15 @@ class DALIA:
         #     flush=True,
         # )
         cov_theta = xp.linalg.inv(hess_theta)
-        synchronize(comm=self.comm_world)     
+        synchronize(comm=self.comm_world)
         toc = time.perf_counter()
         t_covariance_hp = toc - tic
-        print_msg("Time to compute covariance of hyperparameters:", t_covariance_hp, flush=True)
-        
+        print_msg(
+            "Time to compute covariance of hyperparameters:",
+            t_covariance_hp,
+            flush=True,
+        )
+
         return cov_theta
 
     def _evaluate_hessian_f(
