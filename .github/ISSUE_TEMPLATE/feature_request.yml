@@ -17,6 +17,16 @@ body:
       required: true
 
   - type: textarea
+    id: how_to_implement
+    attributes:
+      label: How to implement
+      description: |
+        Please provide a clear description of how you would implement 
+        this feature or change.
+    validations:
+      required: true
+
+  - type: textarea
     id: additional_context
     attributes:
       label: Additional context
