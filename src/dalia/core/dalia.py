@@ -668,8 +668,8 @@ class DALIA:
 
             if task_mapping[0] == self.color_qeval:
                 # Done by processes "even"
-                tic = time.perf_counter()
                 synchronize_gpu()
+                tic = time.perf_counter()
                 Q_conditional = self.model.construct_Q_conditional(eta)
                 synchronize_gpu()
                 toc = time.perf_counter()
@@ -720,7 +720,12 @@ class DALIA:
                 )
                 synchronize(comm=self.comm_qeval)
         else:
+            synchronize_gpu()
+            tic = time.perf_counter()
             self.model.construct_Q_prior()
+            synchronize_gpu()
+            toc = time.perf_counter()
+            self.t_construction_qprior += toc - tic
 
             log_prior_hyperparameters: float = (
                 self.model.evaluate_log_prior_hyperparameters()
@@ -977,7 +982,13 @@ class DALIA:
 
         eta = self.model.a @ self.model.x
 
+        synchronize_gpu()
+        tic = time.perf_counter()
         self.model.construct_Q_conditional(eta)
+        synchronize_gpu()
+        toc = time.perf_counter()
+        self.t_construction_qconditional += toc - tic
+
         self.solver.cholesky(self.model.Q_conditional, sparsity="bta")
         self.solver.selected_inversion(sparsity="bta")
 
@@ -1100,8 +1111,14 @@ class DALIA:
             x_star[:] += x_update
             eta[:] = self.model.a @ x_star
 
+            synchronize_gpu()
+            tic = time.perf_counter()
             Q_conditional = self.model.construct_Q_conditional(eta)
-            self.solver.cholesky(A=Q_conditional)
+            synchronize_gpu()
+            toc = time.perf_counter()
+            self.t_construction_qconditional += toc - tic
+
+            self.solver.cholesky(A=Q_conditional, sparsity="bta")
 
             rhs: NDArray = self.model.construct_information_vector(
                 eta,
