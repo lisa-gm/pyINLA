@@ -19,6 +19,10 @@ class SparseSolver(Solver):
 
         self.L: sp.sparse.spmatrix = None
 
+        # Solver Metrics
+        self.t_cholesky = 0.0
+        self.t_solve = 0.0
+
     def cholesky(self, A: sp.sparse.spmatrix, **kwargs) -> None:
         """Compute the Cholesky decomposition of a matrix.
 
@@ -52,7 +56,20 @@ class SparseSolver(Solver):
         rhs: NDArray,
         **kwargs,
     ) -> NDArray:
-        """Solve linear system using Cholesky factor."""
+        """Solve linear system using Cholesky factor.
+
+        Parameters
+        ----------
+        rhs : NDArray
+            Right-hand side of the linear system.
+
+        Returns
+        -------
+        NDArray
+            Solution of the linear system.
+        """
+        synchronize_gpu()
+        tic = time.perf_counter()
 
         if self.L is None:
             raise ValueError("Cholesky factor not computed")
@@ -61,6 +78,10 @@ class SparseSolver(Solver):
         sp.sparse.linalg.spsolve_triangular(
             self.L.T, rhs, lower=False, overwrite_b=True
         )
+
+        synchronize_gpu()
+        toc = time.perf_counter()
+        self.t_solve += toc - tic
 
         return rhs
 
