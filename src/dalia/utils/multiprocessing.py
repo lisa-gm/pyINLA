@@ -135,8 +135,6 @@ def bcast(
         The communication group. Default is MPI.COMM_WORLD.
     """
 
-    # print("Broadcasting data from root:", root, "to all processes.")
-
     if backend_flags["mpi_avail"]:
         comm.Bcast(data, root=root)
 
@@ -233,16 +231,6 @@ def check_vector_consistency(
     theta_ref = theta.copy()
     bcast(theta_ref, root=0, comm=comm)
 
-    # theta_host = get_host(theta)
-    # theta_ref_host = get_host(theta_ref)
-
-    # if not np.array_equal(theta_host, theta_ref_host):
-    #     norm_diff = np.linalg.norm(theta_host - theta_ref_host)
-    #     raise ValueError(
-    #         f"Process {comm.Get_rank()} has a different theta than the reference process."
-    #         f" Expected: {theta_ref_host}, but got:  {theta_host}. diff = {norm_diff:.4e}"
-    #     )
-
     array_module_name = get_array_module_name(theta)
     if array_module_name == "cupy":
         norm_diff = cp.linalg.norm(theta - theta_ref)
@@ -254,18 +242,3 @@ def check_vector_consistency(
             f"Process {comm.Get_rank()} has a different theta than the reference process."
             f" Expected: {theta_ref}, but got:  {theta}. diff = {norm_diff:.4e}"
         )
-
-
-if __name__ == "__main__":
-
-    # Initialize MPI
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()  
-    mpi_size = comm.Get_size()
-
-    # Create a vector, intentionally make rank 1 different
-    theta = np.ones(5)
-    if backend_flags["mpi_avail"] and rank == 1:
-        theta[0] = 42  # Make it inconsistent on rank 1
-
-    check_vector_consistency(theta, comm)
