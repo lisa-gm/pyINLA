@@ -4,6 +4,14 @@ from dalia import ArrayLike, NDArray, sp, xp
 from dalia.configs.likelihood_config import GaussianLikelihoodConfig
 from dalia.core.likelihood import Likelihood
 
+try:
+    import jax.numpy as jnp
+    from jax import grad, jit, vmap
+    JAX_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    jnp = xp
+    JAX_AVAILABLE = False
+
 
 class GaussianLikelihood(Likelihood):
     """Gaussian likelihood."""
@@ -15,6 +23,12 @@ class GaussianLikelihood(Likelihood):
     ) -> None:
         """Initializes the Gaussian likelihood."""
         super().__init__(n_observations, config)
+
+        if JAX_AVAILABLE:
+            first_derivative = grad(self.evaluate_likelihood_jax, argnums=0)
+            second_derivative = grad(first_derivative, argnums=0)
+            self.gradient_jax = jit(vmap(first_derivative))
+            self.hessian_jax = jit(vmap(second_derivative))
 
     def evaluate_likelihood(
         self,
@@ -59,6 +73,10 @@ class GaussianLikelihood(Likelihood):
         
 
         return likelihood
+    
+    def evaluate_likelihood_jax(self, eta, y, theta):
+        yEta = eta - y
+        return 0.5 * theta - 0.5 * jnp.exp(theta) * yEta * yEta
 
     def evaluate_gradient_likelihood(
         self,
@@ -93,6 +111,21 @@ class GaussianLikelihood(Likelihood):
         gradient_likelihood: NDArray = -xp.exp(theta) * (eta - y)
 
         return gradient_likelihood
+    
+    def evaluate_gradient_likelihood_jax(
+        self,
+        eta: NDArray,
+        y: NDArray,
+        **kwargs,
+    ) -> NDArray:
+        jax_eta = jnp.from_dlpack(eta)
+        jax_y = jnp.from_dlpack(y)
+        theta = kwargs.get("theta", None)
+        if not isinstance(theta, float):
+            theta = float(theta[0])
+        jax_theta = jnp.full_like(jax_eta, theta)
+        grad = self.gradient_jax(jax_eta, jax_y, jax_theta)
+        return xp.from_dlpack(grad)
 
     def evaluate_hessian_likelihood(
         self,
@@ -128,3 +161,16 @@ class GaussianLikelihood(Likelihood):
         )
 
         return hessian_likelihood
+    
+    def evaluate_hessian_likelihood_jax(
+        self,
+        **kwargs,
+    ) -> ArrayLike:
+        jax_eta = jnp.from_dlpack(kwargs.get("eta"))
+        jax_y = jnp.from_dlpack(kwargs.get("y"))
+        theta = kwargs.get("theta", None)
+        if not isinstance(theta, float):
+            theta = float(theta[0])
+        jax_theta = jnp.full_like(jax_eta, theta)
+        hessian = self.hessian_jax(jax_eta, jax_y, jax_theta)
+        return xp.from_dlpack(hessian)

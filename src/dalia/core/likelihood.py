@@ -5,6 +5,13 @@ from abc import ABC, abstractmethod
 from dalia import ArrayLike, NDArray, xp,sp
 from dalia.configs.likelihood_config import LikelihoodConfig
 
+try:
+    import jax.numpy as jnp
+    JAX_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    jnp = xp
+    JAX_AVAILABLE = False
+
 
 class Likelihood(ABC):
     """Abstract core class for likelihood."""
@@ -25,6 +32,10 @@ class Likelihood(ABC):
         elif self.config.method == "finite_difference":
             grad = self.finite_difference_gradient_likelihood(eta, y, h, **kwargs)
             return grad
+        elif self.config.method == "jax_autodiff":
+            if not JAX_AVAILABLE:
+                raise RuntimeError("JAX is not available.")
+            return self.evaluate_gradient_likelihood_jax(eta, y, **kwargs)
         else:
             raise NotImplementedError(f"Method {self.config.method} not implemented.")
         # ref = self.evaluate_gradient_likelihood(eta, y, **kwargs)
@@ -40,6 +51,10 @@ class Likelihood(ABC):
             kwargs["h"] = h
             hess = self.finite_difference_hessian_likelihood(**kwargs)
             return hess
+        elif self.config.method == "jax_autodiff":
+            if not JAX_AVAILABLE:
+                raise RuntimeError("JAX is not available.")
+            return self.evaluate_hessian_likelihood_jax(**kwargs)
         else:
             raise NotImplementedError(f"Method {self.config.method} not implemented.")
         # ref = self.evaluate_hessian_likelihood(**kwargs)
@@ -164,6 +179,14 @@ class Likelihood(ABC):
         # hessian = (-f2 + 16 * f1 - 30 * c + 16 * b1 - b2) / (12 * h * h)
         return grad
 
+    def evaluate_gradient_likelihood_jax(
+        self,
+        eta: NDArray,
+        y: NDArray,
+        **kwargs,
+    ) -> NDArray:
+        raise NotImplementedError("JAX gradient not implemented for this likelihood.")
+
     @abstractmethod
     def evaluate_hessian_likelihood(
         self,
@@ -221,3 +244,9 @@ class Likelihood(ABC):
         # grad = (-f2 + 8 * f1 - 8 * b1 + b2) / (12 * h)
         hessian = (-f2 + 16 * f1 - 30 * c + 16 * b1 - b2) / (12 * h * h)
         return hessian
+    
+    def evaluate_hessian_likelihood_jax(
+        self,
+        **kwargs,
+    ) -> ArrayLike:
+        raise NotImplementedError("JAX Hessian not implemented for this likelihood.")
