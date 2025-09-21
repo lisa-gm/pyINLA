@@ -26,9 +26,9 @@ class AR1SubModel(SubModel):
         exp_tau = xp.exp(tau)
         phi_scaled = kwargs.get("phi")
         # print("tau:", exp_tau)
-        # print("phi_scaled:", phi_scaled)
+        #print("phi_scaled:", phi_scaled)
         phi = scaled_logit(phi_scaled, direction="backward")
-        # print("phi:", phi)
+        print("phi:", phi)
         s2 = 1 / exp_tau
         denom = s2 * (1 - phi**2)
 

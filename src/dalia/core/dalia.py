@@ -518,8 +518,8 @@ class DALIA:
                 )
 
             self.minimization_result: dict = {
-                "theta": scipy_result.x,
-                "theta_interpret": self.model.get_theta_interpret(),
+                "theta": get_host(self.model.theta), #  scipy_result.x, #
+                "theta_interpret": get_host(self.model.get_theta_interpret()),
                 "x": get_host(
                     self.model.x,  # [self.model.inverse_permutation_latent_variables]
                 ),
@@ -547,6 +547,9 @@ class DALIA:
         objective_function_evalutation : tuple
             Function value f(theta) evaluated at theta_i and its gradient.
         """
+
+        print("theta_i: ", theta_i)
+        print("self.model.theta: ", self.model.theta)
 
         self.t_construction_qprior = 0.0
         self.t_construction_qconditional = 0.0
