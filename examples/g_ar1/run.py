@@ -18,7 +18,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
 
-    n = 20
+    np.random.seed(3)
+    n = 1000
 
     # load reference output
     theta_original = np.load("reference_outputs/theta_original.npy")
@@ -29,6 +30,9 @@ if __name__ == "__main__":
         xp.log(theta_original[2]),
     )
 
+    theta_initial = [0.5, 3.0, 3.0]
+    print("theta initial: ", theta_initial)
+
     x_original = np.load("reference_outputs/x_original.npy")
     print("x original: ", x_original[:10])
     print("dim(x original): ", x_original.shape)
@@ -37,8 +41,8 @@ if __name__ == "__main__":
         "type": "ar1",
         "input_dir": f"{BASE_DIR}/inputs_ar1",
         "n_latent_parameters": n,
-        "phi": theta_original[0],  # has to be between 0 and 1
-        "tau": xp.log(theta_original[1]),  # assume to already be in log-scale
+        "phi": theta_initial[0],  # has to be between 0 and 1
+        "tau": xp.log(theta_initial[1]),  # assume to already be in log-scale
         "ph_phi": {"type": "beta", "alpha": 5.0, "beta": 1.0},
         "ph_tau": {"type": "gaussian", "mean": 0.0, "precision": 0.5},
     }
@@ -59,34 +63,39 @@ if __name__ == "__main__":
 
     likelihood_dict = {
         "type": "gaussian",
-        "prec_o": xp.log(theta_original[2]),
-        "prior_hyperparameters": {
-            "type": "penalized_complexity",
-            "alpha": 0.01,
-            "u": 5,
-        },
+        "prec_o": xp.log(theta_initial[2]),
+        # "prior_hyperparameters": {
+        #     "type": "penalized_complexity",
+        #     "alpha": 0.01,
+        #     "u": 5,
+        # },
+        "prior_hyperparameters": {"type": "gaussian", "mean": 3.0, "precision": 0.05},
     }
 
     model = Model(
-        submodels=[ar1, regression],
+        submodels=[ar1, regression], #
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
     print_msg(model)
 
     Qprior = model.construct_Q_prior()
-    print("Qprior: \n", Qprior.toarray())
+    print("Qprior: \n", Qprior.toarray()[:6, :6])
     Qinv = np.linalg.inv(Qprior.toarray())
     geom_mean = np.exp(np.mean(np.log(Qinv.diagonal())))
     print("Geometric mean of Qinv diagonal: ", geom_mean)
 
-    eta = model.a @ x_original
+    # in gaussian case x = 0, thus eta = 0
+    x_i = np.zeros(model.n_latent_parameters)
+    eta = model.a @ x_i
     Qcond = model.construct_Q_conditional(eta=eta)
+    print("Qcond: \n", Qcond.toarray()[:6, :6])
 
-    b = model.construct_information_vector(eta=eta, x_i=x_original)
+    b = model.construct_information_vector(eta=eta, x_i=x_i)
+    print("b: ", b[:10])
 
     x_est = np.linalg.solve(Qcond.toarray(), b)
-    print("x est: ", x_est)
-
+    #print("x est: ", x_est)
+    print("norm(x_original - x_est): ", np.linalg.norm(x_original - x_est))
     # L = np.linalg.cholesky(Qcond.toarray())
 
     # plt.spy(Qcond, markersize=2)
@@ -117,22 +126,27 @@ if __name__ == "__main__":
 
     print("theta: ", model.theta)
     # print("x : ", model.x)
-    f_value = dalia._evaluate_f(model.theta)
-    print("after evaluate f. x: ", model.x)
+    # f_value = dalia._evaluate_f(model.theta)
+    # print("after evaluate f. x: ", model.x)
 
     results = dalia.minimize()
 
     theta_unscaled = results["theta"]
-    theta = theta_unscaled.copy()
-    theta[0] = scaled_logit(theta_unscaled[0], direction="backward")
-    theta[1] = np.exp(theta_unscaled[1])
-    theta[2] = np.exp(theta_unscaled[2])
+    print("theta unscaled: ", theta_unscaled)
+    theta_original_log = xp.array(
+        [
+            theta_original[0],
+            xp.log(theta_original[1]),
+            xp.log(theta_original[2]),
+        ]
+    )
+    print("theta original log: ", theta_original_log)
 
-    print("theta:          ", theta)
-    print("theta original: ", theta_original)
+    # print("x:          ", results["x"])
+    # print("x_original: ", x_original)
 
-    print("x:          ", results["x"])
-    print("x_original: ", x_original)
+    # print("eta: ", model.a @ x_original)
+    # print("eta est: ", model.a @ results["x"])
 
-    print("eta: ", model.a @ x_original)
-    print("eta est: ", model.a @ results["x"])
+    print("norm(eta - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ results["x"]))
+    print("normalized norm(eta - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ results["x"]) / np.linalg.norm(model.a @ x_original))

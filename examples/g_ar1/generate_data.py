@@ -3,19 +3,21 @@ import sys
 
 import numpy as np
 import scipy.sparse as sp
-
-from scipy.stats import multivariate_normal, poisson
+from scipy.sparse.linalg import spsolve, spsolve_triangular
+from scipy.sparse import csc_matrix
+from scipy.linalg import cholesky
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
 
-    n = 100
+    np.random.seed(5)
+    n = 5000
 
     ## define priors
-    s2 = 0.05  # 0.7
+    s2 = 3  
     tau = 1 / s2
-    phi = 0.5  # 0.9
+    phi = 0.9  
     # noise obs
     obs_noise_prec = 100
     theta_original = [
@@ -31,25 +33,37 @@ if __name__ == "__main__":
     off_diag = [-phi / denom] * (n - 1)
 
     Q = sp.diags([diag, off_diag, off_diag], [0, -1, 1])
-    L = np.linalg.cholesky(Q.toarray())
-    Cov = np.linalg.inv(Q.toarray())
-
-    geom_mean = np.exp(np.mean(np.log(Cov.diagonal())))
-    print("Geometric mean of Qinv diagonal: ", geom_mean)
-
-    print(Q.toarray())
-    print(np.linalg.inv(Q.toarray()))
-    print(np.round(Q.toarray() @ np.linalg.inv(Q.toarray()), 6))
-    # exit()
-
-    mv = multivariate_normal(mean=np.zeros(n), cov=Cov, seed=3)
-
+    
+    # Compute sparse Cholesky factorization: Q = L @ L.T
+    # For tridiagonal matrix, we can use dense Cholesky on small blocks or scipy
+    Q_csc = Q.tocsc()
+    
+    print("Q shape:", Q.shape, "Q nnz:", Q.nnz)
+    print("Q sparsity:", 100 * Q.nnz / (Q.shape[0] * Q.shape[1]), "%")
+    print(Q.toarray()[:6, :6])
+    
+    # Method 1: Use dense Cholesky (for moderate sizes this is still efficient)
+    Q_dense = Q.toarray()
+    L_dense = cholesky(Q_dense, lower=True)
+    L = csc_matrix(L_dense)
+    
+    print("L nnz:", L.nnz, "L sparsity:", 100 * L.nnz / (L.shape[0] * L.shape[1]), "%")
+    
+    # Efficient sampling: generate z ~ N(0,I), then solve L @ u = z
+    z = np.random.normal(0, 1, size=n)
+    
+    # Solve L @ u = z using sparse triangular solver
+    u = spsolve_triangular(L, z, lower=True)
+    
+    # Verify the sampling worked correctly
+    print("Sample u statistics - mean:", np.mean(u), "std:", np.std(u), ". Should be around sqrt(s2) =", np.sqrt(s2))
+    
     intercept = 2
-    u = mv.rvs()
+
     x = np.concatenate((u, [intercept]))
-    print("x: ", x)
+    print("x: ", x[:10])
+    
     np.save("reference_outputs/x_original.npy", x)
-    x_initial = u + np.random.normal(0, 0.3, size=len(u))
     np.save("inputs_ar1/x.npy", u)
     np.save("reference_outputs/theta_original.npy", theta_original)
 
@@ -61,30 +75,27 @@ if __name__ == "__main__":
 
     eta = a_ar1 @ u + intercept
 
-    print("eta: ", eta)
+    print("eta: ", eta[:6])
     np.save("inputs_ar1/x_original.npy", eta)
 
     noise = np.random.normal(0, np.sqrt(1 / obs_noise_prec), size=eta.shape)
-    print("noise: ", noise)
+    print("noise: ", noise[:10])
     y = eta + noise
     np.save("y.npy", y)
 
-    print("y: ", y)
+    print("y: ", y[:10])
 
     Qprior = sp.block_diag([Q, sp.csr_matrix([[0.001]])])
-    # print("Qprior : \n", Qprior.toarray())
 
-    a = sp.hstack([a_ar1, a_regression])
+    a = sp.hstack([a_ar1, a_regression]) # a_ar1 #
     Qcond = Qprior + obs_noise_prec * a.T @ a
-    print("Qcond: \n", Qcond.toarray())
+    print("Qcond: \n", Qcond.toarray()[:6,:6])
 
     b = obs_noise_prec * a.T @ y
-    # -xp.exp(theta) * (eta - y)
-    # beta_initial + np.linalg.solve(
-    #     Qconditional.toarray(), information_vector
-    # )
-    x_est = np.linalg.solve(Qcond.toarray(), b)
-    print("x_est: ", x_est)
+    print("b: ", b[:10])
+    #x_est = np.linalg.solve(Qcond.toarray(), b)
+    x_est = spsolve(csc_matrix(Qcond), b)
+    print("norm(x - x_est): ", np.linalg.norm(x - x_est))
 
-    print("eta est : ", a @ x_est)
-    print("eta :     ", a @ x)
+    print("norm(eta - eta_est): ", np.linalg.norm(a @ x - a @ x_est))
+    print("normalized norm(eta - eta_est): ", np.linalg.norm(a @ x - a @ x_est) / np.linalg.norm(a @ x))
