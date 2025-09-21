@@ -134,6 +134,7 @@ def bcast(
     comm (CommunicatorType), optional:
         The communication group. Default is MPI.COMM_WORLD.
     """
+
     if backend_flags["mpi_avail"]:
         comm.Bcast(data, root=root)
 
@@ -209,3 +210,35 @@ def smartsplit(
         color_new_group = 0
 
     return active_comm, comm_new_group, color_new_group
+
+def check_vector_consistency(
+    theta: ArrayLike,
+    comm,
+):
+    """
+    Check if all processes have the same theta.
+
+    Parameters:
+    -----------
+    theta (ArrayLike):
+        The theta to check.
+    comm (CommunicatorType), optional:
+        The communication group. Default is MPI.COMM_WORLD.
+    """
+
+    synchronize(comm = comm)
+
+    theta_ref = theta.copy()
+    bcast(theta_ref, root=0, comm=comm)
+
+    array_module_name = get_array_module_name(theta)
+    if array_module_name == "cupy":
+        norm_diff = cp.linalg.norm(theta - theta_ref)
+    else:
+        norm_diff = np.linalg.norm(theta - theta_ref)
+
+    if norm_diff > 1e-10:
+        raise ValueError(
+            f"Process {comm.Get_rank()} has a different theta than the reference process."
+            f" Expected: {theta_ref}, but got:  {theta}. diff = {norm_diff:.4e}"
+        )

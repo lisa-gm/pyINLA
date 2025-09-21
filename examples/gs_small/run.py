@@ -58,6 +58,8 @@ if __name__ == "__main__":
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
 
+    print_msg(model)
+
     # Configurations of DALIA
     dalia_dict = {
         "solver": {"type": "dense"},
