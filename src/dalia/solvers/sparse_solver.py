@@ -142,7 +142,9 @@ class SparseSolver(Solver):
 
         return self.A_inv
 
-    def _structured_to_spmatrix(self, A: sp.sparse.spmatrix, **kwargs) -> NDArray:
+    def _structured_to_spmatrix(
+        self, A: sp.sparse.spmatrix, **kwargs
+    ) -> sp.sparse.spmatrix:
         B = A.tocoo()
         B.data = self.A_inv[B.row, B.col]
 
