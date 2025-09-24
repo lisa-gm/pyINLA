@@ -330,7 +330,7 @@ class DALIA:
         marginal_variances_latent = self.get_marginal_variances_latent_parameters(
             self.theta_star, self.x_star
         )
-        print("Computed marginal variances of the latent parameters.")
+        print_msg("Computed marginal variances of the latent parameters.")
 
         # compute marginal variances of the observations
         # TODO: only run by default when dense multiplcation issue is fixed, see issue #78
@@ -747,7 +747,7 @@ class DALIA:
                     comm=self.comm_feval,
                 )
                 synchronize(comm=self.comm_qeval)
-            
+
         else:
             synchronize_gpu()
             tic = time.perf_counter()
