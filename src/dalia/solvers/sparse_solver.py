@@ -26,6 +26,7 @@ class SparseSolver(Solver):
         if (LU.U.diagonal() > 0).all():  # Check the matrix A is positive definite.
             self.L = LU.L.dot(sp.sparse.diags(LU.U.diagonal() ** 0.5))
         else:
+            print("min(diag(L)): ", xp.min(LU.U.diagonal()))
             raise ValueError("The matrix is not positive definite")
 
     def solve(
@@ -56,9 +57,23 @@ class SparseSolver(Solver):
 
         return 2 * xp.sum(xp.log(self.L.diagonal()))
 
-    def selected_inversion(self, **kwargs):
-        # Placeholder for the selected inversion method.
-        return super().selected_inversion(**kwargs)
+    def selected_inversion(self, **kwargs) -> None:
+        # convert to dense
+        L_dense = self.L.toarray()
+        L_inv = xp.eye(self.L.shape[0])
+
+        L_inv[:] = sp.linalg.solve_triangular(
+            L_dense, L_inv, lower=True, overwrite_b=True
+        )
+        self.A_inv = L_inv.T @ L_inv
+
+        return self.A_inv
+
+    def _structured_to_spmatrix(self, A: sp.sparse.spmatrix, **kwargs) -> None:
+        B = A.tocoo()
+        B.data = self.A_inv[B.row, B.col]
+
+        return B
 
     def get_solver_memory(self) -> int:
         """Return the memory used by the solver in number of bytes"""
