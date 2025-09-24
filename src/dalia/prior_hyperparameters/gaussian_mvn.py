@@ -31,6 +31,9 @@ class GaussianMVNPriorHyperparameters(PriorHyperparameters):
             self.mean: NDArray = xp.asarray(self.mean)
             self.precision: sp.sparse.spmatrix = sp.sparse.csc_matrix(self.precision)
 
+    def rescale_hyperparameters_to_internal(self, theta, direction):
+        return super().rescale_hyperparameters_to_internal(theta, direction)
+
     def evaluate_log_prior(self, theta: float, **kwargs) -> float:
         """Evaluate the log prior hyperparameters."""
 

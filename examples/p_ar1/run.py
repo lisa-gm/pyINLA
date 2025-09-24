@@ -19,7 +19,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
 
-    n = 5
+    n = 1000
 
     # load reference output
     theta_original = np.load("reference_outputs/theta_original.npy")
@@ -109,15 +109,20 @@ if __name__ == "__main__":
     results = dalia.minimize()
 
     theta_unscaled = results["theta"]
-    theta = theta_unscaled.copy()
-    theta[0] = scaled_logit(theta_unscaled[0], direction="backward")
-    theta[1] = np.exp(theta_unscaled[1])
+    print("theta unscaled: ", theta_unscaled)
+    theta_original_log = xp.array(
+        [
+            theta_original[0],
+            xp.log(theta_original[1]),
+        ]
+    )
+    print("theta original log: ", theta_original_log)
 
-    print("theta:          ", theta)
-    print("theta original: ", theta_original)
+    print("norm(x_original - x): ", np.linalg.norm(x_original - results["x"]))
+    print("normalized norm: ", np.linalg.norm(x_original - results["x"]) / np.linalg.norm(x_original))
 
-    print("x:          ", results["x"])
-    print("x_original: ", x_original)
-
-    print("eta: ", model.a @ x_original)
-    print("eta est: ", model.a @ results["x"])
+    print("norm(eta_original - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ results["x"]))  
+    print(
+        "normalized norm: ",
+        np.linalg.norm(model.a @ x_original - model.a @ results["x"]) / np.linalg.norm(model.a @ x_original),
+    )

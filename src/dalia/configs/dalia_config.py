@@ -55,6 +55,10 @@ class DaliaConfig(BaseModel):
     simulation_dir: Path = Path("./dalia/")
     output_dir: Path = Path.joinpath(simulation_dir, "output/")
 
+    # --- Verbosity level ------------------------------------------------------
+    verbosity: int = 0  # 0: minimal, 1: more info
+
+
 
 def parse_config(config: dict | str) -> DaliaConfig:
     if isinstance(config, str):

@@ -17,6 +17,20 @@ class PriorHyperparameters(ABC):
         self.config: PriorHyperparametersConfig = config
 
     @abstractmethod
+    def rescale_hyperparameters_to_internal(self, theta: float, direction: str) -> float:
+        """Rescale hyperparameters to and from internal scale.
+
+        Args:
+            theta: Hyperparameter
+            direction: "forward" or "backward"
+        Returns:
+            Rescaled hyperparameter.
+
+        """
+        
+        return theta
+
+    @abstractmethod
     def evaluate_log_prior(self, theta: float) -> float:
         """Evaluate the log prior hyperparameters."""
         pass

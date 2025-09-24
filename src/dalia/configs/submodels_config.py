@@ -41,8 +41,6 @@ class RegressionSubModelConfig(SubModelConfig):
 
 class AR1SubModelConfig(SubModelConfig):
 
-    n_latent_parameters: PositiveInt = None
-
     ## prior on phi
     phi: float = None  # AR(1) coefficient
     phi_scaled: float = None
@@ -59,6 +57,7 @@ class AR1SubModelConfig(SubModelConfig):
         # input of phi is in (0,1), rescale to -/+ INF
         self.phi_scaled = scaled_logit(self.phi, direction="forward")
         theta = xp.array([self.phi_scaled, self.tau])
+        theta_internal = xp.array([self.phi_scaled, self.tau])
         theta_keys = ["phi", "tau"]
 
         return theta, theta_keys

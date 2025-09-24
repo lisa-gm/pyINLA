@@ -19,18 +19,15 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if __name__ == "__main__":
 
     np.random.seed(3)
-    n = 1000
 
     # load reference output
     theta_original = np.load("reference_outputs/theta_original.npy")
     print(
         "theta original: ",
-        theta_original[0],
-        xp.log(theta_original[1]),
-        xp.log(theta_original[2]),
+        theta_original,
     )
 
-    theta_initial = [0.5, 3.0, 3.0]
+    theta_initial = theta_original #[0.6, 1.0, 3.0]
     print("theta initial: ", theta_initial)
 
     x_original = np.load("reference_outputs/x_original.npy")
@@ -40,9 +37,8 @@ if __name__ == "__main__":
     ar1_dict = {
         "type": "ar1",
         "input_dir": f"{BASE_DIR}/inputs_ar1",
-        "n_latent_parameters": n,
         "phi": theta_initial[0],  # has to be between 0 and 1
-        "tau": xp.log(theta_initial[1]),  # assume to already be in log-scale
+        "tau": theta_initial[1],  # assume to already be in log-scale
         "ph_phi": {"type": "beta", "alpha": 5.0, "beta": 1.0},
         "ph_tau": {"type": "gaussian", "mean": 0.0, "precision": 0.5},
     }
@@ -69,7 +65,7 @@ if __name__ == "__main__":
         #     "alpha": 0.01,
         #     "u": 5,
         # },
-        "prior_hyperparameters": {"type": "gaussian", "mean": 3.0, "precision": 0.05},
+        "prior_hyperparameters": {"type": "gaussian", "mean": xp.log(theta_original[2]), "precision": 0.05},
     }
 
     model = Model(
@@ -96,11 +92,6 @@ if __name__ == "__main__":
     x_est = np.linalg.solve(Qcond.toarray(), b)
     #print("x est: ", x_est)
     print("norm(x_original - x_est): ", np.linalg.norm(x_original - x_est))
-    # L = np.linalg.cholesky(Qcond.toarray())
-
-    # plt.spy(Qcond, markersize=2)
-    # plt.title("Sparsity pattern of Qcond")
-    # plt.show()
 
     # Configurations of DALIA
     dalia_dict = {
@@ -117,6 +108,7 @@ if __name__ == "__main__":
         "eps_inner_iteration": 1e-3,
         "eps_gradient_f": 1e-3,
         "simulation_dir": ".",
+        "verbosity": 0,
     }
 
     dalia = DALIA(
@@ -124,23 +116,22 @@ if __name__ == "__main__":
         config=dalia_config.parse_config(dalia_dict),
     )
 
-    print("theta: ", model.theta)
-    # print("x : ", model.x)
-    # f_value = dalia._evaluate_f(model.theta)
-    # print("after evaluate f. x: ", model.x)
+    print("initial model theta: ", model.theta)
 
-    results = dalia.minimize()
+    print("\nCalling DALIA.run()")
+    results = dalia.run()
 
-    theta_unscaled = results["theta"]
-    print("theta unscaled: ", theta_unscaled)
-    theta_original_log = xp.array(
-        [
-            theta_original[0],
-            xp.log(theta_original[1]),
-            xp.log(theta_original[2]),
-        ]
+    print_msg("\n--- Results ---")
+
+    theta = results["theta"]
+    print("theta:          ", np.round(theta, 4))
+    print("theta original: ", theta_original)
+
+    print_msg("Covariance of theta:\n", results["cov_theta"])
+    print_msg(
+        "Mean of the fixed effects:\n",
+        results["x"][-model.submodels[-1].n_fixed_effects :],
     )
-    print("theta original log: ", theta_original_log)
 
     # print("x:          ", results["x"])
     # print("x_original: ", x_original)
@@ -148,5 +139,15 @@ if __name__ == "__main__":
     # print("eta: ", model.a @ x_original)
     # print("eta est: ", model.a @ results["x"])
 
+    print_msg("\n--- Comparisons ---")
     print("norm(eta - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ results["x"]))
     print("normalized norm(eta - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ results["x"]) / np.linalg.norm(model.a @ x_original))
+
+    # Compare marginal variances of latent parameters
+    var_latent_params = results["marginal_variances_latent"]
+    Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
+    Qinv_ref = xp.linalg.inv(Qconditional.toarray())
+    print_msg(
+        "Norm (marg var latent - ref):    ",
+        f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
+    )

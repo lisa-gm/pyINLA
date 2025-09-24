@@ -224,6 +224,7 @@ class Model(ABC):
 
         theta.append(lh_hyperparameters)
         self.theta: NDArray = xp.concatenate(theta)
+        print("Initial hyperparameters (internal scale): ", self.theta)
 
         theta_keys += lh_hyperparameters_keys
         self.theta_keys: NDArray = theta_keys
@@ -358,6 +359,9 @@ class Model(ABC):
     def construct_Q_prior(self) -> sp.sparse.spmatrix:
         kwargs = {}
 
+        ## convert theta from bfgs/internal scale to prior/user/interpretable scale
+        theta_interpret = self.rescale_hyperparameters_to_internal(self.theta, direction="backward")
+
         if self.Q_prior is None:
             # During the first construction of Q_prior, we allocate the memory for
             # the data and the mapping of each submodel's to the Q prior matrix.
@@ -371,22 +375,23 @@ class Model(ABC):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
-                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                        # kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                        kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
                 elif isinstance(submodel, SpatialSubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
-                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                        kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
                 elif isinstance(submodel, BrainiacSubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
-                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                        kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
                 elif isinstance(submodel, AR1SubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
-                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                        kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
                 elif isinstance(submodel, RegressionSubModel):
                     ...
 
@@ -411,13 +416,6 @@ class Model(ABC):
                 shape=(self.n_latent_parameters, self.n_latent_parameters),
             )
 
-            # print("in Qprior is none.")
-            # print("submodel.data: ", submodel_Q_prior.data)
-            # print("row indices: ", self.Q_prior.indices)
-            # print("col indptr: ", self.Q_prior.indptr)
-            # print("self.Q_prior.data: ", self.Q_prior.data)
-            # print("data mapping: ", self.Q_prior_data_mapping)
-
         else:
             for i, submodel in enumerate(self.submodels):
                 if isinstance(submodel, RegressionSubModel):
@@ -426,49 +424,29 @@ class Model(ABC):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
-                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                        # kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                        kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
                 elif isinstance(submodel, SpatialSubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
-                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                        kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
                 elif isinstance(submodel, BrainiacSubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
-                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                        kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
                 elif isinstance(submodel, AR1SubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
-                        kwargs[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                        kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
-
-                # print(
-                #     "In model.py. submodel_Q_prior[:6, :6] : \n",
-                #     submodel_Q_prior.toarray()[:6, :6],
-                # )
-
-                # print(
-                #     "self.Q_prior_data_mapping[i] : self.Q_prior_data_mapping[i + 1]: ",
-                #     self.Q_prior_data_mapping[i],
-                #     ":",
-                #     self.Q_prior_data_mapping[i + 1],
-                # )
-
-                # print("submodel.data: ", submodel_Q_prior.data)
 
                 self.Q_prior.data[
                     self.Q_prior_data_mapping[i] : self.Q_prior_data_mapping[i + 1]
                 ] = submodel_Q_prior.data
-
-                # print("row indices: ", self.Q_prior.indices)
-                # print("col indptr: ", self.Q_prior.indptr)
-                # print("self.Q_prior.data: ", self.Q_prior.data)
-                # print("data mapping: ", self.Q_prior_data_mapping)
-
-        # print("In model.py. Q_prior[:6, :6] : \n", self.Q_prior.toarray()[:6, :6])
 
         return self.Q_prior
 
@@ -557,7 +535,7 @@ class Model(ABC):
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0
 
-        theta_interpret = self.theta
+        theta_interpret = self.theta.copy()
 
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
 
@@ -565,6 +543,9 @@ class Model(ABC):
                 theta_interpret[i] = scaled_logit(
                     theta_interpret[i], direction="backward"
                 )
+            # theta_interpret[i] = prior_hyperparameter.rescale_hyperparameters_to_internal(
+            #     theta_interpret[i], direction="backward"
+            # )
 
             log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
 
@@ -598,7 +579,7 @@ class Model(ABC):
 
         return theta_likelihood
 
-    def get_theta_interpret(self) -> NDArray:
+    def get_theta_interpret(self, direction: str) -> NDArray:
         theta_interpret = xp.zeros_like(self.theta)
 
         for i, submodel in enumerate(self.submodels):
@@ -609,10 +590,25 @@ class Model(ABC):
             ] = submodel.rescale_hyperparameters_to_interpret(
                 self.theta[
                     self.hyperparameters_idx[i] : self.hyperparameters_idx[i + 1]
-                ]
+                ], direction=direction
             )
 
         return theta_interpret
+    
+    def rescale_hyperparameters_to_internal(self, theta, direction):
+
+        # need to iterate over theta and its prior hyperparameters
+        theta_internal = xp.copy(theta)
+
+        for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
+
+            ## how to handle priors that have multiple hyperparameters?
+            if isinstance(prior_hyperparameter, GaussianMVNPriorHyperparameters):
+                pass  # no rescaling implemented
+            else:
+                theta_internal[i] = prior_hyperparameter.rescale_hyperparameters_to_internal(theta[i], direction=direction)
+        
+        return theta_internal
 
     def evaluate_likelihood(self, eta: NDArray, **kwargs) -> float:
         """Evaluate the likelihood."""
