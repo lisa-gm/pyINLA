@@ -80,6 +80,9 @@ class BrainiacSubModel(SubModel):
         h2_phi = h2 * normalized_exp_Z_alpha.flatten()
         Q_prior: sp.sparse.spmatrix = sp.sparse.diags(1 / h2_phi)
 
+        d = 1 / h2_phi
+        print(f"Q_prior: {xp.min(d)=}, {xp.max(d)=}, {xp.mean(d)=}")
+
         return Q_prior.tocoo()
 
     def evaluate_likelihood(self, eta: NDArray, y: NDArray, **kwargs) -> float:
@@ -92,6 +95,7 @@ class BrainiacSubModel(SubModel):
             raise ValueError("h2 is 1. Will lead to division by zero.")
 
         yEta = y - eta
+        print(f"{h2=}, {1-h2=}, {np.log(1-h2)=}")
         likelihood: float = (
             0.5 * -np.log(1 - h2) * n_observations - 0.5 / (1 - h2) * yEta.T @ yEta
         )

@@ -20,7 +20,7 @@ if __name__ == "__main__":
     base_dir_data = BASE_DIR + "/inputs_brainiac"
 
     m = 2  # number of annotations per feature
-    b = 20000  # number of latent variables / number of features
+    b = 50000  # number of latent variables / number of features
     sigma_a2 = 1.0 / 1.0
     precision_mat = sigma_a2 * scsp.eye(m)
 
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     brainiac_dict = {
         "type": "brainiac",
-        "input_dir": f"{base_dir_data}/inputs_brainiac",
+        "input_dir": f"{base_dir_data}",
         "h2": initial_h2,
         "alpha": initial_alpha,
         "ph_h2": {"type": "beta", "alpha": 5.0, "beta": 1.0},

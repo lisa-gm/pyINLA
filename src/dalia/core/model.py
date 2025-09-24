@@ -415,6 +415,9 @@ class Model(ABC):
                 ] = submodel_Q_prior.data
                 debug_gpu_memory_usage(f"After setting Q prior data for submodel {i}", sync=False)
 
+        d = self.Q_prior.diagonal()
+        print(f"Full Q_prior: {xp.min(d)=}, {xp.max(d)=}, {xp.mean(d)=}")
+
         return self.Q_prior
 
     def construct_Q_conditional(
@@ -430,6 +433,11 @@ class Model(ABC):
 
         """
 
+        if self.Q_conditional is not None:
+            self.Q_conditional = None
+            free_unused_gpu_memory()
+            debug_gpu_memory_usage("After freeing Q conditional", sync=False)
+
         if self.likelihood_config.type == "gaussian":
             kwargs = {
                 "eta": eta,
@@ -443,6 +451,7 @@ class Model(ABC):
         if isinstance(self.submodels[0], BrainiacSubModel):
             # Brainiac specific rule
             kwargs["h2"] = float(self.theta[0])
+            print(f"{kwargs=}")
             for k, v in kwargs.items():
                 assert not xp.isnan(v).any(), f"Keyword argument {k} is NaN."
             d_matrix = self.submodels[0].evaluate_d_matrix(**kwargs)
@@ -458,6 +467,7 @@ class Model(ABC):
                 self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
             # self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
         else:
+            order = 'F' if xp.__name__ == "cupy" else None
             if self.aTa is not None:
                 # self.Q_conditional = (
                 #     self.Q_prior.toarray() - d_matrix.diagonal()[0] * self.aTa
@@ -483,7 +493,7 @@ class Model(ABC):
                     self.aTa = "host"
                     free_unused_gpu_memory()
                 debug_gpu_memory_usage("After moving aTa to host", sync=False)
-                self.Q_conditional += self.Q_prior.toarray()
+                self.Q_conditional += self.Q_prior.toarray(order=order)
                 if xp.__name__ == "cupy":
                     xp.cuda.runtime.deviceSynchronize()
                     assert not xp.isnan(self.Q_conditional).any()
@@ -491,7 +501,7 @@ class Model(ABC):
                 debug_gpu_memory_usage("After constructing dense Q conditional", sync=False)
             else:
                 self.Q_conditional = (
-                    self.Q_prior.toarray() - self.a.T @ d_matrix @ self.a
+                    self.Q_prior.toarray(order=order) - self.a.T @ d_matrix @ self.a
                 )
             # self.Q_conditional = self.Q_prior.toarray() - self.a.T @ d_matrix @ self.a
 

@@ -559,6 +559,8 @@ class DALIA:
         self.solver.t_cholesky = 0.0
         self.solver.t_solve = 0.0
 
+        print(f"{theta_i=}", flush=True)
+
         debug_gpu_memory_usage("Before evaluating objective function")
 
         synchronize(comm=self.comm_world)
@@ -630,6 +632,8 @@ class DALIA:
                 flush=True,
             )
         self.iter += 1
+
+        print(f"{f_0=}, {grad_f=}", flush=True)
 
         return (f_0, grad_f)
 
@@ -771,17 +775,17 @@ class DALIA:
                 )
                 debug_gpu_memory_usage("After evaluating prior latent parameters", sync=False)
 
-                if xp.isnan(log_prior_hyperparameters):
+                if xp.isnan(log_prior_hyperparameters) or xp.isinf(log_prior_hyperparameters):
                     raise ValueError(
-                        f"Rank: {comm_rank} log prior hyperparameters is NaN. Check what is happening."
+                        f"Rank: {comm_rank} log prior hyperparameters is NaN or Inf. Check what is happening."
                     )
-                if xp.isnan(likelihood):
+                if xp.isnan(likelihood) or xp.isinf(likelihood):
                     raise ValueError(
-                        f"Rank: {comm_rank} likelihood is NaN. Check what is happening."
+                        f"Rank: {comm_rank} likelihood is NaN or Inf. Check what is happening."
                     )
-                if xp.isnan(prior_latent_parameters):
+                if xp.isnan(prior_latent_parameters) or xp.isinf(prior_latent_parameters):
                     raise ValueError(
-                        f"Rank: {comm_rank} prior latent parameters is NaN. Check what is happening."
+                        f"Rank: {comm_rank} prior latent parameters is NaN or Inf. Check what is happening."
                     )
 
                 f_theta[0] -= (
@@ -1265,8 +1269,20 @@ class DALIA:
         Log normal:
         .. math:: 0.5*log(1/(2*pi)^n * |Q_prior|)) - 0.5 * x.T Q_prior x
         """
+        d = self.model.Q_prior.diagonal()
+        print(f"Full Q_prior before cholesky: {xp.min(d)=}, {xp.max(d)=}, {xp.mean(d)=}")
+
         self.solver.cholesky(self.model.Q_prior, sparsity="bt")
         logdet_Q_prior: float = self.solver.logdet(sparsity="bt")
+
+        if xp.isnan(logdet_Q_prior) or xp.isinf(logdet_Q_prior):
+            raise ValueError(
+                f"Rank: {comm_rank} log determinant of prior latent parameters is NaN or Inf. Check what is happening."
+            )
+        if x is not None and (xp.isnan(x).any() or xp.isinf(x).any()):
+            raise ValueError(
+                f"Rank: {comm_rank} latent parameters x is NaN or Inf. Check what is happening."
+            )
 
         log_prior_latent_parameters: float = +0.5 * logdet_Q_prior
 

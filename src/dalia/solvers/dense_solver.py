@@ -64,12 +64,20 @@ class DenseSolver(Solver):
         if sp.sparse.issparse(A):
             # if A is diagonal, we can use the diagonal directly
             if is_diagonal(A):
+                print(f"{self.n=}")
+                print(f"{self.L is None=}")
                 if self.L is None:
                     self.L = xp.zeros((self.n, self.n), dtype=xp.float64)
                 else:
                     self.L[:] = 0
+                print(f"{self.L.shape=}")
                 # self.L.diagonal()[:] = xp.sqrt(A.diagonal())
-                self.L[xp.arange(self.n), xp.arange(self.n)] = xp.sqrt(A.diagonal())
+                d_A = A.diagonal()
+                print(f"{xp.min(d_A)=}, {xp.max(d_A)=}, {xp.mean(d_A)=}")
+                # self.L[xp.arange(self.n), xp.arange(self.n)] = xp.sqrt(A.diagonal())
+                xp.fill_diagonal(self.L, xp.sqrt(A.diagonal()))
+                d_L = xp.diag(self.L)
+                print(f"{xp.min(d_L)=}, {xp.max(d_L)=}, {xp.mean(d_L)=}")
                 return
 
             else:
@@ -80,6 +88,11 @@ class DenseSolver(Solver):
             tmp = A
 
         self.L = xp.linalg.cholesky(tmp)
+
+        d_tmp = xp.diag(tmp)
+        print(f"{xp.min(d_tmp)=}, {xp.max(d_tmp)=}, {xp.mean(d_tmp)=}")
+        d_L = xp.diag(self.L)
+        print(f"{xp.min(d_L)=}, {xp.max(d_L)=}, {xp.mean(d_L)=}")
 
         synchronize_gpu()
         toc = time.perf_counter()
@@ -127,7 +140,14 @@ class DenseSolver(Solver):
         float
             The log determinant of the matrix.
         """
-        return 2 * xp.sum(xp.log(xp.diag(self.L)))
+        if xp.isnan(self.L).any() or xp.isinf(self.L).any():
+            raise ValueError("Cholesky factor L is NaN or Inf. Check what is happening.")
+        d = xp.diag(self.L)
+        print(f"{xp.min(d)=}, {xp.max(d)=}, {xp.mean(d)=}")
+        res = 2 * xp.sum(xp.log(xp.diag(self.L)))
+        if xp.isnan(res) or xp.isinf(res):
+            raise ValueError("Log determinant is NaN or Inf. Check what is happening.")
+        return res
 
     def selected_inversion(self, **kwargs) -> None:
         L_inv = xp.eye(self.L.shape[0])
