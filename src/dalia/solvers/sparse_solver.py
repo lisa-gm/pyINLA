@@ -131,7 +131,7 @@ class SparseSolver(Solver):
 
         return float(log_det_U)
 
-    def selected_inversion(self, **kwargs) -> None:
+    def selected_inversion(self, **kwargs) -> NDArray:
         L_inv = sp.linalg.solve_triangular(
             self.LU_factor.L, xp.eye(self.LU_factor.L.shape[0]), lower=True, overwrite_b=False
         )
@@ -142,7 +142,7 @@ class SparseSolver(Solver):
 
         return self.A_inv
 
-    def _structured_to_spmatrix(self, A: sp.sparse.spmatrix, **kwargs) -> None:
+    def _structured_to_spmatrix(self, A: sp.sparse.spmatrix, **kwargs) -> NDArray:
         B = A.tocoo()
         B.data = self.A_inv[B.row, B.col]
 
