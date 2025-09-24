@@ -12,10 +12,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if __name__ == "__main__":
 
     np.random.seed(5)
-    n = 5000
+    n = 1000
 
     ## define priors
-    s2 = 3  
+    s2 = 5  
     tau = 1 / s2
     phi = 0.9  
     # noise obs

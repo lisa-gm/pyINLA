@@ -1,6 +1,7 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 import numpy as np
 from scipy.sparse import spmatrix
+from dalia import sp, xp
 
 from dalia import NDArray
 from dalia.configs.priorhyperparameters_config import (
@@ -21,6 +22,17 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
 
         self.mean: float = config.mean
         self.precision: float = config.precision
+
+    def rescale_hyperparameters_to_internal(self, theta, direction):
+        
+        if direction == "forward":
+            theta_scaled = xp.log(theta)
+        elif direction == "backward":
+            theta_scaled = xp.exp(theta)
+        else:
+            raise ValueError(f"Unknown direction: {direction}")
+
+        return theta_scaled
 
     def evaluate_log_prior(self, theta: float, **kwargs) -> float:
         """Evaluate the log prior hyperparameters."""

@@ -10,12 +10,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
 
-    n = 5
+    n = 1000
 
     ## define priors
-    s2 = 0.2  # 0.7
+    s2 = 1  # 0.7
     tau = 1 / s2
-    phi = 0.5  # 0.9
+    ### note: phi between -1 and 1 for discrete timesteps 
+    # (doesn't make sense for negative in cts case)
+
+    ## rescale beta prior 2 theta - 1
+    phi = 0.9  # 0.9
     theta_original = [phi, tau]
 
     denom = s2 * (1 - phi**2)
@@ -31,16 +35,16 @@ if __name__ == "__main__":
     geom_mean = np.exp(np.mean(np.log(Cov.diagonal())))
     print("Geometric mean of Qinv diagonal: ", geom_mean)
 
-    print(Q.toarray())
-    print(np.linalg.inv(Q.toarray()))
-    print(np.round(Q.toarray() @ np.linalg.inv(Q.toarray()), 6))
+    print(Q.toarray()[:6, :6])
+    print(np.linalg.inv(Q.toarray())[:6, :6])
+    print(np.round(Q.toarray() @ np.linalg.inv(Q.toarray()), 6)[:6, :6])
     # exit()
 
     mv = multivariate_normal(mean=np.zeros(n), cov=Cov, seed=3)
 
     intercept = 2
     u = mv.rvs()
-    print("u: ", u)
+    print("u: ", u[:10])
     eta = u + intercept
     x = np.concatenate((u, [intercept]))
     np.save("reference_outputs/x_original.npy", x)
@@ -54,7 +58,7 @@ if __name__ == "__main__":
     a_regression = sp.csr_matrix(np.ones((n, 1)))
     sp.save_npz("inputs_regression/a.npz", a_regression)
 
-    print(eta)
+    print("eta: ", eta[:10])
     np.save("inputs_ar1/x_original.npy", eta)
 
     # sample with repitition
@@ -65,7 +69,7 @@ if __name__ == "__main__":
     y = poisson.rvs(E * np.exp(eta), random_state=3)
     np.save("y.npy", y)
 
-    print(y)
+    print("y[:10]: ", y[:10])
 
     Qprior = sp.block_diag([Q, sp.csr_matrix([[0.001]])])
     # print("Qprior : \n", Qprior.toarray())

@@ -52,13 +52,6 @@ class SubModel(ABC):
         except FileNotFoundError:
             self.x_initial: NDArray = xp.zeros((self.a.shape[1]), dtype=float)
 
-    def rescale_hyperparameters_to_interpret(self, theta: NDArray) -> NDArray:
-        """Rescale hyperparameters to interpret them.  Does nothing unless implemented in specific submodel.
-
-        Note: It doesnt include the hyperparameters from the likelihood. If they need rescaling too. Needs to be done in likelihood.
-        """
-
-        return theta
 
     @abstractmethod
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
