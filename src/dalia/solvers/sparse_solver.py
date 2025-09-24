@@ -25,6 +25,7 @@ class SparseSolver(Solver):
         super().__init__(config)
 
         self.LU_factor = None  # Store the LU factorization object
+        self.A_inv = None  # Store the inverse of A if needed
 
         # Solver Metrics
         self.t_factorize = 0.0
@@ -130,24 +131,22 @@ class SparseSolver(Solver):
 
         return float(log_det_U)
 
-    def selected_inversion(self, **kwargs):
-        """Compute selected inversion of input matrix using LU factorization.
-
-        Raises:
-        ------
-        NotImplementedError
-            Selected inversion is not implemented for SparseSolver.
-        """
-        raise NotImplementedError(
-            "Selected inversion is not implemented for SparseSolver."
+    def selected_inversion(self, **kwargs) -> None:
+        L_inv = sp.linalg.solve_triangular(
+            self.LU_factor.L, xp.eye(self.LU_factor.L.shape[0]), lower=True, overwrite_b=False
         )
+        U_inv = sp.linalg.solve_triangular(
+            self.LU_factor.U, xp.eye(self.LU_factor.U.shape[0]), lower=False, overwrite_b=False
+        )
+        self.A_inv = U_inv @ L_inv
 
-    def _structured_to_spmatrix(self, **kwargs) -> None:
-        """Convert structured matrix to sparse matrix.
+        return self.A_inv
 
-        For SparseSolver, this is a no-op since it works directly with sparse matrices.
-        """
-        pass
+    def _structured_to_spmatrix(self, A: sp.sparse.spmatrix, **kwargs) -> None:
+        B = A.tocoo()
+        B.data = self.A_inv[B.row, B.col]
+
+        return B
 
     def get_solver_memory(self) -> int:
         """Return the memory used by the solver in number of bytes"""
@@ -165,4 +164,9 @@ class SparseSolver(Solver):
             + self.LU_factor.U.indptr.nbytes
             + self.LU_factor.U.indices.nbytes
         )
+
+        if self.A_inv is not None:
+            A_inv_memory = self.A_inv.nbytes
+            return L_memory + U_memory + A_inv_memory
+
         return L_memory + U_memory
