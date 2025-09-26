@@ -200,14 +200,14 @@ class DALIA:
             dtype=xp.float64,
         )
         self.theta_mat = xp.zeros(
-            (self.model.theta.size, self.n_f_evaluations), dtype=xp.float64
+            (self.model.theta_internal.size, self.n_f_evaluations), dtype=xp.float64
         )
-        self.theta_optimizer = xp.zeros_like(self.model.theta)
-        self.theta_optimizer[:] = self.model.theta
+        self.theta_optimizer = xp.zeros_like(self.model.theta_internal)
+        self.theta_optimizer[:] = self.model.theta_internal
 
         # --- Metrics
         self.f_values: ArrayLike = []
-        self.theta_values: ArrayLike = []
+        self.theta_values_internal: ArrayLike = []
         self.objective_function_time: ArrayLike = []
         self.solver_time: ArrayLike = []
         self.construction_time: ArrayLike = []
@@ -355,13 +355,13 @@ class DALIA:
             Result of the optimization procedure.
         """
 
-        if len(self.model.theta) == 0:
+        if len(self.model.theta_external) == 0:
             # Only run the inner iteration
             print_msg("No hyperparameters, just running inner iteration.")
-            self.f_value = self._evaluate_f(self.model.theta)
+            self.f_value = self._evaluate_f(self.model.theta_external)
             self.minimization_result: dict = {
-                "theta_internal": self.model.theta,
-                "theta": self.model.rescale_hyperparameters_to_internal(self.model.theta, direction="backward"),
+                "theta_internal": self.model.theta_internal,
+                "theta": self.model.theta_external,
                 "x": self.model.x,  # [self.model.inverse_permutation_latent_variables],
                 "f": self.f_value,
             }
@@ -397,7 +397,7 @@ class DALIA:
                     flush=True,
                 )
 
-                self.theta_values.append(theta_i)
+                self.theta_values_internal.append(theta_i)
                 self.f_values.append(fun_i)
 
                 # check if f_values have been decreasing over last iterations
@@ -415,9 +415,9 @@ class DALIA:
                         )
 
                         self.minimization_result = {
-                            "theta_internal": get_host(self.model.theta),
+                            "theta_internal": get_host(self.model.theta_internal),
                             "theta": get_host(
-                                self.model.rescale_hyperparameters_to_internal(self.model.theta, direction="backward")
+                                self.model.theta_external
                             ),
                             "x": get_host(
                                 self.model.x
@@ -428,7 +428,8 @@ class DALIA:
                             "f": fun_i,
                             "grad_f": self.gradient_f,
                             "f_values": self.f_values,
-                            "theta_values": self.theta_values,
+                            ### these values are in internal scale (!!)
+                            "theta_values": self.theta_values_internal,
                         }
 
                         raise OptimizationConvergedEarlyExit()
@@ -436,13 +437,13 @@ class DALIA:
                 if self.accepted_iter > self.config.theta_reduction_lag:
                     if (
                         xp.linalg.norm(
-                            self.theta_values[-self.config.theta_reduction_lag]
+                            self.theta_values_internal[-self.config.theta_reduction_lag]
                             - theta_i
                         )
                         < self.config.theta_reduction_tol
                     ):
                         norm_diff = xp.linalg.norm(
-                            self.theta_values[
+                            self.theta_values_internal[
                                 self.accepted_iter - self.config.theta_reduction_lag
                             ]
                             - theta_i
@@ -456,10 +457,9 @@ class DALIA:
                         )
 
                         self.minimization_result = {
-                            "theta_internal": get_host(self.model.theta),
+                            "theta_internal": get_host(self.model.theta_internal),
                             "theta": get_host(
-                                self.model.rescale_hyperparameters_to_internal(self.model.theta, direction="backward")
-                            ),
+                                self.model.theta_external),
                             "x": get_host(
                                 self.model.x
                                 # self.model.x[
@@ -469,7 +469,7 @@ class DALIA:
                             "f": fun_i,
                             "grad_f": self.gradient_f,
                             "f_values": self.f_values,
-                            "theta_values": self.theta_values,
+                            "theta_values": self.theta_values_internal,
                         }
 
                         raise OptimizationConvergedEarlyExit()
@@ -519,15 +519,15 @@ class DALIA:
                 )
 
             self.minimization_result: dict = {
-                "theta_internal": get_host(self.model.theta), #  scipy_result.x, #
-                "theta": get_host(self.model.rescale_hyperparameters_to_internal(self.model.theta, direction="backward")),
+                "theta_internal": get_host(self.model.theta_internal), #  scipy_result.x, #
+                "theta": get_host(self.model.theta_external),
                 "x": get_host(
                     self.model.x,  # [self.model.inverse_permutation_latent_variables]
                 ),
                 "f": scipy_result.fun,
                 "grad_f": self.gradient_f,
                 "f_values": self.f_values,
-                "theta_values": self.theta_values,
+                "theta_values": self.theta_values_internal,
             }
 
         return self.minimization_result
@@ -650,7 +650,8 @@ class DALIA:
 
         tic = time.time()
 
-        self.model.theta[:] = theta_i
+        #self.model.theta_internal[:] = theta_i
+        self.model.theta_internal = theta_i
         f_theta = xp.zeros(1, dtype=xp.float64)
 
         # --- Optimize x and evaluate the conditional of the latent parameters
@@ -982,7 +983,8 @@ class DALIA:
         marginal_latent_parameters : NDArray
             Marginal distribution of the latent parameters x.
         """
-        self.model.theta[:] = theta
+        print("Computing covariance of latent parameters at theta:", theta)
+        self.model.theta_external = xp.array(theta)
         self.model.x[:] = x_star
 
         eta = self.model.a @ self.model.x
@@ -992,11 +994,11 @@ class DALIA:
         self.solver.selected_inversion(sparsity="bta")
 
     def get_marginal_variances_latent_parameters(
-        self, theta_interpret: NDArray = None, x_star: NDArray = None
+        self, theta: NDArray = None, x_star: NDArray = None
     ) -> NDArray:
-        
-        ## assume theta to be in "external" scale 
-        theta = self.model.rescale_hyperparameters_to_internal(theta_interpret, direction="forward") if theta_interpret is not None else None
+
+        ## assume theta to be in "external" scale
+        self.model.theta_external = xp.array(theta)
 
         # TODO: this should be only called by rank 0?
         if theta is None and x_star is None:
@@ -1052,7 +1054,7 @@ class DALIA:
                     "Computing marginal variances for currently stored latent parameters. "
                 )
                 x_star = self.model.x
-                theta = self.model.theta
+                theta = self.model.theta_external
             elif theta is None or x_star is None:
                 raise ValueError(
                     "BOTH or NEITHER theta and x_star must be provided to compute the marginal variances."
