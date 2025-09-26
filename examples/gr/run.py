@@ -35,8 +35,9 @@ if __name__ == "__main__":
     # Likelihood
     likelihood_dict = {
         "type": "gaussian",
-        "prec_o": 1.5,
-        "prior_hyperparameters": {"type": "gaussian", "mean": 3.5, "precision": 0.5},
+        "prec_o": 1.0,
+        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+        #"prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
     }
     # Creation of the first model by combining the Regression submodel and the likelihood
     model = Model(
@@ -79,6 +80,7 @@ if __name__ == "__main__":
     print_msg("\n--- Comparisons ---")
     # Compare hyperparameters
     theta_ref = xp.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
+    print_msg("Reference theta:", theta_ref)
     print_msg(
         "Norm (theta - theta_ref):        ",
         f"{np.linalg.norm(results['theta'] - get_host(theta_ref)):.4e}",
