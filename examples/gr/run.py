@@ -111,4 +111,41 @@ if __name__ == "__main__":
         f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
     )
 
+    marginals_hp = dalia.marginal_distributions_hp() 
+    
+    print_msg("\n--- Marginal distributions of the hyperparameters ---")
+
+    import matplotlib.pyplot as plt
+    
+    # Extract theta_0 data
+    theta_0_data = marginals_hp['hyperparameters']['theta_0']
+    theta_external, pdf_external = theta_0_data['pdf_data']
+    mean_external = theta_0_data['mean_external']
+    quantile_pairs = theta_0_data['quantiles']['external']['pairs']
+    
+    # Create the plot
+    plt.figure(figsize=(10, 6))
+    
+    # Plot the PDF
+    plt.plot(theta_external, pdf_external, 'b-', linewidth=2, label='PDF')
+    
+    # Mark the mean
+    plt.axvline(mean_external, color='red', linestyle='--', linewidth=2, label=f'Mean = {mean_external:.3f}')
+    
+    # Mark the quantiles
+    colors = ['green', 'orange', 'green']
+    labels = ['2.5%', '50%', '97.5%']
+    for i, (prob, q_val) in enumerate(quantile_pairs):
+        plt.axvline(q_val, color=colors[i], linestyle=':', linewidth=2, 
+                   label=f'{labels[i]} quantile = {q_val:.3f}')
+    
+    plt.xlabel('θ₀ (external scale)')
+    plt.ylabel('PDF')
+    plt.title('Marginal Distribution of θ₀')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+
     print_msg("\n--- Finished ---")
