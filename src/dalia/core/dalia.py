@@ -316,22 +316,10 @@ class DALIA:
         theta_star[:] = self.comm_world.bcast(theta_star, root=0)
         x_star[:] = self.comm_world.bcast(x_star, root=0)
 
-        # need to update theta_star and x_star to be the same across all ranks
-        theta_star[:] = self.comm_world.bcast(theta_star, root=0)
-        x_star[:] = self.comm_world.bcast(x_star, root=0)
-
         # compute covariance of the hyperparameters theta at the mode
         print("theta_star: ", theta_star)
         cov_theta_dict = self.compute_covariance_hp(theta_star)
         print("Computed covariance of the hyperparameters at the mode.")
-
-        # need to update theta_star and x_star to be the same across all ranks
-        theta_star[:] = self.comm_world.bcast(theta_star, root=0)
-        x_star[:] = self.comm_world.bcast(x_star, root=0)
-
-        # need to update theta_star and x_star to be the same across all ranks
-        theta_star[:] = self.comm_world.bcast(theta_star, root=0)
-        x_star[:] = self.comm_world.bcast(x_star, root=0)
 
         # compute marginal variances of the latent parameters
         marginal_variances_latent = self.get_marginal_variances_latent_parameters(
@@ -846,11 +834,11 @@ class DALIA:
         self.cov_theta_internal = xp.linalg.inv(hess_theta_internal)
         
         # rescale to external scale
-        cov_theta_external = compute_outer_covariance_matrix(self.model.theta_internal, self.cov_theta_internal, self.model.rescale_hyperparameters_to_internal)
+        self.cov_theta_external = compute_outer_covariance_matrix(self.model.theta_internal, self.cov_theta_internal, self.model.rescale_hyperparameters_to_internal)
 
-        dict_cov = {"internal": self.cov_theta_internal, "external": cov_theta_external}
-        print("Cov Internal: ", dict_cov["internal"])
-        print("Cov External: ", dict_cov["external"])
+        dict_cov = {"internal": self.cov_theta_internal, "external": self.cov_theta_external}
+        print("Cov Internal: \n", dict_cov["internal"])
+        print("Cov External: \n", dict_cov["external"])
 
         synchronize(comm=self.comm_world)
         toc = time.perf_counter()
@@ -1027,7 +1015,7 @@ class DALIA:
         return hess
 
     def _compute_covariance_latent_parameters(
-        self, theta: NDArray, x_star: NDArray
+        self, theta_internal: NDArray, x_star: NDArray
     ) -> None:
         """Compute the marginal distribution of the latent parameters x.
 
@@ -1043,8 +1031,8 @@ class DALIA:
         marginal_latent_parameters : NDArray
             Marginal distribution of the latent parameters x.
         """
-        print("Computing covariance of latent parameters at theta:", theta)
-        self.model.theta_external = xp.array(theta)
+
+        self.model.theta_internal = xp.array(theta_internal, dtype=xp.float64)
         self.model.x[:] = x_star
 
         eta = self.model.a @ self.model.x
