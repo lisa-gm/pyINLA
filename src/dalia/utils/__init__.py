@@ -25,6 +25,7 @@ from dalia.utils.multiprocessing import (
     smartsplit,
     synchronize,
     synchronize_gpu,
+    check_vector_consistency,
 )
 from dalia.utils.print_utils import (
     add_str_header,
@@ -55,6 +56,7 @@ __all__ = [
     "allreduce",
     "allgather",
     "bcast",
+    "check_vector_consistency",
     "bdiag_tiling",
     "extract_diagonal",
     "memory_footprint",
