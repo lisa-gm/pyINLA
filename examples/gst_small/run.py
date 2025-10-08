@@ -52,13 +52,13 @@ if __name__ == "__main__":
     likelihood_dict = {
         "type": "gaussian",
         "prec_o": 4,
-        #"prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
         #"prior_hyperparameters": {"type": "gaussian", "mean": 1.4, "precision": 0.5},
-        "prior_hyperparameters": {
-            "type": "penalized_complexity",
-            "alpha": 0.01,
-            "u": 4,
-        },
+        # "prior_hyperparameters": {
+        #     "type": "penalized_complexity",
+        #     "alpha": 0.01,
+        #     "u": 4,
+        # },
     }
 
     # Creation of the model by combining the submodels and the likelihood
@@ -130,5 +130,9 @@ if __name__ == "__main__":
     #     "Norm (var_obs - var_obs_ref):    ",
     #     f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
     # )
+    
+    
+    marginals_hp = dalia.marginal_distributions_hp() 
+
 
     print_msg("\n--- Finished ---")

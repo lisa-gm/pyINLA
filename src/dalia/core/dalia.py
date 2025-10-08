@@ -208,6 +208,11 @@ class DALIA:
         )
         self.theta_optimizer = xp.zeros_like(self.model.theta_internal)
         self.theta_optimizer[:] = self.model.theta_internal
+        self.theta_star = None # mode not yet computed
+        self.theta_star_internal = None
+        self.x_star = None # mode not yet computed
+        self.cov_theta_external = None # covariance not yet computed
+        self.cov_theta_internal = None # covariance not yet computed
 
         # --- Metrics
         self.f_values: ArrayLike = []
@@ -308,22 +313,24 @@ class DALIA:
         # compute mode of the hyperparameters theta
         minimization_result = self.minimize()
 
-        theta_star = get_device(minimization_result["theta"])
-        x_star = get_device(minimization_result["x"])
+        self.theta_star = minimization_result["theta"]
+        self.theta_star_internal = minimization_result["theta_internal"]
+        self.x_star = minimization_result["x"]
         print("Finished the optimization procedure.")
 
         # need to update theta_star and x_star to be the same across all ranks
-        theta_star[:] = self.comm_world.bcast(theta_star, root=0)
-        x_star[:] = self.comm_world.bcast(x_star, root=0)
+        self.theta_star[:] = self.comm_world.bcast(self.theta_star, root=0)
+        self.theta_star_internal[:] = self.comm_world.bcast(self.theta_star_internal, root=0)
+        self.x_star[:] = self.comm_world.bcast(self.x_star, root=0)
 
         # compute covariance of the hyperparameters theta at the mode
-        print("theta_star: ", theta_star)
-        cov_theta_dict = self.compute_covariance_hp(theta_star)
+        print("theta_star: ", self.theta_star)
+        cov_theta_dict = self.compute_covariance_hp(self.theta_star)
         print("Computed covariance of the hyperparameters at the mode.")
 
         # compute marginal variances of the latent parameters
         marginal_variances_latent = self.get_marginal_variances_latent_parameters(
-            theta_star, x_star
+            self.theta_star, self.x_star
         )
         print("Computed marginal variances of the latent parameters.")
 
@@ -1014,6 +1021,125 @@ class DALIA:
 
         return hess
 
+    def marginal_distributions_hp(self, quantiles: NDArray = xp.array([0.025, 0.5, 0.975])) -> dict:
+        """Compute the marginal distributions of the hyperparameters theta.
+
+        Parameters
+        ----------
+        quantiles : NDArray
+            Quantiles to compute. If not provided, default quantiles are used. If None, no quantiles are computed.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the marginal distributions of the hyperparameters theta and possibly quantiles / percentiles.
+
+        """
+        
+        # check that theta_star and covariance matrix are computed
+        if self.theta_star is None or self.cov_theta_external is None or self.cov_theta_internal is None or self.x_star is None:
+            raise ValueError("theta_star, x_star and covariance matrix of the hyperparameters must be computed before calling marginal_distributions_hp(). Please run the full DALIA pipeline or set them manually.")
+        
+        # set up dictionary to store results
+        results = {
+            'hyperparameters': {},
+            'summary': {
+                'n_params': self.model.n_hyperparameters,
+                'param_names': getattr(self.model, 'hyperparameter_names', [f'theta_{i}' for i in range(self.model.n_hyperparameters)]),
+                'quantile_levels': quantiles.tolist() if quantiles is not None else None
+            }
+        }
+        
+        # Import necessary functions
+        from dalia.utils.gaussian_quadrature import compute_variance_gauss_hermite
+        from dalia.utils.reparametrizations import compute_bounds, compute_transformed_pdf, compute_transformed_quantiles
+        
+        # iterate over all hyperparameters and store outputs in a dictionary         
+        for i in range(self.model.n_hyperparameters):
+            param_name = results['summary']['param_names'][i]
+            
+            # Extract marginal parameters for this hyperparameter
+            theta_internal_i = self.theta_star_internal[i]
+            marg_var_internal_i = self.cov_theta_internal[i, i]
+            
+            # extract the correct transform for the hyperparameter
+            # from the individual prior_hyperparameters[i] object
+            def param_transform(x, direction):
+                """Transform function for single parameter i using its specific prior hyperparameter"""
+                # Use the individual prior hyperparameter for this parameter
+                return self.model.prior_hyperparameters[i].rescale_hyperparameters_to_internal(x, direction)
+            
+            # compute external_mean and external_var using 
+            # compute_variance_gauss_hermite(mean_internal, variance_internal, transform, n_points=20): from utils gaussian quadrature
+            gauss_hermite_result = compute_variance_gauss_hermite(
+                theta_internal_i, marg_var_internal_i, param_transform, n_points=30
+            )
+            
+            # compute bounds for theta intervals using compute_bounds() from utils
+            (theta_internal_lower, theta_internal_upper), (theta_external_lower, theta_external_upper) = compute_bounds(
+                theta_internal_i, marg_var_internal_i, param_transform, n_std=3
+            )
+            print("theta_internal bounds: ", theta_internal_lower, theta_internal_upper)
+            print("theta_external bounds: ", theta_external_lower, theta_external_upper)
+            print("param:" , param_transform)
+
+            # set theta_internal_interval
+            theta_internal_interval = xp.linspace(theta_internal_lower, theta_internal_upper, num=100)
+        
+            # compute marginal distributions in external scale using 
+            # compute_transformed_pdf(mean_internal, var_internal, x_internal, transform) from reparametrization
+            # store theta_external_interval and pdf_external in the dictionary
+            
+            # Transform internal interval to external
+            theta_external_interval = xp.array([param_transform(x_int, "backward") for x_int in theta_internal_interval])
+            
+            # Compute PDF values in external scale
+            pdf_external = xp.array([
+                compute_transformed_pdf(theta_internal_i, marg_var_internal_i, x_int, param_transform)
+                for x_int in theta_internal_interval
+            ])
+            
+            
+            
+            # Initialize parameter dictionary
+            param_dict = {
+                'mean_internal': float(theta_internal_i),
+                'variance_internal': float(marg_var_internal_i),
+                'mean_external': float(gauss_hermite_result['mean']),
+                'variance_external': float(gauss_hermite_result['variance']),
+                'pdf_data': (theta_external_interval, pdf_external)  # tuple of xp arrays
+            }
+            
+            # if quantiles is not None, compute quantiles using compute_transformed_quantiles() 
+            if quantiles is not None:
+                quantiles_external = compute_transformed_quantiles(
+                    theta_internal_i, marg_var_internal_i, quantiles, param_transform
+                )
+                
+                # Also compute internal quantiles for completeness
+                from scipy.stats import norm
+                quantiles_internal = norm.ppf(quantiles, loc=theta_internal_i, scale=xp.sqrt(marg_var_internal_i))
+                
+                param_dict['quantiles'] = {
+                    'levels': quantiles.tolist(),
+                    'internal': {
+                        'values': quantiles_internal.tolist(),
+                        'pairs': list(zip(quantiles.tolist(), quantiles_internal.tolist()))
+                    },
+                    'external': {
+                        'values': quantiles_external.tolist(),
+                        'pairs': list(zip(quantiles.tolist(), quantiles_external.tolist()))
+                    }
+                }
+            
+            # Store in main results dictionary
+            results['hyperparameters'][param_name] = param_dict
+        
+        # return dictionary
+        return results
+        
+
+
     def _compute_covariance_latent_parameters(
         self, theta_internal: NDArray, x_star: NDArray
     ) -> None:
@@ -1032,7 +1158,7 @@ class DALIA:
             Marginal distribution of the latent parameters x.
         """
 
-        self.model.theta_internal = xp.array(theta_internal, dtype=xp.float64)
+        self.model.theta_internal = xp.atleast_1d(theta_internal)
         self.model.x[:] = x_star
 
         eta = self.model.a @ self.model.x
@@ -1126,7 +1252,7 @@ class DALIA:
 
 
                 # check order x_star ... -> potentially need to reorder marginal variances
-            self._compute_covariance_latent_parameters(theta, x_star)
+            self._compute_covariance_latent_parameters(theta_external, x_star)
 
             # now only extract diagonal elements corresponding to marginal variances of the latent parameters
             variances_latent = self.solver._structured_to_spmatrix(
