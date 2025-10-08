@@ -24,6 +24,7 @@ from dalia.utils.multiprocessing import (
     smartsplit,
     synchronize,
     synchronize_gpu,
+    check_vector_consistency,
     DummyCommunicator,
 )
 from dalia.utils.spmatrix_utils import bdiag_tiling, extract_diagonal, memory_footprint
@@ -50,6 +51,7 @@ __all__ = [
     "allreduce",
     "allgather",
     "bcast",
+    "check_vector_consistency",
     "bdiag_tiling",
     "extract_diagonal",
     "memory_footprint",
