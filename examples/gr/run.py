@@ -70,7 +70,8 @@ if __name__ == "__main__":
     results = dalia.run()
 
     print_msg("\n--- Results ---")
-    print_msg("Theta values:\n", results["theta"])
+    print_msg("Theta values external:\n", results["theta"])
+    print_msg("Theta values internal:\n", results["theta_internal"])
     print_msg("Covariance of theta:\n", results["cov_theta"])
     print_msg(
         "Mean of the fixed effects:\n",
@@ -103,7 +104,7 @@ if __name__ == "__main__":
     )
 
     # Compare marginal variances of observations
-    var_obs = dalia.get_marginal_variances_observations(theta=theta_ref, x_star=x_ref)
+    var_obs = dalia.get_marginal_variances_observations(theta_external=theta_ref, x_star=x_ref)
     var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
     print_msg(
         "Norm (var_obs - var_obs_ref):    ",
