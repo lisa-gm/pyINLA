@@ -26,7 +26,7 @@ from dalia.utils import (
     smartsplit,
     synchronize,
     synchronize_gpu,
-    check_vector_consistency
+    check_vector_consistency,
     compute_outer_covariance_matrix,
 )
 
@@ -806,11 +806,11 @@ class DALIA:
 
         # ensure that all ranks are initialized to the same theta
         check_vector_consistency(
-            theta_i,
+            theta_external,
             comm=self.comm_world,
         )
 
-        self.model.theta_external = theta_i
+        self.model.theta_external = theta_external
         # self.model.rescale_hyperparameters_to_internal(theta_interpret, direction="forward")
         print_msg(
             f"Computing covariance of hyperparameters at theta_external {theta_external}.",
