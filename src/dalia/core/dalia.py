@@ -813,6 +813,12 @@ class DALIA:
             Covariance matrix of the hyperparameters theta.
         """
 
+        # ensure that all ranks are initialized to the same theta
+        check_vector_consistency(
+            theta_external,
+            comm=self.comm_world,
+        )
+
         # self.model.rescale_hyperparameters_to_internal(theta_interpret, direction="forward")
         # ensure that all ranks are initialized to the same theta
         check_vector_consistency(
@@ -1007,24 +1013,24 @@ class DALIA:
         return hess
 
     def _compute_covariance_latent_parameters(
-        self, theta: NDArray, x_star: NDArray
+        self, theta_external: NDArray, x_star: NDArray
     ) -> None:
         """Compute the marginal distribution of the latent parameters x.
 
         Parameters
         ----------
-        theta_i : NDArray
+        theta_internal : NDArray
             Hyperparameters theta.
         x_star : NDArray
-            Latent parameters x(theta_i).
+            Latent parameters x(theta_internal).
 
         Returns
         -------
         marginal_latent_parameters : NDArray
             Marginal distribution of the latent parameters x.
         """
-        print("Computing covariance of latent parameters at theta:", theta)
-        self.model.theta_external = xp.array(theta)
+        print("Computing covariance of latent parameters at theta external:", theta_external)
+        self.model.theta_external = xp.array(theta_external)
         self.model.x[:] = x_star
 
         eta = self.model.a @ self.model.x
@@ -1112,7 +1118,7 @@ class DALIA:
 
 
                 # check order x_star ... -> potentially need to reorder marginal variances
-            self._compute_covariance_latent_parameters(theta, x_star)
+            self._compute_covariance_latent_parameters(theta_external, x_star)
 
             # now only extract diagonal elements corresponding to marginal variances of the latent parameters
             variances_latent = self.solver._structured_to_spmatrix(
