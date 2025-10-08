@@ -28,12 +28,12 @@ if __name__ == "__main__":
     x = L_Sigma_prior @ z
     a = sparse.random(n_observations, n_latent_parameters, density=0.5)
 
-    theta_observations = np.log(3)
+    theta_observations = 3.0
     print(f"theta_observations: {theta_observations}")
     theta_likelihood: dict = {"theta_observations": theta_observations}
 
     # generate x from a gaussian distribution of dimensions n_latent_parameters with mean 0 and precision exp(theta_observations)
-    variance = 1 / np.exp(theta_observations)
+    variance = 1 / theta_observations
     eta = a @ x
     y = np.random.normal(eta, scale=np.sqrt(variance), size=n_observations)
     print(f"x: {x}")
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     sparse.save_npz(f"{path}/inputs/a.npz", a)
 
     # save original latent parameters
-    np.save(f"{path}/inputs/x_original.npy", x)
+    np.save(f"{path}/reference_outputs/x_ref.npy", x)
 
     # save original hyperparameter theta
-    np.save(f"{path}/inputs/theta_original.npy", theta_observations)
+    np.save(f"{path}/reference_outputs/theta_ref.npy", theta_observations)

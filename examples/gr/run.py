@@ -35,8 +35,9 @@ if __name__ == "__main__":
     # Likelihood
     likelihood_dict = {
         "type": "gaussian",
-        "prec_o": 1.5,
-        "prior_hyperparameters": {"type": "gaussian", "mean": 3.5, "precision": 0.5},
+        "prec_o": 1.0,
+        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+        #"prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
     }
     # Creation of the first model by combining the Regression submodel and the likelihood
     model = Model(
@@ -69,7 +70,8 @@ if __name__ == "__main__":
     results = dalia.run()
 
     print_msg("\n--- Results ---")
-    print_msg("Theta values:\n", results["theta"])
+    print_msg("Theta values external:\n", results["theta"])
+    print_msg("Theta values internal:\n", results["theta_internal"])
     print_msg("Covariance of theta:\n", results["cov_theta"])
     print_msg(
         "Mean of the fixed effects:\n",
@@ -79,6 +81,7 @@ if __name__ == "__main__":
     print_msg("\n--- Comparisons ---")
     # Compare hyperparameters
     theta_ref = xp.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
+    print_msg("Reference theta:", theta_ref)
     print_msg(
         "Norm (theta - theta_ref):        ",
         f"{np.linalg.norm(results['theta'] - get_host(theta_ref)):.4e}",
@@ -101,7 +104,7 @@ if __name__ == "__main__":
     )
 
     # Compare marginal variances of observations
-    var_obs = dalia.get_marginal_variances_observations(theta=theta_ref, x_star=x_ref)
+    var_obs = dalia.get_marginal_variances_observations(theta_external=theta_ref, x_star=x_ref)
     var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
     print_msg(
         "Norm (var_obs - var_obs_ref):    ",

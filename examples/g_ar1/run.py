@@ -1,0 +1,153 @@
+import sys
+import os
+
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(parent_dir)
+
+import numpy as np
+
+from dalia import xp, sp, backend_flags
+from dalia.configs import likelihood_config, dalia_config, submodels_config
+from dalia.core.model import Model
+from dalia.core.dalia import DALIA
+from dalia.submodels import AR1SubModel, RegressionSubModel
+from dalia.utils import get_host, print_msg, scaled_logit  # , extract_diagonal
+from examples_utils.parser_utils import parse_args
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+if __name__ == "__main__":
+
+    np.random.seed(3)
+
+    # load reference output
+    theta_original = np.load("reference_outputs/theta_original.npy")
+    print(
+        "theta original: ",
+        theta_original,
+    )
+
+    theta_initial = theta_original #[0.6, 1.0, 3.0]
+    print("theta initial: ", theta_initial)
+
+    x_original = np.load("reference_outputs/x_original.npy")
+    print("x original: ", x_original[:10])
+    print("dim(x original): ", x_original.shape)
+
+    ar1_dict = {
+        "type": "ar1",
+        "input_dir": f"{BASE_DIR}/inputs_ar1",
+        "phi": theta_initial[0],  # has to be between 0 and 1
+        "tau": theta_initial[1],  # assume to already be in log-scale
+        "ph_phi": {"type": "beta", "alpha": 5.0, "beta": 1.0},
+        "ph_tau": {"type": "gaussian", "mean": 0.0, "precision": 0.5},
+    }
+    ar1 = AR1SubModel(
+        config=submodels_config.parse_config(ar1_dict),
+    )
+
+    # Configurations of the regression submodel
+    regression_dict = {
+        "type": "regression",
+        "input_dir": f"{BASE_DIR}/inputs_regression",
+        "n_fixed_effects": 1,
+        "fixed_effects_prior_precision": 0.001,
+    }
+    regression = RegressionSubModel(
+        config=submodels_config.parse_config(regression_dict),
+    )
+
+    likelihood_dict = {
+        "type": "gaussian",
+        "prec_o": xp.log(theta_initial[2]),
+        # "prior_hyperparameters": {
+        #     "type": "penalized_complexity",
+        #     "alpha": 0.01,
+        #     "u": 5,
+        # },
+        "prior_hyperparameters": {"type": "gaussian", "mean": xp.log(theta_original[2]), "precision": 0.05},
+    }
+
+    model = Model(
+        submodels=[ar1, regression], #
+        likelihood_config=likelihood_config.parse_config(likelihood_dict),
+    )
+    print_msg(model)
+
+    Qprior = model.construct_Q_prior()
+    print("Qprior: \n", Qprior.toarray()[:6, :6])
+    Qinv = np.linalg.inv(Qprior.toarray())
+    geom_mean = np.exp(np.mean(np.log(Qinv.diagonal())))
+    print("Geometric mean of Qinv diagonal: ", geom_mean)
+
+    # in gaussian case x = 0, thus eta = 0
+    x_i = np.zeros(model.n_latent_parameters)
+    eta = model.a @ x_i
+    Qcond = model.construct_Q_conditional(eta=eta)
+    print("Qcond: \n", Qcond.toarray()[:6, :6])
+
+    b = model.construct_information_vector(eta=eta, x_i=x_i)
+    print("b: ", b[:10])
+
+    x_est = np.linalg.solve(Qcond.toarray(), b)
+    #print("x est: ", x_est)
+    print("norm(x_original - x_est): ", np.linalg.norm(x_original - x_est))
+
+    # Configurations of DALIA
+    dalia_dict = {
+        "solver": {"type": "dense"},
+        "minimize": {
+            "max_iter": 100,
+            "gtol": 1e-3,
+            "disp": True,
+            "maxcor": len(model.theta),
+        },
+        "f_reduction_tol": 1e-3,
+        "theta_reduction_tol": 1e-4,
+        "inner_iteration_max_iter": 50,
+        "eps_inner_iteration": 1e-3,
+        "eps_gradient_f": 1e-3,
+        "simulation_dir": ".",
+        "verbosity": 0,
+    }
+
+    dalia = DALIA(
+        model=model,
+        config=dalia_config.parse_config(dalia_dict),
+    )
+
+    print("initial model theta: ", model.theta)
+
+    print("\nCalling DALIA.run()")
+    results = dalia.run()
+
+    print_msg("\n--- Results ---")
+
+    theta = results["theta"]
+    print("theta:          ", np.round(theta, 4))
+    print("theta original: ", theta_original)
+
+    print_msg("Covariance of theta:\n", results["cov_theta"])
+    print_msg(
+        "Mean of the fixed effects:\n",
+        results["x"][-model.submodels[-1].n_fixed_effects :],
+    )
+
+    # print("x:          ", results["x"])
+    # print("x_original: ", x_original)
+
+    # print("eta: ", model.a @ x_original)
+    # print("eta est: ", model.a @ results["x"])
+
+    print_msg("\n--- Comparisons ---")
+    print("norm(eta - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ results["x"]))
+    print("normalized norm(eta - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ results["x"]) / np.linalg.norm(model.a @ x_original))
+
+    # Compare marginal variances of latent parameters
+    var_latent_params = results["marginal_variances_latent"]
+    Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
+    Qinv_ref = xp.linalg.inv(Qconditional.toarray())
+    print_msg(
+        "Norm (marg var latent - ref):    ",
+        f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
+    )
