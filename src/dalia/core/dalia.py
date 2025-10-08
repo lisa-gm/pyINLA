@@ -1094,11 +1094,12 @@ class DALIA:
                 )
                 x_star = self.model.x
                 theta_external = self.model.theta_external
-
-            elif theta_external is None or x_star is None:
+            
+            if theta_external is None or x_star is None:
                 raise ValueError(
                     "BOTH or NEITHER theta and x_star must be provided to compute the marginal variances."
                 )
+
 
                 # check order x_star ... -> potentially need to reorder marginal variances
             self._compute_covariance_latent_parameters(theta_external, x_star)
