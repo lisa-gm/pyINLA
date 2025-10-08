@@ -52,12 +52,13 @@ if __name__ == "__main__":
     likelihood_dict = {
         "type": "gaussian",
         "prec_o": 4,
-        # "prior_hyperparameters": {"type": "gaussian", "mean": 1.4, "precision": 0.5},
-        "prior_hyperparameters": {
-            "type": "penalized_complexity",
-            "alpha": 0.01,
-            "u": 4,
-        },
+        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+        #"prior_hyperparameters": {"type": "gaussian", "mean": 1.4, "precision": 0.5},
+        # "prior_hyperparameters": {
+        #     "type": "penalized_complexity",
+        #     "alpha": 0.01,
+        #     "u": 4,
+        # },
     }
 
     # Creation of the model by combining the submodels and the likelihood
@@ -74,7 +75,7 @@ if __name__ == "__main__":
             "max_iter": args.max_iter,
             "gtol": 1e-3,
             "disp": True,
-            "maxcor": len(model.theta),
+            "maxcor": len(model.theta_external),
         },
         "f_reduction_tol": 1e-3,
         "theta_reduction_tol": 1e-4,
@@ -88,11 +89,18 @@ if __name__ == "__main__":
         config=dalia_config.parse_config(dalia_dict),
     )
 
-    results = dalia.run()
+    results = dalia.minimize()
 
     print_msg("\n--- Results ---")
+    theta_ref = np.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
+    theta_external = np.array([0.08423457, 2.52313066, 1.46267965, np.exp(1.36076756)])
+
     print_msg("Theta values:\n", results["theta"])
-    print_msg("Covariance of theta:\n", results["cov_theta"])
+    print_msg("Theta values internal:\n", results["theta_internal"])
+    
+    #cov_theta = dalia.compute_covariance_hp(results["theta"])
+    cov_theta = dalia.compute_covariance_hp(theta_external)
+    print_msg("Covariance of theta:\n",  cov_theta["internal"])
     print_msg(
         "Mean of the fixed effects:\n",
         results["x"][-model.submodels[-1].n_fixed_effects :],
@@ -100,7 +108,6 @@ if __name__ == "__main__":
 
     print_msg("\n--- Comparisons ---")
     # Compare hyperparameters
-    theta_ref = np.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
     print_msg(
         "Norm (theta - theta_ref):        ",
         f"{np.linalg.norm(results['theta'] - get_host(theta_ref)):.4e}",

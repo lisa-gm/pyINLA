@@ -86,7 +86,7 @@ if __name__ == "__main__":
             "max_iter": 100,
             "gtol": 1e-3,
             "disp": True,
-            "maxcor": len(model.theta),
+            "maxcor": len(model.theta_external),
         },
         "f_reduction_tol": 1e-3,
         "theta_reduction_tol": 1e-4,
@@ -101,9 +101,9 @@ if __name__ == "__main__":
         config=dalia_config.parse_config(dalia_dict),
     )
 
-    print("theta: ", model.theta)
+    print("theta external: ", model.theta_external)
     # print("x : ", model.x)
-    f_value = dalia._evaluate_f(model.theta)
+    f_value = dalia._evaluate_f(model.theta_external)
     print("after evaluate f. x: ", model.x)
 
     results = dalia.minimize()
