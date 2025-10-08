@@ -4,7 +4,7 @@ import numpy as np
 from dalia import xp
 from scipy.special import roots_hermite
 
-from gaussian_quadrature import compute_variance_gauss_hermite
+from dalia.utils.gaussian_quadrature import compute_variance_gauss_hermite
 
 def compute_bivariate_expectation(func1, func2, rho, n_points=20):
     """

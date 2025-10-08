@@ -12,6 +12,9 @@ from dalia.utils.gpu_utils import (
 )
 from dalia.utils.host import get_host_configuration
 from dalia.utils.link_functions import cloglog, scaled_logit, sigmoid
+from dalia.utils.correlation import compute_outer_covariance_matrix
+from dalia.utils.gaussian_quadrature import compute_variance_gauss_hermite
+from dalia.utils.bivariate_gaussian_quadrature import compute_bivariate_expectation
 from dalia.utils.multiprocessing import (
     allreduce,
     allgather,
@@ -36,6 +39,9 @@ __all__ = [
     "sigmoid",
     "cloglog",
     "scaled_logit",
+    "compute_outer_covariance_matrix",
+    "compute_variance_gauss_hermite",
+    "compute_bivariate_expectation",
     "print_msg",
     "synchronize",
     "synchronize_gpu",
