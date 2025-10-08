@@ -231,14 +231,23 @@ def check_vector_consistency(
     theta_ref = theta.copy()
     bcast(theta_ref, root=0, comm=comm)
 
-    array_module_name = get_array_module_name(theta)
     if backend_flags["cupy_avail"]:
         norm_diff = cp.linalg.norm(theta - theta_ref)
     else:
         norm_diff = np.linalg.norm(theta - theta_ref)
 
     if norm_diff > 1e-10:
+        # Print indices and values where theta and theta_ref differ
+        if backend_flags["cupy_avail"]:
+            diff_indices = cp.where(theta != theta_ref)[0]
+            for idx in diff_indices:
+                print(f"Process {comm.Get_rank()} difference at index {idx}: theta_ref={theta_ref[idx]}, theta={theta[idx]}")
+        else:
+            diff_indices = np.where(theta != theta_ref)[0]
+            for idx in diff_indices:
+                print(f"Process {comm.Get_rank()} difference at index {idx}: theta_ref={theta_ref[idx]}, theta={theta[idx]}")
         raise ValueError(
             f"Process {comm.Get_rank()} has a different theta than the reference process."
             f" Expected: {theta_ref}, but got:  {theta}. diff = {norm_diff:.4e}"
+            f""
         )
