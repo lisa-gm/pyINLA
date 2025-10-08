@@ -24,7 +24,7 @@ class SubModelConfig(BaseModel, ABC):
 
     # Input folder for this specific submodel
     input_dir: str = None
-    type: Literal["spatio_temporal", "spatial", "regression", "brainiac"] = None
+    type: Literal["spatio_temporal", "spatial", "regression", "brainiac", "ar1"] = None
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]:
@@ -37,6 +37,30 @@ class RegressionSubModelConfig(SubModelConfig):
 
     def read_hyperparameters(self):
         return xp.array([]), []
+
+
+class AR1SubModelConfig(SubModelConfig):
+
+    ## prior on phi
+    phi: float = None  # AR(1) coefficient
+    phi_scaled: float = None
+    ph_phi: PriorHyperparametersConfig = None
+    ## check that phi is between -1 and 1 (use pc prior)
+    # check inla.doc("pc.cor1")
+
+    ## prior (in log-scale or not?) on tau (marginal precision) or s2 marginal variance
+    tau: float = None  # Marginal variance
+    ph_tau: PriorHyperparametersConfig = None
+
+    def read_hyperparameters(self):
+
+        # input of phi is in (0,1), rescale to -/+ INF
+        self.phi_scaled = scaled_logit(self.phi, direction="forward")
+        theta = xp.array([self.phi_scaled, self.tau])
+        theta_internal = xp.array([self.phi_scaled, self.tau])
+        theta_keys = ["phi", "tau"]
+
+        return theta, theta_keys
 
 
 class SpatioTemporalSubModelConfig(SubModelConfig):
@@ -122,6 +146,10 @@ def parse_config(config: dict | str) -> SubModelConfig:
         config["ph_h2"] = parse_priorhyperparameters_config(config["ph_h2"])
         config["ph_alpha"] = parse_priorhyperparameters_config(config["ph_alpha"])
         return BrainiacSubModelConfig(**config)
+    elif type == "ar1":
+        config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
+        config["ph_phi"] = parse_priorhyperparameters_config(config["ph_phi"])
+        return AR1SubModelConfig(**config)
     # Add more elif branches for other submodel types
     else:
         raise ValueError(f"Unknown submodel type: {type}")
