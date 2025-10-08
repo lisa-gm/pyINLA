@@ -100,7 +100,7 @@ if __name__ == "__main__":
             "max_iter": 100,
             "gtol": 1e-3,
             "disp": True,
-            "maxcor": len(model.theta),
+            "maxcor": len(model.theta_external),
         },
         "f_reduction_tol": 1e-3,
         "theta_reduction_tol": 1e-4,
@@ -116,7 +116,7 @@ if __name__ == "__main__":
         config=dalia_config.parse_config(dalia_dict),
     )
 
-    print("initial model theta: ", model.theta)
+    print("initial model theta: ", model.theta_external)
 
     print("\nCalling DALIA.run()")
     results = dalia.run()

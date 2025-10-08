@@ -140,11 +140,6 @@ def bcast(
         The communication group. Default is MPI.COMM_WORLD.
     """
 
-<<<<<<< HEAD
-=======
-    print("Broadcasting data from root:", root, "to all processes. data :", data)
-
->>>>>>> 1f2a204 (added check consistency function. bcast somehow not working for cupy the way im calling it now)
     if backend_flags["mpi_avail"]:
         comm.Bcast(data, root=root)
 

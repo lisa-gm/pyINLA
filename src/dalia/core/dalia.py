@@ -381,7 +381,7 @@ class DALIA:
 
         # ensure that all ranks are initialized to the same theta
         check_vector_consistency(
-            self.model.theta,
+            self.model.theta_external,
             comm=self.comm_world,
         )
 
@@ -422,7 +422,7 @@ class DALIA:
                     f"Iteration: {self.accepted_iter:2d} (took: {self.objective_function_time[-1]:.2f}) | "
                     f"Theta: [{theta_str}] | "
                     f"Function Value: {fun_i: .6f} | "
-                    f"Gradient: [{gradient_str}] | ",
+                    #f"Gradient: [{gradient_str}] | ",
                     f"Norm(Grad): [{xp.linalg.norm(self.gradient_f): .6f}]",
                     flush=True,
                 )
@@ -839,10 +839,10 @@ class DALIA:
         self.model.theta_external = theta_external
 
         hess_theta_internal = self._evaluate_hessian_f(self.model.theta_internal)
-        # print_msg(
-        #     f"hessian_f: \n {hess_theta}",
-        #     flush=True,
-        # )
+        print_msg(
+            f"hessian_f: \n {hess_theta_internal}",
+            flush=True,
+        )
         self.cov_theta_internal = xp.linalg.inv(hess_theta_internal)
         
         # rescale to external scale
@@ -881,7 +881,7 @@ class DALIA:
         -----
         Compute finite difference approximation of the hessian of f at theta_i.
         """
-
+        
         ## TODO: this is the quick fix ...
         # self.model.theta[:] = theta_i
         dim_theta = self.model.n_hyperparameters
@@ -915,9 +915,10 @@ class DALIA:
         counter = 0
         # compute f(theta)
         if self.color_feval == task_mapping[0]:
-            theta_i = self.model.theta_internal.copy()
+            theta_i = theta_internal.copy()
             f_theta = self._evaluate_f(theta_i)
             f_ii_loc[1, :] = f_theta
+
         counter += 1
 
         for k in range(loop_dim):
@@ -930,16 +931,18 @@ class DALIA:
                     # theta+eps_i
                     #theta_i = theta_internal.copy()
                     #f_ii_loc[0, i] = self._evaluate_f(theta_i + eps_mat[i, :])
-                    theta_i = self.model.theta_internal + eps_mat[i, :]
-                    f_ii_loc[0, i] = self._evaluate_f(theta_i)
+                    theta_i = theta_internal + eps_mat[i, :]
+                    result = self._evaluate_f(theta_i)
+                    f_ii_loc[0, i] = result
                 counter += 1
 
                 if self.color_feval == task_mapping[counter]:
                     # theta-eps_i
                     # theta_i = theta_internal.copy()
                     # f_ii_loc[2, i] = self._evaluate_f(theta_i - eps_mat[i, :])
-                    theta_i = self.model.theta_internal - eps_mat[i, :]
-                    f_ii_loc[2, i] = self._evaluate_f(theta_i)
+                    theta_i = theta_internal - eps_mat[i, :]
+                    result = self._evaluate_f(theta_i)
+                    f_ii_loc[2, i] = result
                 counter += 1
 
             # as hessian is symmetric we only have to compute the upper triangle
@@ -950,7 +953,7 @@ class DALIA:
                     # f_ij_loc[0, k] = self._evaluate_f(
                     #     theta_i + eps_mat[i, :] + eps_mat[j, :]
                     # )
-                    theta_i = self.model.theta_internal + eps_mat[i, :] + eps_mat[j, :]
+                    theta_i = theta_internal + eps_mat[i, :] + eps_mat[j, :]
                     f_ij_loc[0, k] = self._evaluate_f(theta_i)
                 counter += 1
 
@@ -960,7 +963,7 @@ class DALIA:
                     # f_ij_loc[1, k] = self._evaluate_f(
                     #     theta_i + eps_mat[i, :] - eps_mat[j, :]
                     # )
-                    theta_i = self.model.theta_internal + eps_mat[i, :] - eps_mat[j, :]
+                    theta_i = theta_internal + eps_mat[i, :] - eps_mat[j, :]
                     f_ij_loc[1, k] = self._evaluate_f(theta_i)
                 counter += 1
 
@@ -970,7 +973,7 @@ class DALIA:
                     # f_ij_loc[2, k] = self._evaluate_f(
                     #     theta_i - eps_mat[i, :] + eps_mat[j, :]
                     # )
-                    theta_i = self.model.theta_internal - eps_mat[i, :] + eps_mat[j, :]
+                    theta_i = theta_internal - eps_mat[i, :] + eps_mat[j, :]
                     f_ij_loc[2, k] = self._evaluate_f(theta_i)
                 counter += 1
 
@@ -980,7 +983,7 @@ class DALIA:
                     # f_ij_loc[3, k] = self._evaluate_f(
                     #     theta_i - eps_mat[i, :] - eps_mat[j, :]
                     # )
-                    theta_i = self.model.theta_internal - eps_mat[i, :] - eps_mat[j, :]
+                    theta_i = theta_internal - eps_mat[i, :] - eps_mat[j, :]
                     f_ij_loc[3, k] = self._evaluate_f(theta_i)
                 counter += 1
 
@@ -1180,7 +1183,7 @@ class DALIA:
             if counter > self.inner_iteration_max_iter:
                 print_msg(
                     "Theta value at failing of the inner_iteration: ",
-                    self.model.theta,
+                    self.model.theta_internal,
                     flush=True,
                 )
                 raise ValueError(
