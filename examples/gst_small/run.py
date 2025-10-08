@@ -52,13 +52,13 @@ if __name__ == "__main__":
     likelihood_dict = {
         "type": "gaussian",
         "prec_o": 4,
-        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+        #"prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
         #"prior_hyperparameters": {"type": "gaussian", "mean": 1.4, "precision": 0.5},
-        # "prior_hyperparameters": {
-        #     "type": "penalized_complexity",
-        #     "alpha": 0.01,
-        #     "u": 4,
-        # },
+        "prior_hyperparameters": {
+            "type": "penalized_complexity",
+            "alpha": 0.01,
+            "u": 4,
+        },
     }
 
     # Creation of the model by combining the submodels and the likelihood
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         config=dalia_config.parse_config(dalia_dict),
     )
 
-    results = dalia.minimize()
+    results = dalia.run()
 
     print_msg("\n--- Results ---")
     theta_ref = np.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
@@ -97,20 +97,13 @@ if __name__ == "__main__":
 
     print_msg("Theta values:\n", results["theta"])
     print_msg("Theta values internal:\n", results["theta_internal"])
+    print_msg("Covariance of theta:\n", results["cov_theta"])
     
-    #cov_theta = dalia.compute_covariance_hp(results["theta"])
-    cov_theta = dalia.compute_covariance_hp(theta_external)
-    print_msg("Covariance of theta:\n",  cov_theta["internal"])
-    print_msg(
-        "Mean of the fixed effects:\n",
-        results["x"][-model.submodels[-1].n_fixed_effects :],
-    )
-
     print_msg("\n--- Comparisons ---")
     # Compare hyperparameters
     print_msg(
         "Norm (theta - theta_ref):        ",
-        f"{np.linalg.norm(results['theta'] - get_host(theta_ref)):.4e}",
+        f"{np.linalg.norm(results['theta_internal'] - get_host(theta_ref)):.4e}",
     )
 
     # Compare latent parameters
@@ -122,6 +115,7 @@ if __name__ == "__main__":
 
     # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
+    dalia.model.theta_internal = results["theta_internal"]
     Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
     Qinv_ref = xp.linalg.inv(Qconditional.toarray())
     print_msg(
