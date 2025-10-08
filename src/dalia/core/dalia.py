@@ -316,10 +316,18 @@ class DALIA:
         theta_star[:] = self.comm_world.bcast(theta_star, root=0)
         x_star[:] = self.comm_world.bcast(x_star, root=0)
 
+        # need to update theta_star and x_star to be the same across all ranks
+        theta_star[:] = self.comm_world.bcast(theta_star, root=0)
+        x_star[:] = self.comm_world.bcast(x_star, root=0)
+
         # compute covariance of the hyperparameters theta at the mode
         print("theta_star: ", theta_star)
         cov_theta_dict = self.compute_covariance_hp(theta_star)
         print("Computed covariance of the hyperparameters at the mode.")
+
+        # need to update theta_star and x_star to be the same across all ranks
+        theta_star[:] = self.comm_world.bcast(theta_star, root=0)
+        x_star[:] = self.comm_world.bcast(x_star, root=0)
 
         # need to update theta_star and x_star to be the same across all ranks
         theta_star[:] = self.comm_world.bcast(theta_star, root=0)
@@ -1108,7 +1116,7 @@ class DALIA:
         """
 
         # TODO: implement this for non-Gaussian likelihoods
-        check_vector_consistency(theta, comm=self.comm_world)
+        check_vector_consistency(theta_external, comm=self.comm_world)
         check_vector_consistency(x_star, comm=self.comm_world)
 
         if self.model.is_likelihood_gaussian():
