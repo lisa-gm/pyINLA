@@ -26,8 +26,8 @@ from dalia.utils import (
     smartsplit,
     synchronize,
     synchronize_gpu,
-    compute_outer_covariance_matrix,
     check_vector_consistency,
+    compute_outer_covariance_matrix,
 )
 
 if backend_flags["mpi_avail"]:
