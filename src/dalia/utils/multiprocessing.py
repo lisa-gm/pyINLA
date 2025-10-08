@@ -232,7 +232,7 @@ def check_vector_consistency(
     bcast(theta_ref, root=0, comm=comm)
 
     array_module_name = get_array_module_name(theta)
-    if array_module_name == "cupy":
+    if backend_flags["cupy_avail"]:
         norm_diff = cp.linalg.norm(theta - theta_ref)
     else:
         norm_diff = np.linalg.norm(theta - theta_ref)
