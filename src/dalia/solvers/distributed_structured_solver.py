@@ -176,15 +176,15 @@ class DistSerinvSolver(Solver):
         # Solver Metrics
         self.total_bytes: int = 0
 
-        self.t_cholesky = 0.0
+        self.t_factorize = 0.0
         self.t_solve = 0.0
 
-    def cholesky(
+    def factorize(
         self,
         A: sp.sparse.spmatrix,
         sparsity: str,
     ) -> None:
-        """Compute the Cholesky decomposition of a matrix.
+        """Compute the decomposition of a matrix.
 
         Parameters
         ----------
@@ -196,6 +196,10 @@ class DistSerinvSolver(Solver):
         Returns
         -------
         None
+
+        Note:
+        -----
+        Uses the Cholesky decomposition.
         """
         synchronize(comm=self.comm)
         tic = time.perf_counter()
@@ -233,7 +237,7 @@ class DistSerinvSolver(Solver):
 
         synchronize(comm=self.comm)
         toc = time.perf_counter()
-        self.t_cholesky += toc - tic
+        self.t_factorize += toc - tic
 
     def solve(
         self,

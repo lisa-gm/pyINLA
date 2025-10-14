@@ -17,14 +17,17 @@ class SparseSolver(Solver):
         """Initializes the solver."""
         super().__init__(config)
 
-        self.L: sp.sparse.spmatrix = None
+        self.LU_factor = None  # Store the LU factorization object
 
         # Solver Metrics
-        self.t_cholesky = 0.0
+        self.t_factorize = 0.0
         self.t_solve = 0.0
 
-    def cholesky(self, A: sp.sparse.spmatrix, **kwargs) -> None:
-        """Compute the Cholesky decomposition of a matrix.
+    def factorize(self, A: sp.sparse.spmatrix, **kwargs) -> None:
+        """Compute the decomposition of a matrix.
+
+        Note: This uses LU decomposition since sparse Cholesky is not readily available.
+        The interface name 'cholesky' is kept for consistency with the solver interface.
 
         Parameters
         ----------
@@ -34,29 +37,33 @@ class SparseSolver(Solver):
         Returns
         -------
         None
+
+        Note:
+        -----
+        Uses the LU decomposition by default as scipy.sparse doesn't implement Cholesky.
         """
         synchronize_gpu()
         tic = time.perf_counter()
 
         A = sp.sparse.csc_matrix(A)
 
-        LU = sp.sparse.linalg.splu(A, diag_pivot_thresh=0, permc_spec="NATURAL")
-
-        if (LU.U.diagonal() > 0).all():  # Check the matrix A is positive definite.
-            self.L = LU.L.dot(sp.sparse.diags(LU.U.diagonal() ** 0.5))
-        else:
-            raise ValueError("The matrix is not positive definite")
+        # Use LU decomposition as the factorization method
+        self.LU_factor = sp.sparse.linalg.splu(A, diag_pivot_thresh=0, permc_spec="NATURAL")
+        
+        # Check if the matrix appears to be positive definite
+        if not (self.LU_factor.U.diagonal() > 0).all():
+            raise ValueError("The matrix does not appear to be positive definite")
 
         synchronize_gpu()
         toc = time.perf_counter()
-        self.t_cholesky += toc - tic
+        self.t_factorize += toc - tic
 
     def solve(
         self,
         rhs: NDArray,
         **kwargs,
     ) -> NDArray:
-        """Solve linear system using Cholesky factor.
+        """Solve linear system using LU factorization.
 
         Parameters
         ----------
@@ -71,19 +78,28 @@ class SparseSolver(Solver):
         synchronize_gpu()
         tic = time.perf_counter()
 
-        if self.L is None:
-            raise ValueError("Cholesky factor not computed")
+        if self.LU_factor is None:
+            raise ValueError("Matrix factorization not computed")
 
-        sp.sparse.linalg.spsolve_triangular(self.L, rhs, lower=True, overwrite_b=True)
-        sp.sparse.linalg.spsolve_triangular(
-            self.L.T, rhs, lower=False, overwrite_b=True
-        )
+        # Handle multiple RHS cases
+        if rhs.ndim == 1:
+            # Single RHS as 1D array
+            x = self.LU_factor.solve(rhs)
+        elif rhs.ndim == 2 and rhs.shape[1] == 1:
+            # Single RHS as column vector
+            x = self.LU_factor.solve(rhs.flatten())
+            x = x.reshape(rhs.shape)
+        elif rhs.ndim == 2 and rhs.shape[1] > 1:
+            # Multiple RHS (batched) - scipy splu can handle this directly
+            x = self.LU_factor.solve(rhs)
+        else:
+            raise ValueError(f"Unsupported RHS shape: {rhs.shape}")
 
         synchronize_gpu()
         toc = time.perf_counter()
         self.t_solve += toc - tic
 
-        return rhs
+        return x
 
     def logdet(
         self,
@@ -97,18 +113,33 @@ class SparseSolver(Solver):
             The log determinant of the matrix.
         """
 
-        if self.L is None:
-            raise ValueError("Cholesky factor not computed")
+        if self.LU_factor is None:
+            raise ValueError("Matrix factorization not computed")
 
-        return 2 * xp.sum(xp.log(self.L.diagonal()))
+        # For LU decomposition: det(A) = det(L) * det(U)
+        # Since L has 1s on diagonal: det(L) = 1
+        # So det(A) = det(U) = product of diagonal elements of U
+        log_det_U = xp.sum(xp.log(xp.abs(self.LU_factor.U.diagonal())))
+        
+        return float(log_det_U)
 
     def selected_inversion(self, **kwargs):
         # Placeholder for the selected inversion method.
         return super().selected_inversion(**kwargs)
 
+    def _structured_to_spmatrix(self, **kwargs) -> None:
+        """Convert structured matrix to sparse matrix.
+        
+        For SparseSolver, this is a no-op since it works directly with sparse matrices.
+        """
+        pass
+
     def get_solver_memory(self) -> int:
         """Return the memory used by the solver in number of bytes"""
-        if self.L is None:
+        if self.LU_factor is None:
             return 0
 
-        return self.L.data.nbytes + self.L.indptr.nbytes + self.L.indices.nbytes
+        # Estimate memory usage from L and U matrices
+        L_memory = self.LU_factor.L.data.nbytes + self.LU_factor.L.indptr.nbytes + self.LU_factor.L.indices.nbytes
+        U_memory = self.LU_factor.U.data.nbytes + self.LU_factor.U.indptr.nbytes + self.LU_factor.U.indices.nbytes
+        return L_memory + U_memory

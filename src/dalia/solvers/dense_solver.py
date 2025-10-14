@@ -42,11 +42,11 @@ class DenseSolver(Solver):
         self.A_inv = None
 
         # Solver Metrics
-        self.t_cholesky = 0.0
+        self.t_factorize = 0.0
         self.t_solve = 0.0
 
-    def cholesky(self, A: NDArray, **kwargs) -> None:
-        """Compute the Cholesky decomposition of a matrix.
+    def factorize(self, A: NDArray, **kwargs) -> None:
+        """Compute the decomposition decomposition of a matrix.
 
         Parameters
         ----------
@@ -56,6 +56,10 @@ class DenseSolver(Solver):
         Returns
         -------
         None
+
+        Note:
+        -----
+        Uses the Cholesky decomposition.
         """
         synchronize_gpu()
         tic = time.perf_counter()
@@ -77,7 +81,7 @@ class DenseSolver(Solver):
 
         synchronize_gpu()
         toc = time.perf_counter()
-        self.t_cholesky += toc - tic
+        self.t_factorize += toc - tic
 
     def solve(
         self,

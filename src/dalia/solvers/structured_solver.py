@@ -65,15 +65,15 @@ class SerinvSolver(Solver):
         # Solver Metrics
         self.total_bytes: int = 0
 
-        self.t_cholesky = 0.0
+        self.t_factorize = 0.0
         self.t_solve = 0.0
 
-    def cholesky(
+    def factorize(
         self,
         A: sp.sparse.spmatrix,
         sparsity: str,
     ) -> None:
-        """Compute the Cholesky decomposition of a matrix.
+        """Compute the decomposition of a matrix.
 
         Parameters
         ----------
@@ -85,6 +85,10 @@ class SerinvSolver(Solver):
         Returns
         -------
         None
+
+        Note:
+        -----
+        Uses the Cholesky decomposition.
         """
         synchronize_gpu()
         tic = time.perf_counter()
@@ -109,7 +113,7 @@ class SerinvSolver(Solver):
 
         synchronize_gpu()
         toc = time.perf_counter()
-        self.t_cholesky += toc - tic
+        self.t_factorize += toc - tic
 
     def solve(
         self,
