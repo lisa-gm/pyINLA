@@ -213,7 +213,7 @@ class DALIA:
         # --- Timers
         self.t_construction_qprior = 0.0
         self.t_construction_qconditional = 0.0
-        self.solver.t_cholesky = 0.0
+        self.solver.t_factorize = 0.0
         self.solver.t_solve = 0.0
         self._print_init()
 
@@ -548,7 +548,7 @@ class DALIA:
 
         self.t_construction_qprior = 0.0
         self.t_construction_qconditional = 0.0
-        self.solver.t_cholesky = 0.0
+        self.solver.t_factorize = 0.0
         self.solver.t_solve = 0.0
 
         synchronize(comm=self.comm_world)
@@ -605,7 +605,7 @@ class DALIA:
         synchronize(comm=self.comm_world)
         toc = time.perf_counter()
         self.objective_function_time.append(toc - tic)
-        self.solver_time.append(self.solver.t_cholesky + self.solver.t_solve)
+        self.solver_time.append(self.solver.t_factorize + self.solver.t_solve)
         self.construction_time.append(
             self.t_construction_qprior + self.t_construction_qconditional
         )
@@ -675,7 +675,7 @@ class DALIA:
                 toc = time.perf_counter()
                 self.t_construction_qconditional += toc - tic
 
-                self.solver.cholesky(A=Q_conditional, sparsity="bta")
+                self.solver.factorize(A=Q_conditional, sparsity="bta")
 
                 rhs: NDArray = self.model.construct_information_vector(
                     eta,
@@ -989,7 +989,7 @@ class DALIA:
         toc = time.perf_counter()
         self.t_construction_qconditional += toc - tic
 
-        self.solver.cholesky(self.model.Q_conditional, sparsity="bta")
+        self.solver.factorize(self.model.Q_conditional, sparsity="bta")
         self.solver.selected_inversion(sparsity="bta")
 
     def get_marginal_variances_latent_parameters(
@@ -1118,7 +1118,7 @@ class DALIA:
             toc = time.perf_counter()
             self.t_construction_qconditional += toc - tic
 
-            self.solver.cholesky(A=Q_conditional, sparsity="bta")
+            self.solver.factorize(A=Q_conditional, sparsity="bta")
 
             rhs: NDArray = self.model.construct_information_vector(
                 eta,
@@ -1160,7 +1160,7 @@ class DALIA:
         Log normal:
         .. math:: 0.5*log(1/(2*pi)^n * |Q_prior|)) - 0.5 * x.T Q_prior x
         """
-        self.solver.cholesky(self.model.Q_prior, sparsity="bt")
+        self.solver.factorize(self.model.Q_prior, sparsity="bt")
         logdet_Q_prior: float = self.solver.logdet(sparsity="bt")
 
         log_prior_latent_parameters: float = +0.5 * logdet_Q_prior

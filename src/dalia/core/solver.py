@@ -24,8 +24,8 @@ class Solver(ABC):
         self.config = config
 
     @abstractmethod
-    def cholesky(self, A: ArrayLike, **kwargs) -> None:
-        """Compute the Cholesky decomposition of a matrix.
+    def factorize(self, A: ArrayLike, **kwargs) -> None:
+        """Compute the decomposition of a matrix.
 
         Parameters
         ----------
@@ -35,6 +35,10 @@ class Solver(ABC):
         Returns
         -------
         None
+
+        Note:
+        -----
+        Even tho precision matrices are known to be positive definite, depending on the underlying sover implementation, this could be Cholesky, LU, or other factorizations.
         """
         ...
 
