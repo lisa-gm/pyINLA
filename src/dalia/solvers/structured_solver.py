@@ -243,8 +243,10 @@ class SerinvSolver(Solver):
         """Map sp.spmatrix to BT or BTA."""
         self.A_diagonal_blocks[:] = 0.0
         self.A_lower_diagonal_blocks[:] = 0.0
-        self.A_arrow_bottom_blocks[:] = 0.0
-        self.A_arrow_tip_block[:] = 0.0
+        if self.A_arrow_bottom_blocks is not None:
+            self.A_arrow_bottom_blocks[:] = 0.0
+        if self.A_arrow_tip_block is not None:
+            self.A_arrow_tip_block[:] = 0.0
 
         if xp.__name__ == "cupy":
             if sparsity == "bta":
