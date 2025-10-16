@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name="dalia_examples"
+#SBATCH --job-name="dalia_alps"
 #SBATCH --output=%x.%j.out
 #SBATCH --error=%x.%j.err
 #SBATCH --account=sm96
@@ -8,7 +8,6 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=64
 #SBATCH --gpus-per-task=1
-####SBATCH --partition=normal
 #SBATCH --partition=debug
 #SBATCH --constraint=gpu
 #SBATCH --hint=nomultithread
@@ -16,8 +15,16 @@
 #SBATCH --view=modules
 
 # Set DALIA environment variables for examples  
-source ../scripts/alps_environment.sh && setup_dalia_alps_environment
-source ./scripts/job_utils.sh && set_dalia_perfenv && echo_job_config
+source ../scripts/alps_cscs_utils.sh && alps_load_modules && alps_activate_conda_env && alps_set_perfenv
+source ./scripts/dalia_job_utils.sh && dalia_set_perfenv && dalia_print_job_config
+
+# Change to examples directory
+if [[ "$(basename "$(pwd)")" != "examples" ]]; then
+    echo "❌ Error: Not in examples directory"
+    echo "   Current directory: $(pwd)"
+    echo "   Please run this script from the examples/ directory"
+    exit 1
+fi
 
 # --- How to Run ---
 # This run script is designed to run on the Daint supercomputer at CSCS.
@@ -31,18 +38,9 @@ source ./scripts/job_utils.sh && set_dalia_perfenv && echo_job_config
 #                    solver. The default is 1. The maximum number of processes is
 # `--max_iter` : The maximum number of iterations of the minimization.
 
-# Change to examples directory
-if [[ "$(basename "$(pwd)")" != "examples" ]]; then
-    echo "❌ Error: Not in examples directory"
-    echo "   Current directory: $(pwd)"
-    echo "   Please run this script from the examples/ directory"
-    exit 1
-fi
-
-
 # --- Run Regression Example ---
-#echo "Regression Example..."
-#srun python ./regression/run.py --max_iter 100
+echo "Regression Example..."
+srun python ./regression/run.py --max_iter 100
 
 # --- Run Spatial Examples ---
 #echo "Spatial Example (small)..."
@@ -52,8 +50,8 @@ fi
 # echo "Spatio-temporal Example (small)..."
 # srun python ./gst_small/run.py --solver_min_p 1 --max_iter 100
 
-echo "Spatio-temporal Example (medium)..."
-srun python ./gst_medium/run.py --solver_min_p 1 --max_iter 100
+# echo "Spatio-temporal Example (medium)..."
+# srun python ./gst_medium/run.py --solver_min_p 1 --max_iter 100
 
 #echo "Spatio-temporal Example (large)..."
 #srun python ./gst_large/run.py --solver_min_p 1 --max_iter 100
