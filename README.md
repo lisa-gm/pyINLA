@@ -1,41 +1,23 @@
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg?style=flat-square)](https://github.com/psf/black)
+
 
 # DALIA
-Python implementation of the methodology of integrated nested Laplace approximations (INLA), putting the accent on portability, modularity and performance (formerly known as PyINLA).
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg?style=flat-square)](https://github.com/psf/black)  
 
-If you want to help us in the developement of DALIA, you can fill the following `missing features` survey: https://forms.gle/o4CxBDcr1t73pBHbA
+---
+
+Python implementation of the methodology of integrated nested Laplace approximations (INLA), putting the accent on portability, modularity and performance.
 
 If you want to get involved in the development of DALIA, please feel free to contact us directly.
 
 ## Installation
-DALIA is a python package that can be installed from its source code. You will need a working `conda` installation as well as the `Serinv` (https://github.com/vincent-maillou/serinv) solver library for accelerated solution of spatio-temporal models.
+Detailed installation instructions are provided in [install.md](./install.md).
 
-You can get a working installation of `conda` on the Miniconda website: https://repo.anaconda.com/miniconda/
-
-This package relies on several libraries, some of which enabling high performance computing (HPC) features and GPU acceleration. These libraries (CuPy, MPI4Py, etc.) are not required for the basic functionality of the package, but are required for the advanced features.
-
-Default required packages are:
-```bash
-conda install numpy scipy
-conda install -c conda-forge pytest pytest-mpi pytest-cov coverage black isort ruff just pre-commit matplotlib tabulate numba -y
-```
-
-You can then optionally install the Serinv solver (required for spatio-temporal models)
-```bash
-cd /path/to/serinv/
-python -m pip install -e .
-```
-
-And finally install the DALIA package:
-```bash
-cd /path/to/dalia/
-python -m pip install -e .
-```
-
-We then recommend you to run some of the examples provided in the `examples/` directory to test your installation.
-For more detailed installation instructions, especially on clusters, leveraging GPU acceleration through `CuPy` and distributed computing through `MPI4Py`, please refer to the [dev note](DEV_README.md) in the `DEV_README.md` file.
+# Tests, Examples and Benchmarks
+## Testing
+TODO
 
 ## Examples
+
 Some examples are provided with running scripts. The examples are being tracked using `git-lfs`, to download them, run the following commands:
 ```bash
 git lfs pull
@@ -47,8 +29,27 @@ You can then navigate in the `examples/` directory and run the given examples. F
 python gst_small/run.py
 ```
 
+## Benchmarks
+TODO
+
 ## Known Installation Issues
 The `sqlite` module might not work properly. Forcing the following version of `sqlite` might help:
 ```bash
 conda install conda-forge::sqlite=3.45.3
+```
+
+# Citing DALIA
+
+The main DALIA paper describing its high performance computing strategies is available through the following reference:
+
+``` bibtex
+@misc{gaedkemerzhäuser2025acceleratedspatiotemporalbayesianmodeling,
+      title={Accelerated Spatio-Temporal Bayesian Modeling for Multivariate Gaussian Processes}, 
+      author={Lisa Gaedke-Merzhäuser and Vincent Maillou and Fernando Rodriguez Avellaneda and Olaf Schenk and Mathieu Luisier and Paula Moraga and Alexandros Nikolaos Ziogas and Håvard Rue},
+      year={2025},
+      eprint={2507.06938},
+      archivePrefix={arXiv},
+      primaryClass={stat.CO},
+      url={https://arxiv.org/abs/2507.06938}, 
+}
 ```
