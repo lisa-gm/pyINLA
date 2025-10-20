@@ -1021,7 +1021,8 @@ class DALIA:
 
         return hess
 
-    def marginal_distributions_hp(self, quantiles: NDArray = xp.array([0.025, 0.5, 0.975])) -> dict:
+    ## 0.0001
+    def marginal_distributions_hp(self, quantiles: NDArray = xp.array([0.0001, 0.025, 0.5, 0.975, 0.9999])) -> dict:
         """Compute the marginal distributions of the hyperparameters theta.
 
         Parameters
@@ -1045,7 +1046,7 @@ class DALIA:
             'hyperparameters': {},
             'summary': {
                 'n_params': self.model.n_hyperparameters,
-                'param_names': getattr(self.model, 'hyperparameter_names', [f'theta_{i}' for i in range(self.model.n_hyperparameters)]),
+                'param_names': self.model.theta_keys,
                 'quantile_levels': quantiles.tolist() if quantiles is not None else None
             }
         }
@@ -1077,11 +1078,8 @@ class DALIA:
             
             # compute bounds for theta intervals using compute_bounds() from utils
             (theta_internal_lower, theta_internal_upper), (theta_external_lower, theta_external_upper) = compute_bounds(
-                theta_internal_i, marg_var_internal_i, param_transform, n_std=3
+                theta_internal_i, marg_var_internal_i, param_transform, n_std=4
             )
-            print("theta_internal bounds: ", theta_internal_lower, theta_internal_upper)
-            print("theta_external bounds: ", theta_external_lower, theta_external_upper)
-            print("param:" , param_transform)
 
             # set theta_internal_interval
             theta_internal_interval = xp.linspace(theta_internal_lower, theta_internal_upper, num=100)

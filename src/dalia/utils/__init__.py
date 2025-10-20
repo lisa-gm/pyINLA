@@ -34,6 +34,8 @@ from dalia.utils.print_utils import (
     boxify,
 )
 from dalia.utils.spmatrix_utils import bdiag_tiling, extract_diagonal, memory_footprint
+from dalia.utils.print_utils import add_str_header, align_tables_side_by_side, boxify, ascii_logo
+from dalia.utils.plotting_posterior_quantities import plot_marginal_distributions_hp
 
 __all__ = [
     "get_available_devices",
@@ -68,4 +70,5 @@ __all__ = [
     "memory_report",
     "format_size",
     "DummyCommunicator",
+    "plot_marginal_distributions_hp",
 ]

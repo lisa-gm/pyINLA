@@ -25,19 +25,13 @@ class AR1SubModel(SubModel):
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
 
-        ## TODO: link this to prior hyperparameters class
-        ## i.e. rescale phi and tau according to prior hyperparameters class
+        # kwargs expects hyperparameters in external scale
         phi = kwargs.get("phi")
-        #phi = scaled_logit(phi_scaled, direction="backward")
-        #print("phi: ", phi)
-
         tau = kwargs.get("tau")
-        #exp_tau = xp.exp(tau)
-        #print("tau: ", tau)
 
         s2 = 1 / tau
         denom = s2 * (1 - phi**2)
-
+        
         diag = [(1 + phi**2) / denom] * self.n_latent_parameters
         diag[0] = diag[-1] = 1 / denom
         off_diag = [-phi / denom] * (self.n_latent_parameters - 1)

@@ -54,9 +54,9 @@ class AR1SubModelConfig(SubModelConfig):
     def read_hyperparameters(self):
 
         # input of phi is in (0,1), rescale to -/+ INF
-        self.phi_scaled = scaled_logit(self.phi, direction="forward")
-        theta = xp.array([self.phi_scaled, self.tau])
-        theta_internal = xp.array([self.phi_scaled, self.tau])
+        #self.phi_scaled = scaled_logit(self.phi, direction="forward")
+        theta = xp.array([self.phi, self.tau])
+        #theta_internal = xp.array([self.phi, self.tau])
         theta_keys = ["phi", "tau"]
 
         return theta, theta_keys
