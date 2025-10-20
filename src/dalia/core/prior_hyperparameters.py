@@ -1,6 +1,7 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
 from abc import ABC, abstractmethod
+from dalia import xp
 
 from dalia.configs.priorhyperparameters_config import PriorHyperparametersConfig
 
@@ -22,14 +23,17 @@ class PriorHyperparameters(ABC):
 
         Args:
             theta: Hyperparameter
-            direction: "forward" or "backward"
+            direction: "forward", "backward", "forward_jacobian", "backward_jacobian"
         Returns:
             Rescaled hyperparameter.
 
         """
         
-        return theta
-
+        if direction == "forward" or direction == "backward":
+            return theta
+        elif direction == "forward_jacobian" or direction == "backward_jacobian":
+            return xp.ones_like(theta)
+        
     @abstractmethod
     def evaluate_log_prior(self, theta: float) -> float:
         """Evaluate the log prior hyperparameters."""

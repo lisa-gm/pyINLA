@@ -8,7 +8,7 @@ from dalia.configs import dalia_config, likelihood_config, submodels_config
 from dalia.core.dalia import DALIA
 from dalia.core.model import Model
 from dalia.submodels import RegressionSubModel
-from dalia.utils import extract_diagonal, get_host, print_msg
+from dalia.utils import extract_diagonal, get_host, print_msg, plot_marginal_distributions_hp 
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
@@ -111,45 +111,18 @@ if __name__ == "__main__":
         f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
     )
 
+    print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp() 
     
-    print_msg("\n--- Marginal distributions of the hyperparameters ---")
-
+    fig, axes = plot_marginal_distributions_hp(marginals_hp)
     import matplotlib.pyplot as plt
-    
-    # Extract marginal precision observations
-    theta_0_data = marginals_hp['hyperparameters']['prec_o']
-    theta_external, pdf_external = theta_0_data['pdf_data']
-    mean_external = theta_0_data['mean_external']
-    quantile_pairs = theta_0_data['quantiles']['external']['pairs']
-    
-    # Create the plot
-    hp_name = 'prec_o'
-    
-    plt.figure(figsize=(10, 6))
-    
-    # Plot the PDF
-    plt.plot(theta_external, pdf_external, 'b-', linewidth=2, label='PDF')
-    
-    # Mark the mean
-    plt.axvline(mean_external, color='red', linestyle='--', linewidth=2, label=f'Mean = {mean_external:.3f}')
-    
-    # Mark the quantiles
-    colors = ['#DEB887', '#DEB887','darkred', '#DEB887', '#DEB887']
-    labels = ['2.5%', '25%', '50%', '75%','97.5%']
-    # Only plot quantiles that have corresponding labels
-    for i, (prob, q_val) in enumerate(quantile_pairs):
-        if i < len(labels):  # Only plot if we have a label for this quantile
-            plt.axvline(q_val, color=colors[i], linestyle=':', linewidth=2, 
-                       label=f'{labels[i]} quantile = {q_val:.3f}')
-
-    plt.xlabel(f'{hp_name} (external scale)')
-    plt.ylabel('PDF')
-    plt.title(f'Marginal Distribution of {hp_name}')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
     plt.show()
+    
+    prec_obs = marginals_hp['hyperparameters']['prec_o']
+    quantile_pairs = prec_obs['quantiles']['external']['pairs']
+
+    print("Quantile pairs of prec_o:")
+    for p, q in quantile_pairs:
+        print(f"   {p:.3f} quantile: {q:.4f}")
 
     print_msg("\n--- Finished ---")
