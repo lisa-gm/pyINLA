@@ -15,24 +15,23 @@ def matrix_size(request: pytest.FixtureRequest) -> int:
     return request.param
 
 
-DENSITY = [
-    pytest.param(0.1, id="density=0.1"),
-    pytest.param(0.5, id="density=0.5"),
-    pytest.param(1.0, id="density=1.0"),
+MATRIX_TYPE = [
+    pytest.param("dense", id="type=dense"),
+    pytest.param("sparse", id="type=sparse"),
 ]
 
 
-@pytest.fixture(params=DENSITY, autouse=True)
-def density(request: pytest.FixtureRequest) -> int:
+@pytest.fixture(params=MATRIX_TYPE, autouse=True)
+def matrix_type(request: pytest.FixtureRequest) -> int:
     return request.param
 
 
-SOLVERS_TYPES = [
-    pytest.param("scipy", id="solver_type=scipy"),
+SOLVER_TYPES = [
+    pytest.param("dense", id="solver_type=dense"),
 ]
 
 
-@pytest.fixture(params=SOLVERS_TYPES)
+@pytest.fixture(params=SOLVER_TYPES)
 def solver_type(request: pytest.FixtureRequest) -> str:
     return request.param
 

@@ -8,19 +8,22 @@ def test_logdet_correctness(
     create_solver,
     solver_type,
     matrix_size,
-    density,
+    matrix_type,
 ):
-    A = generate_spd_spmatrix(matrix_size, density)
+    # Generate test case
+    A = generate_spd_spmatrix(matrix_type, matrix_size)
 
-    solver = create_solver(solver_type)
+    # Solver to compare
+    solver = create_solver(solver_type, matrix_size)
 
-    # Test that factorization is callable without errors
     solver.factorize(A)
 
     logdet_solver = solver.logdet()
 
+    # Reference
     logdet_ref = reference_logdet(A)
 
+    # Compare
     allclose_floats(
         a_reference=logdet_ref,
         b_toverify=logdet_solver,

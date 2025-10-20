@@ -1,8 +1,8 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
-from dalia import backend_flags, xp
-
 import numpy as np
+
+from dalia import backend_flags, xp
 
 SEED = 63
 
@@ -13,10 +13,8 @@ if backend_flags["cupy_avail"]:
 
     cp.random.seed(cp.uint64(63))
 
-def _create_rhs(
-    n_rhs: int,
-    matrix_size: int
-):
+
+def _create_rhs(n_rhs: int, matrix_size: int):
     """Returns a random right-hand side.
 
     Parameters
@@ -36,47 +34,45 @@ def _create_rhs(
         Random right-hand side.
     """
 
-    B = xp.random.rand(
-        matrix_size, n_rhs
-    )
+    B = xp.random.rand(matrix_size, n_rhs)
 
     return B
 
 
 def _reference_cholesky(A):
     """Compute reference Cholesky decomposition using NumPy.
-    
+
     Parameters
     ----------
     A : ArrayLike
         Input matrix to decompose.
-        
+
     Returns
     -------
     L : numpy.ndarray
         Lower triangular Cholesky factor.
     """
-    A_dense = A.toarray() if hasattr(A, 'toarray') else A
+    A_dense = A.toarray() if hasattr(A, "toarray") else A
     A_dense = np.asarray(A_dense)
     return np.linalg.cholesky(A_dense)
 
 
 def _reference_solve(A, rhs):
     """Solve linear system using NumPy.
-    
+
     Parameters
     ----------
     A : ArrayLike
         System matrix.
     rhs : ArrayLike
         Right-hand side.
-        
+
     Returns
     -------
     x : numpy.ndarray
         Solution vector.
     """
-    A_dense = A.toarray() if hasattr(A, 'toarray') else A
+    A_dense = A.toarray() if hasattr(A, "toarray") else A
     A_dense = np.asarray(A_dense)
     rhs_dense = np.asarray(rhs)
     return np.linalg.solve(A_dense, rhs_dense)
@@ -84,18 +80,18 @@ def _reference_solve(A, rhs):
 
 def _reference_logdet(A):
     """Compute log determinant using NumPy Cholesky.
-    
+
     Parameters
     ----------
     A : ArrayLike
         Input matrix.
-        
+
     Returns
     -------
     logdet : float
         Log determinant of the matrix.
     """
-    A_dense = A.toarray() if hasattr(A, 'toarray') else A
+    A_dense = A.toarray() if hasattr(A, "toarray") else A
     A_dense = np.asarray(A_dense)
     L = np.linalg.cholesky(A_dense)
     return 2.0 * np.sum(np.log(np.diag(L)))
@@ -103,59 +99,68 @@ def _reference_logdet(A):
 
 def _reference_inversion(A):
     """Compute matrix inverse using NumPy.
-    
+
     Parameters
     ----------
     A : ArrayLike
         Input matrix.
-        
+
     Returns
     -------
     A_inv : numpy.ndarray
         Inverse matrix.
     """
-    A_dense = A.toarray() if hasattr(A, 'toarray') else A
+    A_dense = A.toarray() if hasattr(A, "toarray") else A
     A_dense = np.asarray(A_dense)
     return np.linalg.inv(A_dense)
 
-def _allclose_vectors(
+
+def _allclose_ndarrays(
     a_reference: np.ndarray,
     b_toverify: np.ndarray,
+    relaxed_tolerance: bool = False,
 ):
-    """Check correctness of two vectors.
-    
+    """Check correctness of two ndarrays.
+
     Parameters
     ----------
     A_reference : numpy.ndarray
         Reference vector.
     B_toverify : numpy.ndarray
         Vector to verify.
-        
+    relaxed_tolerance : bool, optional
+        Whether to use relaxed tolerance for comparison, by default False.
+
     Raises
     ------
     AssertionError
         If the vectors are not close enough.
     """
-    assert np.allclose( 
+
+    rtol = 1e-10 if relaxed_tolerance else 1e-14
+    atol = 1e-12 if relaxed_tolerance else 1e-16
+
+    assert np.allclose(
         a_reference,
         b_toverify,
-        rtol=1e-14,
-        atol=1e-16,
+        rtol=rtol,
+        atol=atol,
     )
+
 
 def _allclose_floats(
     a_reference: float,
     b_toverify: float,
 ):
     """Check correctness of two floats.
-    
+
     Parameters
     ----------
     a_reference : float
         Reference float.
     b_toverify : float
         Float to verify.
-        
+
     Raises
     ------
     AssertionError
