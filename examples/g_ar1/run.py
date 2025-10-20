@@ -11,7 +11,7 @@ from dalia.configs import likelihood_config, dalia_config, submodels_config
 from dalia.core.model import Model
 from dalia.core.dalia import DALIA
 from dalia.submodels import AR1SubModel, RegressionSubModel
-from dalia.utils import get_host, print_msg, scaled_logit  # , extract_diagonal
+from dalia.utils import get_host, print_msg, plot_marginal_distributions_hp  # , extract_diagonal
 from examples_utils.parser_utils import parse_args
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -59,13 +59,13 @@ if __name__ == "__main__":
 
     likelihood_dict = {
         "type": "gaussian",
-        "prec_o": xp.log(theta_initial[2]),
+        "prec_o": theta_initial[2],
         # "prior_hyperparameters": {
         #     "type": "penalized_complexity",
         #     "alpha": 0.01,
         #     "u": 5,
         # },
-        "prior_hyperparameters": {"type": "gaussian", "mean": xp.log(theta_original[2]), "precision": 0.05},
+        "prior_hyperparameters": {"type": "gaussian", "mean": theta_original[2], "precision": 0.05},
     }
 
     model = Model(
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     print("theta:          ", np.round(theta, 4))
     print("theta original: ", theta_original)
 
-    print_msg("Covariance of theta:\n", results["cov_theta"])
+    print_msg("Covariance of theta:\n", results["cov_theta_internal"])
     print_msg(
         "Mean of the fixed effects:\n",
         results["x"][-model.submodels[-1].n_fixed_effects :],
@@ -151,3 +151,19 @@ if __name__ == "__main__":
         "Norm (marg var latent - ref):    ",
         f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
     )
+    
+    print_msg("\n--- Marginal distributions of the hyperparameters ---")
+    marginals_hp = dalia.marginal_distributions_hp() 
+
+    fig, axes = plot_marginal_distributions_hp(marginals_hp)
+    import matplotlib.pyplot as plt
+    plt.show()
+    
+    phi = marginals_hp['hyperparameters']['phi']
+    quantile_pairs = phi['quantiles']['external']['pairs']
+
+    print("Quantile pairs of phi:")
+    for p, q in quantile_pairs:
+        print(f"   {p:.3f} quantile: {q:.4f}")
+    
+    print_msg("\n--- Finished ---")
