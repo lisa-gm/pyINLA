@@ -1,43 +1,42 @@
 from dalia import sp
 
+
 def test_logdet_correctness(
-        reference_logdet,
-        allclose_floats,
-        create_solver, 
-        create_pobta,
-        create_pobt,
-        solver_type,
-        diagonal_blocksize, 
-        n_diag_blocks, 
-        arrowhead_blocksize
-    ):
-        """Test Cholesky decomposition correctness against NumPy reference."""
-        # Generate test matrix based on sparsity pattern
-        if arrowhead_blocksize > 0:  # bta
-            A = create_pobta(diagonal_blocksize, arrowhead_blocksize, n_diag_blocks)
-        else:  # bt
-            A = create_pobt(diagonal_blocksize, n_diag_blocks)
-        
-        # Convert to sparse matrix
-        A_sparse = sp.sparse.csc_matrix(A)
-        
-        # Create solver
-        solver = create_solver(
-            solver_type, diagonal_blocksize, n_diag_blocks, arrowhead_blocksize
-        )
-        
-        # Run solver factorize
-        solver.factorize(A_sparse, sparsity="bta" if arrowhead_blocksize > 0 else "bt")
-        
-        # Compute logdet using solver
-        logdet_solver = solver.logdet(sparsity="bta" if arrowhead_blocksize > 0 else "bt")
+    reference_logdet,
+    allclose_floats,
+    create_solver,
+    create_pobta,
+    create_pobt,
+    solver_type,
+    diagonal_blocksize,
+    n_diag_blocks,
+    arrowhead_blocksize,
+):
+    """Test Cholesky decomposition correctness against NumPy reference."""
+    # Generate test matrix based on sparsity pattern
+    if arrowhead_blocksize > 0:  # bta
+        A = create_pobta(diagonal_blocksize, arrowhead_blocksize, n_diag_blocks)
+    else:  # bt
+        A = create_pobt(diagonal_blocksize, n_diag_blocks)
 
-        # Compute reference
-        logdet_ref = reference_logdet(A)
+    # Convert to sparse matrix
+    A_sparse = sp.sparse.csc_matrix(A)
 
-        allclose_floats(
-            a_reference=logdet_ref,
-            b_toverify=logdet_solver,
-        )
+    # Create solver
+    solver = create_solver(
+        solver_type, diagonal_blocksize, n_diag_blocks, arrowhead_blocksize
+    )
 
-        
+    # Run solver factorize
+    solver.factorize(A_sparse, sparsity="bta" if arrowhead_blocksize > 0 else "bt")
+
+    # Compute logdet using solver
+    logdet_solver = solver.logdet(sparsity="bta" if arrowhead_blocksize > 0 else "bt")
+
+    # Compute reference
+    logdet_ref = reference_logdet(A)
+
+    allclose_floats(
+        a_reference=logdet_ref,
+        b_toverify=logdet_solver,
+    )

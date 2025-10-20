@@ -1,8 +1,8 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
 import numpy as np
-import pytest
-from dalia import backend_flags, xp, ArrayLike
+
+from dalia import ArrayLike, backend_flags, xp
 
 SEED = 63
 
@@ -34,8 +34,8 @@ def _create_solver(
         )
     else:
         raise ValueError(f"Unknown solver type: {solver_type}")
-    
-    
+
+
 def _create_pobta(
     diagonal_blocksize: int,
     arrowhead_blocksize: int,
@@ -90,7 +90,7 @@ def _create_pobta(
 
     # Make symmetric
     A = A + A.T
-    
+
     # Make positive definite by adding scaled identity
     A = A + (xp.max(xp.abs(A)) + 1.0) * xp.eye(A.shape[0])
 
@@ -140,7 +140,7 @@ def _create_pobt(
 
     # Make symmetric
     A = A + A.T
-    
+
     # Make positive definite by adding scaled identity
     A = A + (xp.max(xp.abs(A)) + 1.0) * xp.eye(A.shape[0])
 
@@ -148,13 +148,13 @@ def _create_pobt(
 
 
 def _allclose_dense_structured(
-    A_reference: ArrayLike, 
-    B_toverify: ArrayLike, 
-    diagonal_blocksize: int, 
-    n_diag_blocks: int, 
+    A_reference: ArrayLike,
+    B_toverify: ArrayLike,
+    diagonal_blocksize: int,
+    n_diag_blocks: int,
     arrowhead_blocksize: int = 0,
     assert_upper_triangle: bool = False,
-    ):
+):
     """Check block-wise correctness of two structured matrices in dense storage format.
 
     Parameters
@@ -178,7 +178,7 @@ def _allclose_dense_structured(
     ------
     AssertionError
         If any of the corresponding blocks are not close enough.
-    """ 
+    """
     if arrowhead_blocksize > 0:
         # Lower arrow blocks
         assert np.allclose(
@@ -248,6 +248,3 @@ def _allclose_dense_structured(
                     rtol=1e-14,
                     atol=1e-16,
                 )
-
-    
-    

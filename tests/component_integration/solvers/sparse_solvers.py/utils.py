@@ -1,9 +1,9 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
-from dalia import backend_flags, xp
-
 import numpy as np
 from scipy import sparse
+
+from dalia import backend_flags, xp
 
 SEED = 63
 
@@ -14,18 +14,20 @@ if backend_flags["cupy_avail"]:
 
     cp.random.seed(cp.uint64(63))
 
+
 def _create_solver(
     solver_type: str,
 ):
     from dalia.configs.dalia_config import SolverConfig
     from dalia.solvers import SparseSolver
-    
+
     config = SolverConfig(type=solver_type)
-    
+
     if solver_type == "scipy":
         return SparseSolver(config=config)
     else:
         raise ValueError(f"Unknown solver type: {solver_type}")
+
 
 def _generate_spd_spmatrix(
     n: int,
@@ -49,4 +51,4 @@ def _generate_spd_spmatrix(
     L = L + n * sparse.eye(n)  # Make diagonal dominant
     L = sparse.tril(L)  # lower triangular
 
-    return L @ L.T # SPD and sparse (but denser than L)
+    return L @ L.T  # SPD and sparse (but denser than L)
