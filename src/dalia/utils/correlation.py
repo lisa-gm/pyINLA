@@ -2,8 +2,6 @@
 
 import numpy as np
 from dalia import xp
-from scipy.stats import multivariate_normal
-from scipy.linalg import cholesky
 import matplotlib.pyplot as plt
 
 # Import our quadrature functions
@@ -16,138 +14,11 @@ from dalia.utils.reparametrizations import (
     compute_bounds
 )
 
-
-def generate_random_covariance_matrix(n_dim=3, condition_number=10.0, random_seed=42):
-    """
-    Generate a random positive definite covariance matrix.
-    
-    Parameters
-    ----------
-    n_dim : int
-        Dimension of the covariance matrix
-    condition_number : float
-        Maximum condition number (controls how ill-conditioned the matrix can be)
-    random_seed : int
-        Random seed for reproducibility
-        
-    Returns
-    -------
-    ndarray
-        Random positive definite covariance matrix
-    """
-    np.random.seed(random_seed)
-    
-    # Generate random eigenvalues between 1/condition_number and 1
-    eigenvals = np.random.uniform(1.0/condition_number, 1.0, n_dim)
-    eigenvals = np.sort(eigenvals)[::-1]  # Sort in descending order
-    
-    # Generate random orthogonal matrix (eigenvectors)
-    Q, _ = np.linalg.qr(np.random.randn(n_dim, n_dim))
-    
-    # Construct covariance matrix: Σ = Q * diag(eigenvals) * Q^T
-    cov_matrix = Q @ np.diag(eigenvals) @ Q.T
-    
-    return cov_matrix
-
-
-class TransformationFunction:
-    """
-    Container for monotone bijective transformation functions.
-    Each transformation should be differentiable and monotone.
-    """
-    
-    def __init__(self, name, forward_func, backward_func, jacobian_func):
-        self.name = name
-        self.forward_func = forward_func
-        self.backward_func = backward_func
-        self.jacobian_func = jacobian_func
-    
-    def __call__(self, x, direction):
-        if direction == "forward":
-            return self.forward_func(x)
-        elif direction == "backward":
-            return self.backward_func(x)
-        elif direction == "forward_jacobian":
-            return self.jacobian_func(x)
-        else:
-            raise ValueError(f"Unknown direction: {direction}")
-
-
-def create_transformation_functions():
-    """
-    Create a set of monotone bijective transformation functions.
-    
-    Returns
-    -------
-    list
-        List of TransformationFunction objects
-    """
-    
-    # 1. Log transformation (like gamma prior rescaling)
-    log_transform = TransformationFunction(
-        name="Log Transform (exp ↔ log)",
-        forward_func=lambda x: xp.log(x),
-        backward_func=lambda x: xp.exp(x),
-        jacobian_func=lambda x: 1.0 / x
-    )
-    
-    # 2. Logistic transformation (maps R ↔ (0,1))
-    logistic_transform = TransformationFunction(
-        name="Logistic Transform (logit ↔ sigmoid)",
-        forward_func=lambda x: xp.log(x / (1 - x)) if hasattr(x, '__iter__') else xp.log(x / (1 - x)),
-        backward_func=lambda x: 1 / (1 + xp.exp(-x)),
-        jacobian_func=lambda x: 1 / (x * (1 - x))
-    )
-    
-    # 3. Identity transformation (no transformation)
-    identity_transform = TransformationFunction(
-        name="Identity Transform (no change)",
-        forward_func=lambda x: x,
-        backward_func=lambda x: x,
-        jacobian_func=lambda x: 1.0
-    )
-    
-    return [log_transform, logistic_transform, identity_transform]
-
-
-def compute_marginal_statistics_univariate(mean_internal, cov_internal, transform, n_points=30):
-    """
-    Compute marginal statistics for a single parameter using univariate quadrature.
-    
-    Parameters
-    ----------
-    mean_internal : float
-        Mean of the internal (Gaussian) distribution for this parameter
-    cov_internal : float
-        Variance of the internal (Gaussian) distribution for this parameter
-    transform : TransformationFunction
-        Transformation function to use
-    n_points : int
-        Number of quadrature points
-        
-    Returns
-    -------
-    dict
-        Dictionary with marginal statistics in outer space
-    """
-    
-    def transform_func(x, direction):
-        return transform(x, direction)
-    
-    # Use univariate Gaussian quadrature
-    result = compute_variance_gauss_hermite(mean_internal, cov_internal, transform_func, n_points)
-    
-    return {
-        'mean': result['mean'],
-        'variance': result['variance'],
-        'std': result['std'],
-        'transform_name': transform.name
-    }
-
-
-def compute_outer_covariance_matrix(mean_internal, cov_internal, transform_func, n_points=25):
+def compute_outer_covariance_matrix(mean_internal, cov_internal, transform_list, n_points=25):
     """
     Compute covariance matrix between all pairs of transformed parameters using bivariate quadrature.
+    The results are to be considered with caution. Covariance matrices provide reliable information in 
+    the Gaussian context, however, not necessarily in the transformed space.
     
     Parameters
     ----------
@@ -155,7 +26,7 @@ def compute_outer_covariance_matrix(mean_internal, cov_internal, transform_func,
         Mean vector of internal distribution
     cov_internal : ndarray
         Covariance matrix of internal distribution
-    transform_func : callable
+    transform_func : function
         Transformation function that takes (theta_vector, direction) and returns transformed vector
         This should be the model's rescale_hyperparameters_to_internal method
     n_points : int
@@ -169,33 +40,7 @@ def compute_outer_covariance_matrix(mean_internal, cov_internal, transform_func,
     
     n_dim = len(mean_internal)
     outer_cov_matrix = np.zeros((n_dim, n_dim))
-    
-    # Create individual parameter transformation functions from the vectorized transform
-    def create_param_transform(param_idx):
-        """Create a transformation function for a single parameter."""
-        def single_param_transform(x_values, direction):
-            # Handle both scalar and array inputs
-            x_values = np.atleast_1d(x_values)
-            
-            # Initialize output array
-            result = np.zeros_like(x_values)
-            
-            # Process each value in the array
-            for i, x_val in enumerate(x_values):
-                # Create a vector with the current mean for all parameters
-                theta_vector = mean_internal.copy()
-                # Replace the param_idx-th parameter with the current value
-                theta_vector[param_idx] = x_val
-                # Apply the full transformation
-                transformed_vector = transform_func(theta_vector, direction)
-                # Store only the param_idx-th component
-                result[i] = transformed_vector[param_idx]
-            
-            # Return scalar if input was scalar, array if input was array
-            return result[0] if result.shape == (1,) else result
-        return single_param_transform
-    
-    # Pre-compute marginal statistics for efficiency
+        
     mean_outer = []
     marginal_vars = []
     
@@ -204,24 +49,20 @@ def compute_outer_covariance_matrix(mean_internal, cov_internal, transform_func,
     for i in range(n_dim):
         mu_i = mean_internal[i]
         var_i = cov_internal[i, i]
-        
-        # Create transformation function for this parameter
-        param_transform = create_param_transform(i)
-        
+                
         # Compute marginal statistics
-        result = compute_variance_gauss_hermite(mu_i, var_i, param_transform, n_points)
+        result = compute_variance_gauss_hermite(mu_i, var_i, transform_list[i], n_points)
         mean_outer.append(result['mean'])
         marginal_vars.append(result['variance'])
-    
+        
+        outer_cov_matrix[i, i] = result['variance']
+
     print("Computing pairwise covariances...")
     
     # Compute pairwise covariances
     for i in range(n_dim):
         for j in range(n_dim):
-            if i == j:
-                # Diagonal elements will be set to marginal variances later
-                pass
-            elif i < j:  # Only compute upper triangle, then symmetrize
+            if i < j:  # Only compute upper triangle, then symmetrize, i == j already filled
                 print(f"  Computing Cov(X_{i+1}, X_{j+1})...", end=" ")
                 
                 # Extract marginal parameters
@@ -230,12 +71,12 @@ def compute_outer_covariance_matrix(mean_internal, cov_internal, transform_func,
                 cov_ij = cov_internal[i, j]
                 
                 # Compute correlation coefficient in internal space
-                rho_internal = cov_ij / np.sqrt(var_i * var_j) if var_i * var_j > 0 else 0.0
+                rho_internal = cov_ij / np.sqrt(var_i * var_j) 
                 
                 # Create transformation functions for these parameters
-                transform_func_i = create_param_transform(i)
-                transform_func_j = create_param_transform(j)
-                
+                transform_func_i = transform_list[i]
+                transform_func_j = transform_list[j]
+
                 # Standardize the variables for bivariate quadrature
                 def standardized_func_i(z):
                     x_internal = mu_i + np.sqrt(var_i) * z
@@ -250,11 +91,7 @@ def compute_outer_covariance_matrix(mean_internal, cov_internal, transform_func,
                     standardized_func_i, standardized_func_j, 
                     rho=rho_internal, n_points=n_points
                 )
-                
-                # Get pre-computed marginal statistics
-                var_i_outer = marginal_vars[i]
-                var_j_outer = marginal_vars[j]
-                
+                                
                 # Covariance: Cov(X,Y) = E[XY] - E[X]E[Y]
                 covariance_outer = cross_moment - mean_outer[i] * mean_outer[j]
                 
@@ -263,21 +100,100 @@ def compute_outer_covariance_matrix(mean_internal, cov_internal, transform_func,
                 outer_cov_matrix[j, i] = covariance_outer  # Symmetric
                 
                 print(f"{covariance_outer:.6f}")
-            else:
-                # Lower triangle - already filled by symmetry
-                pass
-    
-    # Set diagonal elements to marginal variances
-    for i in range(n_dim):
-        outer_cov_matrix[i, i] = marginal_vars[i]
-    
+        
     return outer_cov_matrix
 
 
-def test_multivariate_transformation():
+if __name__ == "__main__":
+
     """
     Main test function for multivariate transformations.
-    """
+    """    
+
+    # Dummy Prior Hyperparameter Class with Log Transform
+    class Prior_LogTransform:
+        """
+        Dummy implementation of gamma prior rescaling for testing purposes.
+        Implements log transformation: forward = log(x), backward = exp(x)
+        """
+        def rescale_hyperparameters_to_internal(self, theta, direction):
+            """Log transformation between positive (external) and unconstrained (internal) space"""
+            if direction == "forward":
+                return np.log(theta)  # theta -> log(theta)
+            elif direction == "backward": 
+                return np.exp(theta)  # log(theta) -> theta
+            elif direction == "forward_jacobian":
+                return 1.0 / theta   # d(log(theta))/d(theta) = 1/theta
+            elif direction == "backward_jacobian":
+                return theta         # d(exp(theta))/d(theta) = exp(theta) = theta
+            else:
+                raise ValueError(f"Unknown direction: {direction}")
+    
+    class Prior_LogisticTransform:
+        """
+        Dummy implementation of beta prior rescaling for testing purposes.
+        Implements logistic transformation: forward = logit(x), backward = sigmoid(x)
+        """     
+        
+        def rescale_hyperparameters_to_internal(self, theta, direction):
+            """Logistic transformation between (0,1) and unconstrained space"""
+            if direction == "forward":
+                return np.log(theta / (1 - theta))  # logit(theta)
+            elif direction == "backward": 
+                return 1 / (1 + np.exp(-theta))      # sigmoid(theta)
+            elif direction == "forward_jacobian":
+                return 1.0 / (theta * (1 - theta))   # d(logit(theta))/d(theta)
+            elif direction == "backward_jacobian":
+                sig = 1 / (1 + np.exp(-theta))
+                return sig * (1 - sig)               # d(sigmoid(theta))/d(theta)
+            else:
+                raise ValueError(f"Unknown direction: {direction}")
+            
+    class Prior_IdentityTransform:
+        """
+        Dummy implementation of identity prior rescaling for testing purposes.
+        Implements identity transformation: forward = x, backward = x
+        """
+        def rescale_hyperparameters_to_internal(self, theta, direction):
+            """Identity transformation (no change)"""
+            if direction in ["forward", "backward"]:
+                return theta
+            elif direction in ["forward_jacobian", "backward_jacobian"]:
+                return 1.0
+            else:
+                raise ValueError(f"Unknown direction: {direction}")
+
+    def generate_random_covariance_matrix(n_dim=3, condition_number=10.0, random_seed=42):
+        """
+        Generate a random positive definite covariance matrix.
+        
+        Parameters
+        ----------
+        n_dim : int
+            Dimension of the covariance matrix
+        condition_number : float
+            Maximum condition number (controls how ill-conditioned the matrix can be)
+        random_seed : int
+            Random seed for reproducibility
+            
+        Returns
+        -------
+        ndarray
+            Random positive definite covariance matrix
+        """
+        np.random.seed(random_seed)
+        
+        # Generate random eigenvalues between 1/condition_number and 1
+        eigenvals = np.random.uniform(1.0/condition_number, 1.0, n_dim)
+        eigenvals = np.sort(eigenvals)[::-1]  # Sort in descending order
+        
+        # Generate random orthogonal matrix (eigenvectors)
+        Q, _ = np.linalg.qr(np.random.randn(n_dim, n_dim))
+        
+        # Construct covariance matrix: Σ = Q * diag(eigenvals) * Q^T
+        cov_matrix = Q @ np.diag(eigenvals) @ Q.T
+        
+        return cov_matrix
     
     print("=" * 90)
     print("MULTIVARIATE TRANSFORMATION TEST")
@@ -306,20 +222,26 @@ def test_multivariate_transformation():
     # Step 2: Create transformation functions  
     print("2. Setting up Transformation Functions")
     print("-" * 50)
+
+    prior_log_transform = Prior_LogTransform()
+
+    def log_transform_func(x, direction):
+        return prior_log_transform.rescale_hyperparameters_to_internal(x, direction)
+
+    prior_logistic_transform = Prior_LogisticTransform()
+    def logistic_transform_func(x, direction):
+        return prior_logistic_transform.rescale_hyperparameters_to_internal(x, direction)
     
-    all_transforms = create_transformation_functions()
+    prior_identity_transform = Prior_IdentityTransform()
+    def identity_transform_func(x, direction):
+        return prior_identity_transform.rescale_hyperparameters_to_internal(x, direction)
     
     # Apply different transforms to each dimension (directly assign transforms to parameters)
     transforms = [
-        all_transforms[0],  # Parameter 1: Log transform
-        all_transforms[1],  # Parameter 2: Logistic transform  
-        all_transforms[2]   # Parameter 3: Identity transform
+        log_transform_func,  # Parameter 1: Log transform
+        logistic_transform_func,  # Parameter 2: Logistic transform
+        identity_transform_func  # Parameter 3: Identity transform
     ]
-    
-    print("Transformation assignments:")
-    for i, transform in enumerate(transforms):
-        print(f"  Parameter {i+1}: {transform.name}")
-    print()
     
     # Step 3: Compute marginal statistics in outer space
     print("3. Computing Marginal Statistics in Outer Space")
@@ -333,7 +255,7 @@ def test_multivariate_transformation():
         var_i = cov_internal[i, i]
         
         # Compute marginal statistics
-        stats = compute_marginal_statistics_univariate(
+        stats = compute_variance_gauss_hermite(
             mean_i, var_i, transforms[i], n_quad_points
         )
         
@@ -653,18 +575,9 @@ def test_multivariate_transformation():
     print()
     
     # Step 8: Summary
-    print("8. Test Summary")
+    print("8. Summary")
     print("-" * 50)
-    
-    print("✓ Successfully generated random 3D Gaussian distribution")
-    print("✓ Applied monotone bijective transformations to each parameter")
-    print("✓ Computed marginal statistics using univariate Gaussian quadrature")
-    print("✓ Computed covariance matrix using bivariate Gaussian quadrature")
-    print("✓ Validated covariance matrix properties (symmetry, positive definiteness)")
-    print("✓ Derived correlation matrix from covariance matrix")
-    print("✓ Validated results against analytical solutions where available")
-    print("✓ Analyzed transformation effects on distribution properties")
-    
+        
     # Calculate total changes in both covariance and correlation structures
     total_cov_change = np.sum(np.abs(outer_cov_matrix - internal_cov_matrix)) / 2  # Divide by 2 due to symmetry
     total_corr_change = np.sum(np.abs(outer_corr_matrix - internal_corr_matrix)) / 2  # Divide by 2 due to symmetry
@@ -673,8 +586,7 @@ def test_multivariate_transformation():
     
     print()
     print("=" * 90)
-    print("MULTIVARIATE TRANSFORMATION TEST COMPLETED SUCCESSFULLY!")
-    print("The function now correctly computes and returns covariance matrices!")
+    print("MULTIVARIATE TRANSFORMATION TEST COMPLETED!")
     print("=" * 90)
 
 
