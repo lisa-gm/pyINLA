@@ -4,9 +4,8 @@ import numpy as np
 from dalia import xp
 from scipy.special import roots_hermite
 
-from dalia.utils.gaussian_quadrature import compute_variance_gauss_hermite
 
-def compute_bivariate_expectation(func1, func2, rho, n_points=20):
+def compute_bivariate_expectation(func1, func2, mu1, mu2, Sigma, n_points=20):
     """
     Compute E[f(Z₁, Z₂)] where (Z₁, Z₂) ~ N(0, Σ) using bivariate Gauss-Hermite quadrature.
     
@@ -35,16 +34,20 @@ def compute_bivariate_expectation(func1, func2, rho, n_points=20):
     z_nodes = xp.sqrt(2) * nodes
     adjusted_weights = weights / xp.sqrt(xp.pi)
     
-    # For bivariate case with correlation ρ, we need to transform to correlated variables
+    rho = Sigma[0, 1]  # Correlation coefficient
+    sigma1 = xp.sqrt(Sigma[0, 0])
+    sigma2 = xp.sqrt(Sigma[1, 1])
+    
+    # For bivariate case with correlation ρ and means μ₁, μ₂:
     # If (U₁, U₂) are independent N(0,1), then:
-    # Z₁ = U₁
-    # Z₂ = ρU₁ + √(1-ρ²)U₂
-    # gives (Z₁, Z₂) ~ N(0, [[1, ρ], [ρ, 1]])
+    # Z₁ = μ₁ + U₁
+    # Z₂ = μ₂ + ρU₁ + √(1-ρ²)U₂
+    # gives (Z₁, Z₂) ~ N([μ₁, μ₂], [[1, ρ], [ρ, 1]])
     
     if abs(rho) > 1:
         raise ValueError("Correlation coefficient rho must be in [-1, 1]")
     
-    sqrt_one_minus_rho_sq = xp.sqrt(1 - rho**2) if abs(rho) < 1 else 0.0
+    sqrt_one_minus_rho_sq = xp.sqrt(1 - rho**2) 
     
     expectation = 0.0
     
@@ -52,8 +55,8 @@ def compute_bivariate_expectation(func1, func2, rho, n_points=20):
     for i, (u1, w1) in enumerate(zip(z_nodes, adjusted_weights)):
         for j, (u2, w2) in enumerate(zip(z_nodes, adjusted_weights)):
             # Transform to correlated variables
-            z1 = u1
-            z2 = rho * u1 + sqrt_one_minus_rho_sq * u2
+            z1 = mu1 + sigma1 * u1
+            z2 = mu2 + rho * sigma1 * u1 + sigma2 * sqrt_one_minus_rho_sq * u2
             
             # Evaluate function at transformed points
             f_val = func1(z1) * func2(z2)
@@ -155,13 +158,25 @@ def test_quadrature_accuracy():
     def f2(z):  
         return z**3
     
+    def f_prod(z):
+        return f1(z[0]) * f2(z[1])
+    
     print("   E[Z₁² * Z₂³] for different correlations:")
-    print("   Correlation | E[Z₁²Z₂³]")
-    print("   ------------|----------")
+    # print("   Correlation | E[Z₁²Z₂³]")
+    # print("   ------------|----------")
+    print("   Correlation | E[Z₁²Z₂³] Numerical | E[Z₁²Z₂³] GHQ | Error")
     
     for rho in [-0.9, -0.5, 0.0, 0.5, 0.9]:
         prod_exp_nonlinear = compute_bivariate_expectation(f1, f2, rho=rho, n_points=30)
-        print(f"   {rho:10.1f} | {prod_exp_nonlinear:10.6f}")
+        
+        Sigma = xp.array([[1.0, rho], [rho, 1.0]])
+        mu = xp.array([0.0, 0.0])
+        import ghq
+
+        prod_ref = ghq.multivariate(f_prod, mu, Sigma, n_points=30)
+        error = abs(prod_exp_nonlinear - prod_ref)
+
+        print(f"   {rho:10.1f} | {prod_exp_nonlinear:10.6f} | {prod_ref:10.6f} | {error:.2e}")
     print()
     
     # Test 6: Convergence study
