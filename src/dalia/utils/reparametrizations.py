@@ -80,7 +80,7 @@ def compute_bounds(mean_internal, var_internal, transform, n_std=4):
 
     return (internal_lower, internal_upper), (original_lower, original_upper)
 
-
+###################################### TEST ######################################
 if __name__ == "__main__":
     """
     Test reparametrization functions using a dummy gamma prior hyperparameter class.
