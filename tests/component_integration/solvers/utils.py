@@ -83,7 +83,7 @@ def _reference_solve(A, rhs):
 
 
 def _reference_logdet(A):
-    """Compute log determinant using NumPy determinant.
+    """Compute log determinant using NumPy Cholesky.
     
     Parameters
     ----------
@@ -97,8 +97,8 @@ def _reference_logdet(A):
     """
     A_dense = A.toarray() if hasattr(A, 'toarray') else A
     A_dense = np.asarray(A_dense)
-    # Use numpy's determinant for the most reliable reference
-    return np.log(np.linalg.det(A_dense))
+    L = np.linalg.cholesky(A_dense)
+    return 2.0 * np.sum(np.log(np.diag(L)))
 
 
 def _reference_inversion(A):
