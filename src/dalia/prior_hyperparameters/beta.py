@@ -31,6 +31,10 @@ class BetaPriorHyperparameters(PriorHyperparameters):
             theta_scaled = scaled_logit(theta, direction="forward")
         elif direction == "backward":
             theta_scaled = scaled_logit(theta, direction="backward")
+        elif direction == "forward_jacobian":
+            theta_scaled = scaled_logit(theta, direction="forward_jacobian")
+        elif direction == "backward_jacobian":
+            theta_scaled = scaled_logit(theta, direction="backward_jacobian")
         else:
             raise ValueError(f"Unknown direction: {direction}")
 
