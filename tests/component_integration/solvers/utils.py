@@ -13,7 +13,7 @@ if backend_flags["cupy_avail"]:
 
     cp.random.seed(cp.uint64(63))
 
-def _rhs(
+def _create_rhs(
     n_rhs: int,
     matrix_size: int
 ):
@@ -117,3 +117,53 @@ def _reference_inversion(A):
     A_dense = A.toarray() if hasattr(A, 'toarray') else A
     A_dense = np.asarray(A_dense)
     return np.linalg.inv(A_dense)
+
+def _allclose_vectors(
+    a_reference: np.ndarray,
+    b_toverify: np.ndarray,
+):
+    """Check correctness of two vectors.
+    
+    Parameters
+    ----------
+    A_reference : numpy.ndarray
+        Reference vector.
+    B_toverify : numpy.ndarray
+        Vector to verify.
+        
+    Raises
+    ------
+    AssertionError
+        If the vectors are not close enough.
+    """
+    assert np.allclose( 
+        a_reference,
+        b_toverify,
+        rtol=1e-14,
+        atol=1e-16,
+    )
+
+def _allclose_floats(
+    a_reference: float,
+    b_toverify: float,
+):
+    """Check correctness of two floats.
+    
+    Parameters
+    ----------
+    a_reference : float
+        Reference float.
+    b_toverify : float
+        Float to verify.
+        
+    Raises
+    ------
+    AssertionError
+        If the floats are not close enough.
+    """
+    assert np.isclose(
+        a_reference,
+        b_toverify,
+        rtol=1e-14,
+        atol=1e-16,
+    )
