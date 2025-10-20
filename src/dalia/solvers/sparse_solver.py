@@ -124,8 +124,14 @@ class SparseSolver(Solver):
         return float(log_det_U)
 
     def selected_inversion(self, **kwargs):
-        # Placeholder for the selected inversion method.
-        return super().selected_inversion(**kwargs)
+        """ Compute selected inversion of input matrix using LU factorization.
+        
+        Raises:
+        ------
+        NotImplementedError
+            Selected inversion is not implemented for SparseSolver.
+        """
+        raise NotImplementedError("Selected inversion is not implemented for SparseSolver.")
 
     def _structured_to_spmatrix(self, **kwargs) -> None:
         """Convert structured matrix to sparse matrix.
