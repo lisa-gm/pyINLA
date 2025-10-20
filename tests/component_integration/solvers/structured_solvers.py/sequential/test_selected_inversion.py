@@ -1,15 +1,15 @@
 from dalia import sp
 
-def test_factorize_correctness(
+def test_selected_inversion_correctness(
+        reference_inversion,
         allclose_dense_structured,
-        reference_cholesky,
         create_solver, 
         create_pobta,
         create_pobt,
         solver_type,
         diagonal_blocksize, 
         n_diag_blocks, 
-        arrowhead_blocksize
+        arrowhead_blocksize,
     ):
         """Test Cholesky decomposition correctness against NumPy reference."""
         # Generate test matrix based on sparsity pattern
@@ -29,23 +29,25 @@ def test_factorize_correctness(
         # Run solver factorize
         solver.factorize(A_sparse, sparsity="bta" if arrowhead_blocksize > 0 else "bt")
         
-        # Compute reference
-        L_ref = reference_cholesky(A)
-        
-        L_solver = solver._structured_to_spmatrix(
+        # Run solver selected inversion
+        solver.selected_inversion(sparsity="bta" if arrowhead_blocksize > 0 else "bt")
+
+        # Get the computed selected inverse in sparse format
+        A_selinv_solver = solver._structured_to_spmatrix(
             A_sparse,
             sparsity="bta" if arrowhead_blocksize > 0 else "bt",
-            symmetrize = False,
+            symmetrize=True,
         )
 
-        L_solver_dense = L_solver.toarray() if hasattr(L_solver, 'toarray') else L_solver
+        # Reference dense inversion
+        A_inv_ref = reference_inversion(A)
 
+        # Assert correctness within sparsity pattern
         allclose_dense_structured(
-            A_reference=L_ref,
-            B_toverify=L_solver_dense,
+            A_reference=A_inv_ref,
+            B_toverify=A_selinv_solver.toarray() if hasattr(A_selinv_solver, 'toarray') else A_selinv_solver,
             diagonal_blocksize=diagonal_blocksize,
             n_diag_blocks=n_diag_blocks,
-            arrowhead_blocksize=arrowhead_blocksize
+            arrowhead_blocksize=arrowhead_blocksize,
+            assert_upper_triangle=True,
         )
-
-        

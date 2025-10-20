@@ -1,8 +1,8 @@
 from dalia import sp
 
-def test_factorize_correctness(
-        allclose_dense_structured,
-        reference_cholesky,
+def test_logdet_correctness(
+        reference_logdet,
+        allclose_floats,
         create_solver, 
         create_pobta,
         create_pobt,
@@ -29,23 +29,15 @@ def test_factorize_correctness(
         # Run solver factorize
         solver.factorize(A_sparse, sparsity="bta" if arrowhead_blocksize > 0 else "bt")
         
+        # Compute logdet using solver
+        logdet_solver = solver.logdet(sparsity="bta" if arrowhead_blocksize > 0 else "bt")
+
         # Compute reference
-        L_ref = reference_cholesky(A)
-        
-        L_solver = solver._structured_to_spmatrix(
-            A_sparse,
-            sparsity="bta" if arrowhead_blocksize > 0 else "bt",
-            symmetrize = False,
-        )
+        logdet_ref = reference_logdet(A)
 
-        L_solver_dense = L_solver.toarray() if hasattr(L_solver, 'toarray') else L_solver
-
-        allclose_dense_structured(
-            A_reference=L_ref,
-            B_toverify=L_solver_dense,
-            diagonal_blocksize=diagonal_blocksize,
-            n_diag_blocks=n_diag_blocks,
-            arrowhead_blocksize=arrowhead_blocksize
+        allclose_floats(
+            a_reference=logdet_ref,
+            b_toverify=logdet_solver,
         )
 
         

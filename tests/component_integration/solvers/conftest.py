@@ -13,9 +13,9 @@ def num_rhs(request: pytest.FixtureRequest) -> int:
     return request.param
 
 @pytest.fixture
-def rhs():
-    from .utils import _rhs
-    return _rhs
+def create_rhs():
+    from .utils import _create_rhs
+    return _create_rhs
 
 @pytest.fixture
 def reference_cholesky():
@@ -36,3 +36,13 @@ def reference_logdet():
 def reference_inversion():
     from .utils import _reference_inversion
     return _reference_inversion
+
+@pytest.fixture
+def allclose_vectors():
+    from .utils import _allclose_vectors
+    return _allclose_vectors
+
+@pytest.fixture
+def allclose_floats():
+    from .utils import _allclose_floats
+    return _allclose_floats

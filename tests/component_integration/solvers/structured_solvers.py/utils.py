@@ -152,7 +152,9 @@ def _allclose_dense_structured(
     B_toverify: ArrayLike, 
     diagonal_blocksize: int, 
     n_diag_blocks: int, 
-    arrowhead_blocksize: int = 0):
+    arrowhead_blocksize: int = 0,
+    assert_upper_triangle: bool = False,
+    ):
     """Check block-wise correctness of two structured matrices in dense storage format.
 
     Parameters
@@ -169,6 +171,13 @@ def _allclose_dense_structured(
         Number of diagonal blocks.
     arrowhead_blocksize : int, optional
         Size of the arrowhead blocks, by default 0.
+    assert_upper_triangle : bool, optional
+        Whether to assert the upper triangle blocks as well, by default False.
+
+    Raises
+    ------
+    AssertionError
+        If any of the corresponding blocks are not close enough.
     """ 
     if arrowhead_blocksize > 0:
         # Lower arrow blocks
@@ -178,6 +187,14 @@ def _allclose_dense_structured(
             rtol=1e-14,
             atol=1e-16,
         )
+        if assert_upper_triangle:
+            # Upper arrow blocks
+            assert np.allclose(
+                A_reference[:-arrowhead_blocksize, -arrowhead_blocksize:],
+                B_toverify[:-arrowhead_blocksize, -arrowhead_blocksize:],
+                rtol=1e-14,
+                atol=1e-16,
+            )
 
         # Tip of the arrowhead
         assert np.allclose(
@@ -216,6 +233,21 @@ def _allclose_dense_structured(
                 rtol=1e-14,
                 atol=1e-16,
             )
+
+            if assert_upper_triangle:
+                # Check the off-diagonal (upper) blocks
+                assert np.allclose(
+                    A_reference[
+                        i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+                        (i + 1) * diagonal_blocksize : (i + 2) * diagonal_blocksize,
+                    ],
+                    B_toverify[
+                        i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
+                        (i + 1) * diagonal_blocksize : (i + 2) * diagonal_blocksize,
+                    ],
+                    rtol=1e-14,
+                    atol=1e-16,
+                )
 
     
     
