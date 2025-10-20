@@ -26,8 +26,7 @@ from dalia.utils import (
     smartsplit,
     synchronize,
     synchronize_gpu,
-    check_vector_consistency,
-    compute_outer_covariance_matrix,
+    check_vector_consistency
 )
 
 if backend_flags["mpi_avail"]:
@@ -209,7 +208,6 @@ class DALIA:
         self.theta_star = None # mode not yet computed
         self.theta_star_internal = None
         self.x_star = None # mode not yet computed
-        self.cov_theta_external = None # covariance not yet computed
         self.cov_theta_internal = None # covariance not yet computed
 
         # --- Metrics
@@ -322,7 +320,7 @@ class DALIA:
 
         # compute covariance of the hyperparameters theta at the mode
         print("theta_star: ", self.theta_star)
-        cov_theta_dict = self.compute_covariance_hp(self.theta_star)
+        cov_theta_ = self.compute_covariance_hp(self.theta_star)
         print("Computed covariance of the hyperparameters at the mode.")
 
         # compute marginal variances of the latent parameters
@@ -346,8 +344,7 @@ class DALIA:
             "grad_f": minimization_result["grad_f"],
             "f_values": minimization_result["f_values"],
             "theta_values": minimization_result["theta_values"],
-            "cov_theta_internal": cov_theta_dict["internal"],
-            "cov_theta": cov_theta_dict["external"],
+            "cov_theta_internal": self.cov_theta_internal,
             "marginal_variances_latent": marginal_variances_latent,
             # "marginal_variances_observations": get_host(
             #     marginal_variances_observations
@@ -828,14 +825,7 @@ class DALIA:
         )
         self.cov_theta_internal = xp.linalg.inv(hess_theta_internal)
         
-        # rescale to external scale
-        self.cov_theta_external = compute_outer_covariance_matrix(self.model.theta_internal, self.cov_theta_internal, self.model.rescale_hyperparameters_to_internal)
-
-        dict_cov = {"internal": self.cov_theta_internal, "external": self.cov_theta_external}
-        print("Cov Internal: \n", dict_cov["internal"])
-        print("Cov External: \n", dict_cov["external"])
-
-        return dict_cov
+        return self.cov_theta_internal
 
     def _evaluate_hessian_f(
         self,
@@ -1001,8 +991,7 @@ class DALIA:
 
         return hess
 
-    ## 0.0001
-    def marginal_distributions_hp(self, quantiles: NDArray = xp.array([0.0001, 0.025, 0.5, 0.975, 0.9999])) -> dict:
+    def marginal_distributions_hp(self, quantiles: NDArray = xp.array([0.0001, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.9999])) -> dict:
         """Compute the marginal distributions of the hyperparameters theta.
 
         Parameters
@@ -1018,7 +1007,7 @@ class DALIA:
         """
         
         # check that theta_star and covariance matrix are computed
-        if self.theta_star is None or self.cov_theta_external is None or self.cov_theta_internal is None or self.x_star is None:
+        if self.theta_star is None or self.cov_theta_internal is None or self.x_star is None:
             raise ValueError("theta_star, x_star and covariance matrix of the hyperparameters must be computed before calling marginal_distributions_hp(). Please run the full DALIA pipeline or set them manually.")
         
         # set up dictionary to store results
@@ -1064,21 +1053,9 @@ class DALIA:
             # set theta_internal_interval
             theta_internal_interval = xp.linspace(theta_internal_lower, theta_internal_upper, num=100)
         
-            # compute marginal distributions in external scale using 
-            # compute_transformed_pdf(mean_internal, var_internal, x_internal, transform) from reparametrization
-            # store theta_external_interval and pdf_external in the dictionary
-            
-            # Transform internal interval to external
-            theta_external_interval = xp.array([param_transform(x_int, "backward") for x_int in theta_internal_interval])
-            
             # Compute PDF values in external scale
-            pdf_external = xp.array([
-                compute_transformed_pdf(theta_internal_i, marg_var_internal_i, x_int, param_transform)
-                for x_int in theta_internal_interval
-            ])
-            
-            
-            
+            theta_external_interval, pdf_external = compute_transformed_pdf(theta_internal_i, marg_var_internal_i, theta_internal_interval, param_transform)
+                
             # Initialize parameter dictionary
             param_dict = {
                 'mean_internal': float(theta_internal_i),

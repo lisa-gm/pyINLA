@@ -72,7 +72,7 @@ if __name__ == "__main__":
     print_msg("\n--- Results ---")
     print_msg("Theta values external:\n", results["theta"])
     print_msg("Theta values internal:\n", results["theta_internal"])
-    print_msg("Covariance of theta:\n", results["cov_theta"])
+    print_msg("Covariance of theta:\n", results["cov_theta_internal"])
     print_msg(
         "Mean of the fixed effects:\n",
         results["x"][-model.submodels[-1].n_fixed_effects :],
@@ -117,13 +117,15 @@ if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
     
-    # Extract theta_0 data
-    theta_0_data = marginals_hp['hyperparameters']['theta_0']
+    # Extract marginal precision observations
+    theta_0_data = marginals_hp['hyperparameters']['prec_o']
     theta_external, pdf_external = theta_0_data['pdf_data']
     mean_external = theta_0_data['mean_external']
     quantile_pairs = theta_0_data['quantiles']['external']['pairs']
     
     # Create the plot
+    hp_name = 'prec_o'
+    
     plt.figure(figsize=(10, 6))
     
     # Plot the PDF
@@ -133,15 +135,17 @@ if __name__ == "__main__":
     plt.axvline(mean_external, color='red', linestyle='--', linewidth=2, label=f'Mean = {mean_external:.3f}')
     
     # Mark the quantiles
-    colors = ['green', 'orange', 'green']
-    labels = ['2.5%', '50%', '97.5%']
+    colors = ['#DEB887', '#DEB887','darkred', '#DEB887', '#DEB887']
+    labels = ['2.5%', '25%', '50%', '75%','97.5%']
+    # Only plot quantiles that have corresponding labels
     for i, (prob, q_val) in enumerate(quantile_pairs):
-        plt.axvline(q_val, color=colors[i], linestyle=':', linewidth=2, 
-                   label=f'{labels[i]} quantile = {q_val:.3f}')
-    
-    plt.xlabel('θ₀ (external scale)')
+        if i < len(labels):  # Only plot if we have a label for this quantile
+            plt.axvline(q_val, color=colors[i], linestyle=':', linewidth=2, 
+                       label=f'{labels[i]} quantile = {q_val:.3f}')
+
+    plt.xlabel(f'{hp_name} (external scale)')
     plt.ylabel('PDF')
-    plt.title('Marginal Distribution of θ₀')
+    plt.title(f'Marginal Distribution of {hp_name}')
     plt.legend()
     plt.grid(True, alpha=0.3)
     
