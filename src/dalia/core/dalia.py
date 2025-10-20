@@ -1011,7 +1011,10 @@ class DALIA:
 
         return hess
 
-    def marginal_distributions_hp(self, quantiles: NDArray = xp.array([0.0001, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.9999])) -> dict:
+    def marginal_distributions_hp(self, 
+                                  #quantiles: NDArray = xp.array([0.0001, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.9999])
+                                  quantiles: NDArray = xp.array([0.025, 0.25, 0.5, 0.75, 0.975])
+                                  ) -> dict:
         """Compute the marginal distributions of the hyperparameters theta.
 
         Parameters
@@ -1052,30 +1055,23 @@ class DALIA:
             theta_internal_i = self.theta_star_internal[i]
             marg_var_internal_i = self.cov_theta_internal[i, i]
             
-            # extract the correct transform for the hyperparameter
-            # from the individual prior_hyperparameters[i] object
-            def param_transform(x, direction):
-                """Transform function for single parameter i using its specific prior hyperparameter"""
-                # Use the individual prior hyperparameter for this parameter
-                return self.model.prior_hyperparameters[i].rescale_hyperparameters_to_internal(x, direction)
-            
             # compute external_mean and external_var using 
             # compute_variance_gauss_hermite(mean_internal, variance_internal, transform, n_points=20): from utils gaussian quadrature
             gauss_hermite_result = compute_variance_gauss_hermite(
-                theta_internal_i, marg_var_internal_i, param_transform, n_points=30
+                theta_internal_i, marg_var_internal_i, self.model.prior_hyperparameters[i].rescale_hyperparameters_to_internal, n_points=30
             )
             
             # compute bounds for theta intervals using compute_bounds() from utils
             (theta_internal_lower, theta_internal_upper), (theta_external_lower, theta_external_upper) = compute_bounds(
-                theta_internal_i, marg_var_internal_i, param_transform, n_std=4
+                theta_internal_i, marg_var_internal_i, self.model.prior_hyperparameters[i].rescale_hyperparameters_to_internal, n_std=4
             )
 
             # set theta_internal_interval
             theta_internal_interval = xp.linspace(theta_internal_lower, theta_internal_upper, num=100)
         
             # Compute PDF values in external scale
-            theta_external_interval, pdf_external = compute_transformed_pdf(theta_internal_i, marg_var_internal_i, theta_internal_interval, param_transform)
-                
+            theta_external_interval, pdf_external = compute_transformed_pdf(theta_internal_i, marg_var_internal_i, theta_internal_interval, self.model.prior_hyperparameters[i].rescale_hyperparameters_to_internal)
+
             # Initialize parameter dictionary
             param_dict = {
                 'mean_internal': float(theta_internal_i),
@@ -1088,7 +1084,7 @@ class DALIA:
             # if quantiles is not None, compute quantiles using compute_transformed_quantiles() 
             if quantiles is not None:
                 quantiles_external = compute_transformed_quantiles(
-                    theta_internal_i, marg_var_internal_i, quantiles, param_transform
+                    theta_internal_i, marg_var_internal_i, quantiles, self.model.prior_hyperparameters[i].rescale_hyperparameters_to_internal
                 )
                 
                 # Also compute internal quantiles for completeness

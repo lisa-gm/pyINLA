@@ -48,17 +48,13 @@ def compute_transformed_pdf(mean_internal, var_internal, x_internal, transform):
     """ 
         
     # PDF in internal scale    
-    pdf_internal = 1 / (var_internal**0.5 * xp.sqrt(2 * xp.pi)) * xp.exp(- 1.0 / (2 * var_internal) * (x_internal - mean_internal)**2)
+    pdf_internal = norm.pdf(x_internal, loc=mean_internal, scale=var_internal**0.5)
+    #pdf_internal = 1 / (var_internal**0.5 * xp.sqrt(2 * xp.pi)) * xp.exp(- 1.0 / (2 * var_internal) * (x_internal - mean_internal)**2)
 
     # Jacobian: derivative of transformation
     # Ensure x_internal is treated as array for vectorized operations
     x_original = transform(x_internal, direction='backward')
-        
-    jacobian = transform(x_original, direction='forward_jacobian')
-    
-    # expect jacobian to be strictly positive
-    if xp.any(jacobian <= 0):
-        raise ValueError("Jacobian has unexpected non-positive values, check transformation.")
+    jacobian = xp.abs(transform(x_original, direction='forward_jacobian'))
 
     # PDF values in original scale
     pdf_original = pdf_internal * jacobian

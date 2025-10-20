@@ -41,13 +41,7 @@ def plot_marginal_distributions_hp(marginals_hp):
         # Create internal distribution (Gaussian)
         x_internal = np.linspace(mean_internal - 4*std_internal, mean_internal + 4*std_internal, 100)
         pdf_internal = norm.pdf(x_internal, loc=mean_internal, scale=std_internal)
-        
-        print("x_internal: ", x_internal[:10])
-        print("x_external: ", theta_external[:10])
-        print("diff (x internal - external): ", np.linalg.norm(x_internal - theta_external))
-        print("pdf_internal: ", pdf_internal[:10])
-        print("pdf_external: ", pdf_external[:10])
-        print("diff pdf internal - external: ", np.linalg.norm(pdf_internal - pdf_external))
+
         # Plot internal PDF
         ax_left.plot(x_internal, pdf_internal, 'b-', linewidth=2, label='PDF (Internal)')
         
