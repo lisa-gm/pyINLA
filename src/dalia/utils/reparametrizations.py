@@ -3,26 +3,6 @@ from scipy.stats import norm
 from dalia import NDArray, xp
 
 
-"""
-Computing Quantiles for Transformed Distributions
-
-Theory:
-If X ~ f(x) and Y = φ(X), then to find quantiles of Y:
-1. For a given probability p, find q_p such that P(Y ≤ q_p) = p
-2. This is equivalent to P(φ(X) ≤ q_p) = p
-3. If φ is monotone increasing:     x_original = np.linspace(original_lower, original_upper, 1000)
-    x_internal_array = np.array([transform_func(x, "forward") for x in x_original])
-    pdf_original = np.array([
-        compute_transformed_pdf(mean_internal, std_internal**2, x_int, transform_func) 
-        for x_int in x_internal_array
-    ]) ≤ φ⁻¹(q_p)) = p
-4. So φ⁻¹(q_p) = F_X⁻¹(p), where F_X⁻¹ is the quantile function of X
-5. Therefore: q_p = φ(F_X⁻¹(p))
-
-Key insight: Quantiles transform directly through φ!
-"""
-
-
 def compute_transformed_quantiles(mean_internal, var_internal, percentiles, transform):
     """
     Compute quantiles for a transformed distribution
@@ -34,6 +14,19 @@ def compute_transformed_quantiles(mean_internal, var_internal, percentiles, tran
     
     Returns:
     - quantiles in original scale
+    
+    Notes:
+    Computing Quantiles for Transformed Distributions
+
+    Idea:
+    If X ~ f(x) and Y = φ(X), then find quantiles of Y:
+    1. For a given probability p, find q_p such that P(Y ≤ q_p) = p
+    2. This is equivalent to P(φ(X) ≤ q_p) = p
+    3. We suppose φ is bijective and monotonely increasing. Then, if F_X is the CDF of X, we can write:
+    F_Y(q_p) = P(Y ≤ q_p) = P(φ(X) ≤ q_p) = P(X ≤ φ⁻¹(q_p)) = F_X(φ⁻¹(q_p))
+
+    4. So φ⁻¹(q_p) = F_X⁻¹(p), where F_X⁻¹ is the quantile function of X
+    5. Therefore: q_p = φ(F_X⁻¹(p))
     """
     
     # Step 1: Compute quantiles in internal scale
@@ -54,20 +47,26 @@ def compute_transformed_pdf(mean_internal, var_internal, x_internal, transform):
     f_X(x) = f_Y(φ(x)) * |dφ/dx|
     """ 
         
-    # PDF in internal scale
-    pdf_internal = norm.pdf(x_internal, loc=mean_internal, scale=var_internal**0.5)
-    
-    # Jacobian: derivative of transformation
-    x_original = transform(x_internal, direction='backward')
-    jacobian = xp.abs(transform(x_original, direction='forward_jacobian'))
-    
-    # PDF in original scale
-    pdf_original = pdf_internal * jacobian
-    
-    return pdf_original
+    # PDF in internal scale    
+    pdf_internal = 1 / (var_internal**0.5 * xp.sqrt(2 * xp.pi)) * xp.exp(- 1.0 / (2 * var_internal) * (x_internal - mean_internal)**2)
 
-# Automatic bound calculation based on 3 standard deviations in internal scale
-def compute_bounds(mean_internal, var_internal, transform, n_std=3):
+    # Jacobian: derivative of transformation
+    # Ensure x_internal is treated as array for vectorized operations
+    x_original = transform(x_internal, direction='backward')
+        
+    jacobian = transform(x_original, direction='forward_jacobian')
+    
+    # expect jacobian to be strictly positive
+    if xp.any(jacobian <= 0):
+        raise ValueError("Jacobian has unexpected non-positive values, check transformation.")
+
+    # PDF values in original scale
+    pdf_original = pdf_internal * jacobian
+        
+    return x_original, pdf_original
+
+# Automatic bound calculation based on 4 (default) standard deviations in internal scale
+def compute_bounds(mean_internal, var_internal, transform, n_std=4):
     """
     Compute plotting bounds based on n standard deviations in internal scale
     """
@@ -192,7 +191,7 @@ if __name__ == "__main__":
     
     # Compute bounds for plotting
     (internal_lower, internal_upper), (original_lower, original_upper) = compute_bounds(
-        mean_internal, std_internal, transform_func, n_std=3
+        mean_internal, std_internal, transform_func, n_std=4
     )
     
     print(f"   Internal bounds: [{internal_lower:.3f}, {internal_upper:.3f}]")
@@ -204,12 +203,12 @@ if __name__ == "__main__":
     print("   x (orig) | PDF (orig) | log(x)   | PDF (int)")
     print("   ---------|------------|----------|----------")
     
-    for x in test_x_original:
-        x_internal = transform_func(x, "forward")
-        pdf_orig = compute_transformed_pdf(mean_internal, std_internal**2, x_internal, transform_func)
-        pdf_internal = norm.pdf(x_internal, loc=mean_internal, scale=std_internal)
-        
-        print(f"   {x:7.2f}  | {pdf_orig:10.6f} | {x_internal:8.3f} | {pdf_internal:8.6f}")
+    x_internal = transform_func(test_x_original, "forward")
+    x_original, pdf_orig = compute_transformed_pdf(mean_internal, std_internal**2, x_internal, transform_func)
+    pdf_internal = norm.pdf(x_internal, loc=mean_internal, scale=std_internal)
+    
+    for i in range(len(test_x_original)):
+        print(f"   {test_x_original[i]:7.2f}  | {pdf_orig[i]:10.6f} | {x_internal[i]:8.3f} | {pdf_internal[i]:8.6f}")
     print()
     
     # Test 5: Analytical validation for log-normal distribution
@@ -240,18 +239,25 @@ if __name__ == "__main__":
     # Test 6: PDF integration check (numerical verification)
     print("6. PDF integration check:")
     
-    # Create fine grid for integration
-    x_grid = np.linspace(original_lower, original_upper, 1000)
-    x_internal_grid = np.array([transform_func(x, "forward") for x in x_grid])
-    pdf_values = np.array([
-        compute_transformed_pdf(mean_internal, std_internal**2, x_int, transform_func) 
-        for x_int in x_internal_grid
-    ])
-    
+    # Create fine grid for integration -> need to start in original scale for dx to be equidistant
+    x_original = np.linspace(original_lower, original_upper, 1000)
+    x_internal = transform_func(x_original, "forward")
+    x_original, pdf_values = compute_transformed_pdf(mean_internal, std_internal**2, x_internal, transform_func)
+        
     # Numerical integration using trapezoidal rule
-    dx = x_grid[1] - x_grid[0]
-    integral = np.trapz(pdf_values, dx=dx)
+    dx = x_original[1] - x_original[0]
+    integral = np.trapezoid(pdf_values, dx=dx)
     
+    print(f"   Numerical integral of PDF: {integral:.6f}")
+    print(f"   Should be close to 1.0, error: {abs(1.0 - integral):.6f}")
+    print()
+    
+    # repeat with non-equidistant grid in original scale but equidistant in internal scale
+    print("   Repeating PDF integration with equidistant grid in internal scale:")
+    x_internal = np.linspace(internal_lower, internal_upper, 1000)
+    x_original, pdf_values = compute_transformed_pdf(mean_internal, std_internal**2, x_internal, transform_func)
+    
+    integral = np.trapezoid(pdf_values, x=x_original)
     print(f"   Numerical integral of PDF: {integral:.6f}")
     print(f"   Should be close to 1.0, error: {abs(1.0 - integral):.6f}")
     print()
@@ -269,36 +275,8 @@ if __name__ == "__main__":
         print(f"     Original: [{orig_lower:7.3f}, {orig_upper:7.3f}]")
     print()
     
-    # Test 8: Edge case handling
-    print("8. Testing edge cases:")
-    
-    # Test very small values
-    small_vals = [1e-6, 1e-4, 1e-2]
-    print("   Small values transformation:")
-    for val in small_vals:
-        try:
-            internal = transform_func(val, "forward")
-            recovered = transform_func(internal, "backward")
-            error = abs(val - recovered)
-            print(f"     {val:.2e} -> {internal:8.3f} -> {recovered:.2e}, error = {error:.2e}")
-        except Exception as e:
-            print(f"     {val:.2e} -> Error: {e}")
-    
-    # Test large values
-    large_vals = [1e2, 1e4, 1e6]
-    print("   Large values transformation:")
-    for val in large_vals:
-        try:
-            internal = transform_func(val, "forward")
-            recovered = transform_func(internal, "backward")
-            rel_error = abs(val - recovered) / val
-            print(f"     {val:.2e} -> {internal:8.3f} -> {recovered:.2e}, rel_error = {rel_error:.2e}")
-        except Exception as e:
-            print(f"     {val:.2e} -> Error: {e}")
-    print()
-    
-    # Test 9: Plotting PDFs in both scales
-    print("9. Plotting PDFs in internal and original scales:")
+    # Test 8: Plotting PDFs in both scales
+    print("8. Plotting PDFs in internal and original scales:")
         
     # Plot 1: PDF in internal scale (log-scale, normal distribution)
     x_internal = np.linspace(internal_lower, internal_upper, 500)
@@ -322,9 +300,8 @@ if __name__ == "__main__":
     ax1.legend()
     
     # Plot 2: Original distribution with quantiles
-    x_original = np.linspace(orig_lower, orig_upper, 1000)
-    x_internal = transform_func(x_original, "forward")
-    pdf_original = compute_transformed_pdf(mean_internal, std_internal**2, x_internal, transform_func)
+    x_original = np.linspace(int_lower, int_upper, 1000)
+    x_original, pdf_original = compute_transformed_pdf(mean_internal, std_internal**2, x_internal, transform_func)
 
     ax2.plot(x_original, pdf_original, 'g-', linewidth=2, label='Original PDF')
     for i, (p, q) in enumerate(zip(percentiles, original_quantiles)):
@@ -341,8 +318,5 @@ if __name__ == "__main__":
     ax2.legend()
     plt.tight_layout()
     plt.show()
-        
-    print("=" * 80)
-    print("All reparametrization functions are working correctly with")
-    print("the gamma prior rescaling transformation!")
+            
     print("=" * 80)
