@@ -1,5 +1,5 @@
 from dalia import sp
-
+import numpy as np
 
 def test_factorize_correctness(
         allclose_dense_structured,
@@ -36,13 +36,14 @@ def test_factorize_correctness(
         L_solver = solver._structured_to_spmatrix(
             A_sparse,
             sparsity="bta" if arrowhead_blocksize > 0 else "bt",
+            symmetrize = False,
         )
 
         L_solver_dense = L_solver.toarray() if hasattr(L_solver, 'toarray') else L_solver
 
         allclose_dense_structured(
-            A=L_solver_dense,
-            B=L_ref,
+            A_reference=L_ref,
+            B_toverify=L_solver_dense,
             diagonal_blocksize=diagonal_blocksize,
             n_diag_blocks=n_diag_blocks,
             arrowhead_blocksize=arrowhead_blocksize

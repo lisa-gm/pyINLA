@@ -262,9 +262,9 @@ class SerinvSolver(Solver):
             A_csc = sp.sparse.csc_matrix(A)
             for i in range(self.n_diag_blocks):
                 block_slice = A_csc[
-                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                ].tocoo()
+                        i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                        i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                    ].tocoo()
                 self.A_diagonal_blocks[i][
                     block_slice.row, block_slice.col
                 ] = block_slice.data
@@ -519,8 +519,36 @@ class SerinvSolver(Solver):
         self,
         A: sp.sparse.spmatrix,
         sparsity: str,
+        symmetrize: bool = True,
     ) -> sp.sparse.spmatrix:
-        """Map BT or BTA matrix to sp.spmatrix using sparsity pattern provided in A."""
+        """Map a BT or BTA structured matrix to a sparse `csc` format given the sparsity pattern.
+        
+        Parameters
+        ----------
+        A : sp.sparse.spmatrix
+            Input matrix in sparse format.
+        sparsity : str
+            The sparsity pattern of the matrix. Either 'bt' or 'bta'.
+        symmetrize : bool, optional
+            Whether to symmetrize the output matrix, by default True.
+        
+        Returns
+        -------
+        sp.sparse.spmatrix
+            The output matrix in sparse format.
+
+        Notes
+        -----
+        By default this function symmetrize the matrix as it is mostly use in DALIA on the selected
+        inverse of SPD matrices. Because of further matrix operations on these matrices, we symmetrize
+        them to avoid numerical asymmetries.
+
+        Raises
+        ------
+        ValueError
+            If the sparsity pattern is unknown.
+
+        """
 
         # A is assumed to be symmetric, only use lower triangular part
         B = sp.sparse.csc_matrix(sp.sparse.tril(sp.sparse.csc_matrix(A)))
@@ -580,10 +608,10 @@ class SerinvSolver(Solver):
 
         B_out = sp.sparse.coo_matrix((data, (rows, cols)), shape=B.shape).tocsc()
 
-        # Symmetrize B
-        B_out = B_out + sp.sparse.tril(B_out, k=-1).T
-
-        return B_out
+        if symmetrize:
+            return B_out + sp.sparse.tril(B_out, k=-1).T
+        else:
+            return B_out
 
     def get_solver_memory(self) -> int:
         """Return the memory used by the solver in number of bytes"""

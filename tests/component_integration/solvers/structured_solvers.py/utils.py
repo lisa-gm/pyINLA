@@ -148,8 +148,8 @@ def _create_pobt(
 
 
 def _allclose_dense_structured(
-    A: ArrayLike, 
-    B: ArrayLike, 
+    A_reference: ArrayLike, 
+    B_toverify: ArrayLike, 
     diagonal_blocksize: int, 
     n_diag_blocks: int, 
     arrowhead_blocksize: int = 0):
@@ -157,9 +157,9 @@ def _allclose_dense_structured(
 
     Parameters
     ----------
-    A : ArrayLike
+    A_reference : ArrayLike
         First structured matrix to compare.
-    B : ArrayLike
+    B_toverify : ArrayLike
         Second structured matrix to compare.
     sparsity : str
         Sparsity pattern, either "bt" or "bta".
@@ -171,28 +171,30 @@ def _allclose_dense_structured(
         Size of the arrowhead blocks, by default 0.
     """ 
     if arrowhead_blocksize > 0:
-        np.allclose(
-            A[-arrowhead_blocksize:, :-arrowhead_blocksize],
-            B[-arrowhead_blocksize:, :-arrowhead_blocksize],
+        # Lower arrow blocks
+        assert np.allclose(
+            A_reference[-arrowhead_blocksize:, :-arrowhead_blocksize],
+            B_toverify[-arrowhead_blocksize:, :-arrowhead_blocksize],
             rtol=1e-14,
             atol=1e-16,
         )
 
-        np.allclose(
-            A[-arrowhead_blocksize:, -arrowhead_blocksize:],
-            B[-arrowhead_blocksize:, -arrowhead_blocksize:],
+        # Tip of the arrowhead
+        assert np.allclose(
+            A_reference[-arrowhead_blocksize:, -arrowhead_blocksize:],
+            B_toverify[-arrowhead_blocksize:, -arrowhead_blocksize:],
             rtol=1e-14,
             atol=1e-16,
         )
 
     # Check the diagonal blocks
     for i in range(n_diag_blocks):
-        np.allclose(
-            A[
+        assert np.allclose(
+            A_reference[
                 i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
                 i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
             ],
-            B[
+            B_toverify[
                 i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
                 i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
             ],
@@ -200,18 +202,20 @@ def _allclose_dense_structured(
             atol=1e-16,
         )
 
-        # Check the off-diagonal blocks
+        # Check the off-diagonal (lower) blocks
         if i < n_diag_blocks - 1:
-            np.allclose(
-                A[
+            assert np.allclose(
+                A_reference[
                     (i + 1) * diagonal_blocksize : (i + 2) * diagonal_blocksize,
                     i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
                 ],
-                B[
+                B_toverify[
                     (i + 1) * diagonal_blocksize : (i + 2) * diagonal_blocksize,
                     i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
                 ],
                 rtol=1e-14,
                 atol=1e-16,
             )
+
+    
     
