@@ -164,6 +164,32 @@ if __name__ == "__main__":
     print("=" * 80)
     print("Testing Gaussian Quadrature with Gamma Prior Rescaling")
     print("=" * 80)
+        
+    # Create a inverse gamma prior configuration
+    alpha_values = [1.0, 3.0, 5.0]
+    beta_values = [0.5, 1.0, 2.0]
+
+    for alpha, beta in zip(alpha_values, beta_values):
+        print(f"\nTesting alpha={alpha}, beta={beta}")
+        config = GammaPriorHyperparametersConfig(alpha=alpha, beta=beta)
+        gamma_prior = GammaPriorHyperparameters(config=config)
+        
+        ## compare against scipy implementation
+        from scipy.stats import gamma
+        
+        test_values = [0.1, 0.5, 1.0, 2.0, 5.0]
+        print("Comparing log prior evaluations with scipy.stats.gamma:")
+        for val in test_values:
+            logp_dalia = gamma_prior.evaluate_log_prior(val)
+            ## note: scipy's gamma takes scale = 1/beta
+            logp_scipy = gamma.logpdf(val, a=alpha, scale=1/beta)
+            print(f"  θ = {val:4.1f}: DALIA logp = {logp_dalia:.6f}, "
+                f"scipy logp = {logp_scipy:.6f}, diff = {abs(logp_dalia - logp_scipy):.2e}")
+            if abs(logp_dalia - logp_scipy) > 1e-6:
+                raise ValueError("Log prior evaluation does not match scipy implementation.")
+    
+    print()
+    print("All tests passed!")
     
     # Create a gamma prior configuration
     config = GammaPriorHyperparametersConfig(alpha=2.0, beta=1.0)

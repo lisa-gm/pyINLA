@@ -2,6 +2,62 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm
 
+
+def plot_prior_hp(param_name, theta_interval, prior_hp, log=False):
+    """
+    Plot prior distribution of a hyperparameter.
+    
+    All priors are in log-scale. Therefore exponeniate unless log=True.
+    
+    Parameters
+    ----------
+    param_name : str
+        Name of the hyperparameter.
+    theta_interval: tuple of float
+        Interval (min, max) for plotting the prior. 
+    prior_hp : PriorHyperparameters
+        Prior hyperparameter object.
+    log : bool, optional
+        Whether to plot in log-scale or original scale. Default is False.
+        
+        
+    Note
+    ----
+    If log is True, the plot will be in log-scale. Otherwise, it will be in the original scale.
+    
+    
+    Returns
+    -------
+    fig, ax : matplotlib Figure and Axes
+        The figure and axes objects containing the plot.
+    """
+    
+    if theta_interval[0] == 0:
+        theta_interval = (1e-6, theta_interval[1])
+    
+    theta_vals = np.linspace(theta_interval[0], theta_interval[1], 200)
+    prior_vals = np.array([prior_hp.evaluate_log_prior(theta) for theta in theta_vals])
+    
+    if log:
+        xlabel = f"{param_name}"
+        ylabel = "Log Prior Density"
+    else:
+        prior_vals = np.exp(prior_vals)
+        xlabel = f"{param_name}"
+        ylabel = "Prior Density"
+    
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(theta_vals, prior_vals, 'b-', linewidth=2)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(f"Prior Distribution of {param_name}")
+    ax.grid(True, alpha=0.3)
+    
+    return fig, ax
+
+
+
+
 def plot_marginal_distributions_hp(marginals_hp):
     """Plot marginal distributions of hyperparameters in both internal and external parametrizations."""
 

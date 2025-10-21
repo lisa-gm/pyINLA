@@ -187,6 +187,12 @@ class Model(ABC):
                             config=submodel.config.ph_tau,
                         )
                     )
+                if isinstance(submodel.config.ph_tau, GammaPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GammaPriorHyperparameters(
+                            config=submodel.config.ph_tau,
+                        )
+                    )
                 else:
                     raise ValueError("Unknown prior hyperparameter type for ph_tau")
 

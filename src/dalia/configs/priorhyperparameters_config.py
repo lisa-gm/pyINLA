@@ -49,6 +49,10 @@ class BetaPriorHyperparametersConfig(PriorHyperparametersConfig):
 class GammaPriorHyperparametersConfig(PriorHyperparametersConfig):
     alpha: float = None
     beta: float = None
+    
+class InverseGammaPriorHyperparametersConfig(PriorHyperparametersConfig):
+    alpha: float = None
+    beta: float = None
 
 
 def parse_config(config: dict) -> PriorHyperparametersConfig:
@@ -63,5 +67,7 @@ def parse_config(config: dict) -> PriorHyperparametersConfig:
         return BetaPriorHyperparametersConfig(**config)
     elif prior_type == "gamma":
         return GammaPriorHyperparametersConfig(**config)
+    elif prior_type == "inverse_gamma":
+        return InverseGammaPriorHyperparametersConfig(**config)
     else:
         raise ValueError(f"Unknown prior hyperparameters config type: {prior_type}")
