@@ -1,4 +1,4 @@
-from dalia import sp
+# Copyright 2024-2025 DALIA authors. All rights reserved.
 
 
 def test_solve_correctness(
@@ -21,9 +21,6 @@ def test_solve_correctness(
     else:  # bt
         A = create_pobt(diagonal_blocksize, n_diag_blocks)
 
-    # Convert to sparse matrix
-    A_sparse = sp.sparse.csc_matrix(A)
-
     # Generate rhs
     b = create_rhs(
         n_rhs=num_rhs,
@@ -39,7 +36,7 @@ def test_solve_correctness(
     )
 
     # Run solver factorize
-    solver.factorize(A_sparse, sparsity="bta" if arrowhead_blocksize > 0 else "bt")
+    solver.factorize(A, sparsity="bta" if arrowhead_blocksize > 0 else "bt")
 
     # Run solver solve
     x_solver = solver.solve(rhs=b, sparsity="bta" if arrowhead_blocksize > 0 else "bt")

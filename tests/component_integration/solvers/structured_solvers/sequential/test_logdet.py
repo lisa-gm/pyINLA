@@ -1,4 +1,4 @@
-from dalia import sp
+# Copyright 2024-2025 DALIA authors. All rights reserved.
 
 
 def test_logdet_correctness(
@@ -19,16 +19,13 @@ def test_logdet_correctness(
     else:  # bt
         A = create_pobt(diagonal_blocksize, n_diag_blocks)
 
-    # Convert to sparse matrix
-    A_sparse = sp.sparse.csc_matrix(A)
-
     # Create solver
     solver = create_solver(
         solver_type, diagonal_blocksize, n_diag_blocks, arrowhead_blocksize
     )
 
     # Run solver factorize
-    solver.factorize(A_sparse, sparsity="bta" if arrowhead_blocksize > 0 else "bt")
+    solver.factorize(A, sparsity="bta" if arrowhead_blocksize > 0 else "bt")
 
     # Compute logdet using solver
     logdet_solver = solver.logdet(sparsity="bta" if arrowhead_blocksize > 0 else "bt")

@@ -1,4 +1,4 @@
-from dalia import sp
+# Copyright 2024-2025 DALIA authors. All rights reserved.
 
 
 def test_selected_inversion_correctness(
@@ -19,23 +19,20 @@ def test_selected_inversion_correctness(
     else:  # bt
         A = create_pobt(diagonal_blocksize, n_diag_blocks)
 
-    # Convert to sparse matrix
-    A_sparse = sp.sparse.csc_matrix(A)
-
     # Create solver
     solver = create_solver(
         solver_type, diagonal_blocksize, n_diag_blocks, arrowhead_blocksize
     )
 
     # Run solver factorize
-    solver.factorize(A_sparse, sparsity="bta" if arrowhead_blocksize > 0 else "bt")
+    solver.factorize(A, sparsity="bta" if arrowhead_blocksize > 0 else "bt")
 
     # Run solver selected inversion
     solver.selected_inversion(sparsity="bta" if arrowhead_blocksize > 0 else "bt")
 
     # Get the computed selected inverse in sparse format
     A_selinv_solver = solver._structured_to_spmatrix(
-        A_sparse,
+        A,
         sparsity="bta" if arrowhead_blocksize > 0 else "bt",
         symmetrize=True,
     )
