@@ -181,7 +181,7 @@ def _allclose_dense_structured(
     """
     if arrowhead_blocksize > 0:
         # Lower arrow blocks
-        assert np.allclose(
+        assert xp.allclose(
             A_reference[-arrowhead_blocksize:, :-arrowhead_blocksize],
             B_toverify[-arrowhead_blocksize:, :-arrowhead_blocksize],
             rtol=1e-14,
@@ -189,7 +189,7 @@ def _allclose_dense_structured(
         )
         if assert_upper_triangle:
             # Upper arrow blocks
-            assert np.allclose(
+            assert xp.allclose(
                 A_reference[:-arrowhead_blocksize, -arrowhead_blocksize:],
                 B_toverify[:-arrowhead_blocksize, -arrowhead_blocksize:],
                 rtol=1e-14,
@@ -197,7 +197,7 @@ def _allclose_dense_structured(
             )
 
         # Tip of the arrowhead
-        assert np.allclose(
+        assert xp.allclose(
             A_reference[-arrowhead_blocksize:, -arrowhead_blocksize:],
             B_toverify[-arrowhead_blocksize:, -arrowhead_blocksize:],
             rtol=1e-14,
@@ -206,7 +206,7 @@ def _allclose_dense_structured(
 
     # Check the diagonal blocks
     for i in range(n_diag_blocks):
-        assert np.allclose(
+        assert xp.allclose(
             A_reference[
                 i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
                 i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
@@ -221,7 +221,7 @@ def _allclose_dense_structured(
 
         # Check the off-diagonal (lower) blocks
         if i < n_diag_blocks - 1:
-            assert np.allclose(
+            assert xp.allclose(
                 A_reference[
                     (i + 1) * diagonal_blocksize : (i + 2) * diagonal_blocksize,
                     i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
@@ -236,7 +236,7 @@ def _allclose_dense_structured(
 
             if assert_upper_triangle:
                 # Check the off-diagonal (upper) blocks
-                assert np.allclose(
+                assert xp.allclose(
                     A_reference[
                         i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
                         (i + 1) * diagonal_blocksize : (i + 2) * diagonal_blocksize,

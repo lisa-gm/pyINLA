@@ -7,6 +7,12 @@ from dalia.configs.dalia_config import SolverConfig
 from dalia.core.solver import Solver
 from dalia.utils import synchronize_gpu
 
+# This is a work-around a problem in cupyx, where linalg is not properly namespaced (directly accessible).
+# May be removed in future versions of cupy (tested on cupy 13.4.1).
+if xp.__name__ == "cupy":
+    from cupyx.scipy.sparse.linalg import splu
+else:
+    from scipy.sparse.linalg import splu
 
 class SparseSolver(Solver):
     def __init__(
@@ -48,7 +54,7 @@ class SparseSolver(Solver):
         A = sp.sparse.csc_matrix(A)
 
         # Use LU decomposition as the factorization method
-        self.LU_factor = sp.sparse.linalg.splu(A, diag_pivot_thresh=0, permc_spec="NATURAL")
+        self.LU_factor = splu(A, diag_pivot_thresh=0, permc_spec="NATURAL")
         
         # Check if the matrix appears to be positive definite
         if not (self.LU_factor.U.diagonal() > 0).all():

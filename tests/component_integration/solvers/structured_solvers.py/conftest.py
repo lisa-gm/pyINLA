@@ -1,18 +1,8 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
-import numpy as np
 import pytest
 
-from dalia import ArrayLike, backend_flags, xp
-
 SEED = 63
-
-np.random.seed(SEED)
-
-if backend_flags["cupy_avail"]:
-    import cupy as cp
-
-    cp.random.seed(cp.uint64(SEED))
 
 
 N_DIAG_BLOCKS = [
