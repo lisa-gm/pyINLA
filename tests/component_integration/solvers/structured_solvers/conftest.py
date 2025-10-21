@@ -2,8 +2,12 @@
 
 import pytest
 
-SEED = 63
-
+from tests.structured_solvers_utils import (
+    _allclose_dense_structured,
+    _create_pobt,
+    _create_pobta,
+    _create_solver,
+)
 
 N_DIAG_BLOCKS = [
     pytest.param(1, id="n_diag_blocks=1"),
@@ -53,27 +57,19 @@ def solver_type(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture
 def create_solver():
-    from .utils import _create_solver
-
     return _create_solver
 
 
 @pytest.fixture
 def create_pobta():
-    from .utils import _create_pobta
-
     return _create_pobta
 
 
 @pytest.fixture
 def create_pobt():
-    from .utils import _create_pobt
-
     return _create_pobt
 
 
 @pytest.fixture
 def allclose_dense_structured():
-    from .utils import _allclose_dense_structured
-
     return _allclose_dense_structured
