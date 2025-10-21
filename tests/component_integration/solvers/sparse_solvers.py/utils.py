@@ -3,15 +3,14 @@
 import numpy as np
 
 from dalia import backend_flags, sp, xp
+from tests import RANDOM_SEED
 
-SEED = 63
-
-np.random.seed(SEED)
+np.random.seed(RANDOM_SEED)
 
 if backend_flags["cupy_avail"]:
     import cupy as cp
 
-    cp.random.seed(cp.uint64(63))
+    cp.random.seed(cp.uint64(RANDOM_SEED))
 
 
 def _create_solver(
