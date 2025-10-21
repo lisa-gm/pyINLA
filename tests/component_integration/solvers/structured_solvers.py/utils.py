@@ -3,15 +3,14 @@
 import numpy as np
 
 from dalia import ArrayLike, backend_flags, xp
+from tests import ATOLS, RANDOM_SEED, RTOLS
 
-SEED = 63
-
-np.random.seed(SEED)
+np.random.seed(RANDOM_SEED)
 
 if backend_flags["cupy_avail"]:
     import cupy as cp
 
-    cp.random.seed(cp.uint64(SEED))
+    cp.random.seed(cp.uint64(RANDOM_SEED))
 
 
 def _create_solver(
@@ -184,24 +183,24 @@ def _allclose_dense_structured(
         assert xp.allclose(
             A_reference[-arrowhead_blocksize:, :-arrowhead_blocksize],
             B_toverify[-arrowhead_blocksize:, :-arrowhead_blocksize],
-            rtol=1e-14,
-            atol=1e-16,
+            rtol=RTOLS["strict"],
+            atol=ATOLS["strict"],
         )
         if assert_upper_triangle:
             # Upper arrow blocks
             assert xp.allclose(
                 A_reference[:-arrowhead_blocksize, -arrowhead_blocksize:],
                 B_toverify[:-arrowhead_blocksize, -arrowhead_blocksize:],
-                rtol=1e-14,
-                atol=1e-16,
+                rtol=RTOLS["strict"],
+                atol=ATOLS["strict"],
             )
 
         # Tip of the arrowhead
         assert xp.allclose(
             A_reference[-arrowhead_blocksize:, -arrowhead_blocksize:],
             B_toverify[-arrowhead_blocksize:, -arrowhead_blocksize:],
-            rtol=1e-14,
-            atol=1e-16,
+            rtol=RTOLS["strict"],
+            atol=ATOLS["strict"],
         )
 
     # Check the diagonal blocks
@@ -215,8 +214,8 @@ def _allclose_dense_structured(
                 i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
                 i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
             ],
-            rtol=1e-14,
-            atol=1e-16,
+            rtol=RTOLS["strict"],
+            atol=ATOLS["strict"],
         )
 
         # Check the off-diagonal (lower) blocks
@@ -230,8 +229,8 @@ def _allclose_dense_structured(
                     (i + 1) * diagonal_blocksize : (i + 2) * diagonal_blocksize,
                     i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
                 ],
-                rtol=1e-14,
-                atol=1e-16,
+                rtol=RTOLS["strict"],
+                atol=ATOLS["strict"],
             )
 
             if assert_upper_triangle:
@@ -245,6 +244,6 @@ def _allclose_dense_structured(
                         i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
                         (i + 1) * diagonal_blocksize : (i + 2) * diagonal_blocksize,
                     ],
-                    rtol=1e-14,
-                    atol=1e-16,
+                    rtol=RTOLS["strict"],
+                    atol=ATOLS["strict"],
                 )

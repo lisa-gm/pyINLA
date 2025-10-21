@@ -3,15 +3,14 @@
 import numpy as np
 
 from dalia import backend_flags, xp
+from tests import ATOLS, RANDOM_SEED, RTOLS
 
-SEED = 63
-
-np.random.seed(SEED)
+np.random.seed(RANDOM_SEED)
 
 if backend_flags["cupy_avail"]:
     import cupy as cp
 
-    cp.random.seed(cp.uint64(63))
+    cp.random.seed(cp.uint64(RANDOM_SEED))
 
 
 def _to_ndarray(A):
@@ -146,20 +145,18 @@ def _allclose_ndarrays(
         If the vectors are not close enough.
     """
 
-    rtol = 1e-10 if relaxed_tolerance else 1e-14
-    atol = 1e-12 if relaxed_tolerance else 1e-16
-
     assert xp.allclose(
         a_reference,
         b_toverify,
-        rtol=rtol,
-        atol=atol,
+        rtol=RTOLS["relaxed"] if relaxed_tolerance else RTOLS["strict"],
+        atol=ATOLS["relaxed"] if relaxed_tolerance else ATOLS["strict"],
     )
 
 
 def _allclose_floats(
     a_reference: float,
     b_toverify: float,
+    relaxed_tolerance: bool = False,
 ):
     """Check correctness of two floats.
 
@@ -169,6 +166,8 @@ def _allclose_floats(
         Reference float.
     b_toverify : float
         Float to verify.
+    relaxed_tolerance : bool, optional
+        Whether to use relaxed tolerance for comparison, by default False.
 
     Raises
     ------
@@ -178,6 +177,6 @@ def _allclose_floats(
     assert xp.isclose(
         a_reference,
         b_toverify,
-        rtol=1e-14,
-        atol=1e-16,
+        rtol=RTOLS["relaxed"] if relaxed_tolerance else RTOLS["strict"],
+        atol=ATOLS["relaxed"] if relaxed_tolerance else ATOLS["strict"],
     )
