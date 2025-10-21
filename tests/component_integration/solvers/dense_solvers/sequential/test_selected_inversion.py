@@ -2,6 +2,8 @@
 
 import warnings
 
+from tests import ATOLS, RTOLS
+
 
 def test_selected_inversion_correctness(
     reference_inversion,
@@ -37,7 +39,7 @@ def test_selected_inversion_correctness(
     # Warn that this test only checks callability, not numerical correctness
     warnings.warn(
         f"Test passed but numerical accuracy relaxed due to differences in numerical approaches. "
-        "Relaxed accuracy: rtol<1e-10 and atol<1e-12",
+        f"Relaxed accuracy: rtol<{RTOLS['relaxed']} and atol<{ATOLS['relaxed']}",
         UserWarning,
         stacklevel=2,
     )
