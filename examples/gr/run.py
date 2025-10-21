@@ -8,7 +8,7 @@ from dalia.configs import dalia_config, likelihood_config, submodels_config
 from dalia.core.dalia import DALIA
 from dalia.core.model import Model
 from dalia.submodels import RegressionSubModel
-from dalia.utils import extract_diagonal, get_host, print_msg, plot_marginal_distributions_hp 
+from dalia.utils import extract_diagonal, get_host, print_msg, plot_marginal_distributions_hp, plot_prior_hp
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
@@ -32,12 +32,13 @@ if __name__ == "__main__":
     regression = RegressionSubModel(
         config=submodels_config.parse_config(regression_dict),
     )
+    
     # Likelihood
     likelihood_dict = {
         "type": "gaussian",
         "prec_o": 1.0,
-        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
-        #"prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
+        #"prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+        "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
     }
     # Creation of the first model by combining the Regression submodel and the likelihood
     model = Model(
@@ -45,6 +46,14 @@ if __name__ == "__main__":
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
     print_msg(model)
+    
+    ## Plot prior of hyperparameter -- identification by [0], [1], ... not amazing but works for now
+    theta_interval = [-5, 7]
+    prior_hp = model.prior_hyperparameters[0]
+
+    fig, ax = plot_prior_hp("prec_o", theta_interval, prior_hp)
+    import matplotlib.pyplot as plt
+    plt.show()
 
     # Configurations of DALIA
     dalia_dict = {

@@ -32,16 +32,15 @@ if __name__ == "__main__":
     ar1_dict = {
         "type": "ar1",
         "input_dir": f"{BASE_DIR}/inputs_ar1",
-        "n_latent_parameters": n,
-        "phi": theta_original[0],  # has to be between 0 and 1
-        "tau": xp.log(theta_original[1]),  # assume to already be in log-scale
+        "phi": 0.45,  # has to be between 0 and 1
+        "tau": 0.5,  # precision 
         "ph_phi": {"type": "beta", "alpha": 5.0, "beta": 1.0},
         "ph_tau": {"type": "gaussian", "mean": 0.0, "precision": 0.5},
     }
     ar1 = AR1SubModel(
         config=submodels_config.parse_config(ar1_dict),
     )
-
+    
     # Configurations of the regression submodel
     regression_dict = {
         "type": "regression",
