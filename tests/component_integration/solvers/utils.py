@@ -14,6 +14,24 @@ if backend_flags["cupy_avail"]:
     cp.random.seed(cp.uint64(63))
 
 
+def _to_ndarray(A):
+    """Convert input to ndarray.
+
+    Parameters
+    ----------
+    A : ArrayLike
+        Input array.
+
+    Returns
+    -------
+    ndarray
+        Converted ndarray.
+    """
+    A_dense = A.toarray() if hasattr(A, "toarray") else A
+    A_dense = xp.asarray(A_dense)
+    return A_dense
+
+
 def _create_rhs(n_rhs: int, matrix_size: int):
     """Returns a random right-hand side.
 
@@ -52,9 +70,7 @@ def _reference_cholesky(A):
     L : numpy.ndarray
         Lower triangular Cholesky factor.
     """
-    A_dense = A.toarray() if hasattr(A, "toarray") else A
-    A_dense = np.asarray(A_dense)
-    return np.linalg.cholesky(A_dense)
+    return xp.linalg.cholesky(_to_ndarray(A))
 
 
 def _reference_solve(A, rhs):
@@ -72,10 +88,7 @@ def _reference_solve(A, rhs):
     x : numpy.ndarray
         Solution vector.
     """
-    A_dense = A.toarray() if hasattr(A, "toarray") else A
-    A_dense = np.asarray(A_dense)
-    rhs_dense = np.asarray(rhs)
-    return np.linalg.solve(A_dense, rhs_dense)
+    return xp.linalg.solve(_to_ndarray(A), _to_ndarray(rhs))
 
 
 def _reference_logdet(A):
@@ -91,10 +104,8 @@ def _reference_logdet(A):
     logdet : float
         Log determinant of the matrix.
     """
-    A_dense = A.toarray() if hasattr(A, "toarray") else A
-    A_dense = np.asarray(A_dense)
-    L = np.linalg.cholesky(A_dense)
-    return 2.0 * np.sum(np.log(np.diag(L)))
+    L = xp.linalg.cholesky(_to_ndarray(A))
+    return 2.0 * xp.sum(xp.log(xp.diag(L)))
 
 
 def _reference_inversion(A):
@@ -110,9 +121,7 @@ def _reference_inversion(A):
     A_inv : numpy.ndarray
         Inverse matrix.
     """
-    A_dense = A.toarray() if hasattr(A, "toarray") else A
-    A_dense = np.asarray(A_dense)
-    return np.linalg.inv(A_dense)
+    return xp.linalg.inv(_to_ndarray(A))
 
 
 def _allclose_ndarrays(
@@ -140,7 +149,7 @@ def _allclose_ndarrays(
     rtol = 1e-10 if relaxed_tolerance else 1e-14
     atol = 1e-12 if relaxed_tolerance else 1e-16
 
-    assert np.allclose(
+    assert xp.allclose(
         a_reference,
         b_toverify,
         rtol=rtol,
@@ -166,7 +175,7 @@ def _allclose_floats(
     AssertionError
         If the floats are not close enough.
     """
-    assert np.isclose(
+    assert xp.isclose(
         a_reference,
         b_toverify,
         rtol=1e-14,

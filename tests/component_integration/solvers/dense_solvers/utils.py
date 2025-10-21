@@ -1,9 +1,8 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
 import numpy as np
-from scipy import sparse
 
-from dalia import backend_flags, xp
+from dalia import backend_flags, sp, xp
 
 SEED = 63
 
@@ -50,12 +49,12 @@ def _generate_spd_spmatrix(
     """
 
     if matrix_type == "sparse":
-        L = sparse.random(n, n, density=0.5, data_rvs=np.random.randn)
-        L = L + n * sparse.eye(n)  # Make diagonal dominant
-        L = sparse.tril(L)  # lower triangular
+        L = sp.sparse.random(n, n, density=0.5, data_rvs=xp.random.randn)
+        L = L + n * sp.sparse.eye(n)  # Make diagonal dominant
+        L = sp.sparse.tril(L)  # lower triangular
 
         return L @ L.T  # SPD and sparse (but denser than L)
     else:
-        L = np.tril(np.random.rand(n, n))
-        L += np.diag(np.sum(np.abs(L), axis=1))
+        L = xp.tril(xp.random.rand(n, n))
+        L += xp.diag(xp.sum(xp.abs(L), axis=1))
         return L @ L.T  # SPD and dense
