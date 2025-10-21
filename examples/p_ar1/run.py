@@ -35,7 +35,7 @@ if __name__ == "__main__":
         "phi": 0.45,  # has to be between 0 and 1
         "tau": 0.5,  # precision 
         "ph_phi": {"type": "beta", "alpha": 5.0, "beta": 1.0},
-        "ph_tau": {"type": "gaussian", "mean": 0.0, "precision": 0.5},
+        "ph_tau": {"type": "gamma", "alpha": 2.0, "beta": 0.5},
     }
     ar1 = AR1SubModel(
         config=submodels_config.parse_config(ar1_dict),

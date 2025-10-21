@@ -11,7 +11,7 @@ from dalia.configs import likelihood_config, dalia_config, submodels_config
 from dalia.core.model import Model
 from dalia.core.dalia import DALIA
 from dalia.submodels import AR1SubModel, RegressionSubModel
-from dalia.utils import get_host, print_msg, plot_marginal_distributions_hp  # , extract_diagonal
+from dalia.utils import get_host, print_msg, plot_marginal_distributions_hp, plot_prior_hp  # , extract_diagonal
 from examples_utils.parser_utils import parse_args
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -37,10 +37,14 @@ if __name__ == "__main__":
     ar1_dict = {
         "type": "ar1",
         "input_dir": f"{BASE_DIR}/inputs_ar1",
-        "phi": theta_initial[0],  # has to be between 0 and 1
-        "tau": theta_initial[1],  # assume to already be in log-scale
+        "phi": 0.5,  # has to be between 0 and 1
         "ph_phi": {"type": "beta", "alpha": 5.0, "beta": 1.0},
-        "ph_tau": {"type": "gaussian", "mean": 0.0, "precision": 0.5},
+        # initial guess on the precision
+        "tau": 3, # has to be positive
+        "ph_tau": {"type": "gamma", "alpha": 2.0, "beta": 1.0},
+        # initial guess on the variance
+        # "sigma2": 0.33, # has to be positive
+        # "ph_sigma2": {"type": "invgamma", "alpha": 2.0, "beta": 1.0}, 
     }
     ar1 = AR1SubModel(
         config=submodels_config.parse_config(ar1_dict),
@@ -59,7 +63,7 @@ if __name__ == "__main__":
 
     likelihood_dict = {
         "type": "gaussian",
-        "prec_o": theta_initial[2],
+        "prec_o": 20,
         # "prior_hyperparameters": {
         #     "type": "penalized_complexity",
         #     "alpha": 0.01,
@@ -73,6 +77,19 @@ if __name__ == "__main__":
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
     print_msg(model)
+    
+    # plot phi
+    # theta_interval = [0, 1]
+    # prior_hp = model.prior_hyperparameters[0]
+    # fig, ax = plot_prior_hp("phi", theta_interval, prior_hp)
+
+    # plot tau
+    theta_interval = [0, 5]
+    prior_hp = model.prior_hyperparameters[1]
+    fig, ax = plot_prior_hp("tau", theta_interval, prior_hp)
+
+    import matplotlib.pyplot as plt
+    plt.show()
 
     Qprior = model.construct_Q_prior()
     print("Qprior: \n", Qprior.toarray()[:6, :6])
