@@ -1,6 +1,9 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
+import pytest
 
+
+@pytest.mark.mpi_skip()
 def test_selected_inversion_correctness(
     reference_inversion,
     allclose_dense_structured,

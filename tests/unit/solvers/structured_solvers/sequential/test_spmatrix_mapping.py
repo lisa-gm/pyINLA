@@ -2,7 +2,10 @@
 
 import copy
 
+import pytest
 
+
+@pytest.mark.mpi_skip()
 def test_spmatrix_mapping(
     allclose_dense_structured,
     create_solver,
@@ -13,7 +16,7 @@ def test_spmatrix_mapping(
     n_diag_blocks,
     arrowhead_blocksize,
 ):
-    """Test Cholesky decomposition correctness against NumPy reference."""
+    """Test the mapping functions from structured to spmatrix and back."""
     # Generate test matrix based on sparsity pattern
     if arrowhead_blocksize > 0:  # bta
         A_initial = create_pobta(diagonal_blocksize, arrowhead_blocksize, n_diag_blocks)
