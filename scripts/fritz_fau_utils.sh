@@ -157,7 +157,7 @@ fritz_create_conda_env() {
     fi
     
     # 4. Locate the conda environment file
-    local env_file="${dalia_path}/envs/dalia_base_fritz.yml"
+    local env_file="${dalia_path}/envs/dalia_base.yml"
     if [[ ! -f "$env_file" ]]; then
         echo "   Error: Conda environment file not found at '${env_file}'."
         return 1
@@ -167,7 +167,7 @@ fritz_create_conda_env() {
     echo "   Found conda environment file at: ${env_file}"
     
     # Check if environment already exists
-    local env_name="dalia_base_fritz"
+    local env_name="dalia_base"
     if conda env list | grep -q "^${env_name} "; then
         echo "   Warning: Conda environment '${env_name}' already exists."
         echo "   Do you want to remove and recreate it? (y/N): "
@@ -399,7 +399,7 @@ fritz_activate_conda_env() {
                 echo ""
                 echo "Examples:"
                 echo "  fritz_activate_conda_env                        # Auto-select best available"
-                echo "  fritz_activate_conda_env --env=dalia_base_fritz  # Activate specific environment"
+                echo "  fritz_activate_conda_env --env=dalia_base  # Activate specific environment"
                 return 0
                 ;;
             *)
@@ -420,7 +420,7 @@ fritz_activate_conda_env() {
     conda deactivate 2>/dev/null || true
 
     # Define available environments in order of preference (most performant first)
-    local env_priorities=("dalia_hmpi_fritz" "dalia_base_fritz")
+    local env_priorities=("dalia_hmpi_fritz" "dalia_base")
     local env_name=""
     
     # If environment name is provided as argument, use it directly
