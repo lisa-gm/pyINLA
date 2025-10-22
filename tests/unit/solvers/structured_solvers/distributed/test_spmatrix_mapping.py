@@ -33,7 +33,11 @@ def test_spmatrix_mapping(
 
     # Create solver
     solver = create_solver(
-        solver_type, diagonal_blocksize, n_diag_blocks, arrowhead_blocksize, distributed=True,
+        solver_type,
+        diagonal_blocksize,
+        n_diag_blocks,
+        arrowhead_blocksize,
+        distributed=True,
     )
 
     # Run mapping functions
@@ -50,7 +54,6 @@ def test_spmatrix_mapping(
             symmetrize=True,
         )
 
-    
     # Verify that the inital matrix is identic as the mapped one
     allclose_dense_structured(
         A_reference=(
@@ -61,7 +64,6 @@ def test_spmatrix_mapping(
         n_diag_blocks=n_diag_blocks,
         arrowhead_blocksize=arrowhead_blocksize,
     )
-   
 
     # Verify that the 2 matrices given to the mapping functions are untouched
     allclose_dense_structured(
