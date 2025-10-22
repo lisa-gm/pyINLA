@@ -4,10 +4,12 @@ DALIA have been developped on several (super)computing infrastructures, since th
 As this generalization is not always possible, we provide a simplified procedure for several supercomputing infrastructure (made of different hardware), with the goal of rendering the installation experience of DALIA on a new cluster as easy as possible.
 
 ## Purpose
-Several `conda` environments are provided in the `dalia/envs` repository. These environments are being used for the CI/CD pipelines of DALIA on the respective clusters and are also available for users to quickly setup DALIA on these clusters.
+A base `conda` environment for DALIA is provided in the `dalia/envs` directory. This environment contains all the Python packages on wich DALIA relies. Are not included in this environment the hardware-specific packages (e.g. CuPy for GPU-compute), these packages can be installed as extensions of the provided base environment.
+
+This environment is being used for the CI/CD pipelines of DALIA on the respective clusters and is also available for users to quickly setup DALIA on these clusters or any other machine.
 
 ## Supported Clusters
-We currently use three different cluster for the testing and development of DALIA:
+We currently use three different clusters for the testing and development of DALIA:
 
 | Organization | Cluster | Arch                              | Description                                                    | Memory                     | Nodes                        |
 | ------------ | ------- | --------------------------------- | -------------------------------------------------------------- | -------------------------- | ---------------------------- |
@@ -21,16 +23,16 @@ DALIA is supposed to work across a wide variety of hardware and software stacks 
 
 |              | No Comm              | Host MPI           | GPU-Aware MPI      | xCCL               |
 | :----------- | :------------------- | :----------------- | :----------------- | :----------------- |
-| CPU (x86)    | ==dalia_base_fritz== | *dalia_hmpi_fritz* | NA                 | NA                 |
-| GPU (NVIDIA) | ==dalia_base_alex==  | *dalia_hmpi_alex*  | *dalia_ampi_alex*  | *dalia_xccl_alex*  |
-| GPU (NVIDIA) | ==dalia_base_daint== | *dalia_hmpi_daint* | *dalia_ampi_daint* | *dalia_xccl_daint* |
+| CPU (x86)    | ==dalia_base== | *dalia_hmpi_fritz* | NA                 | NA                 |
+| GPU (NVIDIA) | ==dalia_base==  | *dalia_hmpi_alex*  | *dalia_ampi_alex*  | *dalia_xccl_alex*  |
+| GPU (NVIDIA) | ==dalia_base== | *dalia_hmpi_daint* | *dalia_ampi_daint* | *dalia_xccl_daint* |
 | CPU (ARM)    | x                    | x                  | x                  | x                  |
 | GPU (AMD)    | x                    | x                  | x                  | x                  |
 
-For each cluster, a `base` environment is provided. This environment contains all the necessary dependencies to run DALIA on a single node without any communication library (e.g. MPI, xCCL) and without GPU support. This environment only contains hardware-independent python dependencies. We provide in `dalia/scripts/` interactive installer that not only can create these `base` environments for you, but also extend them to support, when applicable, multi-node communication with MPI or xCCL and/or GPU acceleration.
+The `dalia_base` environment contains all the necessary dependencies to run DALIA on a single node without any communication library (e.g. MPI, xCCL) and without GPU support. This environment only contains hardware-independent python dependencies. We provide in `dalia/scripts/` interactive installer that not only can create this `dalia_base` environments for you, but also extend it to support, when applicable, multi-node communication with MPI or xCCL and/or GPU acceleration.
 
 
-# Detailes Instructions
+# Detailed Instructions
 ## On Fritz@FAU
 1. Clone the repositories to your workspace:    
     ```

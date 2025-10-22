@@ -1,4 +1,4 @@
-name: dalia_base_fritz
+name: dalia_base
 channels:
   - conda-forge
 dependencies:
