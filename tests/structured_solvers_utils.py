@@ -18,19 +18,32 @@ def _create_solver(
     diagonal_blocksize: int,
     n_diag_blocks: int,
     arrowhead_blocksize: int = 0,
+    distributed: bool = False,
 ):
     from dalia.configs.dalia_config import SolverConfig
-    from dalia.solvers import SerinvSolver
-
+    
     config = SolverConfig(type=solver_type)
 
     if solver_type == "serinv":
-        return SerinvSolver(
-            config=config,
-            diagonal_blocksize=diagonal_blocksize,
-            n_diag_blocks=n_diag_blocks,
-            arrowhead_blocksize=arrowhead_blocksize,
-        )
+        if not distributed:
+            from dalia.solvers import SerinvSolver
+            return SerinvSolver(
+                config=config,
+                diagonal_blocksize=diagonal_blocksize,
+                n_diag_blocks=n_diag_blocks,
+                arrowhead_blocksize=arrowhead_blocksize,
+            )
+        else:
+            import mpi4py.MPI as MPI
+            from dalia.solvers import DistSerinvSolver
+            return DistSerinvSolver(
+                config=config,
+                diagonal_blocksize=diagonal_blocksize,
+                arrowhead_blocksize=arrowhead_blocksize,
+                n_diag_blocks=n_diag_blocks,
+                comm=MPI.COMM_WORLD,
+                nccl_comm=None,
+            )
     else:
         raise ValueError(f"Unknown solver type: {solver_type}")
 

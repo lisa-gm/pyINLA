@@ -18,6 +18,7 @@ else:
 try:
     from serinv.utils import allocate_pobtax_permutation_buffers
     from serinv.wrappers import (
+        allocate_pobtrs,
         allocate_pobtars,
         ppobtaf,
         ppobtas,
@@ -157,17 +158,29 @@ class DistSerinvSolver(Solver):
         self.buffer = allocate_pobtax_permutation_buffers(
             self.A_diagonal_blocks,
         )
-        self.pobtars: dict = allocate_pobtars(
-            A_diagonal_blocks=self.A_diagonal_blocks,
-            A_lower_diagonal_blocks=self.A_lower_diagonal_blocks,
-            A_lower_arrow_blocks=self.A_arrow_bottom_blocks,
-            A_arrow_tip_block=self.A_arrow_tip_block,
-            B=self.dist_rhs,
-            comm=self.comm,
-            array_module=xp.__name__,
-            strategy="allgather",
-            nccl_comm=self.nccl_comm,
-        )
+        
+        if self.arrowhead_blocksize > 0:
+            self.reduced_system: dict = allocate_pobtars(
+                A_diagonal_blocks=self.A_diagonal_blocks,
+                A_lower_diagonal_blocks=self.A_lower_diagonal_blocks,
+                A_lower_arrow_blocks=self.A_arrow_bottom_blocks,
+                A_arrow_tip_block=self.A_arrow_tip_block,
+                B=self.dist_rhs,
+                comm=self.comm,
+                array_module=xp.__name__,
+                strategy="allgather",
+                nccl_comm=self.nccl_comm,
+            )
+        else:
+            self.reduced_system: dict = allocate_pobtrs(
+                A_diagonal_blocks=self.A_diagonal_blocks,
+                A_lower_diagonal_blocks=self.A_lower_diagonal_blocks,
+                B=self.dist_rhs,
+                comm=self.comm,
+                array_module=xp.__name__,
+                strategy="allgather",
+                nccl_comm=self.nccl_comm,
+            )
 
         # Initialize the caching strategy
         self.bta_cache_block_sort_index = None
@@ -215,7 +228,7 @@ class DistSerinvSolver(Solver):
                 self.A_arrow_bottom_blocks,
                 self.A_arrow_tip_block,
                 buffer=self.buffer,
-                pobtars=self.pobtars,
+                pobtars=self.reduced_system,
                 comm=self.comm,
                 strategy="allgather",
                 nccl_comm=self.nccl_comm,
@@ -225,7 +238,7 @@ class DistSerinvSolver(Solver):
                 self.A_diagonal_blocks,
                 self.A_lower_diagonal_blocks,
                 buffer=self.buffer,
-                pobtrs=self.pobtars,
+                pobtrs=self.reduced_system,
                 comm=self.comm,
                 strategy="allgather",
                 nccl_comm=self.nccl_comm,
@@ -276,7 +289,7 @@ class DistSerinvSolver(Solver):
                 L_arrow_tip_block=self.A_arrow_tip_block,
                 B=self.dist_rhs,
                 buffer=self.buffer,
-                pobtars=self.pobtars,
+                pobtars=self.reduced_system,
                 comm=self.comm,
                 strategy="allgather",
                 nccl_comm=self.nccl_comm,
@@ -287,7 +300,7 @@ class DistSerinvSolver(Solver):
                 L_lower_diagonal_blocks=self.A_lower_diagonal_blocks,
                 B=self.dist_rhs[: -self.arrowhead_blocksize],
                 buffer=self.buffer,
-                pobtars=self.pobtars,
+                pobtars=self.reduced_system,
                 comm=self.comm,
                 strategy="allgather",
                 nccl_comm=self.nccl_comm,
@@ -330,14 +343,14 @@ class DistSerinvSolver(Solver):
 
             # Rank 0 do the reduced system; The loop start from 1 because of the
             # AllGather strategy and the size of the reduced system associated.
-            _n = self.pobtars["A_diagonal_blocks"].shape[0]
+            _n = self.reduced_system["A_diagonal_blocks"].shape[0]
             for i in range(1, _n):
                 logdet += xp.sum(
-                    xp.log(self.pobtars["A_diagonal_blocks"][i].diagonal())
+                    xp.log(self.reduced_system["A_diagonal_blocks"][i].diagonal())
                 )
 
             if sparsity == "bta":
-                logdet += xp.sum(xp.log(self.pobtars["A_arrow_tip_block"].diagonal()))
+                logdet += xp.sum(xp.log(self.reduced_system["A_arrow_tip_block"].diagonal()))
         else:
             for i in range(1, self.n_locals[self.rank] - 1):
                 logdet += xp.sum(xp.log(self.A_diagonal_blocks[i].diagonal()))
@@ -370,7 +383,7 @@ class DistSerinvSolver(Solver):
                 L_lower_arrow_blocks=self.A_arrow_bottom_blocks,
                 L_arrow_tip_block=self.A_arrow_tip_block,
                 buffer=self.buffer,
-                pobtars=self.pobtars,
+                pobtars=self.reduced_system,
                 comm=self.comm,
                 strategy="allgather",
                 nccl_comm=self.nccl_comm,
@@ -380,7 +393,7 @@ class DistSerinvSolver(Solver):
                 L_diagonal_blocks=self.A_diagonal_blocks,
                 L_lower_diagonal_blocks=self.A_lower_diagonal_blocks,
                 buffer=self.buffer,
-                pobtrs=self.pobtars,
+                pobtrs=self.reduced_system,
                 comm=self.comm,
                 strategy="allgather",
                 nccl_comm=self.nccl_comm,
@@ -400,8 +413,10 @@ class DistSerinvSolver(Solver):
         """Map sp.spmatrix to BT or BTA."""
         self.A_diagonal_blocks[:] = 0.0
         self.A_lower_diagonal_blocks[:] = 0.0
-        self.A_arrow_bottom_blocks[:] = 0.0
-        self.A_arrow_tip_block[:] = 0.0
+        if self.A_arrow_bottom_blocks is not None:
+            self.A_arrow_bottom_blocks[:] = 0.0
+        if self.A_arrow_tip_block is not None:
+            self.A_arrow_tip_block[:] = 0.0
 
         if xp.__name__ == "cupy" and sparsity == "bta":
             if sparsity == "bta":
@@ -694,6 +709,7 @@ class DistSerinvSolver(Solver):
         self,
         A: sp.sparse.spmatrix,
         sparsity: str,
+        symmetrize: bool = True,
     ) -> sp.sparse.spmatrix:
         """Map BT or BTA matrix to sp.spmatrix using sparsity pattern provided in A."""
         # A is assumed to be symmetric, only use lower triangular part
@@ -767,16 +783,17 @@ class DistSerinvSolver(Solver):
 
         # TODO: Need to communicate to agregates/Map the local B matrix to all ranks
         # Need to operate on the datas
-        l_data = allgather(data, comm=self.comm)
-        l_rows = allgather(rows, comm=self.comm)
-        l_cols = allgather(cols, comm=self.comm)
+        l_data = xp.concatenate(allgather(data, comm=self.comm))
+        l_rows = xp.concatenate(allgather(rows, comm=self.comm))
+        l_cols = xp.concatenate(allgather(cols, comm=self.comm))
         synchronize(comm=self.comm)
+        
         B_out = sp.sparse.coo_matrix((l_data, (l_rows, l_cols)), shape=B.shape).tocsc()
 
-        # Symmetrize B
-        B_out = B_out + sp.sparse.tril(B_out, k=-1).T
-
-        return B_out
+        if symmetrize:
+            return B_out + sp.sparse.tril(B_out, k=-1).T
+        else:
+            return B_out
 
     def _slice_rhs(
         self,
@@ -880,11 +897,11 @@ class DistSerinvSolver(Solver):
         """Return the memory used by the solver in number of bytes"""
         bytes_pobtars: int = (
             self.buffer.nbytes
-            + self.pobtars["A_diagonal_blocks"].nbytes
-            + self.pobtars["A_lower_diagonal_blocks"].nbytes
-            + self.pobtars["A_lower_arrow_blocks"].nbytes
-            + self.pobtars["A_arrow_tip_block"].nbytes
-            + self.pobtars["B"].nbytes
+            + self.reduced_system["A_diagonal_blocks"].nbytes
+            + self.reduced_system["A_lower_diagonal_blocks"].nbytes
+            + self.reduced_system["A_lower_arrow_blocks"].nbytes
+            + self.reduced_system["A_arrow_tip_block"].nbytes
+            + self.reduced_system["B"].nbytes
         )
         bytes_local_system: int = (
             self.A_diagonal_blocks.nbytes
