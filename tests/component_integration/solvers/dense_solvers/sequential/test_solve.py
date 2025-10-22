@@ -1,6 +1,9 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
+import pytest
 
+
+@pytest.mark.mpi_skip()
 def test_solve_correctness(
     reference_solve,
     allclose_ndarrays,

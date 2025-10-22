@@ -2,7 +2,10 @@
 
 import warnings
 
+import pytest
 
+
+@pytest.mark.mpi_skip()
 def test_factorize_correctness(
     generate_spd_spmatrix,
     create_solver,

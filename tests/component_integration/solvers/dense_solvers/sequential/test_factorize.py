@@ -1,6 +1,9 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
+import pytest
 
+
+@pytest.mark.mpi_skip()
 def test_factorize_correctness(
     reference_cholesky,
     allclose_ndarrays,

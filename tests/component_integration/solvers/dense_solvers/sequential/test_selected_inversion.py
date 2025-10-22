@@ -2,9 +2,12 @@
 
 import warnings
 
+import pytest
+
 from tests import ATOLS, RTOLS
 
 
+@pytest.mark.mpi_skip()
 def test_selected_inversion_correctness(
     reference_inversion,
     allclose_ndarrays,

@@ -9,19 +9,6 @@ from tests.structured_solvers_utils import (
     _create_solver,
 )
 
-N_DIAG_BLOCKS = [
-    pytest.param(1, id="n_diag_blocks=1"),
-    pytest.param(2, id="n_diag_blocks=2"),
-    pytest.param(3, id="n_diag_blocks=3"),
-    pytest.param(4, id="n_diag_blocks=4"),
-]
-
-
-@pytest.fixture(params=N_DIAG_BLOCKS, autouse=True)
-def n_diag_blocks(request: pytest.FixtureRequest) -> int:
-    return request.param
-
-
 DIAGONAL_BLOCKSIZE = [
     pytest.param(2, id="diagonal_blocksize=2"),
     pytest.param(3, id="diagonal_blocksize=3"),
