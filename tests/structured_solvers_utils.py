@@ -21,12 +21,13 @@ def _create_solver(
     distributed: bool = False,
 ):
     from dalia.configs.dalia_config import SolverConfig
-    
+
     config = SolverConfig(type=solver_type)
 
     if solver_type == "serinv":
         if not distributed:
             from dalia.solvers import SerinvSolver
+
             return SerinvSolver(
                 config=config,
                 diagonal_blocksize=diagonal_blocksize,
@@ -35,7 +36,9 @@ def _create_solver(
             )
         else:
             import mpi4py.MPI as MPI
+
             from dalia.solvers import DistSerinvSolver
+
             return DistSerinvSolver(
                 config=config,
                 diagonal_blocksize=diagonal_blocksize,
