@@ -278,82 +278,91 @@ fritz_create_conda_env() {
     fi
     
     if [[ "$install_mpi4py" =~ ^[Yy]$ ]]; then
-        echo "   Installing mpi4py with Intel MPI support..."
+        echo "   Creating enhanced environment with mpi4py support..."
         
-        # Install mpi4py in the current environment first
-        if MPICC=$(which mpicc) pip install --no-cache-dir mpi4py; then
-            echo "   Successfully installed mpi4py."
-            
-            # Deactivate current environment
-            echo "   Deactivating current environment to create enhanced version..."
-            conda deactivate 2>/dev/null || true
-            
-            # Create new environment with enhanced name
-            local enhanced_env_name="dalia_hmpi_fritz"
-            echo "   Creating enhanced environment '${enhanced_env_name}' from '${env_name}'..."
-            
-            # Remove enhanced environment if it already exists
-            if conda env list | grep -q "^${enhanced_env_name} "; then
-                echo "   Removing existing enhanced environment..."
-                conda env remove -n "$enhanced_env_name" -y || {
-                    echo "   Warning: Failed to remove existing enhanced environment."
-                }
-            fi
-            
-            # Clone the current environment
-            conda create --name "$enhanced_env_name" --clone "$env_name" -y || {
-                echo "   Error: Failed to create enhanced environment."
-                echo "   Continuing with base environment..."
+        # Deactivate current environment
+        echo "   Deactivating current environment to create enhanced version..."
+        conda deactivate 2>/dev/null || true
+        
+        # Create new environment with enhanced name
+        local enhanced_env_name="dalia_hmpi_fritz"
+        echo "   Creating enhanced environment '${enhanced_env_name}' from '${env_name}'..."
+        
+        # Remove enhanced environment if it already exists
+        if conda env list | grep -q "^${enhanced_env_name} "; then
+            echo "   Removing existing enhanced environment..."
+            conda env remove -n "$enhanced_env_name" -y || {
+                echo "   Warning: Failed to remove existing enhanced environment."
             }
+        fi
+        
+        # Clone the current environment
+        if conda create --name "$enhanced_env_name" --clone "$env_name" -y; then
+            echo "   Successfully created enhanced environment."
             
             # Activate the enhanced environment
-            if conda env list | grep -q "^${enhanced_env_name} "; then
-                echo "   Activating enhanced environment '${enhanced_env_name}'..."
-                if fritz_activate_conda_env --env="$enhanced_env_name"; then
-                    # Install mpi4py in the enhanced environment
-                    echo "   Installing mpi4py in enhanced environment..."
-                    cd "$dalia_path" || true
-                    if MPICC=$(which mpicc) pip install --no-cache-dir mpi4py; then
-                        echo "   Successfully installed mpi4py in enhanced environment."
-                        env_name="$enhanced_env_name"  # Update env_name for final message
-                        
-                        # Determine whether to keep base environment
-                        local keep_base=""
-                        if [[ -n "$install_mpi4py_flag" ]]; then
-                            # Command line mode - use dev_mode_flag to decide
-                            if [[ -n "$dev_mode_flag" ]]; then
-                                keep_base="y"
-                                echo "   Developer mode enabled via --dev-mode. Keeping base environment."
-                            else
-                                keep_base="n"
-                                echo "   Default mode: removing base environment to keep only enhanced version."
-                            fi
+            echo "   Activating enhanced environment '${enhanced_env_name}'..."
+            if fritz_activate_conda_env --env="$enhanced_env_name"; then
+                # Install mpi4py in the enhanced environment
+                echo "   Installing mpi4py with Intel MPI support in enhanced environment..."
+                cd "$dalia_path" || true
+                if MPICC=$(which mpicc) pip install --no-cache-dir mpi4py; then
+                    echo "   Successfully installed mpi4py in enhanced environment."
+                    env_name="$enhanced_env_name"  # Update env_name for final message
+                    
+                    # Determine whether to keep base environment
+                    local keep_base=""
+                    if [[ -n "$install_mpi4py_flag" ]]; then
+                        # Command line mode - use dev_mode_flag to decide
+                        if [[ -n "$dev_mode_flag" ]]; then
+                            keep_base="y"
+                            echo "   Developer mode enabled via --dev-mode. Keeping base environment."
                         else
-                            # Interactive mode - ask user
-                            echo ""
-                            echo "   Do you want to keep the base environment '${env_name%_hmpi*}_base_fritz' for development without MPI? (y/N): "
-                            read -r keep_base
-                        fi
-                        
-                        if [[ ! "$keep_base" =~ ^[Yy]$ ]]; then
-                            echo "   Removing base environment '${env_name%_hmpi*}_base_fritz'..."
-                            conda env remove -n "${env_name%_hmpi*}_base_fritz" -y || {
-                                echo "   Warning: Failed to remove base environment."
-                            }
-                        else
-                            echo "   Keeping base environment for development without MPI."
+                            keep_base="n"
+                            echo "   Default mode: removing base environment to keep only enhanced version."
                         fi
                     else
-                        echo "   Warning: Failed to install mpi4py in enhanced environment."
-                        echo "   You can install it manually later with: MPICC=\$(which mpicc) pip install --no-cache-dir mpi4py"
+                        # Interactive mode - ask user
+                        echo ""
+                        echo "   Do you want to keep the base environment 'dalia_base' for development without MPI? (y/N): "
+                        read -r keep_base
+                    fi
+                    
+                    if [[ ! "$keep_base" =~ ^[Yy]$ ]]; then
+                        echo "   Removing base environment 'dalia_base'..."
+                        conda env remove -n "dalia_base" -y || {
+                            echo "   Warning: Failed to remove base environment."
+                        }
+                    else
+                        echo "   Keeping base environment for development without MPI."
                     fi
                 else
-                    echo "   Warning: Failed to activate enhanced environment."
+                    echo "   Error: Failed to install mpi4py in enhanced environment."
+                    echo "   Removing broken enhanced environment and reverting to base environment..."
+                    
+                    # Deactivate the enhanced environment
+                    conda deactivate 2>/dev/null || true
+                    
+                    # Remove the broken enhanced environment
+                    conda env remove -n "$enhanced_env_name" -y || {
+                        echo "   Warning: Failed to remove broken enhanced environment."
+                    }
+                    
+                    # Reactivate the base environment
+                    if fritz_activate_conda_env --env="dalia_base"; then
+                        echo "   Reverted to base environment 'dalia_base'."
+                        env_name="dalia_base"  # Reset env_name to base environment
+                        echo "   You can install mpi4py manually later with: MPICC=\$(which mpicc) pip install --no-cache-dir mpi4py"
+                    else
+                        echo "   Warning: Failed to reactivate base environment."
+                    fi
                 fi
+            else
+                echo "   Warning: Failed to activate enhanced environment."
             fi
         else
-            echo "   Warning: Failed to install mpi4py. You can install it manually later."
-            echo "   Command: MPICC=\$(which mpicc) pip install --no-cache-dir mpi4py"
+            echo "   Error: Failed to create enhanced environment."
+            echo "   Continuing with base environment..."
         fi
     else
         echo "   Skipping mpi4py installation."
@@ -438,7 +447,7 @@ fritz_activate_conda_env() {
     else
         # Check which environments are available and select the most performant one
         echo "   Checking available DALIA conda environments..."
-        local available_envs=$(conda env list 2>/dev/null | grep -E "dalia_(hmpi|base)_fritz" | awk '{print $1}')
+        local available_envs=$(conda env list 2>/dev/null | grep -E "^(dalia_hmpi_fritz|dalia_base) " | awk '{print $1}')
         
         for preferred_env in "${env_priorities[@]}"; do
             if echo "$available_envs" | grep -q "^${preferred_env}$"; then
