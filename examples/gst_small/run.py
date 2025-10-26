@@ -133,6 +133,7 @@ if __name__ == "__main__":
     
     
     marginals_hp = dalia.marginal_distributions_hp() 
+    print("Theta keys: ", dalia.model.theta_keys)
 
 
     print_msg("\n--- Finished ---")

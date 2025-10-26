@@ -48,9 +48,13 @@ class AR1SubModelConfig(SubModelConfig):
     ## check that phi is between -1 and 1 (use pc prior)
     # check inla.doc("pc.cor1")
 
-    ## prior (in log-scale or not?) on tau (marginal precision) or s2 marginal variance
-    tau: float = None  # Marginal variance
+    ## either define tau or sigma2
+    tau: float = None  # Precision
+    # sigma2: float = None  # Marginal variance
+    
+    
     ph_tau: PriorHyperparametersConfig = None
+    # ph_sigma2: PriorHyperparametersConfig = None
 
     def read_hyperparameters(self):
 
