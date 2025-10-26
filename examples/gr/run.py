@@ -37,8 +37,8 @@ if __name__ == "__main__":
     likelihood_dict = {
         "type": "gaussian",
         "prec_o": 1.0,
-        #"prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
-        "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
+        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+        #"prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
     }
     # Creation of the first model by combining the Regression submodel and the likelihood
     model = Model(

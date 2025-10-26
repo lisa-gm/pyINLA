@@ -32,9 +32,6 @@ if __name__ == "__main__":
     L = np.linalg.cholesky(Q.toarray())
     Cov = np.linalg.inv(Q.toarray())
 
-    geom_mean = np.exp(np.mean(np.log(Cov.diagonal())))
-    print("Geometric mean of Qinv diagonal: ", geom_mean)
-
     print(Q.toarray()[:6, :6])
     print(np.linalg.inv(Q.toarray())[:6, :6])
     print(np.round(Q.toarray() @ np.linalg.inv(Q.toarray()), 6)[:6, :6])
