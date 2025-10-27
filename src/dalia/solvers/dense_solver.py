@@ -46,7 +46,7 @@ class DenseSolver(Solver):
         self.t_solve = 0.0
 
     def factorize(self, A: NDArray, **kwargs) -> None:
-        """Compute the decomposition decomposition of a matrix.
+        """Compute the Cholesky decomposition of a matrix.
 
         Parameters
         ----------
