@@ -179,8 +179,7 @@ def _allclose_dense_structured(
         First structured matrix to compare.
     B_toverify : ArrayLike
         Second structured matrix to compare.
-    sparsity : str
-        Sparsity pattern, either "bt" or "bta".
+
     diagonal_blocksize : int
         Size of the diagonal blocks.
     n_diag_blocks : int

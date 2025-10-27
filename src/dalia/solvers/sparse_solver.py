@@ -7,7 +7,7 @@ from dalia.configs.dalia_config import SolverConfig
 from dalia.core.solver import Solver
 from dalia.utils import synchronize_gpu
 
-# This is a work-around a problem in cupyx, where linalg is not properly namespaced (directly accessible).
+# This is a workaround a problem in cupyx, where linalg is not properly namespaced (directly accessible).
 # May be removed in future versions of cupy (tested on cupy 13.4.1).
 if xp.__name__ == "cupy":
     from cupyx.scipy.sparse.linalg import splu
@@ -33,7 +33,7 @@ class SparseSolver(Solver):
         """Compute the decomposition of a matrix.
 
         Note: This uses LU decomposition since sparse Cholesky is not readily available.
-        The interface name 'cholesky' is kept for consistency with the solver interface.
+
 
         Parameters
         ----------

@@ -30,7 +30,7 @@ def test_spmatrix_mapping(
     else:  # bt
         A_initial = create_pobt(diagonal_blocksize, n_diag_blocks)
 
-    # Make a deep copies of A_initial to keep as references
+    # Make deep copies of A_initial to keep as references
     A_reference = copy.deepcopy(A_initial)
     A_pattern = copy.deepcopy(A_initial)
 
@@ -57,7 +57,7 @@ def test_spmatrix_mapping(
             symmetrize=True,
         )
 
-    # Verify that the inital matrix is identic as the mapped one
+    # Verify that the initial matrix is identical to the mapped one
     allclose_dense_structured(
         A_reference=(
             A_reference.toarray() if hasattr(A_reference, "toarray") else A_reference

@@ -38,7 +38,7 @@ class Solver(ABC):
 
         Note:
         -----
-        Even tho precision matrices are known to be positive definite, depending on the underlying sover implementation, this could be Cholesky, LU, or other factorizations.
+        Even though precision matrices are known to be positive definite, depending on the underlying solver implementation, this could be Cholesky, LU, or other factorizations.
         """
         ...
 

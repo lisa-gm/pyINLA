@@ -877,7 +877,7 @@ class DistSerinvSolver(Solver):
 
         # This part needs a major re-work as the multiple RHS are handled one column at a time
         # but Serinv can handle multiple RHS in one go. The problem is linked to DALIA internal 
-        # representation (2nd dimmension of rhs when only 1 rhs) and the collectives operations.
+        # representation (2nd dimension of rhs when only 1 rhs) and the collectives operations.
         if (
             backend_flags["array_module"] == "cupy"
             and not backend_flags["mpi_cuda_aware"]

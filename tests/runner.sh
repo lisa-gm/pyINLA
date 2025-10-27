@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # DALIA Test Runner Script
