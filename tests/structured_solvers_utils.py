@@ -103,11 +103,12 @@ def _create_pobta(
                 i * diagonal_blocksize : (i + 1) * diagonal_blocksize,
             ] = xp.random.rand(diagonal_blocksize, diagonal_blocksize)
 
+    # Make the matrix diagonally dominant (hence, if symmetric, SPD)
+    for i in range(A.shape[0]):
+        A[i, i] += 1 + xp.sum(A[i, :])
+
     # Make symmetric
     A = A + A.T
-
-    # Make positive definite by adding scaled identity
-    A = A + (xp.max(xp.abs(A)) + 1.0) * xp.eye(A.shape[0])
 
     return A
 

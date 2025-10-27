@@ -279,38 +279,49 @@ class DistSerinvSolver(Solver):
         synchronize(comm=self.comm)
         tic = time.perf_counter()
 
-        self._slice_rhs(rhs, sparsity)
+        # Ensure rhs is a 2D array
+        if rhs.ndim == 1:
+            rhs = rhs[:, None]
+        
+        # Handle multiple RHS by processing each column separately
+        for col in range(rhs.shape[1]):
+            rhs_col = rhs[:, col:col+1]  # Keep 2D shape with single column
+            
+            self._slice_rhs(rhs_col, sparsity)
 
-        if sparsity == "bta":
-            ppobtas(
-                L_diagonal_blocks=self.A_diagonal_blocks,
-                L_lower_diagonal_blocks=self.A_lower_diagonal_blocks,
-                L_lower_arrow_blocks=self.A_arrow_bottom_blocks,
-                L_arrow_tip_block=self.A_arrow_tip_block,
-                B=self.dist_rhs,
-                buffer=self.buffer,
-                pobtars=self.reduced_system,
-                comm=self.comm,
-                strategy="allgather",
-                nccl_comm=self.nccl_comm,
-            )
-        elif sparsity == "bt":
-            ppobts(
-                L_diagonal_blocks=self.A_diagonal_blocks,
-                L_lower_diagonal_blocks=self.A_lower_diagonal_blocks,
-                B=self.dist_rhs[: -self.arrowhead_blocksize],
-                buffer=self.buffer,
-                pobtars=self.reduced_system,
-                comm=self.comm,
-                strategy="allgather",
-                nccl_comm=self.nccl_comm,
-            )
-        else:
-            raise ValueError(
-                f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
-            )
+            if sparsity == "bta":
+                ppobtas(
+                    L_diagonal_blocks=self.A_diagonal_blocks,
+                    L_lower_diagonal_blocks=self.A_lower_diagonal_blocks,
+                    L_lower_arrow_blocks=self.A_arrow_bottom_blocks,
+                    L_arrow_tip_block=self.A_arrow_tip_block,
+                    B=self.dist_rhs,
+                    buffer=self.buffer,
+                    pobtars=self.reduced_system,
+                    comm=self.comm,
+                    strategy="allgather",
+                    nccl_comm=self.nccl_comm,
+                )
+            elif sparsity == "bt":
+                ppobts(
+                    L_diagonal_blocks=self.A_diagonal_blocks,
+                    L_lower_diagonal_blocks=self.A_lower_diagonal_blocks,
+                    B=self.dist_rhs[: -self.arrowhead_blocksize] if self.arrowhead_blocksize > 0 else self.dist_rhs,
+                    buffer=self.buffer,
+                    pobtrs=self.reduced_system,
+                    comm=self.comm,
+                    strategy="allgather",
+                    nccl_comm=self.nccl_comm,
+                )
+            else:
+                raise ValueError(
+                    f"Unknown sparsity pattern: {sparsity}. Use 'bt' or 'bta'."
+                )
 
-        self._gather_rhs(rhs, sparsity)
+            self._gather_rhs(rhs_col, sparsity)
+            
+            # Copy the solved column back to the original rhs
+            rhs[:, col:col+1] = rhs_col
 
         synchronize(comm=self.comm)
         toc = time.perf_counter()
@@ -364,10 +375,9 @@ class DistSerinvSolver(Solver):
         synchronize(comm=self.comm)
 
         if xp.isnan(logdet):
-            print(
-                f"WorldRank {MPI.COMM_WORLD.rank} logdet is NaN for {sparsity} matrix."
+            raise ValueError(
+            f"WorldRank {MPI.COMM_WORLD.rank} logdet is NaN for {sparsity} matrix."
             )
-            exit()
 
         return 2 * logdet
 
@@ -805,14 +815,16 @@ class DistSerinvSolver(Solver):
         start_idx = int(xp.cumsum(n_idx)[self.rank])
         end_idx = int(xp.cumsum(n_idx)[self.rank + 1])
 
-        # Ensure rhs is a 2D array with shape (n, 1)
-        if rhs.ndim == 1:
-            rhs = rhs[:, None]
-
+        # rhs is guaranteed to be 2D with shape (n, 1) at this point
         # print(f"Rank {self.rank} rhs.shape: {rhs.shape}, self.dist_rhs.shape: {self.dist_rhs.shape}, start_idx: {start_idx* self.diagonal_blocksize}, end_idx: {end_idx* self.diagonal_blocksize}")
-        self.dist_rhs[: -self.arrowhead_blocksize] = rhs[
-            start_idx * self.diagonal_blocksize : end_idx * self.diagonal_blocksize
-        ]
+        if self.arrowhead_blocksize > 0:
+            self.dist_rhs[: -self.arrowhead_blocksize] = rhs[
+                start_idx * self.diagonal_blocksize : end_idx * self.diagonal_blocksize
+            ]
+        else:
+            self.dist_rhs[:] = rhs[
+                start_idx * self.diagonal_blocksize : end_idx * self.diagonal_blocksize
+            ]
         if sparsity == "bta":
             self.dist_rhs[-self.arrowhead_blocksize :] = rhs[
                 -self.arrowhead_blocksize :, :
@@ -834,15 +846,27 @@ class DistSerinvSolver(Solver):
             and not backend_flags["mpi_cuda_aware"]
             and not backend_flags["nccl_avail"]
         ):
-            self.dist_rhs[: -self.arrowhead_blocksize].flatten().get(
-                out=self.send_rhs[
-                    self.remainders[self.rank] * self.diagonal_blocksize :
-                ]
-            )
+            if self.arrowhead_blocksize > 0:
+                self.dist_rhs[: -self.arrowhead_blocksize].flatten().get(
+                    out=self.send_rhs[
+                        self.remainders[self.rank] * self.diagonal_blocksize :
+                    ]
+                )
+            else:
+                self.dist_rhs.flatten().get(
+                    out=self.send_rhs[
+                        self.remainders[self.rank] * self.diagonal_blocksize :
+                    ]
+                )
         else:
-            self.send_rhs[self.remainders[self.rank] * self.diagonal_blocksize :] = (
-                self.dist_rhs[: -self.arrowhead_blocksize].flatten()
-            )
+            if self.arrowhead_blocksize > 0:
+                self.send_rhs[self.remainders[self.rank] * self.diagonal_blocksize :] = (
+                    self.dist_rhs[: -self.arrowhead_blocksize].flatten()
+                )
+            else:
+                self.send_rhs[self.remainders[self.rank] * self.diagonal_blocksize :] = (
+                    self.dist_rhs.flatten()
+                )
 
         synchronize(comm=self.comm)
         self.comm.Allgather(
@@ -851,6 +875,9 @@ class DistSerinvSolver(Solver):
         )
         synchronize(comm=self.comm)
 
+        # This part needs a major re-work as the multiple RHS are handled one column at a time
+        # but Serinv can handle multiple RHS in one go. The problem is linked to DALIA internal 
+        # representation (2nd dimmension of rhs when only 1 rhs) and the collectives operations.
         if (
             backend_flags["array_module"] == "cupy"
             and not backend_flags["mpi_cuda_aware"]
@@ -860,18 +887,26 @@ class DistSerinvSolver(Solver):
                 start_idx = int(xp.cumsum(n_idx)[i])
                 end_idx = int(xp.cumsum(n_idx)[i + 1])
 
+                # Extract data from pinned host memory
+                host_data = self.recv_rhs[
+                    (i * self.max_n_locals + self.remainders[i])
+                    * self.diagonal_blocksize : (i + 1)
+                    * self.max_n_locals
+                    * self.diagonal_blocksize
+                ]
+                
+                # Since we're processing one column at a time, rhs.shape[1] is always 1
+                # Reshape the 1D host data to 2D (n_rows, 1)
+                n_rows = end_idx * self.diagonal_blocksize - start_idx * self.diagonal_blocksize
+                host_data_2d = host_data[:n_rows].reshape(-1, 1)
+                
+                # Transfer to device and assign
+                # Here we can't use `.set()` because multidimmensional rhs is not contiguous array.
                 rhs[
                     start_idx
                     * self.diagonal_blocksize : end_idx
                     * self.diagonal_blocksize
-                ].set(
-                    arr=self.recv_rhs[
-                        (i * self.max_n_locals + self.remainders[i])
-                        * self.diagonal_blocksize : (i + 1)
-                        * self.max_n_locals
-                        * self.diagonal_blocksize
-                    ]
-                )
+                ] = xp.asarray(host_data_2d)
         else:
             for i in range(self.comm_size):
                 start_idx = int(xp.cumsum(n_idx)[i])
@@ -886,12 +921,12 @@ class DistSerinvSolver(Solver):
                     * self.diagonal_blocksize : (i + 1)
                     * self.max_n_locals
                     * self.diagonal_blocksize
-                ]
+                ].reshape(-1, rhs.shape[1])
         if sparsity == "bta":
             # Map the arrow-tip of self.dist_rhs to the global rhs
             rhs[-self.arrowhead_blocksize :] = self.dist_rhs[
                 -self.arrowhead_blocksize :
-            ].flatten()
+            ]
 
     def get_solver_memory(self) -> int:
         """Return the memory used by the solver in number of bytes"""
