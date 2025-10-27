@@ -167,7 +167,7 @@ fritz_create_conda_env() {
     echo "   Found conda environment file at: ${env_file}"
     
     # Check if environment already exists
-    local env_name="dalia_base"
+    local env_name="dalia_base_fritz"
     if conda env list | grep -q "^${env_name} "; then
         echo "   Warning: Conda environment '${env_name}' already exists."
         echo "   Do you want to remove and recreate it? (y/N): "
@@ -186,7 +186,7 @@ fritz_create_conda_env() {
     # Create conda environment from YAML file (only if it doesn't exist or was removed)
     if ! conda env list | grep -q "^${env_name} "; then
         echo "   Creating conda environment from '${env_file}'..."
-        conda env create -f "$env_file" || {
+        conda env create --name "$env_name" -f "$env_file" || {
             echo "   Error: Failed to create conda environment from '${env_file}'."
             return 1
         }
@@ -324,13 +324,13 @@ fritz_create_conda_env() {
                     else
                         # Interactive mode - ask user
                         echo ""
-                        echo "   Do you want to keep the base environment 'dalia_base' for development without MPI? (y/N): "
+                        echo "   Do you want to keep the base environment 'dalia_base_fritz' for development without MPI? (y/N): "
                         read -r keep_base
                     fi
                     
                     if [[ ! "$keep_base" =~ ^[Yy]$ ]]; then
-                        echo "   Removing base environment 'dalia_base'..."
-                        conda env remove -n "dalia_base" -y || {
+                        echo "   Removing base environment 'dalia_base_fritz'..."
+                        conda env remove -n "dalia_base_fritz" -y || {
                             echo "   Warning: Failed to remove base environment."
                         }
                     else
@@ -349,9 +349,9 @@ fritz_create_conda_env() {
                     }
                     
                     # Reactivate the base environment
-                    if fritz_activate_conda_env --env="dalia_base"; then
-                        echo "   Reverted to base environment 'dalia_base'."
-                        env_name="dalia_base"  # Reset env_name to base environment
+                    if fritz_activate_conda_env --env="dalia_base_fritz"; then
+                        echo "   Reverted to base environment 'dalia_base_fritz'."
+                        env_name="dalia_base_fritz"  # Reset env_name to base environment
                         echo "   You can install mpi4py manually later with: MPICC=\$(which mpicc) pip install --no-cache-dir mpi4py"
                     else
                         echo "   Warning: Failed to reactivate base environment."
@@ -408,7 +408,7 @@ fritz_activate_conda_env() {
                 echo ""
                 echo "Examples:"
                 echo "  fritz_activate_conda_env                        # Auto-select best available"
-                echo "  fritz_activate_conda_env --env=dalia_base  # Activate specific environment"
+                echo "  fritz_activate_conda_env --env=dalia_base_fritz # Activate specific environment"
                 return 0
                 ;;
             *)
@@ -429,7 +429,7 @@ fritz_activate_conda_env() {
     conda deactivate 2>/dev/null || true
 
     # Define available environments in order of preference (most performant first)
-    local env_priorities=("dalia_hmpi_fritz" "dalia_base")
+    local env_priorities=("dalia_hmpi_fritz" "dalia_base_fritz")
     local env_name=""
     
     # If environment name is provided as argument, use it directly
@@ -447,7 +447,7 @@ fritz_activate_conda_env() {
     else
         # Check which environments are available and select the most performant one
         echo "   Checking available DALIA conda environments..."
-        local available_envs=$(conda env list 2>/dev/null | grep -E "^(dalia_hmpi_fritz|dalia_base) " | awk '{print $1}')
+        local available_envs=$(conda env list 2>/dev/null | grep -E "^(dalia_hmpi_fritz|dalia_base_fritz) " | awk '{print $1}')
         
         for preferred_env in "${env_priorities[@]}"; do
             if echo "$available_envs" | grep -q "^${preferred_env}$"; then
