@@ -224,12 +224,12 @@ except Exception as e:
 }
 
 check_mpi_installation() {
-    # Check if MPI is available (mpiexec and mpi4py)
+    # Check if MPI is available (mpiexec/mpirun and mpi4py)
     print_message "Checking MPI installation and functionality..." "INFO"
     
-    # Check for mpiexec command
-    if ! command -v mpiexec >/dev/null 2>&1; then
-        print_message "mpiexec not found - MPI not available" "WARNING"
+    # Check for mpiexec or mpirun command
+    if ! command -v mpiexec >/dev/null 2>&1 && ! command -v mpirun >/dev/null 2>&1; then
+        print_message "mpiexec/mpirun not found - MPI not available" "WARNING"
         return 1
     fi
     
@@ -280,41 +280,41 @@ determine_available_backends() {
     local has_gpu=0
     local has_mpi=0
     
-    print_message "Detecting available backends..." "INFO"
-    echo
+    print_message "Detecting available backends..." "INFO" >&2
+    echo >&2
     
     # NumPy is always available
-    print_message "NumPy backend: Always available" "SUCCESS"
+    print_message "NumPy backend: Always available" "SUCCESS" >&2
     backends="numpy"
     
     # Check for GPU + CuPy
-    if check_gpu_availability; then
-        if check_cupy_installation; then
-            print_message "CuPy backend: Available" "SUCCESS"
+    if check_gpu_availability >&2; then
+        if check_cupy_installation >&2; then
+            print_message "CuPy backend: Available" "SUCCESS" >&2
             backends="$backends cupy"
             has_gpu=1
         else
-            print_message "CuPy backend: Unavailable (CuPy not working)" "WARNING"
+            print_message "CuPy backend: Unavailable (CuPy not working)" "WARNING" >&2
         fi
     else
-        print_message "CuPy backend: Unavailable (No GPU detected)" "WARNING"
+        print_message "CuPy backend: Unavailable (No GPU detected)" "WARNING" >&2
     fi
     
     # Check for MPI
-    if check_mpi_installation; then
-        print_message "MPI backend: Available" "SUCCESS"
+    if check_mpi_installation >&2; then
+        print_message "MPI backend: Available" "SUCCESS" >&2
         backends="$backends mpi"
         has_mpi=1
         
         # Check MPI + GPU combination
         if [ $has_gpu -eq 1 ]; then
-            print_message "MPI + GPU backend: Available" "SUCCESS"
+            print_message "MPI + GPU backend: Available" "SUCCESS" >&2
             backends="$backends mpi-gpu"
         else
-            print_message "MPI + GPU backend: Unavailable (No GPU)" "WARNING"
+            print_message "MPI + GPU backend: Unavailable (No GPU)" "WARNING" >&2
         fi
     else
-        print_message "MPI backend: Unavailable (MPI not working)" "WARNING"
+        print_message "MPI backend: Unavailable (MPI not working)" "WARNING" >&2
     fi
     
     echo "$backends"
@@ -327,6 +327,7 @@ determine_available_backends() {
 choose_tests_to_run() {
     # Display which tests will be run based on available backends
     local backends="$1"
+    local mpi_available=0
     
     echo "Test execution plan:"
     
@@ -338,9 +339,14 @@ choose_tests_to_run() {
         echo "  Test directories: all"
     fi
     
+    # Check if MPI is actually available
+    if echo "$backends" | grep -q "mpi"; then
+        mpi_available=1
+    fi
+    
     # Show backends
     if [ $RUN_CPU -eq 1 ] && echo "$backends" | grep -q "numpy"; then
-        if [ $RUN_MPI -eq 1 ] && echo "$backends" | grep -q "mpi"; then
+        if [ $RUN_MPI -eq 1 ] && [ $mpi_available -eq 1 ]; then
             echo "  - CPU backend (NumPy) - Serial and MPI tests (2 processes)"
         else
             echo "  - CPU backend (NumPy) - Serial tests"
@@ -348,7 +354,7 @@ choose_tests_to_run() {
     fi
     
     if [ $RUN_GPU -eq 1 ] && echo "$backends" | grep -q "cupy"; then
-        if [ $RUN_MPI -eq 1 ] && echo "$backends" | grep -q "mpi-gpu"; then
+        if [ $RUN_MPI -eq 1 ] && [ $mpi_available -eq 1 ]; then
             echo "  - GPU backend (CuPy) - Serial and MPI tests (2 processes)"
         else
             echo "  - GPU backend (CuPy) - Serial tests"
@@ -356,11 +362,13 @@ choose_tests_to_run() {
     fi
     
     if [ $RUN_MPI -eq 1 ] && [ $RUN_CPU -eq 0 ] && [ $RUN_GPU -eq 0 ]; then
-        if echo "$backends" | grep -q "mpi"; then
+        if [ $mpi_available -eq 1 ]; then
             echo "  - CPU backend (NumPy) - MPI tests only (2 processes)"
-        fi
-        if echo "$backends" | grep -q "mpi-gpu"; then
-            echo "  - GPU backend (CuPy) - MPI tests only (2 processes)"
+            if echo "$backends" | grep -q "cupy"; then
+                echo "  - GPU backend (CuPy) - MPI tests only (2 processes)"
+            fi
+        else
+            echo "  - MPI tests requested but MPI is not available"
         fi
     fi
 }
@@ -437,13 +445,24 @@ run_mpi_numpy_tests() {
     
     set_env_var "ARRAY_MODULE" "numpy"
     
+    # Determine which MPI launcher to use
+    local mpi_launcher=""
+    if command -v mpiexec >/dev/null 2>&1; then
+        mpi_launcher="mpiexec"
+    elif command -v mpirun >/dev/null 2>&1; then
+        mpi_launcher="mpirun"
+    else
+        print_message "Neither mpiexec nor mpirun found - cannot run MPI tests" "ERROR"
+        return 1
+    fi
+    
     # Run with 2 processes
-    echo "Running MPI tests with 2 processes..."
-    if command -v mpiexec >/dev/null 2>&1 && command -v pytest >/dev/null 2>&1; then
+    echo "Running MPI tests with 2 processes using $mpi_launcher..."
+    if command -v pytest >/dev/null 2>&1; then
         if [ -n "$test_dirs" ]; then
-            mpiexec -n 2 pytest --with-mpi $test_dirs -v
+            $mpi_launcher -n 2 pytest --with-mpi $test_dirs -v
         else
-            mpiexec -n 2 pytest --with-mpi . -v
+            $mpi_launcher -n 2 pytest --with-mpi . -v
         fi
         if [ $? -ne 0 ]; then
             print_message "MPI tests with 2 processes failed" "ERROR"
@@ -453,7 +472,7 @@ run_mpi_numpy_tests() {
             return 0
         fi
     else
-        print_message "mpiexec or pytest not found - cannot run MPI tests" "ERROR"
+        print_message "pytest not found - cannot run MPI tests" "ERROR"
         return 1
     fi
 }
@@ -467,13 +486,24 @@ run_mpi_cupy_tests() {
     
     set_env_var "ARRAY_MODULE" "cupy"
     
+    # Determine which MPI launcher to use
+    local mpi_launcher=""
+    if command -v mpiexec >/dev/null 2>&1; then
+        mpi_launcher="mpiexec"
+    elif command -v mpirun >/dev/null 2>&1; then
+        mpi_launcher="mpirun"
+    else
+        print_message "Neither mpiexec nor mpirun found - cannot run MPI tests" "ERROR"
+        return 1
+    fi
+    
     # Run with 2 processes
-    echo "Running MPI + GPU tests with 2 processes..."
-    if command -v mpiexec >/dev/null 2>&1 && command -v pytest >/dev/null 2>&1; then
+    echo "Running MPI + GPU tests with 2 processes using $mpi_launcher..."
+    if command -v pytest >/dev/null 2>&1; then
         if [ -n "$test_dirs" ]; then
-            mpiexec -n 2 pytest --with-mpi $test_dirs -v
+            $mpi_launcher -n 2 pytest --with-mpi $test_dirs -v
         else
-            mpiexec -n 2 pytest --with-mpi . -v
+            $mpi_launcher -n 2 pytest --with-mpi . -v
         fi
         if [ $? -ne 0 ]; then
             print_message "MPI + GPU tests with 2 processes failed" "ERROR"
@@ -483,7 +513,7 @@ run_mpi_cupy_tests() {
             return 0
         fi
     else
-        print_message "mpiexec or pytest not found - cannot run MPI tests" "ERROR"
+        print_message "pytest not found - cannot run MPI tests" "ERROR"
         return 1
     fi
 }
@@ -557,24 +587,26 @@ main() {
     fi
     
     # Run MPI tests if requested and available
-    if [ $RUN_MPI -eq 1 ] && echo "$available_backends" | grep -q "mpi"; then
-        echo "===== MPI TESTS ====="
-        
-        # Run MPI + NumPy tests (always run MPI tests on CPU if MPI is available)
-        if ! run_mpi_numpy_tests "$test_dirs"; then
-            overall_success=1
-        fi
-        echo
-        
-        # Run MPI + CuPy tests if GPU is also available and requested
-        if [ $RUN_GPU -eq 1 ] && echo "$available_backends" | grep -q "mpi-gpu"; then
-            if ! run_mpi_cupy_tests "$test_dirs"; then
+    if [ $RUN_MPI -eq 1 ]; then
+        if echo "$available_backends" | grep -q "mpi"; then
+            echo "===== MPI TESTS ====="
+            
+            # Run MPI + NumPy tests (always run MPI tests on CPU if MPI is available)
+            if ! run_mpi_numpy_tests "$test_dirs"; then
                 overall_success=1
             fi
             echo
+            
+            # Run MPI + CuPy tests if GPU is also available and requested
+            if [ $RUN_GPU -eq 1 ] && echo "$available_backends" | grep -q "mpi-gpu"; then
+                if ! run_mpi_cupy_tests "$test_dirs"; then
+                    overall_success=1
+                fi
+                echo
+            fi
+        else
+            print_message "MPI backend requested but not available - skipping MPI tests" "WARNING"
         fi
-    elif [ $RUN_MPI -eq 1 ]; then
-        print_message "MPI backend requested but not available" "WARNING"
     fi
     
     # Final summary
