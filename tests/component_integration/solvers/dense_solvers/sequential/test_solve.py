@@ -15,6 +15,7 @@ def test_solve_correctness(
     matrix_type,
     num_rhs,
 ):
+    """Test correctness of the solve step of the solver."""
     # Generate test case
     A = generate_spd_spmatrix(matrix_type, matrix_size)
 

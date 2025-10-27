@@ -13,6 +13,7 @@ def test_logdet_correctness(
     matrix_size,
     matrix_type,
 ):
+    """Test correctness of the log-determinant computation of the solver."""
     # Generate test case
     A = generate_spd_spmatrix(matrix_type, matrix_size)
 

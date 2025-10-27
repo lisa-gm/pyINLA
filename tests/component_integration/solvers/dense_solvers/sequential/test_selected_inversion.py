@@ -17,6 +17,7 @@ def test_selected_inversion_correctness(
     matrix_size,
     matrix_type,
 ):
+    """Test correctness of the selected inversion step of the solver."""
     # Generate test case
     A = generate_spd_spmatrix(matrix_type, matrix_size)
 

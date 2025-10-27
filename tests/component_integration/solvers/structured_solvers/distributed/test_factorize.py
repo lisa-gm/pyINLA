@@ -40,7 +40,7 @@ def test_factorize_correctness(
     # Warn that this test only checks callability, not numerical correctness
     warnings.warn(
         f"Test passed but only verified `structured_solvers.distributed.{solver_type}.factorize()` is callable. "
-        "Canno't verify against reference Cholesky as distributed Cholesky factorization is not equal to sequential one."
+        "Cannot verify against reference Cholesky as distributed Cholesky factorization is not equal to sequential one."
         "Correctness is still tested through `solve()`, `logdet()`, and `selected_inversion()` tests.",
         UserWarning,
         stacklevel=2,

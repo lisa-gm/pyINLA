@@ -12,6 +12,6 @@ The tests can either be run directly using `pytest` or through the provided `run
 | Reference | Status | Reason |
 | --------- | ------ | ------ |
 | `component_integration/solvers/sparse_solvers/sequential/test_selected_inversion()` | Not Implemented | Not Implemented                                                 |
-| `component_integration/solvers/sparse_solvers/sequential/test_factorize()` | Limited (canno't check for numerical corectness) | LU decomposition instead of Cholesky due to `scipy` limitations |
-| `component_integration/solvers/structured_solvers/distributed/test_factorize()` | Limited (canno't check for numerical corectness) | Distributed factorization is not numerically equal to sequential reference |
+| `component_integration/solvers/sparse_solvers/sequential/test_factorize()` | Limited (cannot check for numerical correctness) | LU decomposition instead of Cholesky due to `scipy` limitations |
+| `component_integration/solvers/structured_solvers/distributed/test_factorize()` | Limited (cannot check for numerical correctness) | Distributed factorization is not numerically equal to sequential reference |
 

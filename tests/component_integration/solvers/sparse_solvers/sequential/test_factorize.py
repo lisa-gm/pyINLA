@@ -23,7 +23,7 @@ def test_factorize_correctness(
     # Warn that this test only checks callability, not numerical correctness
     warnings.warn(
         f"Test passed but only verified sparse_solver.{solver_type}.factorize() is callable. "
-        "Canno't verify against reference Cholesky as current sparse solver is using LU decomposition. "
+        "Cannot verify against reference Cholesky as current sparse solver is using LU decomposition. "
         "Correctness is still tested through `solve()` and `logdet()` tests.",
         UserWarning,
         stacklevel=2,
