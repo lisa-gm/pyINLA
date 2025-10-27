@@ -15,12 +15,15 @@ def test_spmatrix_mapping(
     diagonal_blocksize,
     n_diag_blocks_per_process,
     arrowhead_blocksize,
+    non_uniform_partition,
 ):
     """Test the mapping functions from structured to spmatrix and back."""
     import mpi4py.MPI as MPI
 
     # Generate test matrix based on sparsity pattern
-    n_diag_blocks = n_diag_blocks_per_process * MPI.COMM_WORLD.Get_size()
+    n_diag_blocks = n_diag_blocks_per_process * MPI.COMM_WORLD.Get_size() + (
+        1 if non_uniform_partition else 0
+    )
 
     if arrowhead_blocksize > 0:  # bta
         A_initial = create_pobta(diagonal_blocksize, arrowhead_blocksize, n_diag_blocks)
