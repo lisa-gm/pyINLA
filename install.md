@@ -23,9 +23,9 @@ DALIA is supposed to work across a wide variety of hardware and software stacks 
 
 |              | No Comm              | Host MPI           | GPU-Aware MPI      | xCCL               |
 | :----------- | :------------------- | :----------------- | :----------------- | :----------------- |
-| CPU (x86)    | ==dalia_base== | *dalia_hmpi_fritz* | NA                 | NA                 |
-| GPU (NVIDIA) | ==dalia_base==  | *dalia_hmpi_alex*  | *dalia_ampi_alex*  | *dalia_xccl_alex*  |
-| GPU (NVIDIA) | ==dalia_base== | *dalia_hmpi_daint* | *dalia_ampi_daint* | *dalia_xccl_daint* |
+| CPU (x86)    | *dalia_base_fritz* | *dalia_hmpi_fritz* | NA                 | NA                 |
+| GPU (NVIDIA) | *dalia_base_alex*  | NA  | *dalia_ampi_alex*  | *dalia_xccl_alex*  |
+| GPU (NVIDIA) | *dalia_base_daint* | NA | *dalia_ampi_daint* | *dalia_xccl_daint* |
 | CPU (ARM)    | x                    | x                  | x                  | x                  |
 | GPU (AMD)    | x                    | x                  | x                  | x                  |
 
@@ -64,7 +64,33 @@ The `dalia_base` environment contains all the necessary dependencies to run DALI
 
 
 ## On Alex@FAU
-... todo
+1. Clone the repositories to your workspace:    
+    ```
+    mv /my/install/path
+    git clone https://github.com/dalia-project/DALIA
+    git clone https://github.com/vincent-maillou/serinv # Optional, recommended for ST-modeling
+    ```
+2. Source the `alex_fau_utils.sh` script to access the install utilities:
+    ```
+    cd DALIA/
+    source scripts/alex_fau_utils.sh
+    ```
+3. Load the required environments modules:
+    ```
+    alex_load_modules
+    ```
+4. Create the conda environment:
+    ```
+    alex_create_conda_env --dalia-path=path/to/DALIA --serinv-path=path/to/serinv --install-mpi4py --install-nccl --dev-mode
+    ```
+    Notes:
+    - Here a complete installation, with all optional dependencies and developper mode, is provided. You can also run the installer in interactive mode by simply running `alex_create_conda_env`.    
+    - The created environment will be activated automatically at the end of the installation.
+5. Activate the conda environment:
+    ```
+    alex_activate_conda_env
+    ```
+    Note: This function will try to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env` argument to the function.
 
 ## On Daint@CSCS
 ... todo
