@@ -1,24 +1,28 @@
-#!/bin/bash
-
-#SBATCH --job-name=dalia
+#!/bin/bash -l
+#SBATCH --job-name=dalia_alex
+#SBATCH --output=%x.%j.out
+#SBATCH --error=%x.%j.err
+#SBATCH --time=00:04:00
 #SBATCH --nodes=1
-#SBATCH --time=01:00:00
-#SBATCH --gres=gpu:a100:2
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:a100:1
 #SBATCH --partition=a100
-#SBATCH --constraint=a100_80
-# ##SBATCH --qos=a100multi
-# ##SBATCH --exclusive
-#SBATCH --error=%x.err          #The .error file name
-#SBATCH --output=%x.out         #The .output file name
+###SBATCH --constraint=a100_80
+###SBATCH --qos=a100multi
+###SBATCH --exclusive
+#SBATCH --export=NONE
 
-# --- Set Backend ---
-# The backend can be set to either 'cupy' or 'numpy'.
-export ARRAY_MODULE=cupy
+# Set DALIA environment variables for examples  
+source ../scripts/alex_fau_utils.sh && alex_load_modules && alex_activate_conda_env && alex_set_perfenv
+source ../scripts/dalia_job_utils.sh && dalia_set_perfenv && dalia_print_job_config
 
-export MPI_CUDA_AWARE=0
-export USE_NCCL=0
-
-TIMESTAMP=$(date +"%H-%M-%S")
+# Change to examples directory
+if [[ "$(basename "$(pwd)")" != "examples" ]]; then
+    echo "Error: Not in examples directory"
+    echo "   Current directory: $(pwd)"
+    echo "   Please run this script from the examples/ directory"
+    exit 1
+fi
 
 # --- How to Run ---
 # This run script is designed to run on Alex at NHR@FAU
@@ -31,27 +35,34 @@ TIMESTAMP=$(date +"%H-%M-%S")
 #                    solver. The default is 1. The maximum number of processes is
 # `--max_iter` : The maximum number of iterations of the minimization.
 
-base_dir=.
-
 # --- Run Regression Example ---
-# srun python ${base_dir}/gr/run.py --max_iter 100
+# echo "Regression Example..."
+# srun python ./gr/run.py --max_iter 100
 
 # --- Run Spatial Examples ---
-# srun python ${base_dir}/gs_small/run.py --max_iter 100
+# echo "Spatial Example (small)..."
+# srun python ./gs_small/run.py --max_iter 100
 
 # --- Run Spatio-temporal Examples ---
-srun python ${base_dir}/gst_small/run.py --solver_min_p 1 --max_iter 100
-# srun python ${base_dir}/gst_medium/run.py --solver_min_p 1 --max_iter 100
-# srun python ${base_dir}/gst_large/run.py --solver_min_p 1 --max_iter 100
+# echo "Spatio-temporal Example (small)..."
+# srun python ./gst_small/run.py --solver_min_p 1 --max_iter 100
+
+echo "Spatio-temporal Example (medium)..."
+srun python ./gst_medium/run.py --solver_min_p 1 --max_iter 100
+
+# echo "Spatio-temporal Example (large)..."
+# srun python ./gst_large/run.py --solver_min_p 1 --max_iter 100
 
 # --- Run Coregional (Spatial) Examples ---
-# srun python ${base_dir}/gs_coreg2_small/run.py --max_iter 100
-# srun python ${base_dir}/gs_coreg3_small/run.py --max_iter 100
+# echo "Coregional Spatial Example (2 models)..."
+# srun python ./gs_coreg2_small/run.py --max_iter 100
+
+# echo "Coregional Spatial Example (3 models)..."
+# srun python ./gs_coreg3_small/run.py --max_iter 100
 
 # --- Run Coregional (Spatio-temporal) Examples ---
-# srun python ${base_dir}/gst_coreg2_small/run.py --solver_min_p 1 --max_iter 100
-# srun python ${base_dir}/gst_coreg3_small/run.py --solver_min_p 1 --max_iter 100
+# echo "Coregional Spatio-temporal Example (2 models)..."
+# srun python ./gst_coreg2_small/run.py --solver_min_p 1 --max_iter 100
 
-# --- Run Poisson Examples ---
-# srun python ${base_dir}/pr/run.py --max_iter 100
-# srun python ${base_dir}/pst_small/run.py --max_iter 100
+# echo "Coregional Spatio-temporal Example (3 models)..."
+# srun python ./gst_coreg3_small/run.py --solver_min_p 1 --max_iter 100

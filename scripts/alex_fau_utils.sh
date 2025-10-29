@@ -16,8 +16,8 @@ alex_load_modules() {
     }
 
     # Load required modules
-    echo "   Loading required modules: mkl/2023.2.0 gcc/12.1.0 openmpi/4.1.6-nvhpc23.7-cuda12 cuda/12.9.0 python"
-    module load mkl/2023.2.0 gcc/12.1.0 openmpi/4.1.6-nvhpc23.7-cuda12 cuda/12.9.0 python || {
+    echo "   Loading required modules: mkl/2023.2.0 gcc/12.1.0 cuda/12.9.0 openmpi/4.1.3-nvhpc22.5-cuda  python"
+    module load mkl/2023.2.0 gcc/12.1.0 openmpi/4.1.3-nvhpc22.5-cuda cuda/12.9.0 python || {
         echo "   Error: Failed to load required modules."
         echo "   Available modules:"
         module avail 2>&1 | head -20
@@ -32,7 +32,7 @@ alex_load_modules() {
 alex_check_modules() {
     echo "alex_check_modules: checking if required modules are loaded."
     
-    local required_modules=("mkl/2023.2.0" "gcc/12.1.0" "openmpi/4.1.6-nvhpc23.7-cuda12" "cuda/12.9.0" "python")
+    local required_modules=("mkl/2023.2.0" "gcc/12.1.0" "cuda/12.9.0" "openmpi/4.1.3-nvhpc22.5-cuda" "python")
     local missing_modules=()
     
     # Get list of currently loaded modules
@@ -78,7 +78,7 @@ alex_create_conda_env_help() {
     echo "  # Install base with GPU support only"
     echo "  alex_create_conda_env --dalia-path=/path/to/dalia"
     echo ""
-    echo "Note: GPU support via cupy-core is installed by default for Alex cluster."
+    echo "Note: GPU support via cupy is installed by default for Alex cluster."
     echo "      If parameters are not provided, the function will prompt interactively."
 }
 
@@ -270,19 +270,19 @@ alex_create_conda_env() {
         echo "   Skipping serinv installation."
     fi
     
-    # 8. Install cupy-core with GPU support (default for Alex cluster)
+    # 8. Install cupy with GPU support (default for Alex cluster)
     echo ""
-    echo "   Installing cupy-core with GPU support using SLURM job (default for Alex cluster)..."
+    echo "   Installing cupy with GPU support using SLURM job (default for Alex cluster)..."
     
     # Install cupy using SLURM job on GPU partition
-    echo "   Submitting SLURM job to install cupy-core on GPU partition..."
+    echo "   Submitting SLURM job to install cupy on GPU partition..."
     local job_script=$(mktemp)
     cat > "$job_script" <<'SLURM_EOF'
 #!/bin/bash -l
 export http_proxy=http://proxy.nhr.fau.de:80
 export https_proxy=http://proxy.nhr.fau.de:80
 conda activate ENV_NAME_PLACEHOLDER
-conda install -y -c conda-forge cupy-core
+conda install -y -c conda-forge cupy
 SLURM_EOF
     
     # Replace the environment name placeholder
@@ -297,7 +297,7 @@ SLURM_EOF
     
     if [[ -n "$job_id" ]]; then
         echo "   SLURM job submitted successfully with ID: ${job_id}"
-        echo "   Waiting for cupy-core installation to complete..."
+        echo "   Waiting for cupy installation to complete..."
         
         # Wait for job completion
         local job_status=""
@@ -340,12 +340,12 @@ SLURM_EOF
             rm -f "cupy_install_${env_name}.o${job_id}" "cupy_install_${env_name}.e${job_id}" 2>/dev/null || true
         elif [[ "$job_status" == "COMPLETED" || -z "$job_status" ]]; then
             # Verify cupy installation by checking if cupy-core package is installed
-            echo "   Verifying cupy-core installation..."
+            echo "   Verifying cupy installation..."
             if alex_activate_conda_env --env="$env_name"; then
                 if conda list cupy-core | grep -q cupy-core && python -c "import cupy; print(f'CuPy version: {cupy.__version__}')" 2>/dev/null; then
                     echo "   Successfully installed and verified cupy-core in base environment."
                 else
-                    echo "   Warning: cupy-core installation may have failed. Could not import cupy or detect CUDA devices."
+                    echo "   Warning: cupy installation may have failed. Could not import cupy or detect CUDA devices."
                     echo "   You can test the installation manually with: python -c 'import cupy; print(cupy.__version__)'"
                 fi
             else
@@ -358,15 +358,15 @@ SLURM_EOF
         else
             echo "   Error: CuPy installation job failed. Please check SLURM logs."
             echo "   Continuing with base environment without GPU support..."
-            echo "   You can install cupy-core manually later by submitting a GPU job."
+            echo "   You can install cupy manually later by submitting a GPU job."
             # Clean up SLURM job output files after failure
             echo "   Cleaning up SLURM job files..."
             rm -f "cupy_install_${env_name}.o${job_id}" "cupy_install_${env_name}.e${job_id}" 2>/dev/null || true
         fi
     else
-        echo "   Error: Failed to submit SLURM job for cupy-core installation."
+        echo "   Error: Failed to submit SLURM job for cupy installation."
         echo "   Continuing with base environment without GPU support..."
-        echo "   You can install cupy-core manually later by submitting a GPU job."
+        echo "   You can install cupy manually later by submitting a GPU job."
     fi
     
     # 9. Optional: Install mpi4py and create enhanced environment
@@ -605,7 +605,7 @@ SLURM_EOF
     if [[ "$install_serinv" =~ ^[Yy]$ ]] && [[ -d "$serinv_path" ]]; then
         echo "   Serinv path: ${serinv_path}"
     fi
-    echo "   Base environment includes GPU support via cupy-core (default for Alex cluster)."
+    echo "   Base environment includes GPU support via cupy (default for Alex cluster)."
     if [[ "$install_mpi4py" =~ ^[Yy]$ ]]; then
         if [[ "$env_name" == *"ampi"* || "$env_name" == *"xccl"* ]]; then
             echo "   Enhanced environment with mpi4py support created."
@@ -722,4 +722,13 @@ alex_activate_conda_env() {
     fi
     
     return 0
+}
+
+alex_set_perfenv() {
+    echo "alex_set_perfenv: setting performance environment variables for Alex."
+
+    unset SLURM_EXPORT_ENV
+
+    export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+    export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 }
