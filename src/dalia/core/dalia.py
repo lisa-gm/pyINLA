@@ -965,7 +965,7 @@ class DALIA:
             factor=1 / self.comm_feval.size,
         )
         synchronize(comm=self.comm_feval)
-
+        
         # compute hessian
         for k in range(loop_dim):
             i = k // dim_theta
@@ -988,8 +988,47 @@ class DALIA:
 
         if xp.any(eigvals < 0):
             print_msg(f"Negative eigenvalues detected: {eigvals}")
+            
+        ## check if one of the values around the mode is actually smaller than f(theta_star)
+        min_theta, reevaluate = check_fij_hessian(f_ii_loc, f_ij_loc)
 
         return hess
+    
+    
+    def check_fij_hessian(self, f_ii_loc: NDArray, f_ij_loc: NDArray) -> tuple:
+        """Check if any of the function evaluations used to compute the hessian is smaller than f(theta_star).
+
+        Parameters
+        ----------
+        f_ii_loc : NDArray
+            Function evaluations for diagonal elements.
+        f_ij_loc : NDArray
+            Function evaluations for off-diagonal elements.
+
+        Returns
+        -------
+        min_theta : float
+            Minimum function evaluation found.
+        reevaluate : bool
+            Whether a re-evaluation is needed.
+        """
+        # remove f_ii_loc[1, :] as it contains f(theta_star)
+        f_ii_loc_sub = xp.delete(f_ii_loc, 1, axis=0)
+        
+        # sort and find minimum
+        f_values = xp.sort(xp.concatenate((f_ii_loc_sub.flatten(), f_ij_loc.flatten())))
+        min_f = xp.min(f_values)
+
+        reevaluate = False
+        if min_f < f_ii_loc[1, 0]:  # f(theta_star) is stored at f_ii_loc[1, 0]
+            reevaluate = True
+            # count how many values are smaller
+            n_smaller = xp.sum(f_values < f_ii_loc[1, 0])
+            print_msg(
+                f"Function evaluation smaller than at the mode detected: {min_f} < {f_ii_loc[1, 0]}. There are {n_smaller} such values. Re-evaluating the mode.",
+            )
+            
+        return min_f, reevaluate
 
     def marginal_distributions_hp(self, 
                                   #quantiles: NDArray = xp.array([0.0001, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.9999])
