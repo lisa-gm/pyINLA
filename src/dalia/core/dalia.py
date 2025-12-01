@@ -305,18 +305,18 @@ class DALIA:
 
         theta_star = get_device(minimization_result["theta"])
         x_star = get_device(minimization_result["x"])
-        print("Finished the optimization procedure.")
+        print_msg("Finished the optimization procedure.")
 
         # compute covariance of the hyperparameters theta at the mode
-        print("theta_star: ", theta_star)
+        print_msg("theta_star: ", theta_star)
         cov_theta = self.compute_covariance_hp(theta_star)
-        print("Computed covariance of the hyperparameters at the mode.")
+        print_msg("Computed covariance of the hyperparameters at the mode.")
 
         # compute marginal variances of the latent parameters
         marginal_variances_latent = self.get_marginal_variances_latent_parameters(
             theta_star, x_star
         )
-        print("Computed marginal variances of the latent parameters.")
+        print_msg("Computed marginal variances of the latent parameters.")
 
         # compute marginal variances of the observations
         # TODO: only run by default when dense multiplcation issue is fixed, see issue #78
@@ -724,7 +724,7 @@ class DALIA:
                     comm=self.comm_feval,
                 )
                 synchronize(comm=self.comm_qeval)
-            
+
         else:
             self.model.construct_Q_prior()
 
@@ -823,7 +823,7 @@ class DALIA:
         """
 
         ## TODO: this is the quick fix ...
-        #theta_internal = theta_i.copy()
+        # theta_internal = theta_i.copy()
         theta = theta_i.copy()
         # self.model.theta[:] = theta_i
         dim_theta = self.model.n_hyperparameters
@@ -870,8 +870,8 @@ class DALIA:
             if i == j:
                 if self.color_feval == task_mapping[counter]:
                     # theta+eps_i
-                    #theta_i = theta_internal.copy()
-                    #f_ii_loc[0, i] = self._evaluate_f(theta_i + eps_mat[i, :])
+                    # theta_i = theta_internal.copy()
+                    # f_ii_loc[0, i] = self._evaluate_f(theta_i + eps_mat[i, :])
                     theta_i = theta + eps_mat[i, :]
                     f_ii_loc[0, i] = self._evaluate_f(self.model.rescale_hyperparameters_to_internal(theta_i, direction="forward"))
                 counter += 1
@@ -994,8 +994,8 @@ class DALIA:
     def get_marginal_variances_latent_parameters(
         self, theta_interpret: NDArray = None, x_star: NDArray = None
     ) -> NDArray:
-        
-        ## assume theta to be in "external" scale 
+
+        ## assume theta to be in "external" scale
         theta = self.model.rescale_hyperparameters_to_internal(theta_interpret, direction="forward") if theta_interpret is not None else None
 
         # TODO: this should be only called by rank 0?

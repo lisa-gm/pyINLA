@@ -26,7 +26,7 @@ class SparseSolver(Solver):
         if (LU.U.diagonal() > 0).all():  # Check the matrix A is positive definite.
             self.L = LU.L.dot(sp.sparse.diags(LU.U.diagonal() ** 0.5))
         else:
-            print("min(diag(L)): ", xp.min(LU.U.diagonal()))
+            # print("min(diag(L)): ", xp.min(LU.U.diagonal()))
             raise ValueError("The matrix is not positive definite")
 
     def solve(
@@ -39,8 +39,10 @@ class SparseSolver(Solver):
         if self.L is None:
             raise ValueError("Cholesky factor not computed")
 
-        sp.sparse.linalg.spsolve_triangular(self.L, rhs, lower=True, overwrite_b=True)
-        sp.sparse.linalg.spsolve_triangular(
+        rhs[:] = sp.sparse.linalg.spsolve_triangular(
+            self.L, rhs, lower=True, overwrite_b=True
+        )
+        rhs[:] = sp.sparse.linalg.spsolve_triangular(
             self.L.T, rhs, lower=False, overwrite_b=True
         )
 
@@ -57,7 +59,7 @@ class SparseSolver(Solver):
 
         return 2 * xp.sum(xp.log(self.L.diagonal()))
 
-    def selected_inversion(self, **kwargs) -> None:
+    def selected_inversion(self, **kwargs) -> NDArray:
         # convert to dense
         L_dense = self.L.toarray()
         L_inv = xp.eye(self.L.shape[0])
@@ -69,7 +71,9 @@ class SparseSolver(Solver):
 
         return self.A_inv
 
-    def _structured_to_spmatrix(self, A: sp.sparse.spmatrix, **kwargs) -> None:
+    def _structured_to_spmatrix(
+        self, A: sp.sparse.spmatrix, **kwargs
+    ) -> sp.sparse.spmatrix:
         B = A.tocoo()
         B.data = self.A_inv[B.row, B.col]
 
