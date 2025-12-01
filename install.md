@@ -55,6 +55,7 @@ The `dalia_base` environment contains all the necessary dependencies to run DALI
     ```
     Notes:
     - Here a complete installation, with all optional dependencies and developper mode, is provided. You can also run the installer in interactive mode by simply running `fritz_create_conda_env`.    
+    - The developer mode `--dev-mode` will not only keep the most performant conda environment available, but also all the conda environments created along the way. This ensure that during developement DALIA can be tested against all possible configurations.
     - The created environment will be activated automatically at the end of the installation.
 5. Activate the conda environment:
     ```
@@ -84,7 +85,8 @@ The `dalia_base` environment contains all the necessary dependencies to run DALI
     alex_create_conda_env --dalia-path=path/to/DALIA --serinv-path=path/to/serinv --install-mpi4py --install-nccl --dev-mode
     ```
     Notes:
-    - Here a complete installation, with all optional dependencies and developper mode, is provided. You can also run the installer in interactive mode by simply running `alex_create_conda_env`.    
+    - Here a complete installation, with all optional dependencies and developper mode, is provided. You can also run the installer in interactive mode by simply running `alex_create_conda_env`.
+    - The developer mode `--dev-mode` will not only keep the most performant conda environment available, but also all the conda environments created along the way. This ensure that during developement DALIA can be tested against all possible configurations.
     - The created environment will be activated automatically at the end of the installation.
 5. Activate the conda environment:
     ```
@@ -93,4 +95,13 @@ The `dalia_base` environment contains all the necessary dependencies to run DALI
     Note: This function will try to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env` argument to the function.
 
 ## On Daint@CSCS
-... todo
+
+... work in progress
+
+
+# Known Installation Issues
+
+The `sqlite` module might not work properly, in this case forcing the following version of `sqlite` might help:
+```bash
+conda install conda-forge::sqlite=3.45.3
+```
