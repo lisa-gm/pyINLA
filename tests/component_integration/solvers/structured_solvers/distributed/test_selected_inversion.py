@@ -16,7 +16,7 @@ def test_selected_inversion_correctness(
     arrowhead_blocksize,
     non_uniform_partition,
 ):
-    """Test Distributed Selected Inversion correctness against NumPy reference."""
+    """Test Distributed Selected Inversion correctness against NumPy/CuPy dense reference."""
     import mpi4py.MPI as MPI
 
     # Generate test matrix based on sparsity pattern

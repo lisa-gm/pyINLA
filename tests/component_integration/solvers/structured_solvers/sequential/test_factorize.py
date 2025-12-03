@@ -15,7 +15,7 @@ def test_factorize_correctness(
     n_diag_blocks,
     arrowhead_blocksize,
 ):
-    """Test Cholesky decomposition correctness against NumPy reference."""
+    """Test Cholesky decomposition correctness against NumPy/CuPy dense reference."""
     # Generate test matrix based on sparsity pattern
     if arrowhead_blocksize > 0:  # bta
         A = create_pobta(diagonal_blocksize, arrowhead_blocksize, n_diag_blocks)

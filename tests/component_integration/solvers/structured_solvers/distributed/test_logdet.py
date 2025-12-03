@@ -16,7 +16,7 @@ def test_logdet_correctness(
     arrowhead_blocksize,
     non_uniform_partition,
 ):
-    """Test logdet correctness against NumPy reference."""
+    """Test logdet correctness against NumPy/CuPy reference."""
     import mpi4py.MPI as MPI
 
     # Generate test matrix based on sparsity pattern

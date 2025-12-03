@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from dalia import backend_flags, xp
+from dalia import backend_flags, xp, sp
 from tests import ATOLS, RANDOM_SEED, RTOLS
 
 np.random.seed(RANDOM_SEED)
@@ -57,7 +57,7 @@ def _create_rhs(n_rhs: int, matrix_size: int):
 
 
 def _reference_cholesky(A):
-    """Compute reference Cholesky decomposition using NumPy.
+    """Compute reference Cholesky decomposition using NumPy/CuPy.
 
     Parameters
     ----------
@@ -66,15 +66,20 @@ def _reference_cholesky(A):
 
     Returns
     -------
-    L : numpy.ndarray
+    L : ndarray
         Lower triangular Cholesky factor.
     """
     return xp.linalg.cholesky(_to_ndarray(A))
 
 
 def _reference_solve(A, rhs):
-    """Solve linear system using NumPy.
+    """Solve linear system using NumPy/CuPy.
 
+    The reference solution is computed using:
+        1. Cholesky decomposition A = L L^T
+        2. Solve for y: L y = rhs
+        3. Solve for x: L^T x = y
+    
     Parameters
     ----------
     A : ArrayLike
@@ -84,14 +89,21 @@ def _reference_solve(A, rhs):
 
     Returns
     -------
-    x : numpy.ndarray
+    x : ndarray
         Solution vector.
     """
-    return xp.linalg.solve(_to_ndarray(A), _to_ndarray(rhs))
+    L = xp.linalg.cholesky(_to_ndarray(A))
+    y = sp.linalg.solve_triangular(L, _to_ndarray(rhs), lower=True)
+    x = sp.linalg.solve_triangular(L, y, trans="T", lower=True)
+    return x
 
 
 def _reference_logdet(A):
-    """Compute log determinant using NumPy Cholesky.
+    """Compute log determinant using NumPy/CuPy Cholesky.
+
+    The log determinant is computed using:
+        1. Cholesky decomposition A = L L^T
+        2. logdet(A) = 2 * sum(log(diag(L)))
 
     Parameters
     ----------
@@ -108,7 +120,12 @@ def _reference_logdet(A):
 
 
 def _reference_inversion(A):
-    """Compute matrix inverse using NumPy.
+    """Compute matrix inverse using NumPy/CuPy.
+
+    The reference inverse is computed using:
+        1. Cholesky decomposition A = L L^T
+        2. Solve for L_inv: L L_inv = I
+        3. Compute A_inv = L_inv^T L_inv
 
     Parameters
     ----------
@@ -117,10 +134,15 @@ def _reference_inversion(A):
 
     Returns
     -------
-    A_inv : numpy.ndarray
+    A_inv : ndarray
         Inverse matrix.
     """
-    return xp.linalg.inv(_to_ndarray(A))
+    L = xp.linalg.cholesky(_to_ndarray(A))
+    L_inv = sp.linalg.solve_triangular(
+        L, xp.eye(L.shape[0]), lower=True, overwrite_b=False
+    )
+    A_inv = L_inv.T @ L_inv
+    return A_inv
 
 
 def _allclose_ndarrays(
@@ -132,9 +154,9 @@ def _allclose_ndarrays(
 
     Parameters
     ----------
-    A_reference : numpy.ndarray
+    A_reference : ndarray
         Reference vector.
-    B_toverify : numpy.ndarray
+    B_toverify : ndarray
         Vector to verify.
     relaxed_tolerance : bool, optional
         Whether to use relaxed tolerance for comparison, by default False.

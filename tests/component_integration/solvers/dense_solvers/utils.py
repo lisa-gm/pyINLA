@@ -48,12 +48,11 @@ def _generate_spd_spmatrix(
     """
 
     if matrix_type == "sparse":
-        L = sp.sparse.random(n, n, density=0.5, data_rvs=xp.random.randn)
-        L = L + n * sp.sparse.eye(n)  # Make diagonal dominant
-        L = sp.sparse.tril(L)  # lower triangular
-
+        L = sp.sparse.random(n, n, density=0.5)
+        L = L + sp.sparse.eye(n, format="csr") # Make diagonal entries positive
+        L = sp.sparse.tril(L, format="csr")  # lower triangular
         return L @ L.T  # SPD and sparse (but denser than L)
     else:
         L = xp.tril(xp.random.rand(n, n))
-        L += xp.diag(xp.sum(xp.abs(L), axis=1))
+        L = L + xp.eye(n)  # Make diagonal entries positive
         return L @ L.T  # SPD and dense
