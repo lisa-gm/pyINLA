@@ -262,9 +262,9 @@ class SerinvSolver(Solver):
             A_csc = sp.sparse.csc_matrix(A)
             for i in range(self.n_diag_blocks):
                 block_slice = A_csc[
-                        i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                        i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
-                    ].tocoo()
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                    i * self.diagonal_blocksize : (i + 1) * self.diagonal_blocksize,
+                ].tocoo()
                 self.A_diagonal_blocks[i][
                     block_slice.row, block_slice.col
                 ] = block_slice.data
@@ -522,7 +522,7 @@ class SerinvSolver(Solver):
         symmetrize: bool = True,
     ) -> sp.sparse.spmatrix:
         """Map a BT or BTA structured matrix to a sparse `csc` format given the sparsity pattern.
-        
+
         Parameters
         ----------
         A : sp.sparse.spmatrix
@@ -531,7 +531,7 @@ class SerinvSolver(Solver):
             The sparsity pattern of the matrix. Either 'bt' or 'bta'.
         symmetrize : bool, optional
             Whether to symmetrize the output matrix, by default True.
-        
+
         Returns
         -------
         sp.sparse.spmatrix

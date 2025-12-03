@@ -14,6 +14,7 @@ if xp.__name__ == "cupy":
 else:
     from scipy.sparse.linalg import splu
 
+
 class SparseSolver(Solver):
     def __init__(
         self,
@@ -55,7 +56,7 @@ class SparseSolver(Solver):
 
         # Use LU decomposition as the factorization method
         self.LU_factor = splu(A, diag_pivot_thresh=0, permc_spec="NATURAL")
-        
+
         # Check if the matrix appears to be positive definite
         if not (self.LU_factor.U.diagonal() > 0).all():
             raise ValueError("The matrix does not appear to be positive definite")
@@ -126,22 +127,24 @@ class SparseSolver(Solver):
         # Since L has 1s on diagonal: det(L) = 1
         # So det(A) = det(U) = product of diagonal elements of U
         log_det_U = xp.sum(xp.log(xp.abs(self.LU_factor.U.diagonal())))
-        
+
         return float(log_det_U)
 
     def selected_inversion(self, **kwargs):
-        """ Compute selected inversion of input matrix using LU factorization.
-        
+        """Compute selected inversion of input matrix using LU factorization.
+
         Raises:
         ------
         NotImplementedError
             Selected inversion is not implemented for SparseSolver.
         """
-        raise NotImplementedError("Selected inversion is not implemented for SparseSolver.")
+        raise NotImplementedError(
+            "Selected inversion is not implemented for SparseSolver."
+        )
 
     def _structured_to_spmatrix(self, **kwargs) -> None:
         """Convert structured matrix to sparse matrix.
-        
+
         For SparseSolver, this is a no-op since it works directly with sparse matrices.
         """
         pass
@@ -152,6 +155,14 @@ class SparseSolver(Solver):
             return 0
 
         # Estimate memory usage from L and U matrices
-        L_memory = self.LU_factor.L.data.nbytes + self.LU_factor.L.indptr.nbytes + self.LU_factor.L.indices.nbytes
-        U_memory = self.LU_factor.U.data.nbytes + self.LU_factor.U.indptr.nbytes + self.LU_factor.U.indices.nbytes
+        L_memory = (
+            self.LU_factor.L.data.nbytes
+            + self.LU_factor.L.indptr.nbytes
+            + self.LU_factor.L.indices.nbytes
+        )
+        U_memory = (
+            self.LU_factor.U.data.nbytes
+            + self.LU_factor.U.indptr.nbytes
+            + self.LU_factor.U.indices.nbytes
+        )
         return L_memory + U_memory

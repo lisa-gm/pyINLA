@@ -1,6 +1,7 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
-import numpy as np
 from dataclasses import dataclass
+
+import numpy as np
 
 from dalia import ArrayLike, backend_flags, comm_rank
 from dalia.utils.gpu_utils import get_array_module_name, get_device, get_host
@@ -11,11 +12,13 @@ if backend_flags["mpi_avail"]:
 if backend_flags["cupy_avail"]:
     import cupy as cp
 
+
 @dataclass
 class DummyCommunicator:
     """Communicator class to handle MPI communication when
     MPI is not available.
     """
+
     size: int = 1
     rank: int = 0
 

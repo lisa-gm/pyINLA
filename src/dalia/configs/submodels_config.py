@@ -27,8 +27,7 @@ class SubModelConfig(BaseModel, ABC):
     type: Literal["spatio_temporal", "spatial", "regression", "brainiac"] = None
 
     @abstractmethod
-    def read_hyperparameters(self) -> tuple[ArrayLike, list]:
-        ...
+    def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
 
 
 class RegressionSubModelConfig(SubModelConfig):
@@ -77,8 +76,7 @@ class SpatialSubModelConfig(SubModelConfig):
         return theta, theta_keys
 
 
-class TemporalSubModelConfig(SubModelConfig):
-    ...
+class TemporalSubModelConfig(SubModelConfig): ...
 
 
 class BrainiacSubModelConfig(SubModelConfig):
