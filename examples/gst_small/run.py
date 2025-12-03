@@ -97,8 +97,8 @@ if __name__ == "__main__":
 
     print_msg("Theta values:\n", results["theta"])
     print_msg("Theta values internal:\n", results["theta_internal"])
-    print_msg("Covariance of theta:\n", results["cov_theta"])
-    
+    print_msg("Covariance of theta:\n", results["cov_theta_internal"])
+
     print_msg("\n--- Comparisons ---")
     # Compare hyperparameters
     print_msg(
@@ -130,10 +130,8 @@ if __name__ == "__main__":
     #     "Norm (var_obs - var_obs_ref):    ",
     #     f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
     # )
-    
-    
+
     marginals_hp = dalia.marginal_distributions_hp() 
     print("Theta keys: ", dalia.model.theta_keys)
-
 
     print_msg("\n--- Finished ---")

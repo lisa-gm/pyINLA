@@ -47,11 +47,12 @@ if __name__ == "__main__":
     likelihood_dict = {
         "type": "gaussian",
         "prec_o": 4,
-        "prior_hyperparameters": {
-            "type": "penalized_complexity",
-            "alpha": 0.01,
-            "u": 5,
-        },
+        # "prior_hyperparameters": {
+        #     "type": "penalized_complexity",
+        #     "alpha": 0.01,
+        #     "u": 5,
+        # },
+        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
     }
     model = Model(
         submodels=[spatial, regression],
@@ -86,7 +87,7 @@ if __name__ == "__main__":
 
     print_msg("\n--- Results ---")
     print_msg("Theta values:\n", results["theta"])
-    print_msg("Covariance of theta:\n", results["cov_theta"])
+    print_msg("Internal Covariance of theta:\n", results["cov_theta_internal"])
     print_msg(
         "Mean of the fixed effects:\n",
         results["x"][-model.submodels[-1].n_fixed_effects :],
@@ -97,7 +98,7 @@ if __name__ == "__main__":
     theta_ref = np.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
     print_msg(
         "Norm (theta - theta_ref):        ",
-        f"{np.linalg.norm(results['theta'] - get_host(theta_ref)):.4e}",
+        f"{np.linalg.norm(results['theta_internal'] - get_host(theta_ref)):.4e}",
     )
 
     # Compare latent parameters

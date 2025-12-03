@@ -32,7 +32,7 @@ if __name__ == "__main__":
     regression = RegressionSubModel(
         config=submodels_config.parse_config(regression_dict),
     )
-    
+
     # Likelihood
     likelihood_dict = {
         "type": "gaussian",
@@ -46,7 +46,7 @@ if __name__ == "__main__":
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
     print_msg(model)
-    
+
     ## Plot prior of hyperparameter -- identification by [0], [1], ... not amazing but works for now
     theta_interval = [-5, 7]
     prior_hp = model.prior_hyperparameters[0]
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     print_msg("\n--- Results ---")
     print_msg("Theta values external:\n", results["theta"])
     print_msg("Theta values internal:\n", results["theta_internal"])
-    print_msg("Covariance of theta:\n", results["cov_theta_internal"])
+    print_msg("Internal Covariance of theta:\n", results["cov_theta_internal"])
     print_msg(
         "Mean of the fixed effects:\n",
         results["x"][-model.submodels[-1].n_fixed_effects :],
@@ -122,11 +122,11 @@ if __name__ == "__main__":
 
     print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp() 
-    
+
     fig, axes = plot_marginal_distributions_hp(marginals_hp)
     import matplotlib.pyplot as plt
     plt.show()
-    
+
     prec_obs = marginals_hp['hyperparameters']['prec_o']
     quantile_pairs = prec_obs['quantiles']['external']['pairs']
 
