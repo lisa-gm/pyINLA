@@ -17,7 +17,7 @@ def test_solve_correctness(
     arrowhead_blocksize,
     num_rhs,
 ):
-    """Test Cholesky decomposition correctness against NumPy reference."""
+    """Test Cholesky decomposition correctness against NumPy/CuPy reference."""
     # Generate test matrix based on sparsity pattern
     if arrowhead_blocksize > 0:  # bta
         A = create_pobta(diagonal_blocksize, arrowhead_blocksize, n_diag_blocks)

@@ -16,8 +16,8 @@ def matrix_size(request: pytest.FixtureRequest) -> int:
 
 
 MATRIX_TYPE = [
-    pytest.param("dense", id="type=dense"),
-    pytest.param("sparse", id="type=sparse"),
+    pytest.param("dense", id="matrix_type=dense"),
+    pytest.param("sparse", id="matrix_type=sparse"),
 ]
 
 

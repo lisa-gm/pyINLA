@@ -68,7 +68,6 @@ class DenseSolver(Solver):
             # if A is diagonal, we can use the diagonal directly
             if is_diagonal(A):
                 self.L[:] = 0
-                # self.L.diagonal()[:] = xp.sqrt(A.diagonal())
                 self.L[xp.arange(self.n), xp.arange(self.n)] = xp.sqrt(A.diagonal())
                 return
 
@@ -103,9 +102,16 @@ class DenseSolver(Solver):
         synchronize_gpu()
         tic = time.perf_counter()
 
-        rhs[:] = sp.linalg.solve_triangular(self.L, rhs, lower=True, overwrite_b=True)
         rhs[:] = sp.linalg.solve_triangular(
-            self.L.T, rhs, lower=False, overwrite_b=True
+            self.L,
+            rhs,
+            lower=True,
+        )
+        rhs[:] = sp.linalg.solve_triangular(
+            self.L,
+            rhs,
+            trans="T",
+            lower=True,
         )
 
         synchronize_gpu()
@@ -128,9 +134,10 @@ class DenseSolver(Solver):
         return 2 * xp.sum(xp.log(xp.diag(self.L)))
 
     def selected_inversion(self, **kwargs) -> None:
-        L_inv = xp.eye(self.L.shape[0])
-        L_inv[:] = sp.linalg.solve_triangular(
-            self.L, L_inv, lower=True, overwrite_b=True
+        L_inv = sp.linalg.solve_triangular(
+            self.L,
+            xp.eye(self.L.shape[0]),
+            lower=True,
         )
         self.A_inv = L_inv.T @ L_inv
 

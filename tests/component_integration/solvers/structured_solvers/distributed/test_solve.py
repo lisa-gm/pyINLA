@@ -18,7 +18,7 @@ def test_solve_correctness(
     num_rhs,
     non_uniform_partition,
 ):
-    """Test Triangular Solve correctness against NumPy reference."""
+    """Test Triangular Solve correctness against NumPy/CuPy reference."""
     import mpi4py.MPI as MPI
 
     # Generate test matrix based on sparsity pattern
