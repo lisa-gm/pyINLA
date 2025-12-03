@@ -18,8 +18,8 @@ else:
 try:
     from serinv.utils import allocate_pobtax_permutation_buffers
     from serinv.wrappers import (
-        allocate_pobtrs,
         allocate_pobtars,
+        allocate_pobtrs,
         ppobtaf,
         ppobtas,
         ppobtasi,
@@ -158,7 +158,7 @@ class DistSerinvSolver(Solver):
         self.buffer = allocate_pobtax_permutation_buffers(
             self.A_diagonal_blocks,
         )
-        
+
         if self.arrowhead_blocksize > 0:
             self.reduced_system: dict = allocate_pobtars(
                 A_diagonal_blocks=self.A_diagonal_blocks,
@@ -282,11 +282,11 @@ class DistSerinvSolver(Solver):
         # Ensure rhs is a 2D array
         if rhs.ndim == 1:
             rhs = rhs[:, None]
-        
+
         # Handle multiple RHS by processing each column separately
         for col in range(rhs.shape[1]):
-            rhs_col = rhs[:, col:col+1]  # Keep 2D shape with single column
-            
+            rhs_col = rhs[:, col : col + 1]  # Keep 2D shape with single column
+
             self._slice_rhs(rhs_col, sparsity)
 
             if sparsity == "bta":
@@ -306,7 +306,11 @@ class DistSerinvSolver(Solver):
                 ppobts(
                     L_diagonal_blocks=self.A_diagonal_blocks,
                     L_lower_diagonal_blocks=self.A_lower_diagonal_blocks,
-                    B=self.dist_rhs[: -self.arrowhead_blocksize] if self.arrowhead_blocksize > 0 else self.dist_rhs,
+                    B=(
+                        self.dist_rhs[: -self.arrowhead_blocksize]
+                        if self.arrowhead_blocksize > 0
+                        else self.dist_rhs
+                    ),
                     buffer=self.buffer,
                     pobtrs=self.reduced_system,
                     comm=self.comm,
@@ -319,9 +323,9 @@ class DistSerinvSolver(Solver):
                 )
 
             self._gather_rhs(rhs_col, sparsity)
-            
+
             # Copy the solved column back to the original rhs
-            rhs[:, col:col+1] = rhs_col
+            rhs[:, col : col + 1] = rhs_col
 
         synchronize(comm=self.comm)
         toc = time.perf_counter()
@@ -361,7 +365,9 @@ class DistSerinvSolver(Solver):
                 )
 
             if sparsity == "bta":
-                logdet += xp.sum(xp.log(self.reduced_system["A_arrow_tip_block"].diagonal()))
+                logdet += xp.sum(
+                    xp.log(self.reduced_system["A_arrow_tip_block"].diagonal())
+                )
         else:
             for i in range(1, self.n_locals[self.rank] - 1):
                 logdet += xp.sum(xp.log(self.A_diagonal_blocks[i].diagonal()))
@@ -376,7 +382,7 @@ class DistSerinvSolver(Solver):
 
         if xp.isnan(logdet):
             raise ValueError(
-            f"WorldRank {MPI.COMM_WORLD.rank} logdet is NaN for {sparsity} matrix."
+                f"WorldRank {MPI.COMM_WORLD.rank} logdet is NaN for {sparsity} matrix."
             )
 
         return 2 * logdet
@@ -791,13 +797,13 @@ class DistSerinvSolver(Solver):
         rows = xp.concatenate(rows)
         cols = xp.concatenate(cols)
 
-        # TODO: Need to communicate to agregates/Map the local B matrix to all ranks
+        # Need to communicate to agregates/Map the local B matrix to all ranks
         # Need to operate on the datas
         l_data = xp.concatenate(allgather(data, comm=self.comm))
         l_rows = xp.concatenate(allgather(rows, comm=self.comm))
         l_cols = xp.concatenate(allgather(cols, comm=self.comm))
         synchronize(comm=self.comm)
-        
+
         B_out = sp.sparse.coo_matrix((l_data, (l_rows, l_cols)), shape=B.shape).tocsc()
 
         if symmetrize:
@@ -860,13 +866,13 @@ class DistSerinvSolver(Solver):
                 )
         else:
             if self.arrowhead_blocksize > 0:
-                self.send_rhs[self.remainders[self.rank] * self.diagonal_blocksize :] = (
-                    self.dist_rhs[: -self.arrowhead_blocksize].flatten()
-                )
+                self.send_rhs[
+                    self.remainders[self.rank] * self.diagonal_blocksize :
+                ] = self.dist_rhs[: -self.arrowhead_blocksize].flatten()
             else:
-                self.send_rhs[self.remainders[self.rank] * self.diagonal_blocksize :] = (
-                    self.dist_rhs.flatten()
-                )
+                self.send_rhs[
+                    self.remainders[self.rank] * self.diagonal_blocksize :
+                ] = self.dist_rhs.flatten()
 
         synchronize(comm=self.comm)
         self.comm.Allgather(
@@ -876,7 +882,7 @@ class DistSerinvSolver(Solver):
         synchronize(comm=self.comm)
 
         # This part needs a major re-work as the multiple RHS are handled one column at a time
-        # but Serinv can handle multiple RHS in one go. The problem is linked to DALIA internal 
+        # but Serinv can handle multiple RHS in one go. The problem is linked to DALIA internal
         # representation (2nd dimension of rhs when only 1 rhs) and the collectives operations.
         if (
             backend_flags["array_module"] == "cupy"
@@ -894,12 +900,15 @@ class DistSerinvSolver(Solver):
                     * self.max_n_locals
                     * self.diagonal_blocksize
                 ]
-                
+
                 # Since we're processing one column at a time, rhs.shape[1] is always 1
                 # Reshape the 1D host data to 2D (n_rows, 1)
-                n_rows = end_idx * self.diagonal_blocksize - start_idx * self.diagonal_blocksize
+                n_rows = (
+                    end_idx * self.diagonal_blocksize
+                    - start_idx * self.diagonal_blocksize
+                )
                 host_data_2d = host_data[:n_rows].reshape(-1, 1)
-                
+
                 # Transfer to device and assign
                 # Here we can't use `.set()` because multidimmensional rhs is not contiguous array.
                 rhs[
@@ -921,7 +930,9 @@ class DistSerinvSolver(Solver):
                     * self.diagonal_blocksize : (i + 1)
                     * self.max_n_locals
                     * self.diagonal_blocksize
-                ].reshape(-1, rhs.shape[1])
+                ].reshape(
+                    -1, rhs.shape[1]
+                )
         if sparsity == "bta":
             # Map the arrow-tip of self.dist_rhs to the global rhs
             rhs[-self.arrowhead_blocksize :] = self.dist_rhs[
