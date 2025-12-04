@@ -25,8 +25,9 @@ fi
 # --- How to Run ---
 # This run script is designed to run on Fritz at NHR@FAU
 # It uses SLURM for job scheduling and assumes that the user has a working 
-# installation of DALIA and its dependencies. By default, DALIA will exploit  
-# job parallelism at the parallel function evaluation level.
+# installation of DALIA and its dependencies.  By default, DALIA will exploit  
+# job parallelism in a cascade, first at the function evaluation level,
+# then at the precision matrix level, finally at the structured solver level.
 
 # --- Parameters ---
 # `--solver_min_p` : The minimum number of Processes(/GPUs) to use for the structured 

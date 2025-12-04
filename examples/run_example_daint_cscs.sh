@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name="dalia_alps"
+#SBATCH --job-name="dalia_daint"
 #SBATCH --output=%x.%j.out
 #SBATCH --error=%x.%j.err
 #SBATCH --account=sm96
@@ -11,16 +11,16 @@
 #SBATCH --partition=debug
 #SBATCH --constraint=gpu
 #SBATCH --hint=nomultithread
-#SBATCH --uenv=prgenv-gnu/24.11:v1
+#SBATCH --uenv=prgenv-gnu/25.6:v2
 #SBATCH --view=modules
 
 # Set DALIA environment variables for examples  
-source ../scripts/alps_cscs_utils.sh && alps_load_modules && alps_activate_conda_env && alps_set_perfenv
-source ./scripts/dalia_job_utils.sh && dalia_set_perfenv && dalia_print_job_config
+source ../scripts/daint_cscs_utils.sh && daint_load_modules && daint_activate_conda_env && daint_set_perfenv
+source ../scripts/dalia_job_utils.sh && dalia_set_perfenv && dalia_print_job_config
 
 # Change to examples directory
 if [[ "$(basename "$(pwd)")" != "examples" ]]; then
-    echo "❌ Error: Not in examples directory"
+    echo "Error: Not in examples directory"
     echo "   Current directory: $(pwd)"
     echo "   Please run this script from the examples/ directory"
     exit 1

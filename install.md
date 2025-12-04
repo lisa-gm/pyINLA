@@ -4,7 +4,7 @@ DALIA have been developped on several (super)computing infrastructures, since th
 As this generalization is not always possible, we provide a simplified procedure for several supercomputing infrastructure (made of different hardware), with the goal of rendering the installation experience of DALIA on a new cluster as easy as possible.
 
 ## Purpose
-A base `conda` environment for DALIA is provided in the `dalia/envs` directory. This environment contains all the Python packages on wich DALIA relies. Are not included in this environment the hardware-specific packages (e.g. CuPy for GPU-compute), these packages can be installed as extensions of the provided base environment.
+Base `conda` environments for DALIA are provided in the `dalia/envs` directory. These environments contains all the Python packages on wich DALIA relies. Are not included in these environments the hardware-specific packages (e.g. `cupy` for GPU-compute, `mpi4py` for multiprocessing capabilities), these packages can be installed as extensions of the provided base environment. We provide base environment for both `x86` and `aarch64` architectures. 
 
 This environment is being used for the CI/CD pipelines of DALIA on the respective clusters and is also available for users to quickly setup DALIA on these clusters or any other machine.
 
@@ -25,12 +25,13 @@ DALIA is supposed to work across a wide variety of hardware and software stacks 
 | :----------- | :------------------- | :----------------- | :----------------- | :----------------- |
 | CPU (x86)    | *dalia_base_fritz* | *dalia_hmpi_fritz* | NA                 | NA                 |
 | GPU (NVIDIA) | *dalia_base_alex*  | NA  | *dalia_ampi_alex*  | *dalia_xccl_alex*  |
-| GPU (NVIDIA) | *dalia_base_daint* | NA | *dalia_ampi_daint* | *dalia_xccl_daint* |
+| GPU (NVIDIA) | *dalia_base_daint* | NA | NA | *dalia_xccl_daint* |
 | CPU (ARM)    | x                    | x                  | x                  | x                  |
 | GPU (AMD)    | x                    | x                  | x                  | x                  |
 
 The `dalia_base` environment contains all the necessary dependencies to run DALIA on a single node without any communication library (e.g. MPI, xCCL) and without GPU support. This environment only contains hardware-independent python dependencies. We provide in `dalia/scripts/` interactive installer that not only can create this `dalia_base` environments for you, but also extend it to support, when applicable, multi-node communication with MPI or xCCL and/or GPU acceleration.
 
+**Notes:** On the Alex and Daint clusters, CuPy is installed using Wheels which comes with NCCL pre-installed. Therefore, NCCL is available whenever CuPy is installed on these clusters. For this reason, they are no GPU-Aware MPI environments alone provided. 
 
 # Detailed Instructions
 ## On Fritz@FAU
@@ -95,13 +96,75 @@ The `dalia_base` environment contains all the necessary dependencies to run DALI
     Note: This function will try to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env` argument to the function.
 
 ## On Daint@CSCS
+1. Clone the repositories to your workspace:    
+    ```
+    mv /my/install/path
+    git clone https://github.com/dalia-project/DALIA
+    git clone https://github.com/vincent-maillou/serinv # Optional, recommended for ST-modeling
+    ```
 
-... work in progress
+2. Source the `daint_cscs_utils.sh` script to access the install utilities:
+    ```
+    cd DALIA/
+    source scripts/daint_cscs_utils.sh
+    ```
+
+3. Use the `daint_install_conda` utility to install Miniconda in your user space (if not already installed):
+    ```
+    daint_install_conda --yes
+    ```
+    Notes:
+    - This step is only required if you do not have `conda` installed already.
+    - The `--yes` option automatically confirms the installation prompts.
+    - Additional informations about the installer options can be found by running `daint_install_conda --help`.
+
+4. Source the installed conda environment:
+    ```
+    source ~/miniconda3/etc/profile.d/conda.sh
+    ```
+    Notes:
+    - This is only needed this time, in any subsequent shell sessions conda will be initialized automatically through your `.bashrc` file.
+
+5. Install the programming environment (`uenv`):
+    ```
+    daint_install_uenv
+    ```
+
+6. Start the programming environment:
+    ```
+    daint_start_uenv
+    ```
+
+7. Source the `daint_cscs_utils.sh` script again to access the install utilities:
+    ```
+    source scripts/daint_cscs_utils.sh
+    ```
+    Notes:
+    - This is needed because starting the programming environment spawns a new shell session, in which previously sourced scripts are not available anymore.
+
+8. Load the required environments modules:
+    ```
+    daint_load_modules
+    ```
+
+9. Create the conda environment:
+    ```
+    daint_create_conda_env --dalia-path=path/to/DALIA --serinv-path=path/to/serinv --install-mpi4py --dev-mode
+    ```
+
+10. Activate the conda environment:
+    ```
+    daint_activate_conda_env
+    ```
+    Note: This function will try to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env` argument to the function.
 
 
-# Known Installation Issues
+## Others Informations
 
-The `sqlite` module might not work properly, in this case forcing the following version of `sqlite` might help:
-```bash
-conda install conda-forge::sqlite=3.45.3
-```
+- After using conda for installing packages, it is recommended to run a cleanup using `conda clean --all`.
+- These installation procedures and `conda` environments have been tested on Linux systems based on both `x86` and `aarch64` architectures.
+- The `sqlite` module might not work properly, in this case forcing the following version of `sqlite` might help:
+    ```bash
+    conda install conda-forge::sqlite=3.45.3
+    ```
+- It is worth mentionning that CuPy switched NCCL to lazy import, which means that NCCL needs to be imported first explictly using `from cupy.cuda import nccl` before being available in `cupy.cuda.nccl`.
