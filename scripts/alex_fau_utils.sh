@@ -165,7 +165,7 @@ alex_create_conda_env() {
     fi
     
     # 4. Locate the conda environment file
-    local env_file="${dalia_path}/envs/dalia_base.yml"
+    local env_file="${dalia_path}/envs/dalia_base_x86.yml"
     if [[ ! -f "$env_file" ]]; then
         echo "   Error: Conda environment file not found at '${env_file}'."
         return 1

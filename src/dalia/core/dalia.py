@@ -32,7 +32,10 @@ if backend_flags["mpi_avail"]:
     from mpi4py import MPI
 
 if backend_flags["cupy_avail"]:
-    import cupy as cp
+    try:
+        from cupy.cuda import nccl
+    except ImportError:
+        nccl = None
 
 import time
 
@@ -169,12 +172,12 @@ class DALIA:
                             f"rank {self.initial_comm_world.rank} initializing NCCL communicator.",
                             flush=True,
                         )
-                        nccl_id = cp.cuda.nccl.get_unique_id()
+                        nccl_id = nccl.get_unique_id()
                         self.comm_qeval.bcast(nccl_id, root=0)
                     else:
                         nccl_id = self.comm_qeval.bcast(None, root=0)
 
-                    self.nccl_comm = cp.cuda.nccl.NcclCommunicator(
+                    self.nccl_comm = nccl.NcclCommunicator(
                         self.comm_qeval.size,
                         nccl_id,
                         self.comm_qeval.rank,
