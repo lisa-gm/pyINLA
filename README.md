@@ -15,7 +15,7 @@ Detailed installation instructions are provided in [install.md](./install.md).
 
 ## Testing
 
-... work in progress
+The testing suite is described in detail in [tests/README.md](./tests/README.md). It relies on `pytest` and can be run either directly or through the provided `runner.sh` script.
 
 ## Examples
 
