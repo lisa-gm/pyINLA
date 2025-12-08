@@ -30,6 +30,9 @@ def compute_bivariate_expectation(func1, func2, mu1, mu2, Sigma, n_points=20):
     # Get Gauss-Hermite quadrature points and weights
     nodes, weights = roots_hermite(n_points)
     
+    nodes = xp.array(nodes)
+    weights = xp.array(weights)
+    
     # Transform nodes from Hermite polynomial roots to standard normal
     z_nodes = xp.sqrt(2) * nodes
     adjusted_weights = weights / xp.sqrt(xp.pi)
@@ -44,7 +47,7 @@ def compute_bivariate_expectation(func1, func2, mu1, mu2, Sigma, n_points=20):
     # Z₂ = μ₂ + ρU₁ + √(1-ρ²)U₂
     # gives (Z₁, Z₂) ~ N([μ₁, μ₂], [[1, ρ], [ρ, 1]])
     
-    if abs(rho) > 1:
+    if xp.abs(rho) > 1:
         raise ValueError("Correlation coefficient rho must be in [-1, 1]")
     
     sqrt_one_minus_rho_sq = xp.sqrt(1 - rho**2) 

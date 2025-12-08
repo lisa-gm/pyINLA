@@ -57,7 +57,7 @@ if __name__ == "__main__":
 
     # Configurations of DALIA
     dalia_dict = {
-        "solver": {"type": "scipy"},
+        "solver": {"type": "dense"},
         "minimize": {
             "max_iter": args.max_iter,
             "gtol": 1e-3,
@@ -93,14 +93,14 @@ if __name__ == "__main__":
     print_msg("Reference theta:", theta_ref)
     print_msg(
         "Norm (theta - theta_ref):        ",
-        f"{np.linalg.norm(results['theta'] - get_host(theta_ref)):.4e}",
+        f"{xp.linalg.norm(results['theta'] - theta_ref):.4e}",
     )
 
     # Compare latent parameters
     x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
     print_msg(
         "Norm (x - x_ref):                ",
-        f"{np.linalg.norm(results['x'] - get_host(x_ref)):.4e}",
+        f"{xp.linalg.norm(results['x'] - x_ref):.4e}",
     )
 
     # Compare marginal variances of latent parameters
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     fig, axes = plot_marginal_distributions_hp(marginals_hp)
     import matplotlib.pyplot as plt
     plt.show()
-
+    
     prec_obs = marginals_hp['hyperparameters']['prec_o']
     quantile_pairs = prec_obs['quantiles']['external']['pairs']
 

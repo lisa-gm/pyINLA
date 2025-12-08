@@ -103,14 +103,14 @@ if __name__ == "__main__":
     # Compare hyperparameters
     print_msg(
         "Norm (theta - theta_ref):        ",
-        f"{np.linalg.norm(results['theta_internal'] - get_host(theta_ref)):.4e}",
+        f"{xp.linalg.norm(get_host(results['theta_internal']) - theta_ref):.4e}",
     )
 
     # Compare latent parameters
-    x_ref = np.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
+    x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
     print_msg(
         "Norm (x - x_ref):                ",
-        f"{np.linalg.norm(results['x'] - get_host(x_ref)):.4e}",
+        f"{xp.linalg.norm(results['x'] - x_ref):.4e}",
     )
 
     # Compare marginal variances of latent parameters
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     Qinv_ref = xp.linalg.inv(Qconditional.toarray())
     print_msg(
         "Norm (marg var latent - ref):    ",
-        f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
+        f"{xp.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
     )
 
     # Compare marginal variances of observations
@@ -132,6 +132,10 @@ if __name__ == "__main__":
     # )
 
     marginals_hp = dalia.marginal_distributions_hp() 
-    print("Theta keys: ", dalia.model.theta_keys)
 
+    print_msg("\n--- Marginal distributions of the hyperparameters ---")
+
+    print("marginals_hp")
+    print(marginals_hp)
+    
     print_msg("\n--- Finished ---")

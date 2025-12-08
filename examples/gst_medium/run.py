@@ -66,7 +66,7 @@ if __name__ == "__main__":
     dalia_dict = {
         "solver": {
             "type": "serinv", 
-            "min_processes": args.solver_min_p,
+            "min_processes": 1,
         },
         "minimize": {
             "max_iter": args.max_iter, 
@@ -111,6 +111,16 @@ if __name__ == "__main__":
     print_msg(
         "Norm (x - x_ref):                ",
         f"{np.linalg.norm(results['x'] - get_host(x_ref)):.4e}",
+    )
+    
+    # Compare marginal variances of latent parameters
+    var_latent_params = results["marginal_variances_latent"]
+    dalia.model.theta_internal = results["theta_internal"]
+    Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
+    Qinv_ref = xp.linalg.inv(Qconditional.toarray())
+    print_msg(
+        "Norm (marg var latent - ref):    ",
+        f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
     )
     
     print_msg("\n--- Finished ---")

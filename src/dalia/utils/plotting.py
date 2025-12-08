@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm
 
+from dalia import xp
+from dalia.utils import get_host
 
 def plot_prior_hp(param_name, theta_interval, prior_hp, log=False):
     """
@@ -35,8 +37,11 @@ def plot_prior_hp(param_name, theta_interval, prior_hp, log=False):
     if theta_interval[0] == 0:
         theta_interval = (1e-6, theta_interval[1])
     
-    theta_vals = np.linspace(theta_interval[0], theta_interval[1], 200)
-    prior_vals = np.array([prior_hp.evaluate_log_prior(theta) for theta in theta_vals])
+    theta_vals = xp.linspace(theta_interval[0], theta_interval[1], 200)
+    prior_vals = xp.array([prior_hp.evaluate_log_prior(theta) for theta in theta_vals])
+    
+    theta_vals = get_host(theta_vals)
+    prior_vals = get_host(prior_vals)
     
     if log:
         xlabel = f"{param_name}"

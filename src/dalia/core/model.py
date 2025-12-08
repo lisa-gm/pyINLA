@@ -380,8 +380,7 @@ class Model(ABC):
         ) = likelihood_config.read_hyperparameters()
 
         theta_external.append(lh_hyperparameters)
-        self.theta_external = np.concatenate(theta_external)
-        # self.theta = np.concatenate(theta_external)
+        self.theta_external = xp.concatenate(theta_external)
 
         print("Initial hyperparameters (external scale): ", self.theta_external)
         print("Initial hyperparameters (internal scale): ", self.theta_internal)
@@ -408,7 +407,7 @@ class Model(ABC):
     def theta_external(self, value):
         """Set external theta and automatically update internal."""
         
-        self._theta_external = np.array(value) 
+        self._theta_external = xp.array(value) 
         self._theta_internal = self.rescale_hyperparameters_to_internal(
             self._theta_external, direction="forward"
         )
@@ -421,7 +420,7 @@ class Model(ABC):
     @theta_internal.setter
     def theta_internal(self, value):
         """Set internal theta and automatically update external."""
-        self._theta_internal = np.array(value) 
+        self._theta_internal = xp.array(value) 
         self._theta_external = self.rescale_hyperparameters_to_internal(
                 self._theta_internal, direction="backward"
         )
