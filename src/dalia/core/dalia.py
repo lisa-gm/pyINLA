@@ -31,11 +31,10 @@ from dalia.utils import (
 if backend_flags["mpi_avail"]:
     from mpi4py import MPI
 
-if backend_flags["cupy_avail"]:
-    try:
-        from cupy.cuda import nccl
-    except ImportError:
-        nccl = None
+if backend_flags["nccl_avail"]:
+    from cupy.cuda import nccl
+else:
+    nccl = None
 
 import time
 

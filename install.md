@@ -1,12 +1,12 @@
 # How to install DALIA on one of the default clusters
-DALIA have been developped on several (super)computing infrastructures, since the beginning of the project it has been our goal to provide a seamless experience for users, regardless of the underlying hardware and software stack.
+DALIA has been developed on several (super)computing infrastructures. Since the beginning of the project, our goal has been to provide a seamless experience for users regardless of the underlying hardware and software stack.
 
-As this generalization is not always possible, we provide a simplified procedure for several supercomputing infrastructure (made of different hardware), with the goal of rendering the installation experience of DALIA on a new cluster as easy as possible.
+Because full generalization is not always possible, we provide a simplified procedure for multiple supercomputing infrastructures (with different hardware) to make installing DALIA on a new cluster as easy as possible.
 
 ## Purpose
-Base `conda` environments for DALIA are provided in the `dalia/envs` directory. These environments contains all the Python packages on wich DALIA relies. Are not included in these environments the hardware-specific packages (e.g. `cupy` for GPU-compute, `mpi4py` for multiprocessing capabilities), these packages can be installed as extensions of the provided base environment. We provide base environment for both `x86` and `aarch64` architectures. 
+Base `conda` environments for DALIA are provided in the `dalia/envs` directory. These environments contain all the Python packages on which DALIA relies. Hardware-specific packages (e.g., `cupy` for GPU compute, `mpi4py` for multiprocessing) are not included; they can be installed as extensions of the base environment. We provide base environments for both `x86` and `aarch64` architectures.
 
-This environment is being used for the CI/CD pipelines of DALIA on the respective clusters and is also available for users to quickly setup DALIA on these clusters or any other machine.
+These environments are used in the CI/CD pipelines for the respective clusters and are also available for users to quickly set up DALIA on these clusters or any other machine.
 
 ## Supported Clusters
 We currently use three different clusters for the testing and development of DALIA:
@@ -19,19 +19,19 @@ We currently use three different clusters for the testing and development of DAL
 
 
 ## Environments Configuration Matrix
-DALIA is supposed to work across a wide variety of hardware and software stacks e.g. GPU accelerated, distributed memory, vendor specific libraries, etc. The following table summarizes the different configurations that are supported by DALIA and for which pre-configured `conda` environments are provided.
+DALIA is designed to work across a wide variety of hardware and software stacks (e.g., GPU acceleration, distributed memory, vendor-specific libraries). The table below summarizes the supported configurations and the corresponding pre-configured `conda` environments.
 
 |              | No Comm              | Host MPI           | GPU-Aware MPI      | xCCL               |
 | :----------- | :------------------- | :----------------- | :----------------- | :----------------- |
 | CPU (x86)    | *dalia_base_fritz* | *dalia_hmpi_fritz* | NA                 | NA                 |
-| GPU (NVIDIA) | *dalia_base_alex*  | NA  | *dalia_ampi_alex*  | *dalia_xccl_alex*  |
+| GPU (NVIDIA) | *dalia_base_alex*  | NA  | NA  | *dalia_xccl_alex*  |
 | GPU (NVIDIA) | *dalia_base_daint* | NA | NA | *dalia_xccl_daint* |
 | CPU (ARM)    | x                    | x                  | x                  | x                  |
 | GPU (AMD)    | x                    | x                  | x                  | x                  |
 
-The `dalia_base` environment contains all the necessary dependencies to run DALIA on a single node without any communication library (e.g. MPI, xCCL) and without GPU support. This environment only contains hardware-independent python dependencies. We provide in `dalia/scripts/` interactive installer that not only can create this `dalia_base` environments for you, but also extend it to support, when applicable, multi-node communication with MPI or xCCL and/or GPU acceleration.
+The `dalia_base` environment contains all the dependencies needed to run DALIA on a single node without any communication library (e.g., MPI, xCCL) and without GPU support. This environment includes only hardware-independent Python dependencies. In `dalia/scripts/` we provide interactive installers that can create these `dalia_base` environments for you and, when applicable, extend them to support multi-node communication with MPI or xCCL and/or GPU acceleration.
 
-**Notes:** On the Alex and Daint clusters, CuPy is installed using Wheels which comes with NCCL pre-installed. Therefore, NCCL is available whenever CuPy is installed on these clusters. For this reason, they are no GPU-Aware MPI environments alone provided. 
+**Notes:** On the Daint and Alex clusters, CuPy is installed using wheels that include NCCL. Therefore, NCCL is available whenever CuPy is installed. For this reason, no standalone GPU-aware MPI environments are provided.
 
 # Detailed Instructions
 ## On Fritz@FAU
@@ -46,7 +46,7 @@ The `dalia_base` environment contains all the necessary dependencies to run DALI
     cd DALIA/
     source scripts/fritz_fau_utils.sh
     ```
-3. Load the required environments modules:
+3. Load the required environment modules:
     ```
     fritz_load_modules
     ```
@@ -55,9 +55,9 @@ The `dalia_base` environment contains all the necessary dependencies to run DALI
     fritz_create_conda_env --dalia-path=path/to/DALIA --serinv-path=path/to/serinv --install-mpi4py --dev-mode
     ```
     Notes:
-    - Here a complete installation, with all optional dependencies and developper mode, is provided. You can also run the installer in interactive mode by simply running `fritz_create_conda_env`.    
-    - The developer mode `--dev-mode` will not only keep the most performant conda environment available, but also all the conda environments created along the way. This ensure that during developement DALIA can be tested against all possible configurations.
-    - The created environment will be activated automatically at the end of the installation.
+    - This example installs all optional dependencies and uses developer mode. You can also run the installer in interactive mode by simply running `fritz_create_conda_env`.
+    - Developer mode (`--dev-mode`) keeps the most performant conda environment available, as well as all environments created along the way. This ensures that during development DALIA can be tested against all supported configurations.
+    - The created environment is activated automatically at the end of the installation.
 5. Activate the conda environment:
     ```
     fritz_activate_conda_env
@@ -77,18 +77,18 @@ The `dalia_base` environment contains all the necessary dependencies to run DALI
     cd DALIA/
     source scripts/alex_fau_utils.sh
     ```
-3. Load the required environments modules:
+3. Load the required environment modules:
     ```
     alex_load_modules
     ```
 4. Create the conda environment:
     ```
-    alex_create_conda_env --dalia-path=path/to/DALIA --serinv-path=path/to/serinv --install-mpi4py --install-nccl --dev-mode
+    alex_create_conda_env --dalia-path=path/to/DALIA --serinv-path=path/to/serinv --install-mpi4py --dev-mode
     ```
     Notes:
-    - Here a complete installation, with all optional dependencies and developper mode, is provided. You can also run the installer in interactive mode by simply running `alex_create_conda_env`.
-    - The developer mode `--dev-mode` will not only keep the most performant conda environment available, but also all the conda environments created along the way. This ensure that during developement DALIA can be tested against all possible configurations.
-    - The created environment will be activated automatically at the end of the installation.
+    - This example installs all optional dependencies and uses developer mode. You can also run the installer in interactive mode by simply running `alex_create_conda_env`.
+    - Developer mode (`--dev-mode`) keeps the most performant conda environment available, as well as all environments created along the way. This ensures that during development DALIA can be tested against all supported configurations.
+    - The created environment is activated automatically at the end of the installation.
 5. Activate the conda environment:
     ```
     alex_activate_conda_env
@@ -114,16 +114,16 @@ The `dalia_base` environment contains all the necessary dependencies to run DALI
     daint_install_conda --yes
     ```
     Notes:
-    - This step is only required if you do not have `conda` installed already.
+    - This step is only required if you do not already have `conda` installed.
     - The `--yes` option automatically confirms the installation prompts.
-    - Additional informations about the installer options can be found by running `daint_install_conda --help`.
+    - Additional information about the installer options can be found by running `daint_install_conda --help`.
 
 4. Source the installed conda environment:
     ```
     source ~/miniconda3/etc/profile.d/conda.sh
     ```
     Notes:
-    - This is only needed this time, in any subsequent shell sessions conda will be initialized automatically through your `.bashrc` file.
+    - This is needed only once; in subsequent shell sessions conda will be initialized automatically through your `.bashrc` file.
 
 5. Install the programming environment (`uenv`):
     ```
@@ -140,9 +140,9 @@ The `dalia_base` environment contains all the necessary dependencies to run DALI
     source scripts/daint_cscs_utils.sh
     ```
     Notes:
-    - This is needed because starting the programming environment spawns a new shell session, in which previously sourced scripts are not available anymore.
+    - This is needed because starting the programming environment spawns a new shell session in which previously sourced scripts are no longer available.
 
-8. Load the required environments modules:
+8. Load the required environment modules:
     ```
     daint_load_modules
     ```
@@ -156,15 +156,15 @@ The `dalia_base` environment contains all the necessary dependencies to run DALI
     ```
     daint_activate_conda_env
     ```
-    Note: This function will try to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env` argument to the function.
+    Note: This function tries to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env` argument.
 
 
-## Others Informations
+## Other Information
 
-- After using conda for installing packages, it is recommended to run a cleanup using `conda clean --all`.
+- After installing packages with conda, it is recommended to run `conda clean --all`.
 - These installation procedures and `conda` environments have been tested on Linux systems based on both `x86` and `aarch64` architectures.
-- The `sqlite` module might not work properly, in this case forcing the following version of `sqlite` might help:
+- If the `sqlite` module does not work properly, forcing the following version might help:
     ```bash
     conda install conda-forge::sqlite=3.45.3
     ```
-- It is worth mentionning that CuPy switched NCCL to lazy import, which means that NCCL needs to be imported first explictly using `from cupy.cuda import nccl` before being available in `cupy.cuda.nccl`.
+- CuPy switched NCCL to lazy import, which means NCCL must be imported explicitly with `from cupy.cuda import nccl` before it is available in `cupy.cuda.nccl`.
