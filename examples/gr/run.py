@@ -125,7 +125,7 @@ if __name__ == "__main__":
 
     fig, axes = plot_marginal_distributions_hp(marginals_hp)
     import matplotlib.pyplot as plt
-    plt.show()
+    plt.savefig(f"gr_marginal_distributions_hp.png")
     
     prec_obs = marginals_hp['hyperparameters']['prec_o']
     quantile_pairs = prec_obs['quantiles']['external']['pairs']

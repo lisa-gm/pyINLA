@@ -11,7 +11,7 @@ from dalia.configs import likelihood_config, dalia_config, submodels_config
 from dalia.core.model import Model
 from dalia.core.dalia import DALIA
 from dalia.submodels import RegressionSubModel, SpatioTemporalSubModel
-from dalia.utils import get_host, print_msg, extract_diagonal
+from dalia.utils import get_host, print_msg, plot_marginal_distributions_hp
 from examples_utils.parser_utils import parse_args
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -131,11 +131,18 @@ if __name__ == "__main__":
     #     f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
     # )
 
+    print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp() 
 
-    print_msg("\n--- Marginal distributions of the hyperparameters ---")
+    fig, axes = plot_marginal_distributions_hp(marginals_hp)
+    import matplotlib.pyplot as plt
+    plt.savefig(f"gst_small_marginal_distributions_hp.png")
+    
+    prec_obs = marginals_hp['hyperparameters']['prec_o']
+    quantile_pairs = prec_obs['quantiles']['external']['pairs']
 
-    print("marginals_hp")
-    print(marginals_hp)
+    print("Quantile pairs of prec_o:")
+    for p, q in quantile_pairs:
+        print(f"   {p:.3f} quantile: {q:.4f}")
     
     print_msg("\n--- Finished ---")
