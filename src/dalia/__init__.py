@@ -85,10 +85,7 @@ try:
             comm.Recv([array, MPI.FLOAT], source=0)
 
     backend_flags["mpi_avail"] = True
-    
-    # Initialize CUDA-aware MPI flag
-    backend_flags["mpi_cuda_aware"] = False
-    
+
     if backend_flags["cupy_avail"] and os.environ.get("MPI_CUDA_AWARE", "0") == "1":
         # If CuPy is available and CUDA-aware MPI is requested, check if it works.
         try:
@@ -107,23 +104,19 @@ try:
                 backend_flags["mpi_cuda_aware"] = True
         except Exception as e:
             warn(f"CUDA-aware MPI test failed: {e}. Setting mpi_cuda_aware=False.")
-            backend_flags["mpi_cuda_aware"] = False
 
     if backend_flags["cupy_avail"] and os.environ.get("USE_NCCL", "0") == "1":
         # If CuPy is available and NCCL is requested, check if NCCL is available.
         try:
             # Check if NCCL is available and functional
             from cupy.cuda import nccl
+
             nccl_id = nccl.get_unique_id()
             backend_flags["nccl_avail"] = True
         except (ImportError, ImportWarning, ModuleNotFoundError) as e:
             warn(f"No 'NCCL' backend detected. ({e})")
-            backend_flags["nccl_avail"] = False
-        except Exception as e:
+        except (RuntimeError, OSError) as e:
             warn(f"NCCL test failed: {e}. Setting nccl_avail=False.")
-            backend_flags["nccl_avail"] = False
-    else:
-        backend_flags["nccl_avail"] = False
 
 except (ImportError, ImportWarning, ModuleNotFoundError) as e:
     warn(f"No 'MPI' backend detected. ({e})")

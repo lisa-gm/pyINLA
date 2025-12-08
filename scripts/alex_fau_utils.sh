@@ -65,15 +65,14 @@ alex_create_conda_env_help() {
     echo "  --dalia-path=PATH       Path to DALIA repository root directory"
     echo "  --serinv-path=PATH      Path to serinv repository (automatically installs serinv)"
     echo "  --install-mpi4py        Install mpi4py and create enhanced environment"
-    echo "  --install-nccl          Install NCCL and create ultimate enhanced environment"
-    echo "  --dev-mode              Keep intermediate environments (use with --install-mpi4py/nccl)"
+    echo "  --dev-mode              Keep intermediate environments (use with --install-mpi4py)"
     echo ""
     echo "Examples:"
     echo "  # Interactive mode (GPU support included by default)"
     echo "  alex_create_conda_env"
     echo ""
     echo "  # Non-interactive mode with all options"
-    echo "  alex_create_conda_env --dalia-path=/path/to/dalia --serinv-path=/path/to/serinv --install-mpi4py --install-nccl --dev-mode"
+    echo "  alex_create_conda_env --dalia-path=/path/to/dalia --serinv-path=/path/to/serinv --install-mpi4py --dev-mode"
     echo ""
     echo "  # Install base with GPU support only"
     echo "  alex_create_conda_env --dalia-path=/path/to/dalia"
@@ -90,7 +89,6 @@ alex_create_conda_env() {
     local dalia_path=""
     local serinv_path=""
     local install_mpi4py_flag=""
-    local install_nccl_flag=""
     local dev_mode_flag=""
     
     while [[ $# -gt 0 ]]; do
@@ -105,10 +103,6 @@ alex_create_conda_env() {
                 ;;
             --install-mpi4py)
                 install_mpi4py_flag="y"
-                shift
-                ;;
-            --install-nccl)
-                install_nccl_flag="y"
                 shift
                 ;;
             --dev-mode)
@@ -269,7 +263,7 @@ alex_create_conda_env() {
     else
         echo "   Skipping serinv installation."
     fi
-    
+
     # 8. Install cupy with GPU support (default for Alex cluster)
     echo ""
     echo "   Installing cupy with GPU support using SLURM job (default for Alex cluster)..."
@@ -282,7 +276,7 @@ alex_create_conda_env() {
 export http_proxy=http://proxy.nhr.fau.de:80
 export https_proxy=http://proxy.nhr.fau.de:80
 conda activate ENV_NAME_PLACEHOLDER
-conda install -y -c conda-forge cupy
+python -m pip install cupy-cuda12x --no-cache-dir
 SLURM_EOF
     
     # Replace the environment name placeholder
@@ -388,7 +382,7 @@ SLURM_EOF
         echo "   Creating enhanced environment with mpi4py support..."
         
         # Determine the enhanced environment name
-        local mpi_enhanced_env_name="dalia_ampi_alex"  # Always GPU + MPI for Alex
+        local mpi_enhanced_env_name="dalia_xccl_alex"  # Always GPU + MPI for Alex
         echo "   Creating environment with GPU and mpi4py support..."
         
         # Deactivate current environment
@@ -475,130 +469,8 @@ SLURM_EOF
     else
         echo "   Skipping mpi4py installation."
     fi
-    
-    # 10. Optional: Install NCCL support
-    echo ""
-    local install_nccl=""
-    
-    if [[ -n "$install_nccl_flag" ]]; then
-        # NCCL installation requested via command line
-        echo "   NCCL installation requested via --install-nccl. Installing automatically..."
-        install_nccl="y"
-    else
-        # Interactive mode - ask user only if MPI is installed (since GPU is now default)
-        if [[ "$env_name" == *"ampi"* ]]; then
-            echo "   NCCL (NVIDIA Collective Communications Library) can enhance multi-GPU performance."
-            echo "   Do you want to install NCCL support and create the ultimate enhanced environment? (y/N): "
-            read -r install_nccl
-        else
-            echo "   NCCL support requires MPI. If you want NCCL, please install MPI first."
-        fi
-    fi
-    
-    if [[ "$install_nccl" =~ ^[Yy]$ ]] && [[ "$env_name" == *"ampi"* ]]; then
-        echo "   Creating ultimate enhanced environment with NCCL support..."
-        
-        # Determine the base environment for NCCL enhancement
-        local nccl_base_env="$env_name"
-        local nccl_enhanced_env_name="dalia_xccl_alex"  # ultimate environment
-        
-        # Deactivate current environment
-        echo "   Deactivating current environment to create NCCL-enhanced version..."
-        conda deactivate 2>/dev/null || true
-        
-        # Remove enhanced environment if it already exists
-        if conda env list | grep -q "^${nccl_enhanced_env_name} "; then
-            echo "   Removing existing NCCL-enhanced environment..."
-            conda env remove -n "$nccl_enhanced_env_name" -y || {
-                echo "   Warning: Failed to remove existing NCCL-enhanced environment."
-            }
-        fi
-        
-        # Clone the current environment
-        if conda create --name "$nccl_enhanced_env_name" --clone "$nccl_base_env" -y; then
-            echo "   Successfully created NCCL-enhanced environment."
-            
-            # Activate the enhanced environment
-            echo "   Activating NCCL-enhanced environment '${nccl_enhanced_env_name}'..."
-            if alex_activate_conda_env --env="$nccl_enhanced_env_name"; then
-                # Install NCCL using CuPy's installation tool
-                echo "   Installing NCCL support using CuPy's installation tool..."
-                cd "$dalia_path" || true
-                
-                # Check for existing NCCL installation and clean up if necessary
-                local nccl_dir="$HOME/.cupy/cuda_lib/12.x/nccl"
-                if [[ -d "$nccl_dir" ]]; then
-                    echo "   Found existing NCCL installation at ${nccl_dir}. Removing it first..."
-                    rm -rf "$nccl_dir" || {
-                        echo "   Warning: Failed to remove existing NCCL directory. Continuing anyway..."
-                    }
-                fi
-                
-                if python -m cupyx.tools.install_library --cuda 12.x --library nccl; then
-                    echo "   Successfully installed NCCL in ultimate enhanced environment."
-                    
-                    # Determine whether to keep intermediate environment
-                    local keep_intermediate=""
-                    if [[ -n "$install_nccl_flag" ]]; then
-                        # Command line mode - use dev_mode_flag to decide
-                        if [[ -n "$dev_mode_flag" ]]; then
-                            keep_intermediate="y"
-                            echo "   Developer mode enabled via --dev-mode. Keeping intermediate environment."
-                        else
-                            keep_intermediate="n"
-                            echo "   Default mode: removing intermediate environment to keep only ultimate version."
-                        fi
-                    else
-                        # Interactive mode - ask user
-                        echo ""
-                        echo "   Do you want to keep the intermediate environment '${nccl_base_env}' for development without NCCL? (y/N): "
-                        read -r keep_intermediate
-                    fi
-                    
-                    if [[ ! "$keep_intermediate" =~ ^[Yy]$ ]]; then
-                        echo "   Removing intermediate environment '${nccl_base_env}'..."
-                        conda env remove -n "$nccl_base_env" -y || {
-                            echo "   Warning: Failed to remove intermediate environment."
-                        }
-                    else
-                        echo "   Keeping intermediate environment for development without NCCL."
-                    fi
-                    
-                    env_name="$nccl_enhanced_env_name"  # Update env_name for final message
-                else
-                    echo "   Error: Failed to install NCCL in enhanced environment."
-                    echo "   Removing broken NCCL-enhanced environment and reverting to previous environment..."
-                    
-                    # Deactivate the enhanced environment
-                    conda deactivate 2>/dev/null || true
-                    
-                    # Remove the broken enhanced environment
-                    conda env remove -n "$nccl_enhanced_env_name" -y || {
-                        echo "   Warning: Failed to remove broken NCCL-enhanced environment."
-                    }
-                    
-                    # Reactivate the previous environment
-                    if alex_activate_conda_env --env="$nccl_base_env"; then
-                        echo "   Reverted to previous environment '${nccl_base_env}'."
-                        env_name="$nccl_base_env"  # Reset env_name to previous environment
-                        echo "   You can install NCCL manually later with: python -m cupyx.tools.install_library --cuda 12.x --library nccl"
-                    else
-                        echo "   Warning: Failed to reactivate previous environment."
-                    fi
-                fi
-            else
-                echo "   Warning: Failed to activate NCCL-enhanced environment."
-            fi
-        else
-            echo "   Error: Failed to create NCCL-enhanced environment."
-            echo "   Continuing with current environment..."
-        fi
-    elif [[ "$install_nccl" =~ ^[Yy]$ ]]; then
-        echo "   Warning: NCCL support requires MPI. Please install MPI first."
-    else
-        echo "   Skipping NCCL installation."
-    fi
-    
+
+    # 10. Final success message    
     echo ""
     echo "   Success! DALIA conda environment '${env_name}' has been created and configured."
     echo "   Repository path: ${dalia_path}"
@@ -607,16 +479,10 @@ SLURM_EOF
     fi
     echo "   Base environment includes GPU support via cupy (default for Alex cluster)."
     if [[ "$install_mpi4py" =~ ^[Yy]$ ]]; then
-        if [[ "$env_name" == *"ampi"* || "$env_name" == *"xccl"* ]]; then
-            echo "   Enhanced environment with mpi4py support created."
-        fi
-    fi
-    if [[ "$install_nccl" =~ ^[Yy]$ ]]; then
         if [[ "$env_name" == *"xccl"* ]]; then
-            echo "   Ultimate enhanced environment with NCCL multi-GPU support created."
+            echo "   Enhanced environment with mpi4py and NCCL support created."
         fi
     fi
-    echo "   To use this environment in the future, run: alex_activate_conda_env"
     
     return 0
 }
@@ -668,7 +534,7 @@ alex_activate_conda_env() {
     conda deactivate 2>/dev/null || true
 
     # Define available environments in order of preference (most performant first)
-    local env_priorities=("dalia_xccl_alex" "dalia_ampi_alex" "dalia_base_alex")
+    local env_priorities=("dalia_xccl_alex" "dalia_base_alex")
     local env_name=""
     
     # If environment name is provided as argument, use it directly
@@ -686,7 +552,7 @@ alex_activate_conda_env() {
     else
         # Check which environments are available and select the most performant one
         echo "   Checking available DALIA conda environments..."
-        local available_envs=$(conda env list 2>/dev/null | grep -E "^(dalia_xccl_alex|dalia_ampi_alex|dalia_base_alex) " | awk '{print $1}')
+        local available_envs=$(conda env list 2>/dev/null | grep -E "^(dalia_xccl_alex|dalia_base_alex) " | awk '{print $1}')
         
         for preferred_env in "${env_priorities[@]}"; do
             if echo "$available_envs" | grep -q "^${preferred_env}$"; then
