@@ -2,6 +2,7 @@ from scipy.stats import norm
 import numpy as np
 
 from dalia import NDArray, xp
+from dalia.utils import get_host, get_device
 
 
 def compute_transformed_quantiles(mean_internal, var_internal, percentiles, transform):
