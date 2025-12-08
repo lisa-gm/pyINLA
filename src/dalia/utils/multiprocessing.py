@@ -232,16 +232,29 @@ def check_vector_consistency(
     bcast(theta_ref, root=0, comm=comm)
 
     if backend_flags["cupy_avail"]:
-        norm_diff = cp.linalg.norm(theta - theta_ref)
+        if (
+            get_array_module_name(theta) == "cupy"
+        ):
+            norm_diff = cp.linalg.norm(theta - theta_ref)
+        else:
+            norm_diff = np.linalg.norm(theta - theta_ref)
     else:
         norm_diff = np.linalg.norm(theta - theta_ref)
 
     if norm_diff > 1e-10:
         # Print indices and values where theta and theta_ref differ
         if backend_flags["cupy_avail"]:
-            diff_indices = cp.where(theta != theta_ref)[0]
-            for idx in diff_indices:
-                print(f"Process {comm.Get_rank()} difference at index {idx}: theta_ref={theta_ref[idx]}, theta={theta[idx]}")
+            if (
+                get_array_module_name(theta) == "cupy"
+            ):
+                diff_indices = cp.where(theta != theta_ref)[0]
+                for idx in diff_indices:
+                    print(f"Process {comm.Get_rank()} difference at index {idx}: theta_ref={theta_ref[idx]}, theta={theta[idx]}")
+            else:
+                diff_indices = np.where(theta != theta_ref)[0]
+                for idx in diff_indices:
+                    print(f"Process {comm.Get_rank()} difference at index {idx}: theta_ref={theta_ref[idx]}, theta={theta[idx]}")
+                    
         else:
             diff_indices = np.where(theta != theta_ref)[0]
             for idx in diff_indices:

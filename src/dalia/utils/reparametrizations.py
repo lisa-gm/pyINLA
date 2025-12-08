@@ -1,4 +1,5 @@
 from scipy.stats import norm
+import numpy as np
 
 from dalia import NDArray, xp
 
@@ -30,7 +31,14 @@ def compute_transformed_quantiles(mean_internal, var_internal, percentiles, tran
     """
     
     # Step 1: Compute quantiles in internal scale
-    internal_quantiles = norm.ppf(percentiles, loc=mean_internal, scale=var_internal**0.5)
+    quantiles_np = get_host(percentiles)
+    mean_internal_np = get_host(mean_internal)
+    var_internal_np = get_host(var_internal)
+
+    internal_quantiles = norm.ppf(quantiles_np, loc=mean_internal_np, scale=var_internal_np**0.5)
+
+    # copy qunatiles to device
+    internal_quantiles = get_device(internal_quantiles)
     
     # Step 2: Transform back to original scale
     # If φ: original → internal, then original quantiles = φ⁻¹(internal quantiles)
@@ -47,9 +55,14 @@ def compute_transformed_pdf(mean_internal, var_internal, x_internal, transform):
     f_X(x) = f_Y(φ(x)) * |dφ/dx|
     """ 
         
-    # PDF in internal scale    
-    pdf_internal = norm.pdf(x_internal, loc=mean_internal, scale=var_internal**0.5)
-    #pdf_internal = 1 / (var_internal**0.5 * xp.sqrt(2 * xp.pi)) * xp.exp(- 1.0 / (2 * var_internal) * (x_internal - mean_internal)**2)
+    # PDF in internal scale
+    x_internal_np = get_host(x_internal)
+    mean_internal_np = get_host(mean_internal)
+    var_internal_np = get_host(var_internal)
+    pdf_internal_np = norm.pdf(x_internal_np, loc=mean_internal_np, scale=var_internal_np**0.5)
+
+    # copy pdf_internal to device
+    pdf_internal = get_device(pdf_internal_np)
 
     # Jacobian: derivative of transformation
     # Ensure x_internal is treated as array for vectorized operations
@@ -96,9 +109,9 @@ if __name__ == "__main__":
         def rescale_hyperparameters_to_internal(self, theta, direction):
             """Log transformation between positive (external) and unconstrained (internal) space"""
             if direction == "forward":
-                return np.log(theta)  # theta -> log(theta)
+                return xp.log(theta)  # theta -> log(theta)
             elif direction == "backward": 
-                return np.exp(theta)  # log(theta) -> theta
+                return xp.exp(theta)  # log(theta) -> theta
             elif direction == "forward_jacobian":
                 return 1.0 / theta   # d(log(theta))/d(theta) = 1/theta
             elif direction == "backward_jacobian":
@@ -171,7 +184,7 @@ if __name__ == "__main__":
     # Test 3: Quantile computation
     print("3. Testing quantile computation:")
     
-    percentiles = np.array([0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975])
+    percentiles = xp.array([0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975])
     original_quantiles = compute_transformed_quantiles(
         mean_internal, std_internal**0.5, percentiles, transform_func
     )
@@ -194,7 +207,7 @@ if __name__ == "__main__":
     print(f"   Original bounds: [{original_lower:.3f}, {original_upper:.3f}]")
     
     # Test PDF at specific points
-    test_x_original = np.array([0.5, 1.0, 2.0, 3.0, 5.0])
+    test_x_original = xp.array([0.5, 1.0, 2.0, 3.0, 5.0])
     
     print("   x (orig) | PDF (orig) | log(x)   | PDF (int)")
     print("   ---------|------------|----------|----------")
@@ -215,14 +228,14 @@ if __name__ == "__main__":
     sigma = std_internal
     
     # Analytical log-normal statistics
-    analytical_mean = np.exp(mu + sigma**2/2)
-    analytical_var = (np.exp(sigma**2) - 1) * np.exp(2*mu + sigma**2)
-    analytical_std = np.sqrt(analytical_var)
+    analytical_mean = xp.exp(mu + sigma**2/2)
+    analytical_var = (xp.exp(sigma**2) - 1) * xp.exp(2*mu + sigma**2)
+    analytical_std = xp.sqrt(analytical_var)
     
     # Numerical verification using quantiles
     # Mean ≈ 50th percentile for log-normal (approximately)
     median_quantile = compute_transformed_quantiles(
-        mean_internal, std_internal**0.5, np.array([0.5]), transform_func
+        mean_internal, std_internal**0.5, xp.array([0.5]), transform_func
     )[0]
     
     print(f"   Analytical mean: {analytical_mean:.6f}")
@@ -236,7 +249,7 @@ if __name__ == "__main__":
     print("6. PDF integration check:")
     
     # Create fine grid for integration -> need to start in original scale for dx to be equidistant
-    x_original = np.linspace(original_lower, original_upper, 1000)
+    x_original = xp.linspace(original_lower, original_upper, 1000)
     x_internal = transform_func(x_original, "forward")
     x_original, pdf_values = compute_transformed_pdf(mean_internal, std_internal**2, x_internal, transform_func)
         
@@ -275,7 +288,7 @@ if __name__ == "__main__":
     print("8. Plotting PDFs in internal and original scales:")
         
     # Plot 1: PDF in internal scale (log-scale, normal distribution)
-    x_internal = np.linspace(internal_lower, internal_upper, 500)
+    x_internal = xp.linspace(internal_lower, internal_upper, 500)
     pdf_internal = norm.pdf(x_internal, loc=mean_internal, scale=std_internal)
     # Create visualization
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))

@@ -203,7 +203,7 @@ if __name__ == "__main__":
     print(f"Internal space (log-scale) parameters:")
     print(f"  Mean: {mean_internal}")
     print(f"  Variance: {variance_internal}")
-    print(f"  Standard deviation: {np.sqrt(variance_internal)}")
+    print(f"  Standard deviation: {xp.sqrt(variance_internal)}")
     print()
     
     # Test 1: Compute statistics using Gaussian quadrature
@@ -237,9 +237,9 @@ if __name__ == "__main__":
     mu = mean_internal
     sigma2 = variance_internal
     
-    analytical_mean = np.exp(mu + sigma2/2)
-    analytical_variance = (np.exp(sigma2) - 1) * np.exp(2*mu + sigma2)
-    analytical_std = np.sqrt(analytical_variance)
+    analytical_mean = xp.exp(mu + sigma2/2)
+    analytical_variance = (xp.exp(sigma2) - 1) * xp.exp(2*mu + sigma2)
+    analytical_std = xp.sqrt(analytical_variance)
     
     print(f"   Analytical mean: {analytical_mean:.6f}")
     print(f"   Analytical std:  {analytical_std:.6f}")
@@ -286,8 +286,8 @@ if __name__ == "__main__":
         )
         
         # Analytical result
-        anal_mean = np.exp(mu_test + var_test/2)
-        anal_var = (np.exp(var_test) - 1) * np.exp(2*mu_test + var_test)
+        anal_mean = xp.exp(mu_test + var_test/2)
+        anal_var = (xp.exp(var_test) - 1) * xp.exp(2*mu_test + var_test)
         
         rel_mean_error = abs(quad_result['mean'] - anal_mean) / anal_mean
         rel_var_error = abs(quad_result['variance'] - anal_var) / anal_var
@@ -322,7 +322,7 @@ if __name__ == "__main__":
     
     mu_conv = 0.3
     var_conv = 0.4
-    analytical_mean_conv = np.exp(mu_conv + var_conv/2)
+    analytical_mean_conv = xp.exp(mu_conv + var_conv/2)
     
     n_points_list = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100]
     

@@ -365,7 +365,6 @@ class DALIA:
         minimization_result : scipy.optimize.OptimizeResult
             Result of the optimization procedure.
         """
-
         # ensure that all ranks are initialized to the same theta
         check_vector_consistency(
             self.model.theta_external,
@@ -432,16 +431,10 @@ class DALIA:
                         )
 
                         self.minimization_result = {
-                            "theta_internal": get_host(self.model.theta_internal),
-                            "theta": get_host(
-                                self.model.theta_external
-                            ),
-                            "x": get_host(
-                                self.model.x
-                                # self.model.x[
-                                #     self.model.inverse_permutation_latent_variables
-                                # ]
-                            ),
+                            "theta_internal": self.model.theta_internal,
+                            "theta":
+                                self.model.theta_external,
+                            "x": self.model.x,
                             "f": fun_i,
                             "grad_f": self.gradient_f,
                             "f_values": self.f_values,
@@ -536,11 +529,9 @@ class DALIA:
                 )
 
             self.minimization_result: dict = {
-                "theta_internal": get_host(self.model.theta_internal), #  scipy_result.x, #
-                "theta": get_host(self.model.theta_external),
-                "x": get_host(
-                    self.model.x,  # [self.model.inverse_permutation_latent_variables]
-                ),
+                "theta_internal": self.model.theta_internal, #  scipy_result.x, #
+                "theta": self.model.theta_external,
+                "x": self.model.x,  # [self.model.inverse_permutation_latent_variables]
                 "f": scipy_result.fun,
                 "grad_f": self.gradient_f,
                 "f_values": self.f_values,
@@ -1054,11 +1045,11 @@ class DALIA:
 
             # Initialize parameter dictionary
             param_dict = {
-                'mean_internal': float(theta_internal_i),
-                'variance_internal': float(marg_var_internal_i),
-                'mean_external': float(gauss_hermite_result['mean']),
-                'variance_external': float(gauss_hermite_result['variance']),
-                'pdf_data': (theta_external_interval, pdf_external)  # tuple of xp arrays
+                'mean_internal': float(get_host(theta_internal_i)),
+                'variance_internal': float(get_host(marg_var_internal_i)),
+                'mean_external': float(get_host(gauss_hermite_result['mean'])),
+                'variance_external': float(get_host(gauss_hermite_result['variance'])),
+                'pdf_data': (get_host(theta_external_interval), get_host(pdf_external))  # tuple of xp arrays
             }
             
             # if quantiles is not None, compute quantiles using compute_transformed_quantiles() 
@@ -1069,17 +1060,17 @@ class DALIA:
                 
                 # Also compute internal quantiles for completeness
                 from scipy.stats import norm
-                quantiles_internal = norm.ppf(quantiles, loc=theta_internal_i, scale=xp.sqrt(marg_var_internal_i))
+                quantiles_internal = get_device(norm.ppf(get_host(quantiles), loc=get_host(theta_internal_i), scale=get_host(xp.sqrt(marg_var_internal_i))))
                 
                 param_dict['quantiles'] = {
-                    'levels': quantiles.tolist(),
+                    'levels': get_host(quantiles).tolist(),
                     'internal': {
-                        'values': quantiles_internal.tolist(),
-                        'pairs': list(zip(quantiles.tolist(), quantiles_internal.tolist()))
+                        'values': get_host(quantiles_internal).tolist(),
+                        'pairs': list(zip(get_host(quantiles).tolist(), get_host(quantiles_internal).tolist()))
                     },
                     'external': {
-                        'values': quantiles_external.tolist(),
-                        'pairs': list(zip(quantiles.tolist(), quantiles_external.tolist()))
+                        'values': get_host(quantiles_external).tolist(),
+                        'pairs': list(zip(get_host(quantiles).tolist(), get_host(quantiles_external).tolist()))
                     }
                 }
             
