@@ -45,6 +45,8 @@ The DALIA repository uses a dual-branch workflow with `main` and `dev` branches:
 Use descriptive commit messages with one of the following prefixes:
 
 #### Core Development
+- `STATS` : new feature or change related to statistical modeling
+- `SLVR` : new feature or change related to solvers or numerical methods
 - `API`: an (incompatible) API change
 - `DEP`: deprecate something, or remove a deprecated object
 - `ENH`: enhancement
