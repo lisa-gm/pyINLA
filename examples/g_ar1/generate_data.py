@@ -33,44 +33,48 @@ if __name__ == "__main__":
     off_diag = [-phi / denom] * (n - 1)
 
     Q = sp.diags([diag, off_diag, off_diag], [0, -1, 1])
-    
+
     # Compute sparse Cholesky factorization: Q = L @ L.T
     # For tridiagonal matrix, we can use dense Cholesky on small blocks or scipy
     Q_csc = Q.tocsc()
-    
+
     print("Q shape:", Q.shape, "Q nnz:", Q.nnz)
     print("Q sparsity:", 100 * Q.nnz / (Q.shape[0] * Q.shape[1]), "%")
     print(Q.toarray()[:6, :6])
-    
+
     # Method 1: Use dense Cholesky (for moderate sizes this is still efficient)
     Q_dense = Q.toarray()
     L_dense = cholesky(Q_dense, lower=True)
     L = csc_matrix(L_dense)
-    
+
     print("L nnz:", L.nnz, "L sparsity:", 100 * L.nnz / (L.shape[0] * L.shape[1]), "%")
-    
+
     # Efficient sampling: generate z ~ N(0,I), then solve L @ u = z
     z = np.random.normal(0, 1, size=n)
-    
+
     # Solve L @ u = z using sparse triangular solver
     u = spsolve_triangular(L, z, lower=True)
-    
+
     # Verify the sampling worked correctly
     print("Sample u statistics - mean:", np.mean(u), "std:", np.std(u), ". Should be around sqrt(s2) =", np.sqrt(s2))
-    
+
     intercept = 2
 
     x = np.concatenate((u, [intercept]))
     print("x: ", x[:10])
-    
+
+    os.makedirs("reference_outputs", exist_ok=True)
     np.save("reference_outputs/x_original.npy", x)
-    np.save("inputs_ar1/x.npy", u)
     np.save("reference_outputs/theta_original.npy", theta_original)
+
+    os.makedirs("inputs_ar1", exist_ok=True)
+    np.save("inputs_ar1/x.npy", u)
 
     a_ar1 = sp.eye(n)
     sp.save_npz("inputs_ar1/a.npz", a_ar1)
 
     a_regression = sp.csr_matrix(np.ones((n, 1)))
+    os.makedirs("inputs_regression", exist_ok=True)
     sp.save_npz("inputs_regression/a.npz", a_regression)
 
     eta = a_ar1 @ u + intercept
@@ -93,7 +97,7 @@ if __name__ == "__main__":
 
     b = obs_noise_prec * a.T @ y
     print("b: ", b[:10])
-    #x_est = np.linalg.solve(Qcond.toarray(), b)
+    # x_est = np.linalg.solve(Qcond.toarray(), b)
     x_est = spsolve(csc_matrix(Qcond), b)
     print("norm(x - x_est): ", np.linalg.norm(x - x_est))
 

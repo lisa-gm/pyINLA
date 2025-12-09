@@ -15,7 +15,7 @@ if __name__ == "__main__":
     ## define priors
     s2 = 1  # 0.7
     tau = 1 / s2
-    ### note: phi between -1 and 1 for discrete timesteps 
+    ### note: phi between -1 and 1 for discrete timesteps
     # (doesn't make sense for negative in cts case)
 
     ## rescale beta prior 2 theta - 1
@@ -44,15 +44,20 @@ if __name__ == "__main__":
     print("u: ", u[:10])
     eta = u + intercept
     x = np.concatenate((u, [intercept]))
+
+    os.makedirs("reference_outputs", exist_ok=True)
     np.save("reference_outputs/x_original.npy", x)
-    x_initial = u + np.random.normal(0, 0.3, size=len(u))
-    np.save("inputs_ar1/x.npy", u)
     np.save("reference_outputs/theta_original.npy", theta_original)
+
+    x_initial = u + np.random.normal(0, 0.3, size=len(u))
+    os.makedirs("inputs_ar1", exist_ok=True)
+    np.save("inputs_ar1/x.npy", u)
 
     a_ar1 = sp.eye(n)
     sp.save_npz("inputs_ar1/a.npz", a_ar1)
 
     a_regression = sp.csr_matrix(np.ones((n, 1)))
+    os.makedirs("inputs_regression", exist_ok=True)
     sp.save_npz("inputs_regression/a.npz", a_regression)
 
     print("eta: ", eta[:10])
