@@ -17,15 +17,15 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if __name__ == "__main__":
     print_msg("--- Example: Brainiac Submodel ---")
 
-    base_dir_data = BASE_DIR + "/inputs_brainiac_cmPRS"
+    base_dir_data = BASE_DIR  # + "/cmPRS_model"
 
     m = 2  # number of annotations per feature
-    b = 1000  # number of latent variables / number of features
+    b = 20  # number of latent variables / number of features
     sigma_a2 = 1.0 / 1.0
     precision_mat = sigma_a2 * scsp.eye(m)
 
-    theta_ref = xp.load(f"{base_dir_data}/theta_original.npy")
-    x_ref = np.load(f"{base_dir_data}/beta_original.npy")
+    theta_ref = xp.load(f"{base_dir_data}/reference_outputs/theta_original.npy")
+    x_ref = np.load(f"{base_dir_data}/reference_outputs/beta_original.npy")
 
     xp.random.seed(5)
     # has to be between 0 and 1
@@ -37,7 +37,7 @@ if __name__ == "__main__":
         "input_dir": f"{base_dir_data}/inputs_brainiac",
         "h2": initial_h2,
         "alpha": initial_alpha,
-        "ph_h2": {"type": "beta", "alpha": 5.0, "beta": 1.0},
+        "ph_h2": {"type": "beta", "alpha": 1.0, "beta": 1.0},
         "ph_alpha": {
             "type": "gaussian_mvn",
             "mean": theta_ref[1:],

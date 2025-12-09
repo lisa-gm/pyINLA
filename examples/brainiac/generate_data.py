@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.sparse as sp
 from scipy.sparse import diags
+import os
 
 if __name__ == "__main__":
 
@@ -22,30 +23,33 @@ if __name__ == "__main__":
 
     # generate random Z -> needs to be loaded with the model
     z = np.random.rand(b, m)
+
+    os.makedirs(f"inputs_brainiac", exist_ok=True)
     np.save("inputs_brainiac/z.npy", z)
 
     # Generate random h^2 with a Beta prior defined on the interval [0, 1]
     # TODO: how to estimate alpha_beta and beta_beta?
     # alpha_beta = 5.0
     # beta_beta = 1.0
-    #h2 = np.random.beta(alpha_beta, beta_beta)
+    # h2 = np.random.beta(alpha_beta, beta_beta)
     h2 = 0.95
     print("h2: ", h2)
-    
+
     # \sigma_a^2: large and fixed
     sigma_a2 = 1
     print("sigma_a2: ", sigma_a2)
 
     # sample alpha from N(0, \sigma_a^2 I)
     alpha = np.random.normal(2, np.sqrt(sigma_a2), (m, 1))
-    #alpha = np.ones((m, 1))
+    # alpha = np.ones((m, 1))
     # print(alpha)
 
     theta_original = np.concatenate(([h2], alpha.flatten()))
     print(theta_original)
 
     # save original hyperparameters
-    np.save("inputs_brainiac/theta_original.npy", theta_original)
+    os.makedirs(f"inputs_brainiac/reference_outputs", exist_ok=True)
+    np.save("inputs_brainiac/reference_outputs/theta_original.npy", theta_original)
 
     # \Phi = 1 / \sum_k=1^B exp(Z^k \alpha) * diag(exp(Z_1 \alpha), exp(Z_2 \alpha), ... )
     print("z : ", z)
@@ -76,7 +80,7 @@ if __name__ == "__main__":
     var = 1 / Qprior.diagonal()
     print(var)
     beta = np.random.normal(0, np.sqrt(var)).reshape(b, 1)
-    np.save("inputs_brainiac/beta_original.npy", beta.flatten())
+    np.save("inputs_brainiac/reference_outputs/beta_original.npy", beta.flatten())
     # print(beta)
 
     # beta regression parameters with
@@ -103,5 +107,3 @@ if __name__ == "__main__":
     print("beta recovered: ", beta_recovered.flatten())
     print("beta original : ", beta.flatten())
     print("norm(diff) : ", np.linalg.norm(beta_recovered - beta))
-
-

@@ -172,6 +172,16 @@ class Model(ABC):
                             config=submodel.config.ph_alpha,
                         )
                     )
+                if isinstance(
+                    submodel.config.ph_alpha,
+                    PenalizedComplexityPriorHyperparametersConfig,
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_alpha,
+                            hyperparameter_type="alpha",
+                        )
+                    )
             else:
                 raise ValueError("Unknown submodel type")
 
