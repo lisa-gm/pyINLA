@@ -158,6 +158,12 @@ The `dalia_base` environment contains all the dependencies needed to run DALIA o
     ```
     Note: This function tries to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env` argument.
 
+In addition to the above steps, you might need to install `git-lfs` to work with the examples provided
+by the package. Unfortunately, `git-lfs` is not available as a module on Daint. We provide a utility to install `git-lfs` in your user space as part of the `daint_cscs_utils.sh` script.
+To install `git-lfs`, source the `daint_cscs_utils.sh` script and then simply run:
+```
+daint_install_git_lfs
+```
 
 ## Other Information
 
