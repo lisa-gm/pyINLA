@@ -13,7 +13,7 @@
 #SBATCH --export=NONE
 
 # Set DALIA environment variables for examples  
-source ../scripts/alex_fau_utils.sh && alex_load_modules && alex_activate_conda_env --env=dalia_ampi_alex && alex_set_perfenv
+source ../scripts/alex_fau_utils.sh && alex_load_modules && alex_activate_conda_env && alex_set_perfenv
 source ../scripts/dalia_job_utils.sh && dalia_set_perfenv && dalia_print_job_config
 
 # Change to examples directory

@@ -103,7 +103,7 @@ try:
                 _ = cupy_array.data.ptr  # This will fail if CUDA context is broken
                 backend_flags["mpi_cuda_aware"] = True
         except Exception as e:
-            warn(f"CUDA-aware MPI test failed: {e}. Setting mpi_cuda_aware=False.")
+            warn(f"CUDA-aware MPI test failed: {e}, CUDA-aware MPI will be disabled.")
 
     if backend_flags["cupy_avail"] and os.environ.get("USE_NCCL", "0") == "1":
         # If CuPy is available and NCCL is requested, check if NCCL is available.
@@ -116,7 +116,7 @@ try:
         except (ImportError, ImportWarning, ModuleNotFoundError) as e:
             warn(f"No 'NCCL' backend detected. ({e})")
         except (RuntimeError, OSError) as e:
-            warn(f"NCCL test failed: {e}. Setting nccl_avail=False.")
+            warn(f"NCCL test failed: {e}, NCCL will be disabled.")
 
 except (ImportError, ImportWarning, ModuleNotFoundError) as e:
     warn(f"No 'MPI' backend detected. ({e})")

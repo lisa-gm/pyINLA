@@ -137,7 +137,7 @@ fritz_create_conda_env() {
     fi
     
     # Expand tilde and remove trailing slash
-    dalia_path=$(eval echo "${dalia_path}")
+    dalia_path="${dalia_path/#\~/$HOME}"
     dalia_path="${dalia_path%/}"
     
     # 3. Validate DALIA repository path
@@ -231,8 +231,8 @@ fritz_create_conda_env() {
     fi
     
     if [[ "$install_serinv" =~ ^[Yy]$ ]]; then
-        # Expand tilde and remove trailing slash
-        serinv_path=$(eval echo "${serinv_path}")
+        # Expand tilde (if present) and remove trailing slash
+        serinv_path="${serinv_path/#~/$HOME}"
         serinv_path="${serinv_path%/}"
         
         # Validate serinv repository path
