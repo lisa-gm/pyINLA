@@ -339,7 +339,7 @@ SLURM_EOF
                 if conda list cupy-core | grep -q cupy-core && python -c "import cupy; print(f'CuPy version: {cupy.__version__}')" 2>/dev/null; then
                     echo "   Successfully installed and verified cupy-core in base environment."
                 else
-                    echo "   Warning: cupy installation may have failed. Could not import cupy or detect CUDA devices."
+                    echo "   Warning: cupy installation may have failed. Could not import cupy or verify installation."
                     echo "   You can test the installation manually with: python -c 'import cupy; print(cupy.__version__)'"
                 fi
             else

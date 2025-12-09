@@ -68,7 +68,7 @@ daint_install_conda() {
     done
     
     # Expand tilde and remove trailing slash
-    install_path=$(eval echo "${install_path}")
+    install_path="${install_path/#\~/$HOME}"
     install_path="${install_path%/}"
     
     echo "   Target installation path: ${install_path}"
@@ -222,12 +222,7 @@ daint_install_conda() {
     # Set download URL
     local download_url="https://repo.anaconda.com/miniconda/${installer_name}"
     local installer_path="/tmp/${installer_name}"
-    
-    # Check for proxy settings (common on HPC systems)
-    if [[ -n "${http_proxy}" ]] || [[ -n "${https_proxy}" ]]; then
-        echo "   Proxy detected: http_proxy=${http_proxy}, https_proxy=${https_proxy}"
-    fi
-    
+        
     # Test network connectivity
     echo "   Testing connectivity to repo.anaconda.com..."
     if ! curl -s --connect-timeout 10 --max-time 15 "https://repo.anaconda.com" > /dev/null; then
@@ -609,7 +604,7 @@ daint_create_conda_env() {
     fi
     
     # Expand tilde and remove trailing slash
-    dalia_path=$(eval echo "${dalia_path}")
+    dalia_path="${dalia_path/#~/$HOME}"
     dalia_path="${dalia_path%/}"
     
     # 3. Validate DALIA repository path
@@ -704,7 +699,7 @@ daint_create_conda_env() {
     
     if [[ "$install_serinv" =~ ^[Yy]$ ]]; then
         # Expand tilde and remove trailing slash
-        serinv_path=$(eval echo "${serinv_path}")
+        serinv_path="${serinv_path/#~/$HOME}"
         serinv_path="${serinv_path%/}"
         
         # Validate serinv repository path
