@@ -525,8 +525,12 @@ daint_load_modules() {
     export LIBRARY_PATH=$CUDA_HOME/lib64:$LIBRARY_PATH
     export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-    # Set NCCL environment variables
-    export NCCL_ROOT=/user-environment/linux-neoverse_v2/nccl-2.27.5-1-dzqljh25nabms3u5wj7xwaj6r5sd5653
+    # Set NCCL environment variables (dynamically find the nccl installation)
+    export NCCL_ROOT=$(ls -d /user-environment/linux-neoverse_v2/nccl-* 2>/dev/null | head -1)
+    if [[ -z "$NCCL_ROOT" ]]; then
+        echo "   Error: NCCL not found in /user-environment/linux-neoverse_v2/"
+        return 1
+    fi
     export NCCL_LIB_DIR=$NCCL_ROOT/lib
     export NCCL_INCLUDE_DIR=$NCCL_ROOT/include
 
