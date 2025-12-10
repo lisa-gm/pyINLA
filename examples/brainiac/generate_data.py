@@ -17,9 +17,9 @@ if __name__ == "__main__":
 
     # dim(\Phi) = (b,b)
 
-    no = 100  # number of observations
-    b = 1000  # number of latent variables (number of features)
-    m = 10  # number of annotations per feature
+    no = 1000  # number of observations (n: number of subjects)
+    b = 2  # number of latent variables (N: number of features)
+    m = 2  # number of annotations per feature (K: number of covariates)
 
     # generate random Z -> needs to be loaded with the model
     z = np.random.rand(b, m)

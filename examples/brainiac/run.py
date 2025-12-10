@@ -19,7 +19,8 @@ if __name__ == "__main__":
 
     base_dir_data = BASE_DIR  # + "/cmPRS_model"
 
-    m = 10  # number of annotations per feature
+    b = 2  # number of latent variables (N: number of features)
+    m = 2  # number of annotations per feature (K: number of covariates)
     sigma_a2 = 1.0 / 100.0
     precision_mat = sigma_a2 * scsp.eye(m)
 
@@ -94,17 +95,18 @@ if __name__ == "__main__":
 
     # marginal variances latent parameters
     var_latent_params = result["marginal_variances_latent"]
+    print("var_latent_params: ", var_latent_params)
+
     Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
 
-    # Convert to dense array if sparse
-    if scsp.issparse(Qconditional):
-        Qconditional = Qconditional.toarray()
-
-    Qinv_ref = xp.linalg.inv(Qconditional)
-    print_msg(
-        "Norm (marg var latent - ref):    ",
-        f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
-    )
+    if Qconditional.shape[0] <= 1000:
+        Qinv_ref = xp.linalg.inv(Qconditional.toarray())
+        print_msg(
+            "Norm (marg var latent - ref):    ",
+            f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
+        )
+    else:
+        print_msg("Qconditional too large to compute reference inverse.")
 
     # Plot beta_ref vs beta
     import matplotlib.pyplot as plt
