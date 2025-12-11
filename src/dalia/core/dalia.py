@@ -490,9 +490,9 @@ class DALIA:
             except OptimizationConvergedEarlyExit:
                 return self.minimization_result
 
-            print(
-                f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}"
-            )
+            # print(
+            #     f"rank {comm_rank} | objective function time: {self.objective_function_time[1:]}"
+            # )
 
             # MEMO:
             # From here rank 0 own the optimized theta_star and the
@@ -610,11 +610,11 @@ class DALIA:
             self.t_construction_qprior + self.t_construction_qconditional
         )
 
-        if self.iter > 0:
-            print(
-                f"rank {comm_rank} | objfunc_time: {self.objective_function_time[1:]} | solver_time: {self.solver_time[1:]} | construction_time: {self.construction_time[1:]}",
-                flush=True,
-            )
+        # if self.iter > 0:
+        #     print(
+        #         f"rank {comm_rank} | objfunc_time: {self.objective_function_time[1:]} | solver_time: {self.solver_time[1:]} | construction_time: {self.construction_time[1:]}",
+        #         flush=True,
+        #     )
         self.iter += 1
 
         return (f_0, grad_f)

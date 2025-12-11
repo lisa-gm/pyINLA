@@ -17,9 +17,9 @@ if __name__ == "__main__":
 
     # dim(\Phi) = (b,b)
 
-    no = 1000  # number of observations
-    b = 2  # number of latent variables (number of features)
-    m = 2  # number of annotations per feature
+    no = 100  # number of observations
+    b = 1000  # number of latent variables (number of features)
+    m = 10  # number of annotations per feature
 
     # generate random Z -> needs to be loaded with the model
     z = np.random.rand(b, m)
@@ -36,11 +36,11 @@ if __name__ == "__main__":
     print("h2: ", h2)
 
     # \sigma_a^2: large and fixed
-    sigma_a2 = 1
+    sigma_a2 = 0.1
     print("sigma_a2: ", sigma_a2)
 
     # sample alpha from N(0, \sigma_a^2 I)
-    alpha = np.random.normal(2, np.sqrt(sigma_a2), (m, 1))
+    alpha = np.random.normal(0, np.sqrt(sigma_a2), (m, 1))
     # alpha = np.ones((m, 1))
     # print(alpha)
 
@@ -48,14 +48,14 @@ if __name__ == "__main__":
     print(theta_original)
 
     # save original hyperparameters
-    os.makedirs(f"inputs_brainiac/reference_outputs", exist_ok=True)
-    np.save("inputs_brainiac/reference_outputs/theta_original.npy", theta_original)
+    os.makedirs(f"reference_outputs", exist_ok=True)
+    np.save("reference_outputs/theta_original.npy", theta_original)
 
     # \Phi = 1 / \sum_k=1^B exp(Z^k \alpha) * diag(exp(Z_1 \alpha), exp(Z_2 \alpha), ... )
     print("z : ", z)
     print("alpha : ", alpha)
     exp_Z_alpha = np.exp(z @ alpha)
-    # print(exp_Z_alpha)
+    print(exp_Z_alpha)
     sum_exp_Z_alpha = np.sum(exp_Z_alpha)
     print(sum_exp_Z_alpha)
 
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     var = 1 / Qprior.diagonal()
     print(var)
     beta = np.random.normal(0, np.sqrt(var)).reshape(b, 1)
-    np.save("inputs_brainiac/reference_outputs/beta_original.npy", beta.flatten())
+    np.save("reference_outputs/beta_original.npy", beta.flatten())
     # print(beta)
 
     # beta regression parameters with
