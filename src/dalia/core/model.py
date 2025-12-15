@@ -34,7 +34,7 @@ from dalia.submodels import (
     SpatioTemporalSubModel,
     AR1SubModel,
 )
-from dalia.utils import add_str_header, boxify, scaled_logit
+from dalia.utils import add_str_header, boxify
 
 
 class Model(ABC):

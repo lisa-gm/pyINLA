@@ -1,8 +1,8 @@
+from pathlib import Path
+from typing import Literal
+
 import numpy as np
 from scipy import sparse as sp
-
-from typing import Literal
-from pathlib import Path
 
 np.random.seed(5)
 
@@ -14,14 +14,15 @@ if __name__ == "__main__":
     n_annotations_per_features : int = 2
 
     # Model parameters
-    h2 : float = 0.95
+    h2 : float = 0.6
     sigma_a2 : float = 1.0
 
     # General parameters
     model_format : Literal["dense", "sparse"] = "dense"
     density : float = 0.4  # only used if model_format is "sparse"
 
-    path_inputs : Path = Path("inputs_brainiac")
+    path_script : Path = Path(__file__).parent
+    path_inputs : Path = path_script / "inputs_brainiac"
     path_reference : Path = path_inputs / "reference"
     
     path_inputs.mkdir(parents=True, exist_ok=True)
@@ -58,7 +59,7 @@ if __name__ == "__main__":
         y = a @ beta
     elif model_format == "sparse":
         y = a.dot(beta)
-    y += np.random.normal(0, 1, n_observations)
+    y += np.random.normal(0, np.sqrt(1 - h2), n_observations)
 
     # 8. Construct reference conditional precision matrix
     if model_format == "dense":
@@ -87,7 +88,7 @@ if __name__ == "__main__":
         np.save(path_inputs / "a.npy", a)
     elif model_format == "sparse":
         sp.save_npz(path_inputs / "a.npz", a)
-    np.save(path_inputs / "y.npy", y)
+    np.save(path_script / "y.npy", y)
     model_params = {
         "n_observations": n_observations,
         "n_features": n_features,

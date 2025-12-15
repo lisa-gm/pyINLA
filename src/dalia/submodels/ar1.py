@@ -6,7 +6,7 @@ import numpy as np
 from dalia import sp, xp
 from dalia.configs.submodels_config import AR1SubModelConfig
 from dalia.core.submodel import SubModel
-from dalia.utils import add_str_header, scaled_logit
+from dalia.utils import add_str_header
 
 
 class AR1SubModel(SubModel):
