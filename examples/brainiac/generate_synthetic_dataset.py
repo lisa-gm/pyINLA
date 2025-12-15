@@ -9,25 +9,24 @@ np.random.seed(5)
 if __name__ == "__main__":
 
     # Study parameters
-    n_observations : int = 1000
-    n_features : int = 2
-    n_annotations_per_features : int = 2
+    n_observations: int = 1000
+    n_features: int = 2
+    n_annotations_per_features: int = 2
 
     # Model parameters
-    h2 : float = 0.6
-    sigma_a2 : float = 1.0
+    h2: float = 0.6
+    sigma_a2: float = 1.0
 
     # General parameters
-    model_format : Literal["dense", "sparse"] = "dense"
-    density : float = 0.4  # only used if model_format is "sparse"
+    model_format: Literal["dense", "sparse"] = "dense"
+    density: float = 0.4  # only used if model_format is "sparse"
 
-    path_script : Path = Path(__file__).parent
-    path_inputs : Path = path_script / "inputs_brainiac"
-    path_reference : Path = path_inputs / "reference"
-    
+    path_script: Path = Path(__file__).parent
+    path_inputs: Path = path_script / "inputs_brainiac"
+    path_reference: Path = path_inputs / "reference"
+
     path_inputs.mkdir(parents=True, exist_ok=True)
     path_reference.mkdir(parents=True, exist_ok=True)
-
 
     # 1. Generate random Z matrix
     z = np.random.rand(n_features, n_annotations_per_features)
@@ -48,12 +47,14 @@ if __name__ == "__main__":
     if model_format == "dense":
         a = np.random.rand(n_observations, n_features)
     elif model_format == "sparse":
-        a = sp.random(n_observations, n_features, density=density, format="csc", dtype=np.float64)
+        a = sp.random(
+            n_observations, n_features, density=density, format="csc", dtype=np.float64
+        )
 
     # 6. Construct reference beta vector
     var = 1 / Q_prior.diagonal()
     beta = np.random.normal(0, np.sqrt(var), n_features)
-    
+
     # 7. Generate observation vector: sample full model: Y = a beta + epsilon
     if model_format == "dense":
         y = a @ beta
@@ -63,9 +64,9 @@ if __name__ == "__main__":
 
     # 8. Construct reference conditional precision matrix
     if model_format == "dense":
-        Q_conditional = Q_prior.toarray() + 1/(1-h2) * (a.T @ a)
+        Q_conditional = Q_prior.toarray() + 1 / (1 - h2) * (a.T @ a)
     elif model_format == "sparse":
-        Q_conditional = Q_prior + 1/(1-h2) * (a.T @ a).tocsc()
+        Q_conditional = Q_prior + 1 / (1 - h2) * (a.T @ a).tocsc()
 
     # Print Summary
     print("Generated BRAINIAC synthetic dataset with the following parameters:")
