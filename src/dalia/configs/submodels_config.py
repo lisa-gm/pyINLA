@@ -16,8 +16,6 @@ from dalia.configs.priorhyperparameters_config import (
 from dalia.configs.priorhyperparameters_config import (
     parse_config as parse_priorhyperparameters_config,
 )
-from dalia.utils import scaled_logit
-
 
 class SubModelConfig(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
@@ -118,10 +116,7 @@ class BrainiacSubModelConfig(SubModelConfig):
     ph_alpha: GaussianMVNPriorHyperparametersConfig = None
 
     def read_hyperparameters(self):
-        # input of h2 is in (0,1), rescale to -/+ INF
-        self.h2_scaled = scaled_logit(self.h2, direction="forward")
-
-        theta = xp.concatenate([xp.array([self.h2_scaled]), xp.array(self.alpha)])
+        theta = xp.concatenate([xp.array([self.h2]), xp.array(self.alpha)])
         theta_keys = ["h2"] + [f"alpha_{i}" for i in range(len(self.alpha))]
 
         return theta, theta_keys

@@ -37,7 +37,7 @@ if __name__ == "__main__":
     print("sigma_a2: ", sigma_a2)
 
     # sample alpha from N(0, \sigma_a^2 I)
-    alpha = np.random.normal(2, np.sqrt(sigma_a2), (m, 1))
+    alpha = np.random.normal(0, np.sqrt(sigma_a2), (m, 1))
     #alpha = np.ones((m, 1))
     # print(alpha)
 
@@ -68,9 +68,9 @@ if __name__ == "__main__":
     # sample full model: Y = a \beta + \epsilon
     # X random covariates of dimension (no, b)
     a = np.random.rand(no, b)
-    # np.save("a.npy", a)
+    np.save("inputs_brainiac/a.npy", a)
     a_sp = sp.csc_matrix(a)
-    sp.save_npz("inputs_brainiac/a.npz", a_sp)
+    # sp.save_npz("inputs_brainiac/a.npz", a_sp)
 
     # beta ~ N(0, (h^2 \Phi)^-1)
     var = 1 / Qprior.diagonal()

@@ -17,15 +17,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if __name__ == "__main__":
     print_msg("--- Example: Brainiac Submodel ---")
 
-    base_dir_data = BASE_DIR + "/inputs_brainiac_cmPRS"
+    # base_dir_data = BASE_DIR + "/inputs_brainiac_cmPRS"
+    base_dir_data = BASE_DIR
 
     m = 2  # number of annotations per feature
     b = 1000  # number of latent variables / number of features
     sigma_a2 = 1.0 / 1.0
     precision_mat = sigma_a2 * scsp.eye(m)
 
-    theta_ref = xp.load(f"{base_dir_data}/theta_original.npy")
-    x_ref = np.load(f"{base_dir_data}/beta_original.npy")
+    theta_ref = xp.load(f"{base_dir_data}/inputs_brainiac/theta_original.npy")
+    x_ref = np.load(f"{base_dir_data}/inputs_brainiac/beta_original.npy")
 
     xp.random.seed(5)
     # has to be between 0 and 1
@@ -86,8 +87,8 @@ if __name__ == "__main__":
     print("\n------ Compare to reference solution ------\n")
     print("theta_ref: ", theta_ref)
 
-    theta = result["theta_interpret"]
-    print("theta_interpret:", theta)
+    theta = result["theta"]
+    print("theta dalia:", theta)
 
     x = result["x"]
     print("norm(x_ref - x) = ", np.linalg.norm(x_ref - x))
@@ -95,8 +96,12 @@ if __name__ == "__main__":
     # marginal variances latent parameters
     var_latent_params = result["marginal_variances_latent"]
     Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
-    Qinv_ref = xp.linalg.inv(Qconditional)
+
+    if scsp.issparse(Qconditional):
+        Q_inv_ref = xp.linalg.inv(Qconditional.toarray())
+    else:
+        Q_inv_ref = xp.linalg.inv(Qconditional)
     print_msg(
         "Norm (marg var latent - ref):    ",
-        f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
+        f"{np.linalg.norm(var_latent_params - xp.diag(Q_inv_ref)):.4e}",
     )
