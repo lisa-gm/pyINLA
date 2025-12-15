@@ -26,7 +26,8 @@ from dalia.utils import (
     smartsplit,
     synchronize,
     synchronize_gpu,
-    check_vector_consistency
+    check_vector_consistency,
+    bcast,
 )
 
 if backend_flags["mpi_avail"]:
@@ -313,10 +314,14 @@ class DALIA:
         self.x_star = minimization_result["x"]
         print("Finished the optimization procedure.")
 
+        print("theta_star (1): ", self.theta_star)
+
         # need to update theta_star and x_star to be the same across all ranks
-        self.theta_star[:] = self.comm_world.bcast(self.theta_star, root=0)
-        self.theta_star_internal[:] = self.comm_world.bcast(self.theta_star_internal, root=0)
-        self.x_star[:] = self.comm_world.bcast(self.x_star, root=0)
+        bcast(data=self.theta_star[:], root=0, comm=self.comm_world)
+        bcast(data=self.theta_star_internal[:], root=0, comm=self.comm_world)
+        bcast(data=self.x_star[:], root=0, comm=self.comm_world)
+
+        print("theta_star (2): ", self.theta_star)
 
         # compute covariance of the hyperparameters theta at the mode
         print("theta_star: ", self.theta_star)

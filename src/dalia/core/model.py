@@ -215,7 +215,7 @@ class Model(ABC):
                         )
                     )
                 if isinstance(
-                    submodel.config.ph_alpha,
+                    submodel.config.ph_alpha, PenalizedComplexityPriorHyperparametersConfig
                 ):
                     self.prior_hyperparameters.append(
                         PenalizedComplexityPriorHyperparameters(
@@ -608,38 +608,16 @@ class Model(ABC):
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0
 
-        #theta_interpret = self.theta.copy()
-
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-
-            # if isinstance(prior_hyperparameter, BetaPriorHyperparameters):
-            #     theta_interpret[i] = scaled_logit(
-            #         theta_interpret[i], direction="backward"
-            #     )
-            # theta_interpret[i] = prior_hyperparameter.rescale_hyperparameters_to_internal(
-            #     theta_interpret[i], direction="backward"
-            # )
-
-            log_prior += prior_hyperparameter.evaluate_log_prior(self.theta_external[i])
-            #log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
-
-        # if BFGS and model scale differ: rescale -- generalize
-        # if isinstance(self.submodels[0], BrainiacSubModel):
-        #     #
-        #     theta_interpret = self.theta.copy()
-        #     theta_interpret[0] = scaled_logit(self.theta[0], direction="backward")
-        #     log_prior += self.prior_hyperparameters[0].evaluate_log_prior(
-        #         theta_interpret[0]
-        #     )
-
-        #     log_prior += self.prior_hyperparameters[1].evaluate_log_prior(
-        #         theta_interpret[1:]
-        #     )
-        # else:
-        #     theta_interpret = self.theta
-
-        #     for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-        #         log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
+            if isinstance(prior_hyperparameter, GaussianMVNPriorHyperparameters):
+                # for MVN prior hyperparameters, we need to pass the full vector
+                log_prior += prior_hyperparameter.evaluate_log_prior(
+                    self.theta_external[
+                        i : i + prior_hyperparameter.mean.shape[0]
+                    ]
+                )
+            else:
+                log_prior += prior_hyperparameter.evaluate_log_prior(self.theta_external[i])
 
         return log_prior
 
