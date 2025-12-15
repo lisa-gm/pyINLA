@@ -50,23 +50,13 @@ class BrainiacSubModel(SubModel):
             self.z.shape[0] == self.a.shape[1]
         ), f"Numbers rows in z ({self.z.shape[0]}) must match number of columns in a ({self.a.shape[1]})."
 
-    def rescale_hyperparameters_to_interpret(self, theta: NDArray) -> NDArray:
-        h2_scaled = theta[0]
-        # rescale h2 to (0,1) as it's currently between -INF:+INF
-        h2 = scaled_logit(h2_scaled, direction="backward")
-
-        theta_interpret = xp.concatenate((xp.array([h2]), theta[1:]))
-        return theta_interpret
 
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
         # Extract all alpha_x values and put them into an array
         alpha_keys = sorted([key for key in kwargs if key.startswith("alpha_")])
         alpha = xp.array([kwargs[key] for key in alpha_keys])
-        h2_scaled = kwargs.get("h2")
-
-        # rescale h2 to (0,1) as it's currently between -INF:+INF
-        h2 = scaled_logit(h2_scaled, direction="backward")
+        h2 = kwargs.get("h2")
 
         # \Phi = 1 / \sum_k=1^B exp(Z^k \alpha) * diag(exp(Z_1 \alpha), exp(Z_2 \alpha), ... )
         exp_Z_alpha = xp.exp(self.z @ alpha)
@@ -85,9 +75,7 @@ class BrainiacSubModel(SubModel):
     def evaluate_likelihood(self, eta: NDArray, y: NDArray, **kwargs) -> float:
         n_observations = y.shape[0]
 
-        h2_scaled = kwargs.get("h2")
-        # rescale h2 to (0,1) as it's currently between -INF:+INF
-        h2 = scaled_logit(h2_scaled, direction="backward")
+        h2 = kwargs.get("h2")
         if h2 == 1:
             raise ValueError("h2 is 1. Will lead to division by zero.")
 
@@ -101,10 +89,8 @@ class BrainiacSubModel(SubModel):
     def evaluate_gradient_likelihood(
         self, eta: NDArray, y: NDArray, **kwargs
     ) -> NDArray:
-        h2_scaled = kwargs.get("h2")
+        h2 = kwargs.get("h2")
 
-        # rescale h2 to (0,1) as it's currently between -INF:+INF
-        h2 = scaled_logit(h2_scaled, direction="backward")
         if h2 == 1:
             raise ValueError("h2 is 1. Will lead to division by zero.")
 
@@ -113,9 +99,7 @@ class BrainiacSubModel(SubModel):
         return gradient
 
     def evaluate_d_matrix(self, **kwargs) -> NDArray:
-        h2_scaled = kwargs.get("h2")
-        # rescale h2 to (0,1) as it's currently between -INF:+INF
-        h2 = scaled_logit(h2_scaled, direction="backward")
+        h2 = kwargs.get("h2")
 
         if h2 == 1:
             raise ValueError("h2 is 1. Will lead to division by zero.")

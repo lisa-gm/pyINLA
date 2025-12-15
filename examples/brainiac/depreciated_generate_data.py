@@ -28,17 +28,17 @@ if __name__ == "__main__":
     # TODO: how to estimate alpha_beta and beta_beta?
     # alpha_beta = 5.0
     # beta_beta = 1.0
-    #h2 = np.random.beta(alpha_beta, beta_beta)
-    h2 = 0.95
+    # h2 = np.random.beta(alpha_beta, beta_beta)
+    h2 = 0.6
     print("h2: ", h2)
-    
+
     # \sigma_a^2: large and fixed
     sigma_a2 = 1
     print("sigma_a2: ", sigma_a2)
 
     # sample alpha from N(0, \sigma_a^2 I)
     alpha = np.random.normal(0, np.sqrt(sigma_a2), (m, 1))
-    #alpha = np.ones((m, 1))
+    # alpha = np.ones((m, 1))
     # print(alpha)
 
     theta_original = np.concatenate(([h2], alpha.flatten()))
@@ -103,5 +103,3 @@ if __name__ == "__main__":
     print("beta recovered: ", beta_recovered.flatten())
     print("beta original : ", beta.flatten())
     print("norm(diff) : ", np.linalg.norm(beta_recovered - beta))
-
-
