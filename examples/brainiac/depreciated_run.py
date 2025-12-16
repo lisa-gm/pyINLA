@@ -21,17 +21,19 @@ if __name__ == "__main__":
     base_dir_data = BASE_DIR
 
     m = 2  # number of annotations per feature
-    b = 1000  # number of latent variables / number of features
+    b = 20  # number of latent variables / number of features
     sigma_a2 = 1.0 / 1.0
     precision_mat = sigma_a2 * scsp.eye(m)
 
-    theta_ref = xp.load(f"{base_dir_data}/inputs_brainiac/theta_original.npy")
-    x_ref = np.load(f"{base_dir_data}/inputs_brainiac/beta_original.npy")
+    theta_ref = xp.load(f"{base_dir_data}/reference_outputs/theta_original.npy")
+    x_ref = np.load(f"{base_dir_data}/reference_outputs/beta_original.npy")
+
+    print("Reference theta: ", theta_ref)
 
     xp.random.seed(5)
     # has to be between 0 and 1
     initial_h2 = theta_ref[0] - 0.1
-    initial_alpha = theta_ref[1:] + 1.5 * xp.random.randn(m - 1)
+    initial_alpha = theta_ref[1:] + 1.5 * xp.random.randn(m)
 
     brainiac_dict = {
         "type": "brainiac",
