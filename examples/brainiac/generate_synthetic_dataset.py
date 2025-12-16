@@ -10,12 +10,12 @@ if __name__ == "__main__":
 
     # Study parameters
     n_observations: int = 1000
-    n_features: int = 2
-    n_annotations_per_features: int = 2
+    n_features: int = 4
+    n_annotations_per_features: int = 4
 
     # Model parameters
-    h2: float = 0.6
-    sigma_a2: float = 1.0
+    h2: float = 0.7
+    sigma_a2: float = 5.0
 
     # General parameters
     model_format: Literal["dense", "sparse"] = "dense"
