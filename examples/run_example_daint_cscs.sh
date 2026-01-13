@@ -2,7 +2,7 @@
 #SBATCH --job-name="dalia_daint"
 #SBATCH --output=%x.%j.out
 #SBATCH --error=%x.%j.err
-#SBATCH --account=sm96
+#SBATCH --account=lp16
 #SBATCH --time=00:05:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1

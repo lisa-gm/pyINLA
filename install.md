@@ -186,7 +186,7 @@ Git-lfs will now be installed and available in your user space. Its path have be
     ```bash
     daint_install_conda --yes
     ```
-    Notes:
+    **Notes:**
     - This step is only required if you do not already have `conda` installed.
     - The `--yes` option automatically confirms the installation prompts.
     - Additional information about the installer options can be found by running `daint_install_conda --help`.
@@ -195,7 +195,7 @@ Git-lfs will now be installed and available in your user space. Its path have be
     ```bash
     source ~/miniconda3/etc/profile.d/conda.sh
     ```
-    Notes:
+    **Notes:**
     - This is needed only once; in subsequent shell sessions conda will be initialized automatically through your `.bashrc` file.
 
 5. Install the programming environment (`uenv`):
@@ -207,14 +207,14 @@ Git-lfs will now be installed and available in your user space. Its path have be
     ```bash
     daint_start_uenv
     ```
-    Notes: 
+    **Notes:**
     - This script assumes that you have successfully installed the programming environment in the previous step. If a programming environment is already active, it will be stopped and replaced with a new one.
 
 7. Source the `daint_cscs_utils.sh` script again to access the install utilities:
     ```bash
     source scripts/daint_cscs_utils.sh
     ```
-    Notes:
+    **Notes:**
     - This is needed because starting the programming environment spawns a new shell session in which previously sourced scripts are no longer available.
 
 8. Load the required environment modules:
@@ -234,10 +234,36 @@ Git-lfs will now be installed and available in your user space. Its path have be
     Note: This function tries to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env` argument.
 
 ### b) Usage
-...
+Right after installation, you can use DALIA using the loaded modules and activated conda environment.
+
+However, in general, in future shell sessions you will need to:
+1. Source the `daint_cscs_utils.sh` script:
+    ```bash
+    source /path/to/DALIA/scripts/daint_cscs_utils.sh
+    ```
+2. Start the programming environment:
+    ```bash
+    daint_start_uenv
+    ```
+3. Source the `daint_cscs_utils.sh` script again (`uenv` is starting a new shell) to access the install utilities:
+    ```bash
+    source /path/to/DALIA/scripts/daint_cscs_utils.sh
+    ```
+4. Load the required environment modules:
+    ```bash
+    daint_load_modules
+    ```
+5. Activate the conda environment:
+    ```bash
+    daint_activate_conda_env
+    ```
+
+You will then be ready to use DALIA.
 
 ### c) Verify Installation
-...
+There is currently two ways to verify that DALIA has been installed correctly:
+1. Run the provided test suite. Directly from the front node (after activating the correct conda environment) you can run the test suite: `./path/to/DALIA/tests/runner.sh`.
+2. Run one of the provided examples, you can check the `/path/to/DALIA/examples/run_example_daint_cscs.sh` script for an example on how to submit a job on Daint.
 
 ## On a Personal Machine
 ### a) Installation
