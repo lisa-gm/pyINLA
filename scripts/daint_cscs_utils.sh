@@ -118,14 +118,15 @@ daint_install_conda() {
         echo "   =========================================="
         echo "   EXISTING CONDA INSTALLATION DETECTED"
         echo "   =========================================="
-        echo "   Please manually uninstall conda/miniconda first:"
-        echo ""
-        echo "   1. Remove the installation directory:"
+        echo "   An existing conda/miniconda installation was detected on your system."
+        echo "     a) If this installation is working, you may continue..."
+        echo "     b) If this installation is broken, please manually uninstall it and re-running this script:"
+        echo "       1. Remove the installation directory:"
         if [[ -d "$install_path" ]]; then
-            echo "      rm -rf ${install_path}"
+            echo "       rm -rf ${install_path}"
         fi
         echo ""
-        echo "   2. Remove conda initialization from shell configuration files:"
+        echo "       2. Remove conda initialization from shell configuration files:"
         if [[ -f "$HOME/.bashrc" ]] && grep -q "# >>> conda initialize >>>" "$HOME/.bashrc"; then
             echo "      Edit ~/.bashrc and remove the section between:"
             echo "      '# >>> conda initialize >>>' and '# <<< conda initialize <<<'"
@@ -138,9 +139,9 @@ daint_install_conda() {
             echo "      '# >>> conda initialize >>>' and '# <<< conda initialize <<<'"
         fi
         echo ""
-        echo "   3. Start a new terminal session or run: source ~/.bashrc"
+        echo "       3. Start a new terminal session or run: source ~/.bashrc"
         echo ""
-        echo "   4. Re-run this installer: daint_install_conda"
+        echo "       4. Re-run this installer: daint_install_conda"
         echo ""
         return 1
     fi
@@ -838,7 +839,7 @@ daint_create_conda_env() {
                 # Install mpi4py in the enhanced environment
                 echo "   Installing mpi4py with OpenMPI support in enhanced environment..."
                 cd "$dalia_path" || true
-                if MPICC=$(which mpicc) python -m pip install --no-cache-dir mpi4py; then
+                if MPICC=$(which mpicc) python -m pip install --no-cache-dir --no-binary=mpi4py mpi4py; then
                     echo "   Successfully installed mpi4py in MPI-enhanced environment."
 
                     # Try to import nccl to ensure it's available
