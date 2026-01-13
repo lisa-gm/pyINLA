@@ -12,17 +12,19 @@
 ###SBATCH --exclusive
 #SBATCH --export=NONE
 
-# Set DALIA environment variables for examples  
-source ../scripts/alex_fau_utils.sh && alex_load_modules && alex_activate_conda_env && alex_set_perfenv
-source ../scripts/dalia_job_utils.sh && dalia_set_perfenv && dalia_print_job_config
-
 # Change to examples directory
 if [[ "$(basename "$(pwd)")" != "examples" ]]; then
+    echo ""
     echo "Error: Not in examples directory"
     echo "   Current directory: $(pwd)"
     echo "   Please run this script from the examples/ directory"
+    echo ""
     exit 1
 fi
+
+# Set DALIA environment variables for examples  
+source ../scripts/alex_fau_utils.sh && alex_load_modules && alex_activate_conda_env && alex_set_perfenv
+source ../scripts/dalia_job_utils.sh && dalia_set_perfenv && dalia_print_job_config
 
 # --- How to Run ---
 # This run script is designed to run on Alex at NHR@FAU

@@ -16,8 +16,8 @@ alex_load_modules() {
     }
 
     # Load required modules
-    echo "   Loading required modules: mkl/2023.2.0 gcc/12.1.0 cuda/12.9.0 openmpi/4.1.3-nvhpc22.5-cuda  python"
-    module load mkl/2023.2.0 gcc/12.1.0 openmpi/4.1.3-nvhpc22.5-cuda cuda/12.9.0 python || {
+    echo "   Loading required modules: mkl/2023.2.0 gcc/12.1.0 cuda/12.9.0 openmpi/4.1.6-nvhpc23.7-cuda12  python"
+    module load mkl/2023.2.0 gcc/12.1.0 openmpi/4.1.6-nvhpc23.7-cuda12 cuda/12.9.0 python || {
         echo "   Error: Failed to load required modules."
         echo "   Available modules:"
         module avail 2>&1 | head -20
@@ -32,7 +32,7 @@ alex_load_modules() {
 alex_check_modules() {
     echo "alex_check_modules: checking if required modules are loaded."
     
-    local required_modules=("mkl/2023.2.0" "gcc/12.1.0" "cuda/12.9.0" "openmpi/4.1.3-nvhpc22.5-cuda" "python")
+    local required_modules=("mkl/2023.2.0" "gcc/12.1.0" "cuda/12.9.0" "openmpi/4.1.6-nvhpc23.7-cuda12" "python")
     local missing_modules=()
     
     # Get list of currently loaded modules
@@ -333,19 +333,9 @@ SLURM_EOF
             echo "   Cleaning up SLURM job files..."
             rm -f "cupy_install_${env_name}.o${job_id}" "cupy_install_${env_name}.e${job_id}" 2>/dev/null || true
         elif [[ "$job_status" == "COMPLETED" || -z "$job_status" ]]; then
-            # Verify cupy installation by checking if cupy-core package is installed
-            echo "   Verifying cupy installation..."
-            if alex_activate_conda_env --env="$env_name"; then
-                if conda list cupy-core | grep -q cupy-core && python -c "import cupy; print(f'CuPy version: {cupy.__version__}')" 2>/dev/null; then
-                    echo "   Successfully installed and verified cupy-core in base environment."
-                else
-                    echo "   Warning: cupy installation may have failed. Could not import cupy or verify installation."
-                    echo "   You can test the installation manually with: python -c 'import cupy; print(cupy.__version__)'"
-                fi
-            else
-                echo "   Warning: Failed to activate environment for verification."
-            fi
-            
+            # Removed cupy instalaltion check as on front node there is no Cuda capable device.
+            echo "   CuPy installation completed."
+
             # Clean up SLURM job output files
             echo "   Cleaning up SLURM job files..."
             rm -f "cupy_install_${env_name}.o${job_id}" "cupy_install_${env_name}.e${job_id}" 2>/dev/null || true
@@ -483,6 +473,8 @@ SLURM_EOF
             echo "   Enhanced environment with mpi4py and NCCL support created."
         fi
     fi
+    echo "   To use a specific environment in the future, run: alex_activate_conda_env --env=\"alex_env_name\""
+    echo "   To use the most performant environment you have available, just run: alex_activate_conda_env"
     
     return 0
 }

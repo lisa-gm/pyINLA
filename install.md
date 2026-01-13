@@ -1,4 +1,4 @@
-# How to install DALIA on one of the default clusters
+# How to install DALIA on one of the default clusters or your personal machine
 DALIA has been developed on several (super)computing infrastructures. Since the beginning of the project, our goal has been to provide a seamless experience for users regardless of the underlying hardware and software stack.
 
 Because full generalization is not always possible, we provide a simplified procedure for multiple supercomputing infrastructures (with different hardware) to make installing DALIA on a new cluster as easy as possible.
@@ -31,10 +31,13 @@ DALIA is designed to work across a wide variety of hardware and software stacks 
 
 The `dalia_base` environment contains all the dependencies needed to run DALIA on a single node without any communication library (e.g., MPI, xCCL) and without GPU support. This environment includes only hardware-independent Python dependencies. In `dalia/scripts/` we provide interactive installers that can create these `dalia_base` environments for you and, when applicable, extend them to support multi-node communication with MPI or xCCL and/or GPU acceleration.
 
-**Notes:** On the Daint and Alex clusters, CuPy is installed using wheels that include NCCL. Therefore, NCCL is available whenever CuPy is installed. For this reason, no standalone GPU-aware MPI environments are provided.
+**Notes:** 
+- On the Daint and Alex clusters, CuPy is installed using wheels that include NCCL. Therefore, NCCL is available whenever CuPy is installed. For this reason, no standalone GPU-aware MPI environments are provided.
+- On Daint, the `dalia_base_daint` environment allows one to run on the ARM CPU. However, we do not provide any conda environment specifically targeted for a general ARM CPU-cluster.
 
 # Detailed Instructions
 ## On Fritz@FAU
+### a) Installation
 1. Clone the repositories to your workspace:    
     ```
     mv /my/install/path
@@ -62,10 +65,35 @@ The `dalia_base` environment contains all the dependencies needed to run DALIA o
     ```
     fritz_activate_conda_env
     ```
-    Note: This function will try to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env` argument to the function.
+    Note: This function will try to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env="desired_environment"` argument to the function.
 
+### b) Usage
+Right after installation, you can use DALIA using the loaded modules and activated conda environment.
+
+However, in general, in future shell sessions you will need to:
+1. Source the `fritz_fau_utils.sh` script:
+    ```
+    source /path/to/DALIA/scripts/fritz_fau_utils.sh
+    ```
+2. Load the required environment modules:
+    ```
+    fritz_load_modules
+    ```
+3. Activate the conda environment:
+    ```
+    fritz_activate_conda_env
+    ```
+
+You will then be ready to use DALIA.
+
+### c) Verify Installation
+There is currently two ways to verify that DALIA has been installed correctly:
+1. Run the provided test suite. In an interactive session: `salloc -N 1 --time=00:30:00` (you might need to wait to get the allocation), you can (after activated the correct conda environment) run the test suite: `./path/to/DALIA/tests/runner.sh`.
+2. Run one of the provided examples, you can check the `/path/to/DALIA/examples/run_example_fritz_fau.sh` script for an example on how to submit a job on Fritz.
 
 ## On Alex@FAU
+### a) Installation
+
 1. Clone the repositories to your workspace:    
     ```
     mv /my/install/path
@@ -95,7 +123,33 @@ The `dalia_base` environment contains all the dependencies needed to run DALIA o
     ```
     Note: This function will try to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env` argument to the function.
 
+### b) Usage
+Right after installation, you can use DALIA using the loaded modules and activated conda environment.
+
+However, in general, in future shell sessions you will need to:
+1. Source the `alex_fau_utils.sh` script:
+    ```
+    source /path/to/DALIA/scripts/alex_fau_utils.sh
+    ```
+2. Load the required environment modules:
+    ```
+    alex_load_modules
+    ```
+3. Activate the conda environment:
+    ```
+    alex_activate_conda_env
+    ```
+
+You will then be ready to use DALIA.
+
+### c) Verify Installation
+There is currently two ways to verify that DALIA has been installed correctly:
+1. Run the provided test suite. In an interactive session: `salloc --gres=gpu:a100:1 --time=0:30:00` (you might need to wait to get the allocation), you can (after activated the correct conda environment) run the test suite: `./path/to/DALIA/tests/runner.sh`.
+2. Run one of the provided examples, you can check the `/path/to/DALIA/examples/run_example_alex_fau.sh` script for an example on how to submit a job on Alex.
+
+
 ## On Daint@CSCS
+### a) Installation
 1. Clone the repositories to your workspace:    
     ```
     mv /my/install/path
@@ -134,6 +188,8 @@ The `dalia_base` environment contains all the dependencies needed to run DALIA o
     ```
     daint_start_uenv
     ```
+    Notes: 
+    - This script assumes that you have successfully installed the programming environment in the previous step. If a programming environment is already active, it will be stopped and replaced with a new one.
 
 7. Source the `daint_cscs_utils.sh` script again to access the install utilities:
     ```
@@ -158,16 +214,71 @@ The `dalia_base` environment contains all the dependencies needed to run DALIA o
     ```
     Note: This function tries to activate the most performant environment available on the cluster. You can also activate a specific environment by providing the `--env` argument.
 
-In addition to the above steps, you might need to install `git-lfs` to work with the examples provided
-by the package. Unfortunately, `git-lfs` is not available as a module on Daint. We provide a utility to install `git-lfs` in your user space as part of the `daint_cscs_utils.sh` script.
-To install `git-lfs`, source the `daint_cscs_utils.sh` script and then simply run:
+### b) Usage
+...
+
+### c) Verify Installation
+...
+
+## On a Personal Machine
+### a) Installation
+Given a working installation of `git` and `conda`, you can install DALIA on your personal machine as follows:
+
+1. Clone the repositories to your workspace:
+    ```
+    mv /my/install/path
+    git clone https://github.com/dalia-project/DALIA
+    git clone https://github.com/vincent-maillou/serinv # Optional, recommended for ST-modeling
+    ```
+
+2. Based on your micro-architecture (x86 or aarch64), create the conda environment using the provided installer scripts:
+- For x86 architecture:
+    ```bash
+    conda env create --name "env_name" -f path/to/DALIA/envs/dalia_base_x86.yml
+    ```
+- For aarch64 architecture:
+    ```bash
+    conda env create --name "env_name" -f path/to/DALIA/envs/dalia_base_aarch64.yml
+    ```
+
+3. Activate the conda environment:
+    ```bash
+    conda activate env_name
+    ```
+
+4. Install DALIA in editable mode:
+    ```bash
+    cd path/to/DALIA
+    pip install -e .
+    ```
+
+5. Install Serinv (optional, recommended for ST-modeling) in editable mode:
+    ```bash
+    cd path/to/serinv
+    pip install -e .
+    ```
+
+### b) Verify Installation
+They are currently two ways to verify that DALIA has been installed correctly:
+1. Run the provided test suite: `./path/to/DALIA/tests/runner.sh`.
+2. Run one of the provided examples, for example: `python /path/to/DALIA/examples/gr/run.py`
+
+
+## Notes on `git-lfs`
+In order to handle large files (e.g. examples datasets), we use `git-lfs` (Git Large File Storage). Some files are then tracked by `git-lfs` instead of `git`, and are only downloaded on demand.
+
+In order to run the examples provided with DALIA, you need to have `git-lfs` installed and configured on your system.
+
+On Fritz and Alex, `git-lfs` is available by default and is in your path: `/usr/bin/git-lfs`. However on Daint this is not the case, and `git-lfs` is not provided by the system. We provide a utility to install `git-lfs` in your user space as part of the `daint_cscs_utils.sh` script. 
+
+After sourcing the `daint_cscs_utils.sh` script, you can run the following command to install `git-lfs`:
 ```
 daint_install_git_lfs
 ```
 
-## Other Information
+## Other Informations
 
-- After installing packages with conda, it is recommended to run `conda clean --all`.
+- After installing packages with conda, it is recommended to run `conda clean --all` to free up disk space.
 - These installation procedures and `conda` environments have been tested on Linux systems based on both `x86` and `aarch64` architectures.
 - If the `sqlite` module does not work properly, forcing the following version might help:
     ```bash

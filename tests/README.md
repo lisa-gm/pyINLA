@@ -4,8 +4,11 @@ The DALIA testing suite is in construction. Integration tests are not yet availa
 
 ## How to run tests
 
-The tests can either be run directly using `pytest` or through the provided `runner.sh` script. The `runner.sh` script allows for more convenient selection of test categories and backends. You can either run it directly using `./runner.sh` or check the available options with `./runner.sh --help`.
+The tests can either be run directly using `pytest` or through the provided `runner.sh` script. The `runner.sh` script allows for more convenient selection of test categories and backends. 
 
+In a "functionnal" environment, on a cluster with the appropriate modules loaded, and with a working conda environment activated, you can run the tests as follows:
+- Directly using: `./runner.sh`
+- Check available options: `./runner.sh --help`.
 
 ## Tests status
 

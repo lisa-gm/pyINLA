@@ -922,6 +922,8 @@ daint_create_conda_env() {
             echo "   Enhanced environment with mpi4py and NCCL support created."
         fi
     fi
+    echo "   To use a specific environment in the future, run: daint_activate_conda_env --env=\"daint_env_name\""
+    echo "   To use the most performant environment you have available, just run: daint_activate_conda_env"
     
     return 0
 }
@@ -950,7 +952,7 @@ daint_activate_conda_env() {
                 echo ""
                 echo "Examples:"
                 echo "  daint_activate_conda_env                        # Auto-select best available"
-                echo "  daint_activate_conda_env --env=dalia_base_daint  # Activate specific environment"
+                echo "  daint_activate_conda_env --env=dalia_base_daint # Activate specific environment"
                 return 0
                 ;;
             *)
