@@ -379,7 +379,8 @@ fritz_create_conda_env() {
             echo "   Enhanced environment with mpi4py support created."
         fi
     fi
-    echo "   To use this environment in the future, run: fritz_activate_conda_env ${env_name}"
+    echo "   To use a specific environment in the future, run: fritz_activate_conda_env --env=\"fritz_env_name\""
+    echo "   To use the most performant environment you have available, just run: fritz_activate_conda_env"
     
     return 0
 }

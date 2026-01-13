@@ -223,17 +223,26 @@ except Exception as e:
 }
 
 check_mpi_installation() {
-    # Check if MPI is available (mpiexec/mpirun and mpi4py)
+    # Check if MPI is available (srun/mpirun/mpiexec and mpi4py)
     print_message "Checking MPI installation and functionality..." "INFO"
     
-    # Check for mpiexec or mpirun command
-    if ! command -v mpiexec >/dev/null 2>&1 && ! command -v mpirun >/dev/null 2>&1; then
-        print_message "mpiexec/mpirun not found - MPI not available" "WARNING"
+    # Check for srun, mpirun or mpiexec command
+    if ! command -v srun >/dev/null 2>&1 && ! command -v mpirun >/dev/null 2>&1 && ! command -v mpiexec >/dev/null 2>&1; then
+        print_message "srun/mpirun/mpiexec not found - MPI not available" "WARNING"
         return 1
     fi
     
+    # Determine which MPI launcher to use (priority: srun, mpirun, mpiexec)
+    if command -v srun >/dev/null 2>&1; then
+        MPI_LAUNCHER="srun"
+    elif command -v mpirun >/dev/null 2>&1; then
+        MPI_LAUNCHER="mpirun"
+    elif command -v mpiexec >/dev/null 2>&1; then
+        MPI_LAUNCHER="mpiexec"
+    fi
+    
     # Try to import and test mpi4py
-    python -c "
+    $MPI_LAUNCHER -n 1 python -c "
 import sys
 try:
     import mpi4py
@@ -396,12 +405,23 @@ run_numpy_tests() {
     
     set_env_var "ARRAY_MODULE" "numpy"
     
+    # Determine which MPI launcher to use (priority: srun, mpirun, mpiexec)
+    if command -v srun >/dev/null 2>&1; then
+        MPI_LAUNCHER="srun -n 1"
+    elif command -v mpirun >/dev/null 2>&1; then
+        MPI_LAUNCHER="mpirun -n 1"
+    elif command -v mpiexec >/dev/null 2>&1; then
+        MPI_LAUNCHER="mpiexec -n 1"
+    else # No MPI available
+        MPI_LAUNCHER=""
+    fi
+
     # Run pytest
     if command -v pytest >/dev/null 2>&1; then
         if [ -n "$test_dirs" ]; then
-            pytest $test_dirs -v
+            $MPI_LAUNCHER pytest $test_dirs -v
         else
-            pytest . -v
+            $MPI_LAUNCHER pytest . -v
         fi
         local exit_code=$?
         return $exit_code
@@ -420,12 +440,23 @@ run_cupy_tests() {
     
     set_env_var "ARRAY_MODULE" "cupy"
     
+    # Determine which MPI launcher to use (priority: srun, mpirun, mpiexec)
+    if command -v srun >/dev/null 2>&1; then
+        MPI_LAUNCHER="srun -n 1"
+    elif command -v mpirun >/dev/null 2>&1; then
+        MPI_LAUNCHER="mpirun -n 1"
+    elif command -v mpiexec >/dev/null 2>&1; then
+        MPI_LAUNCHER="mpiexec -n 1"
+    else # No MPI available
+        MPI_LAUNCHER=""
+    fi
+
     # Run pytest
     if command -v pytest >/dev/null 2>&1; then
         if [ -n "$test_dirs" ]; then
-            pytest $test_dirs -v
+            $MPI_LAUNCHER pytest $test_dirs -v
         else
-            pytest . -v
+            $MPI_LAUNCHER pytest . -v
         fi
         local exit_code=$?
         return $exit_code
@@ -444,24 +475,22 @@ run_mpi_numpy_tests() {
     
     set_env_var "ARRAY_MODULE" "numpy"
     
-    # Determine which MPI launcher to use
-    local mpi_launcher=""
-    if command -v mpiexec >/dev/null 2>&1; then
-        mpi_launcher="mpiexec"
+    # Determine which MPI launcher to use (priority: srun, mpirun, mpiexec)
+    if command -v srun >/dev/null 2>&1; then
+        MPI_LAUNCHER="srun"
     elif command -v mpirun >/dev/null 2>&1; then
-        mpi_launcher="mpirun"
-    else
-        print_message "Neither mpiexec nor mpirun found - cannot run MPI tests" "ERROR"
-        return 1
+        MPI_LAUNCHER="mpirun"
+    elif command -v mpiexec >/dev/null 2>&1; then
+        MPI_LAUNCHER="mpiexec"
     fi
-    
-    # Run with 2 processes
-    echo "Running MPI tests with 2 processes using $mpi_launcher..."
+
+    # Run with 2 processes using the MPI launcher determined during backend detection
+    echo "Running MPI tests with 2 processes using $MPI_LAUNCHER..."
     if command -v pytest >/dev/null 2>&1; then
         if [ -n "$test_dirs" ]; then
-            $mpi_launcher -n 2 pytest --with-mpi $test_dirs -v
+            $MPI_LAUNCHER -n 2 pytest --with-mpi $test_dirs -v
         else
-            $mpi_launcher -n 2 pytest --with-mpi . -v
+            $MPI_LAUNCHER -n 2 pytest --with-mpi . -v
         fi
         if [ $? -ne 0 ]; then
             print_message "MPI tests with 2 processes failed" "ERROR"
@@ -485,24 +514,22 @@ run_mpi_cupy_tests() {
     
     set_env_var "ARRAY_MODULE" "cupy"
     
-    # Determine which MPI launcher to use
-    local mpi_launcher=""
-    if command -v mpiexec >/dev/null 2>&1; then
-        mpi_launcher="mpiexec"
+    # Determine which MPI launcher to use (priority: srun, mpirun, mpiexec)
+    if command -v srun >/dev/null 2>&1; then
+        MPI_LAUNCHER="srun"
     elif command -v mpirun >/dev/null 2>&1; then
-        mpi_launcher="mpirun"
-    else
-        print_message "Neither mpiexec nor mpirun found - cannot run MPI tests" "ERROR"
-        return 1
+        MPI_LAUNCHER="mpirun"
+    elif command -v mpiexec >/dev/null 2>&1; then
+        MPI_LAUNCHER="mpiexec"
     fi
-    
-    # Run with 2 processes
-    echo "Running MPI + GPU tests with 2 processes using $mpi_launcher..."
+
+    # Run with 2 processes using the MPI launcher determined during backend detection
+    echo "Running MPI + GPU tests with 2 processes using $MPI_LAUNCHER..."
     if command -v pytest >/dev/null 2>&1; then
         if [ -n "$test_dirs" ]; then
-            $mpi_launcher -n 2 pytest --with-mpi $test_dirs -v
+            $MPI_LAUNCHER -n 2 pytest --with-mpi $test_dirs -v
         else
-            $mpi_launcher -n 2 pytest --with-mpi . -v
+            $MPI_LAUNCHER -n 2 pytest --with-mpi . -v
         fi
         if [ $? -ne 0 ]; then
             print_message "MPI + GPU tests with 2 processes failed" "ERROR"
