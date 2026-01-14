@@ -1,0 +1,1 @@
+inla_bru should give us idea on how the interface "should be". Interface to the inla interface
