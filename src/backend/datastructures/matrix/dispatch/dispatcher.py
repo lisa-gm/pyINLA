@@ -1,12 +1,15 @@
+# src/backend/datastructures/matrix/dispatch/dispatcher.py
 import numpy as np
 import scipy.sparse as sp
 
 from .operations import Operation
 from .matmul import dispatch_matmul
+from .add import dispatch_add
 
 # At module level
 _OPERATION_MAP = {
     Operation.MATMUL: dispatch_matmul,
+    Operation.ADD: dispatch_add,
 }
 
 

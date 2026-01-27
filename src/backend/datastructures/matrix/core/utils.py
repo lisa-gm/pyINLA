@@ -1,3 +1,4 @@
+# src/backend/datastructures/matrix/core/utils.py
 import numpy as np
 import scipy.sparse as sp
 
@@ -13,3 +14,10 @@ def wrap_result(data):
     if sp.issparse(data):
         return SparseMatrix(data)
     raise TypeError(f"Unknown matrix type: {type(data)}")
+
+
+def toarray(data):
+    """Convert data to a dense numpy array"""
+    if sp.issparse(data):
+        return data.toarray()
+    return np.asarray(data)  # Works for arrays and views
