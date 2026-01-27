@@ -1,4 +1,13 @@
+import numpy as np
+import scipy.sparse as sp
+
 from .operations import Operation
+from .matmul import dispatch_matmul
+
+# At module level
+_OPERATION_MAP = {
+    Operation.MATMUL: dispatch_matmul,
+}
 
 
 def blas_dispatch(operation: Operation, left, right):
@@ -7,8 +16,14 @@ def blas_dispatch(operation: Operation, left, right):
     right_type = _get_matrix_type(right)
 
     # Dispatch based on operation
-    if operation == Operation.MATMUL:
-        return _dispatch_matmul(left, right, left_type, right_type)
-    elif operation == Operation.ADD:
-        return _dispatch_add(left, right, left_type, right_type)
-    # ...
+    dispatch_func = _OPERATION_MAP[operation]
+    return dispatch_func(left, right, left_type, right_type)
+
+
+def _get_matrix_type(data):
+    """Determine the type of matrix data"""
+    if sp.issparse(data):
+        return "sparse"
+    if isinstance(data, np.ndarray):
+        return "dense"
+    raise TypeError(f"Unknown matrix type: {type(data)}")

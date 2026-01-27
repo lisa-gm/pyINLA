@@ -10,28 +10,24 @@ The operatios are dispatched automatically based on the type of the operands.
 
 """
 
-import numpy as np
-import scipy.sparse as sp
+from abc import ABC
 
 from backend.datastructures.matrix.dispatch import blas_dispatch, Operation
 
+from .utils import wrap_result
 
-class Matrix:
+
+class Matrix(ABC):
     def __init__(self, data):
         self._data = data
 
     def __matmul__(self, other):
         other_data = other._data if isinstance(other, Matrix) else other
         result_data = blas_dispatch(Operation.MATMUL, self._data, other_data)
-        return self._wrap_result(result_data)  # ← Wrapping happens here
+        return self._wrap_result(
+            result_data
+        )  # Wrapping to correct Matrix() happens here
 
     def _wrap_result(self, data):
         """Wrap the result data in the appropriate Matrix subclass"""
-        if sp.issparse(data):
-            return SparseMatrix(data)
-        elif isinstance(data, np.ndarray):
-            return DenseMatrix(data)
-        elif isinstance(data, StructuredMatrix):
-            return StructuredMatrix(data)
-        else:
-            raise TypeError(f"Unknown matrix type: {type(data)}")
+        return wrap_result(data)
