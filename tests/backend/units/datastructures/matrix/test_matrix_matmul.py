@@ -1,4 +1,4 @@
-# tests/backend/components/datastructures/matrix/test_matrix_matmul.py
+# tests/backend/units/datastructures/matrix/test_matrix_matmul.py
 import pytest
 
 from conftest import EXTERNAL_SPARSE_TYPES, EXTERNAL_DENSE_TYPES

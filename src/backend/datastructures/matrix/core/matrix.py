@@ -1,25 +1,113 @@
-"""
-Design choices: Explicit sub-class for Sparse, Dense and Structured cases.
-
-A Matrix class is the base class of all matrix types. There is no automatic dispatch
-and the user need to create the subclass that matches the correct matrix type.
-We opted for this coice as the sparsity is know from a statistical model implementation perspective.
-
-The operatios are dispatched automatically based on the type of the operands.
-
-
-"""
-
 # src/backend/datastructures/matrix/core/matrix.py
-
 from abc import ABC
 
-from backend.datastructures.matrix.dispatch import blas_dispatch, Operation
+from backend.datastructures.matrix.dispatch import Operation, blas_dispatch
 
-from .utils import wrap_result, toarray
+from .utils import toarray, wrap_result
 
 
 class Matrix(ABC):
+    """Abstract base class for all matrix types in DALIA.
+
+    Matrix provides a unified interface for dense and sparse matrix operations
+    with automatic dispatch to optimized BLAS/LAPACK backends. This allows users
+    to perform operations without worrying about the underlying matrix format or
+    explicitly choosing between numpy and scipy operations.
+
+    **Do not instantiate Matrix directly.** Use concrete subclasses:
+    - :class:`DenseMatrix` for dense matrices (wraps numpy.ndarray)
+    - :class:`SparseMatrix` for sparse matrices (wraps scipy.sparse in CSR format)
+
+    Key Design Principles
+    ---------------------
+    1. **Type Consistency**: All operations return Matrix subclasses, never raw
+       numpy/scipy arrays. This prevents accidental loss of type information.
+
+    2. **Automatic Dispatch**: Operations automatically select optimal backends:
+       - Dense x Dense → Dense
+       - Sparse x Sparse → Sparse
+       - Mixed operations → Depends on result sparsity
+
+    3. **Explicit Conversion**: Matrix blocks numpy's array protocol to maintain
+       type consistency. Use `.toarray()` for explicit conversion to numpy arrays.
+
+    4. **External Compatibility**: Works seamlessly with scipy.sparse and numpy
+       in mixed operations while preserving Matrix types in results.
+
+    Choosing Subclasses
+    -------------------
+    - Use **SparseMatrix** for large matrices with mostly zero entries
+      (e.g., precision matrices from SPDE models, design matrices with many zeros)
+    - Use **DenseMatrix** for small or fully populated matrices
+      (e.g., covariance matrices, small design matrices)
+
+    Common Operations
+    -----------------
+    Matrix multiplication (`@`), addition (`+`), subtraction (`-`), transpose (`.T`),
+    and element access (`[]`) are supported. All operations return appropriate
+    Matrix subclasses based on result sparsity.
+
+    Attributes
+    ----------
+    _data : numpy.ndarray or scipy.sparse matrix
+        Underlying matrix data (access via `._data` when needed)
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import scipy.sparse as sp
+    >>> from backend.datastructures import DenseMatrix, SparseMatrix
+
+    Create matrices:
+
+    >>> dense = DenseMatrix(np.array([[1, 2], [3, 4]]))
+    >>> sparse = SparseMatrix(sp.csr_matrix([[1, 0], [0, 2]]))
+
+    Operations return Matrix types:
+
+    >>> result = dense @ sparse
+    >>> isinstance(result, DenseMatrix)
+    True
+
+    Mixed operations with external types:
+
+    >>> scipy_csr = sp.csr_matrix([[1, 0], [0, 1]])
+    >>> result = scipy_csr @ dense  # Returns DenseMatrix, not numpy array
+    >>> type(result)
+    <class 'backend.datastructures.matrix.core.dense.DenseMatrix'>
+
+    Explicit conversion when needed:
+
+    >>> import matplotlib.pyplot as plt
+    >>> plt.imshow(sparse.toarray())  # Convert for plotting
+
+    Copy matrices:
+
+    >>> copy = dense.copy()  # Independent copy
+    >>> copy[0, 0] = 999
+    >>> dense[0, 0]  # Original unchanged
+    1
+
+    Transpose:
+
+    >>> transposed = dense.T
+    >>> transposed.shape
+    (2, 2)
+
+    See Also
+    --------
+    DenseMatrix : Concrete class for dense matrices
+    SparseMatrix : Concrete class for sparse matrices (CSR format)
+
+    Notes
+    -----
+    Matrix blocks the numpy array protocol (`__array__`, `__array_interface__`,
+    `__array_struct__`) to prevent implicit conversion. This ensures that
+    operations like `scipy.sparse @ Matrix` properly return Matrix types
+    rather than unwrapped numpy arrays. This design follows pandas/PyTorch
+    patterns rather than numpy's implicit conversion approach.
+    """
+
     # 1. Class attributes (if any)
     __array_ufunc__ = None  # Disable numpy ufuncs to avoid conflicts
 
@@ -40,14 +128,6 @@ class Matrix(ABC):
         # pylint: disable=invalid-name
         return wrap_result(self._data.T)
 
-    # @property
-    # def shape(self):
-    #     return self._data.shape
-
-    # @property
-    # def ndim(self):
-    #     return self._data.ndim
-
     # 5. Comparison operators (if needed)
 
     # 6. Arithmetic operators (standard order)
@@ -63,6 +143,11 @@ class Matrix(ABC):
         result_data = blas_dispatch(Operation.ADD, self._data, other_data)
         return self._wrap_result(result_data)
 
+    def __sub__(self, other):
+        other_data = other._data if isinstance(other, Matrix) else other
+        result_data = blas_dispatch(Operation.SUB, self._data, other_data)
+        return self._wrap_result(result_data)
+
     # 7. Right-hand operators (same order as above)
     def __rmatmul__(self, other):
         """Right-hand matrix multiplication: other @ self"""
@@ -76,6 +161,12 @@ class Matrix(ABC):
         """Right-hand addition: other + self"""
         other_data = other._data if isinstance(other, Matrix) else other
         result_data = blas_dispatch(Operation.ADD, other_data, self._data)
+        return self._wrap_result(result_data)
+
+    def __rsub__(self, other):
+        """Right-hand subtraction: other - self"""
+        other_data = other._data if isinstance(other, Matrix) else other
+        result_data = blas_dispatch(Operation.SUB, other_data, self._data)
         return self._wrap_result(result_data)
 
     # 8. In-place operators (if supported)
@@ -119,6 +210,30 @@ class Matrix(ABC):
         self._data[key] = value
 
     # 10. Public methods
+    def copy(self):
+        """Create a deep copy of the matrix.
+
+        Returns a new Matrix instance with an independent copy of the underlying
+        data. Modifications to the copy will not affect the original matrix.
+
+        Returns
+        -------
+        Matrix
+            New instance of the same Matrix subclass (SparseMatrix or DenseMatrix)
+            with copied data.
+
+        Examples
+        --------
+        >>> original = SparseMatrix(sp.csr_matrix([[1, 0], [0, 2]]))
+        >>> duplicate = original.copy()
+        >>> duplicate is original
+        False
+        >>> duplicate._data is original._data
+        False
+        >>> duplicate[0, 0] = 999  # Does not affect original
+        """
+        return type(self)(self._data.copy())
+
     def toarray(self):
         """Convert Matrix to dense numpy array (explicit conversion).
 

@@ -2,14 +2,16 @@
 import numpy as np
 import scipy.sparse as sp
 
-from .operations import Operation
-from .matmul import dispatch_matmul
 from .add import dispatch_add
+from .matmul import dispatch_matmul
+from .operations import Operation
+from .sub import dispatch_sub
 
 # At module level
 _OPERATION_MAP = {
     Operation.MATMUL: dispatch_matmul,
     Operation.ADD: dispatch_add,
+    Operation.SUB: dispatch_sub,
 }
 
 

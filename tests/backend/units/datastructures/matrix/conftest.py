@@ -1,4 +1,4 @@
-# tests/backend/components/datastructures/matrix/conftest.py
+# tests/backend/units/datastructures/matrix/conftest.py
 import numpy as np
 import scipy.sparse as sp
 
