@@ -3,14 +3,19 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "DALIA"
+name = "dalia"
 authors = [
     { name = "Lisa Gaedke-Merzhaeuser", email = "lisa.gaedke.merzhaeuser@usi.ch" },
     { name = "Vincent Maillou", email = "vmaillou@iis.ee.ethz.ch" },
+    { name = "Alexandros Nikolaos Ziogas", email = "alziogas@iis.ee.ethz.ch" },
 ]
 description = "Python implementation of the method of integrated nested Laplace approximations (INLA)"
-license = {text = "BSD-3-Clause"}
+readme = "README.md"
+license = {file="LICENSE"}
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Mathematics",
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
@@ -18,11 +23,22 @@ classifiers = [
 keywords = ["INLA", "Bayesian", "statistics"]
 dynamic = ["version"]
 requires-python = ">=3.11"
+
 dependencies = [
     "numpy>=1.23.2",
-    "scipy",
-    "matplotlib",
-    "pydantic",
+    "scipy>=1.15.0",
+    "matplotlib>=3.10.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+# High-performance computing features
+mpi4py = ["mpi4py"]
+cupy = ["cupy==13.2.0"]
+serinv = ["serinv @ git+https://github.com/vincent-maillou/serinv"]
+
+# Development tools (for contributors)
+dev = [
     "pytest",
     "pytest-cov",
     "pytest-mpi",
@@ -34,13 +50,22 @@ dependencies = [
     "just",
     "pre-commit",
 ]
-[project.optional-dependencies]
-mpi4py = ["mpi4py"]
-cupy = ["cupy==13.2.0"]
-serinv = ["serinv @ git+https://github.com/vincent-maillou/serinv"]
+
+all = [
+    "dalia[dev]"
+]
 
 [project.urls]
-Code = "https://github.com/lisa-gm/DALIA"
+Homepage = "https://github.com/dalia-project/DALIA"
+Repository = "https://github.com/dalia-project/DALIA"
+Issues = "https://github.com/dalia-project/DALIA/issues"
+Documentation = "https://dalia.readthedocs.io"
+Changelog = "https://github.com/dalia-project/DALIA/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["dalia*"]
+namespaces = false
 
 [tool.setuptools.dynamic]
 version = { attr = "dalia.__about__.__version__" }
@@ -51,3 +76,18 @@ testpaths = ["tests"]
 
 [tool.isort]
 profile = "black"
+src_paths = ["src", "tests"]
+known_first_party = ["dalia"]
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

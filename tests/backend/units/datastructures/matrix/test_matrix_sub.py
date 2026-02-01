@@ -1,10 +1,9 @@
 # tests/backend/units/datastructures/matrix/test_matrix_sub.py
 import pytest
 
-from conftest import EXTERNAL_SPARSE_TYPES, EXTERNAL_DENSE_TYPES
+from .conftest import EXTERNAL_SPARSE_TYPES, EXTERNAL_DENSE_TYPES
 
-
-from backend.datastructures import SparseMatrix, DenseMatrix
+from dalia.backend.datastructures import SparseMatrix, DenseMatrix
 
 
 # Test-specific: Expected results for sub

@@ -3,7 +3,7 @@ import numpy as np
 
 import pytest
 
-from backend.datastructures import DenseMatrix, SparseMatrix
+from dalia.backend.datastructures import DenseMatrix, SparseMatrix
 
 
 @pytest.mark.parametrize("matrix_type", ["SparseMatrix", "DenseMatrix"])
