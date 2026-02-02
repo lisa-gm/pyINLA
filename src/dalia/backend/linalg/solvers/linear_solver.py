@@ -34,10 +34,10 @@ class LinearSolver(ABC):
             If True, allows in-place factorization that destroys original matrix data.
             Use when matrix is no longer needed after factorization to save memory.
         """
-        self._matrix = matrix
-        self._overwrite_matrix = overwrite_matrix
-        self._is_factorized = False
-        self._factors = None
+        self._matrix: Matrix = matrix
+        self._overwrite_matrix: bool = overwrite_matrix
+        self._is_factorized: bool = False
+        self._factors: bool = None
 
     # 3. Special representation methods
     # 4. Properties (grouped together)
@@ -62,8 +62,8 @@ class LinearSolver(ABC):
         if new_matrix.shape != self._matrix.shape:
             raise ValueError("Cannot change matrix shape after solver creation")
 
-        self._matrix = new_matrix
-        self._is_factorized = False  # Invalidate factorization
+        self._matrix: Matrix = new_matrix
+        self._is_factorized: bool = False  # Invalidate factorization
 
     def factorize(self, matrix: Matrix = None, overwrite: bool = None):
         """Factorize system matrix.
@@ -98,10 +98,10 @@ class LinearSolver(ABC):
             self.update_matrix(matrix)
 
         if overwrite is None:
-            overwrite = self._overwrite_matrix
+            overwrite: bool = self._overwrite_matrix
 
         self._factors = self._compute_factorization(overwrite=overwrite)
-        self._is_factorized = True
+        self._is_factorized: bool = True
 
     def solve(self, b):
         """Solve linear system Ax = b.
@@ -184,8 +184,8 @@ class LinearSolver(ABC):
 
         if overwrite_factors:
             # Invalidate solver state - factors were destroyed
-            self._is_factorized = False
-            self._factors = None
+            self._is_factorized: bool = False
+            self._factors: bool = None
 
         return result
 
