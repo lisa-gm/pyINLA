@@ -1,11 +1,10 @@
 # tests/backend/units/datastructures/matrix/conftest.py
 
 import numpy as np
+import pytest
 import scipy.sparse as sp
 
-import pytest
-
-from dalia.backend.datastructures import SparseMatrix, DenseMatrix
+from dalia.backend.datastructures import DenseMatrix, SparseMatrix
 
 # Type groups - reusable across all tests
 EXTERNAL_SPARSE_TYPES = ["scipy_csr", "scipy_csc", "scipy_coo"]

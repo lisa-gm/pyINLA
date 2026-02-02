@@ -1,6 +1,5 @@
 # tests/backend/units/datastructures/matrix/test_matrix_transpose.py
 import numpy as np
-
 import pytest
 
 from dalia.backend.datastructures import DenseMatrix, SparseMatrix

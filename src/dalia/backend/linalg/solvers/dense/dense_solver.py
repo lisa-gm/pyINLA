@@ -127,7 +127,7 @@ class DenseSolver(LinearSolver):
         the inverse afterward. The solver becomes unusable until refactorization.
         """
         # pylint: disable=invalid-name,import-outside-toplevel
-        from backend.datastructures import DenseMatrix
+        from dalia.backend.datastructures import DenseMatrix
 
         n = self._factors.shape[0]
         if overwrite_factors:
