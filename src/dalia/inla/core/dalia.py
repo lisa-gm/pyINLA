@@ -1,19 +1,22 @@
+# src/dalia/inla/core/dalia.py
 # general orchestrator
 
 
-class DALIAConfig:
+# from dalia.inla.configs.configs import Config
+
+
+class Config:
     # Checkpointing for restart durign the optimization
     # ...
     pass
 
 
-class Model: ...
+class Model:
+    pass
 
 
-class Observations: ...
-
-
-class Config: ...
+class Observations:
+    pass
 
 
 class DALIA:
@@ -56,7 +59,9 @@ class DALIA:
     # 1. Class attributes (if any)
     # 2. Initialization
 
-    def __init__(self, model: Model, config: DALIAConfig = DALIAConfig()) -> None:
+    def __init__(self, model: Model, config: Config = Config()) -> None:
+        # self.model = model
+        # self.config = config
         pass
 
     def __new__(cls):
@@ -76,6 +81,8 @@ class DALIA:
     # 10. Public methods
 
     def learn_from_observations(self, observations: Observations) -> None:
+        # assert utils.validate_observation(self.model, observations)
+        # self.observations = observations.validate()
         pass
 
     def update_model(self, new_model: Model) -> None:
