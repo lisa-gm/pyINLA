@@ -2,7 +2,7 @@
 
 dalia_set_perfenv() {
     echo "dalia_set_perfenv: setting up DALIA performance environment variables."
-    export ARRAY_MODULE=cupy
+    export ARRAY_MODULE=numpy
     export MPI_CUDA_AWARE=0
     export USE_NCCL=0
     export MPICH_GPU_SUPPORT_ENABLED=0
