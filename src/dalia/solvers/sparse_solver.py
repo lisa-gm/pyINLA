@@ -1,18 +1,8 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
-import time
-
 from dalia import NDArray, sp, xp
 from dalia.configs.dalia_config import SolverConfig
 from dalia.core.solver import Solver
-from dalia.utils import synchronize_gpu
-
-# This is a workaround a problem in cupyx, where linalg is not properly namespaced (directly accessible).
-# May be removed in future versions of cupy (tested on cupy 13.4.1).
-if xp.__name__ == "cupy":
-    from cupyx.scipy.sparse.linalg import splu
-else:
-    from scipy.sparse.linalg import splu
 
 
 class SparseSolver(Solver):
@@ -24,121 +14,60 @@ class SparseSolver(Solver):
         """Initializes the solver."""
         super().__init__(config)
 
-        self.LU_factor = None  # Store the LU factorization object
-        self.A_inv = None  # Store the inverse of A if needed
+        self.L: sp.sparse.spmatrix = None
 
-        # Solver Metrics
-        self.t_factorize = 0.0
-        self.t_solve = 0.0
-
-    def factorize(self, A: sp.sparse.spmatrix, **kwargs) -> None:
-        """Compute the decomposition of a matrix.
-
-        Note: This uses LU decomposition since sparse Cholesky is not readily available.
-
-
-        Parameters
-        ----------
-        A : sp.sparse.spmatrix
-            The input matrix to decompose.
-
-        Returns
-        -------
-        None
-
-        Note:
-        -----
-        Uses the LU decomposition by default as scipy.sparse doesn't implement Cholesky.
-        """
-        synchronize_gpu()
-        tic = time.perf_counter()
+    def cholesky(self, A: sp.sparse.spmatrix, **kwargs) -> None:
+        """Compute Cholesky factor of input matrix."""
 
         A = sp.sparse.csc_matrix(A)
 
-        # Use LU decomposition as the factorization method
-        self.LU_factor = splu(A, diag_pivot_thresh=0, permc_spec="NATURAL")
+        LU = sp.sparse.linalg.splu(A, diag_pivot_thresh=0, permc_spec="NATURAL")
 
-        # Check if the matrix appears to be positive definite
-        if not (self.LU_factor.U.diagonal() > 0).all():
-            raise ValueError("The matrix does not appear to be positive definite")
-
-        synchronize_gpu()
-        toc = time.perf_counter()
-        self.t_factorize += toc - tic
+        if (LU.U.diagonal() > 0).all():  # Check the matrix A is positive definite.
+            self.L = LU.L.dot(sp.sparse.diags(LU.U.diagonal() ** 0.5))
+        else:
+            # print("min(diag(L)): ", xp.min(LU.U.diagonal()))
+            raise ValueError("The matrix is not positive definite")
 
     def solve(
         self,
         rhs: NDArray,
         **kwargs,
     ) -> NDArray:
-        """Solve linear system using LU factorization.
+        """Solve linear system using Cholesky factor."""
 
-        Parameters
-        ----------
-        rhs : NDArray
-            Right-hand side of the linear system.
+        if self.L is None:
+            raise ValueError("Cholesky factor not computed")
 
-        Returns
-        -------
-        NDArray
-            Solution of the linear system.
-        """
-        synchronize_gpu()
-        tic = time.perf_counter()
+        rhs[:] = sp.sparse.linalg.spsolve_triangular(
+            self.L, rhs, lower=True, overwrite_b=True
+        )
+        rhs[:] = sp.sparse.linalg.spsolve_triangular(
+            self.L.T, rhs, lower=False, overwrite_b=True
+        )
 
-        if self.LU_factor is None:
-            raise ValueError("Matrix factorization not computed")
-
-        # Handle multiple RHS cases
-        if rhs.ndim == 1:
-            # Single RHS as 1D array
-            x = self.LU_factor.solve(rhs)
-        elif rhs.ndim == 2 and rhs.shape[1] == 1:
-            # Single RHS as column vector
-            x = self.LU_factor.solve(rhs.flatten())
-            x = x.reshape(rhs.shape)
-        elif rhs.ndim == 2 and rhs.shape[1] > 1:
-            # Multiple RHS (batched) - scipy splu can handle this directly
-            x = self.LU_factor.solve(rhs)
-        else:
-            raise ValueError(f"Unsupported RHS shape: {rhs.shape}")
-
-        synchronize_gpu()
-        toc = time.perf_counter()
-        self.t_solve += toc - tic
-
-        return x
+        return rhs
 
     def logdet(
         self,
         **kwargs,
     ) -> float:
-        """Compute the log determinant of the matrix.
+        """Compute logdet of input matrix using Cholesky factor."""
 
-        Returns
-        -------
-        float
-            The log determinant of the matrix.
-        """
+        if self.L is None:
+            raise ValueError("Cholesky factor not computed")
 
-        if self.LU_factor is None:
-            raise ValueError("Matrix factorization not computed")
-
-        # For LU decomposition: det(A) = det(L) * det(U)
-        # Since L has 1s on diagonal: det(L) = 1
-        # So det(A) = det(U) = product of diagonal elements of U
-        log_det_U = xp.sum(xp.log(xp.abs(self.LU_factor.U.diagonal())))
-
-        return float(log_det_U)
+        return 2 * xp.sum(xp.log(self.L.diagonal()))
 
     def selected_inversion(self, **kwargs) -> NDArray:
-        L_inv = sp.linalg.solve_triangular(
-            self.LU_factor.L, xp.eye(self.LU_factor.L.shape[0]), lower=True, overwrite_b=False
+        # convert to dense
+        L_dense = self.L.toarray()
+        L_inv = xp.eye(self.L.shape[0])
+
+        L_inv[:] = sp.linalg.solve_triangular(
+            L_dense, L_inv, lower=True, overwrite_b=True
         )
-        U_inv = sp.linalg.solve_triangular(
-            self.LU_factor.U, xp.eye(self.LU_factor.U.shape[0]), lower=False, overwrite_b=False
-        )
-        self.A_inv = U_inv @ L_inv
+        self.A_inv = L_inv.T @ L_inv
 
         return self.A_inv
 
@@ -152,23 +81,7 @@ class SparseSolver(Solver):
 
     def get_solver_memory(self) -> int:
         """Return the memory used by the solver in number of bytes"""
-        if self.LU_factor is None:
+        if self.L is None:
             return 0
 
-        # Estimate memory usage from L and U matrices
-        L_memory = (
-            self.LU_factor.L.data.nbytes
-            + self.LU_factor.L.indptr.nbytes
-            + self.LU_factor.L.indices.nbytes
-        )
-        U_memory = (
-            self.LU_factor.U.data.nbytes
-            + self.LU_factor.U.indptr.nbytes
-            + self.LU_factor.U.indices.nbytes
-        )
-
-        if self.A_inv is not None:
-            A_inv_memory = self.A_inv.nbytes
-            return L_memory + U_memory + A_inv_memory
-
-        return L_memory + U_memory
+        return self.L.data.nbytes + self.L.indptr.nbytes + self.L.indices.nbytes

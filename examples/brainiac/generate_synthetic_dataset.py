@@ -9,12 +9,13 @@ np.random.seed(5)
 if __name__ == "__main__":
 
     # Study parameters
-    n_observations: int = 100  # keep: 100
-    n_features: int = 20  # keep: 20
-    n_annotations_per_features: int = 2  # keep: 2
+    n_observations: int = 1000
+    n_features: int = 2
+    n_annotations_per_features: int = 2
 
     # Model parameters
-    h2: float = 0.9
+    h2: float = 0.6
+    sigma_a2: float = 1.0
 
     # General parameters
     model_format: Literal["dense", "sparse"] = "dense"
@@ -30,9 +31,8 @@ if __name__ == "__main__":
     # 1. Generate random Z matrix
     z = np.random.rand(n_features, n_annotations_per_features)
 
-    # 2. Sample alpha(s) from N(0, 1)
-    alpha = np.random.normal(0, 1, (n_annotations_per_features, 1))
-    print("alpha: ", alpha.flatten())
+    # 2. Sample alpha(s) from N(0, \sigma_a^2 I)
+    alpha = np.random.normal(0, np.sqrt(sigma_a2), (n_annotations_per_features, 1))
 
     # 3. Construct reference hyperparameters vector
     theta = np.concatenate(([h2], alpha.flatten()))
@@ -77,6 +77,7 @@ if __name__ == "__main__":
     if model_format == "sparse":
         print(f" - Projection matrix density: {density}")
     print(f" - h2: {h2}")
+    print(f" - sigma_a2: {sigma_a2}")
     print()
     print("Saved the following files:")
     print(f" - BRAINIAC inputs in {path_inputs.resolve()}")
@@ -94,6 +95,7 @@ if __name__ == "__main__":
         "n_features": n_features,
         "n_annotations_per_features": n_annotations_per_features,
         "h2": h2,
+        "sigma_a2": sigma_a2,
     }
     np.save(path_inputs / "model_params.npy", model_params)
 

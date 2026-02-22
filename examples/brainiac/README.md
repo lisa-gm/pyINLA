@@ -25,4 +25,3 @@ The GPU-backend is especially suitable for this model.
 export ARRAY_MODULE=cupy
 python generate_data.py
 python run.py
-```

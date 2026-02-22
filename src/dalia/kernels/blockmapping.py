@@ -100,7 +100,6 @@ def compute_block_sort_index(
 
     return sort_index
 
-
 def compute_block_slice(
     rows: xp.ndarray,
     cols: xp.ndarray,

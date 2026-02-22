@@ -17,12 +17,15 @@ from dalia.configs.priorhyperparameters_config import (
     parse_config as parse_priorhyperparameters_config,
 )
 
+
 class SubModelConfig(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     # Input folder for this specific submodel
     input_dir: str = None
-    type: Literal["spatio_temporal", "spatial", "regression", "brainiac", "ar1"] = None
+    type: Literal[
+        "spatio_temporal", "spatial", "regression", "brainiac", "ar1", "generic"
+    ] = None
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
@@ -34,6 +37,18 @@ class RegressionSubModelConfig(SubModelConfig):
 
     def read_hyperparameters(self):
         return xp.array([]), []
+
+
+class GenericSubModelConfig(SubModelConfig):
+    tau: float = None  # Precision of the Gaussian prior on the latent parameters
+
+    ph_tau: PriorHyperparametersConfig = None
+
+    def read_hyperparameters(self):
+        theta = xp.array([self.tau])
+        theta_keys = ["tau"]
+
+        return theta, theta_keys
 
 
 class AR1SubModelConfig(SubModelConfig):
@@ -48,17 +63,16 @@ class AR1SubModelConfig(SubModelConfig):
     ## either define tau or sigma2
     tau: float = None  # Precision
     # sigma2: float = None  # Marginal variance
-    
-    
+
     ph_tau: PriorHyperparametersConfig = None
     # ph_sigma2: PriorHyperparametersConfig = None
 
     def read_hyperparameters(self):
 
         # input of phi is in (0,1), rescale to -/+ INF
-        #self.phi_scaled = scaled_logit(self.phi, direction="forward")
+        # self.phi_scaled = scaled_logit(self.phi, direction="forward")
         theta = xp.array([self.phi, self.tau])
-        #theta_internal = xp.array([self.phi, self.tau])
+        # theta_internal = xp.array([self.phi, self.tau])
         theta_keys = ["phi", "tau"]
 
         return theta, theta_keys
@@ -122,7 +136,6 @@ class BrainiacSubModelConfig(SubModelConfig):
         return theta, theta_keys
 
 
-
 def parse_config(config: dict | str) -> SubModelConfig:
     if isinstance(config, str):
         with open(config, "rb") as f:
@@ -147,4 +160,9 @@ def parse_config(config: dict | str) -> SubModelConfig:
         config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
         config["ph_phi"] = parse_priorhyperparameters_config(config["ph_phi"])
         return AR1SubModelConfig(**config)
-    raise ValueError(f"Unknown submodel type: {model_type}")
+    elif type == "generic":
+        config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
+        return GenericSubModelConfig(**config)
+    # Add more elif branches for other submodel types
+    else:
+        raise ValueError(f"Unknown submodel type: {type}")

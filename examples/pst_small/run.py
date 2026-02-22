@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     # Configurations of DALIA
     dalia_dict = {
-        "solver": {"type": "serinv"},
+        "solver": {"type": "dense"},
         "minimize": {
             "max_iter": args.max_iter,
             "gtol": 1e-3,

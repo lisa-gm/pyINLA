@@ -116,9 +116,7 @@ def allgather(
     if backend_flags["mpi_avail"]:
         if get_array_module_name(obj) == "cupy" and not backend_flags["mpi_cuda_aware"]:
             obj_comm = get_host(obj)
-            gathered_objs = comm.allgather(obj_comm)
-            # Convert gathered numpy arrays back to cupy arrays
-            return [get_device(arr) for arr in gathered_objs]
+            return get_device(np.concatenate(comm.allgather(obj_comm)))
         else:
             return comm.allgather(obj)
 
@@ -220,6 +218,7 @@ def smartsplit(
 
     return active_comm, comm_new_group, color_new_group
 
+
 def check_vector_consistency(
     value: ArrayLike,
     comm,
@@ -227,7 +226,7 @@ def check_vector_consistency(
     verbose: Literal["No", "Minimal", "Full"] = "No",
     rtol: float = 1e-10,
 ):
-    """ Check if all processes have the same value.
+    """Check if all processes have the same value.
 
     Parameters:
     -----------
@@ -247,7 +246,7 @@ def check_vector_consistency(
     ValueError:
         If the value is not consistent across all processes.
     """
-    synchronize(comm = comm)
+    synchronize(comm=comm)
 
     value_ref = value.copy()
     bcast(value_ref, root=0, comm=comm)
@@ -260,11 +259,11 @@ def check_vector_consistency(
             raise ValueError(
                 f"Process {comm.Get_rank()} has a different {flag} than the reference process with a norm of the difference of {norm_diff:.4e}."
             )
-        
+
         diff_indices = xp.where(value != value_ref)[0]
         if verbose == "Minimal":
             # Only print the first 5 differences, make sure it's 5 or the max number of differences
-            diff_indices = diff_indices[:min(5, len(diff_indices))]
+            diff_indices = diff_indices[: min(5, len(diff_indices))]
         elif verbose == "Full":
             pass
         else:
@@ -273,4 +272,6 @@ def check_vector_consistency(
             )
 
         for idx in diff_indices:
-            print(f"Process {comm.Get_rank()} difference at index {idx}: {flag}={value_ref[idx]}, value={value[idx]}")
+            print(
+                f"Process {comm.Get_rank()} difference at index {idx}: {flag}={value_ref[idx]}, value={value[idx]}"
+            )
