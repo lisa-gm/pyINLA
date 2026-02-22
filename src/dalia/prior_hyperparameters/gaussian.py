@@ -1,9 +1,10 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
-import numpy as np
+from dalia import NDArray
 from scipy.sparse import spmatrix
 from dalia import sp, xp
 
-from dalia import NDArray
+import numpy as np
+
 from dalia.configs.priorhyperparameters_config import (
     GaussianPriorHyperparametersConfig,
 )

@@ -3,10 +3,10 @@
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-from scipy.sparse import spmatrix
 from typing_extensions import Annotated
 
 from dalia.__init__ import NDArray
+from scipy.sparse import spmatrix
 
 
 # --- PRIOR HYPERPARAMETERS ----------------------------------------------------

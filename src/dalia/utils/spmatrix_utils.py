@@ -81,3 +81,4 @@ def memory_footprint(
     total_memory_gb = total_memory_bytes / (1024**3)
 
     print(f"Total memory footprint of Q_prior: {total_memory_gb:.6f} GB")
+

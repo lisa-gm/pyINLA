@@ -22,7 +22,9 @@ class SubModelConfig(BaseModel, ABC):
 
     # Input folder for this specific submodel
     input_dir: str = None
-    type: Literal["spatio_temporal", "spatial", "regression", "brainiac", "ar1"] = None
+    type: Literal[
+        "spatio_temporal", "spatial", "regression", "brainiac", "ar1", "generic"
+    ] = None
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
@@ -34,6 +36,18 @@ class RegressionSubModelConfig(SubModelConfig):
 
     def read_hyperparameters(self):
         return xp.array([]), []
+
+
+class GenericSubModelConfig(SubModelConfig):
+    tau: float = None  # Precision of the Gaussian prior on the latent parameters
+
+    ph_tau: PriorHyperparametersConfig = None
+
+    def read_hyperparameters(self):
+        theta = xp.array([self.tau])
+        theta_keys = ["tau"]
+
+        return theta, theta_keys
 
 
 class AR1SubModelConfig(SubModelConfig):
@@ -147,6 +161,9 @@ def parse_config(config: dict | str) -> SubModelConfig:
         config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
         config["ph_phi"] = parse_priorhyperparameters_config(config["ph_phi"])
         return AR1SubModelConfig(**config)
+    elif type == "generic":
+        config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
+        return GenericSubModelConfig(**config)
     # Add more elif branches for other submodel types
     else:
         raise ValueError(f"Unknown submodel type: {type}")
