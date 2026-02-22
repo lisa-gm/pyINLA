@@ -1,8 +1,8 @@
 from dalia.statistical_modeling_toolbox.latent_structure import LatentStructure
 
 
-class FixedEffect(LatentStructure):
-    """Class for Fixed Effect latent structures."""
+class RandomWalk(LatentStructure):
+    """Class for Random Walk latent structures."""
 
     def __init__(self, ...):
         super().__init__()
