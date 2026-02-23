@@ -1,4 +1,4 @@
-from dalia.statistical_modeling_toolbox.latent_structure import LatentStructure
+from dalia.statistical_modeling_toolbox.latent_gaussian_structure import LatentStructure
 
 
 class SPDE(LatentStructure):
