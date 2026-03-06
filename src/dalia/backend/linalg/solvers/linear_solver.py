@@ -37,7 +37,7 @@ class LinearSolver(ABC):
         self._matrix: Matrix = matrix
         self._overwrite_matrix: bool = overwrite_matrix
         self._is_factorized: bool = False
-        self._factors: bool = None
+        self._factors: Matrix = None
 
     # 3. Special representation methods
     # 4. Properties (grouped together)
