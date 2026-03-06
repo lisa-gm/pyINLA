@@ -1,27 +1,22 @@
-import sys
-import os
-
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.append(parent_dir)
+from pathlib import Path
 
 import numpy as np
 
-from dalia import xp, sp, backend_flags
+from dalia import xp
 from dalia.configs import likelihood_config, dalia_config, submodels_config
 from dalia.core.model import Model
 from dalia.core.dalia import DALIA
 from dalia.submodels import AR1SubModel, RegressionSubModel
-from dalia.utils import get_host, print_msg, plot_marginal_distributions_hp, plot_prior_hp  # , extract_diagonal
-from examples_utils.parser_utils import parse_args
+from dalia.utils import print_msg, plot_marginal_distributions_hp, plot_prior_hp  # , extract_diagonal
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR: Path = Path(__file__).parent
 
 if __name__ == "__main__":
 
     np.random.seed(3)
 
     # load reference output
-    theta_original = np.load("reference_outputs/theta_original.npy")
+    theta_original = np.load(BASE_DIR / "reference_outputs" / "theta_original.npy")
     print(
         "theta original: ",
         theta_original,
@@ -30,7 +25,7 @@ if __name__ == "__main__":
     theta_initial = theta_original #[0.6, 1.0, 3.0]
     print("theta initial: ", theta_initial)
 
-    x_original = np.load("reference_outputs/x_original.npy")
+    x_original = np.load(BASE_DIR / "reference_outputs" / "x_original.npy")
     print("x original: ", x_original[:10])
     print("dim(x original): ", x_original.shape)
 
@@ -93,12 +88,12 @@ if __name__ == "__main__":
 
     Qprior = model.construct_Q_prior()
     print("Qprior: \n", Qprior.toarray()[:6, :6])
-    Qinv = np.linalg.inv(Qprior.toarray())
-    geom_mean = np.exp(np.mean(np.log(Qinv.diagonal())))
+    Qinv = xp.linalg.inv(Qprior.toarray())
+    geom_mean = xp.exp(xp.mean(xp.log(Qinv.diagonal())))
     print("Geometric mean of Qinv diagonal: ", geom_mean)
 
     # in gaussian case x = 0, thus eta = 0
-    x_i = np.zeros(model.n_latent_parameters)
+    x_i = xp.zeros(model.n_latent_parameters)
     eta = model.a @ x_i
     Qcond = model.construct_Q_conditional(eta=eta)
     print("Qcond: \n", Qcond.toarray()[:6, :6])
@@ -106,9 +101,9 @@ if __name__ == "__main__":
     b = model.construct_information_vector(eta=eta, x_i=x_i)
     print("b: ", b[:10])
 
-    x_est = np.linalg.solve(Qcond.toarray(), b)
+    x_est = xp.linalg.solve(Qcond.toarray(), b)
     #print("x est: ", x_est)
-    print("norm(x_original - x_est): ", np.linalg.norm(x_original - x_est))
+    print("norm(x_original - x_est): ", xp.linalg.norm(xp.asarray(x_original) - x_est))
 
     # Configurations of DALIA
     dalia_dict = {
@@ -157,8 +152,8 @@ if __name__ == "__main__":
     # print("eta est: ", model.a @ results["x"])
 
     print_msg("\n--- Comparisons ---")
-    print("norm(eta - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ results["x"]))
-    print("normalized norm(eta - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ results["x"]) / np.linalg.norm(model.a @ x_original))
+    print("norm(eta - eta_est): ", xp.linalg.norm(model.a @ xp.asarray(x_original) - model.a @ results["x"]))
+    print("normalized norm(eta - eta_est): ", xp.linalg.norm(model.a @ xp.asarray(x_original) - model.a @ results["x"]) / xp.linalg.norm(model.a @ xp.asarray(x_original)))
 
     # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
@@ -166,7 +161,7 @@ if __name__ == "__main__":
     Qinv_ref = xp.linalg.inv(Qconditional.toarray())
     print_msg(
         "Norm (marg var latent - ref):    ",
-        f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
+        f"{xp.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
     )
     
     print_msg("\n--- Marginal distributions of the hyperparameters ---")

@@ -1300,10 +1300,9 @@ class DALIA:
 
             return marginal_variances_observations
 
-        else:
-            raise NotImplementedError(
-                "in compute marginals observations: Only Gaussian likelihood is currently supported."
-            )
+        raise NotImplementedError(
+            "in compute marginals observations: Only Gaussian likelihood is currently supported."
+        )
 
     def _inner_iteration(
         self,

@@ -1,5 +1,5 @@
 import os
-import sys
+from pathlib import Path
 
 import numpy as np
 import scipy.sparse as sp
@@ -7,7 +7,7 @@ from scipy.sparse.linalg import spsolve, spsolve_triangular
 from scipy.sparse import csc_matrix
 from scipy.linalg import cholesky
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR: Path = Path(__file__).parent
 
 if __name__ == "__main__":
 
@@ -63,29 +63,29 @@ if __name__ == "__main__":
     x = np.concatenate((u, [intercept]))
     print("x: ", x[:10])
 
-    os.makedirs("reference_outputs", exist_ok=True)
-    np.save("reference_outputs/x_original.npy", x)
-    np.save("reference_outputs/theta_original.npy", theta_original)
+    os.makedirs(BASE_DIR / "reference_outputs", exist_ok=True)
+    np.save(BASE_DIR / "reference_outputs" / "x_original.npy", x)
+    np.save(BASE_DIR / "reference_outputs" / "theta_original.npy", theta_original)
 
-    os.makedirs("inputs_ar1", exist_ok=True)
-    np.save("inputs_ar1/x.npy", u)
+    os.makedirs(BASE_DIR / "inputs_ar1", exist_ok=True)
+    np.save(BASE_DIR / "inputs_ar1" / "x.npy", u)
 
     a_ar1 = sp.eye(n)
-    sp.save_npz("inputs_ar1/a.npz", a_ar1)
+    sp.save_npz(BASE_DIR / "inputs_ar1" / "a.npz", a_ar1)
 
     a_regression = sp.csr_matrix(np.ones((n, 1)))
-    os.makedirs("inputs_regression", exist_ok=True)
-    sp.save_npz("inputs_regression/a.npz", a_regression)
+    os.makedirs(BASE_DIR / "inputs_regression", exist_ok=True)
+    sp.save_npz(BASE_DIR / "inputs_regression" / "a.npz", a_regression)
 
     eta = a_ar1 @ u + intercept
 
     print("eta: ", eta[:6])
-    np.save("inputs_ar1/x_original.npy", eta)
+    np.save(BASE_DIR / "inputs_ar1" / "x_original.npy", eta)
 
     noise = np.random.normal(0, np.sqrt(1 / obs_noise_prec), size=eta.shape)
     print("noise: ", noise[:10])
     y = eta + noise
-    np.save("y.npy", y)
+    np.save(BASE_DIR / "y.npy", y)
 
     print("y: ", y[:10])
 

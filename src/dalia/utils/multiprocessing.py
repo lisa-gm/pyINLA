@@ -141,7 +141,10 @@ def bcast(
     """
 
     if backend_flags["mpi_avail"]:
-        comm.Bcast(data[:], root=root)
+        if data.ndim == 0:
+            comm.Bcast(data, root=root)
+        else:
+            comm.Bcast(data[:], root=root)
 
 
 def get_active_comm(

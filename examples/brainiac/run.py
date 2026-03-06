@@ -10,13 +10,13 @@ from dalia.configs import dalia_config, likelihood_config, submodels_config
 from dalia.core.dalia import DALIA
 from dalia.core.model import Model
 from dalia.submodels import BrainiacSubModel
-from dalia.utils import plot_marginal_distributions_hp, print_msg
+from dalia.utils import print_msg
 from plotting import plot_marginal_distributions_hp_external
 
 if __name__ == "__main__":
     print_msg(f"Running BRAINIAC model on synthetic dataset.")
 
-    path_inputs: Path = Path("inputs_brainiac")
+    path_inputs: Path = Path(__file__).parent / "inputs_brainiac"
     path_reference: Path = path_inputs / "reference"
 
     # 1. Load model parameters
@@ -50,7 +50,7 @@ if __name__ == "__main__":
                 "ph_h2": {"type": "beta", "alpha": 1.0, "beta": 1.0},
                 "ph_alpha": {
                     "type": "gaussian_mvn",
-                    "mean": np.zeros(n_annotations_per_features),
+                    "mean": xp.zeros(n_annotations_per_features),
                     "precision": (1.0 / sigma_a2) * sp.eye(n_annotations_per_features),
                 },
             }
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     print_msg("theta_reference: ", theta_reference)
     print_msg("theta dalia:", result["theta"])
 
-    print_msg("norm(x_reference - x) = ", np.linalg.norm(x_reference - result["x"]))
+    print_msg("norm(x_reference - x) = ", np.linalg.norm(xp.asarray(x_reference) - result["x"]))
 
     # 8. Check marginal variances of latent parameters
     var_latent_params = result["marginal_variances_latent"]
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     else:
         Q_inv_ref = xp.linalg.inv(Q_conditional)
     print_msg(
-        f"Norm (marginal variances of latent parameters - reference): {np.linalg.norm(var_latent_params - xp.diag(Q_inv_ref)):.4e}",
+        f"Norm (marginal variances of latent parameters - reference): {xp.linalg.norm(var_latent_params - xp.diag(Q_inv_ref)):.4e}",
     )
 
     # 9. Compute marginal distributions of the hyperparameters
