@@ -101,14 +101,18 @@ class CoregionalModel(Model):
                                 f"Model {model} has a different number of fixed effects than the first model"
                             )
 
+        self._theta_external: ArrayLike = []
+        self._theta_internal: ArrayLike = []
+
+        # For each model
         # Get Models() hyperparameters
-        theta: ArrayLike = []
+        theta_external: ArrayLike = []
         theta_keys: ArrayLike = []
         self.hyperparameters_idx: ArrayLike = [0]
         self.prior_hyperparameters: list[PriorHyperparameters] = []
 
         for model in self.models:
-            theta_model = model.theta
+            theta_model = model.theta_external
             theta_keys_model = model.theta_keys
 
             # remove the theta that correspond to the "sigma_xx" where x can be whatever
@@ -124,7 +128,7 @@ class CoregionalModel(Model):
                 key for i, key in enumerate(theta_keys_model) if i not in sigma_indices
             ]
 
-            theta.append(xp.array(theta_model))
+            theta_external.append(xp.array(theta_model))
             theta_keys += theta_keys_model
 
             self.hyperparameters_idx.append(
@@ -143,7 +147,7 @@ class CoregionalModel(Model):
             theta_coregional_model,
             theta_keys_coregional_model,
         ) = coregional_model_config.read_hyperparameters()
-        theta.append(xp.array(theta_coregional_model))
+        theta_external.append(xp.array(theta_coregional_model))
         theta_keys += theta_keys_coregional_model
 
         self.hyperparameters_idx.append(
@@ -151,8 +155,8 @@ class CoregionalModel(Model):
         )
 
         # Finalize the hyperparameters
-        self.theta: NDArray = xp.concatenate(theta)
-        self.n_hyperparameters = self.theta.size
+        self.theta_external: NDArray = xp.concatenate(theta_external)
+        self.n_hyperparameters = self.theta_external.size
         self.theta_keys: NDArray = theta_keys
 
         # Initialize the Coregional Prior Hyperparameters
@@ -298,7 +302,7 @@ class CoregionalModel(Model):
             for hp_idx in range(
                 self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
             ):
-                kwargs_st[self.theta_keys[hp_idx]] = float(self.theta[hp_idx])
+                kwargs_st[self.theta_keys[hp_idx]] = float(self.theta_external[hp_idx])
 
             Qu_list[i] = submodel_st.construct_Q_prior(**kwargs_st).tocsc()
 
@@ -309,10 +313,10 @@ class CoregionalModel(Model):
                 kwargs_r = {}
                 Q_r[i] = submodel_r.construct_Q_prior(**kwargs_r).tocsc()
 
-        sigma_0 = xp.exp(self.theta[self.theta_keys.index("sigma_0")])
-        sigma_1 = xp.exp(self.theta[self.theta_keys.index("sigma_1")])
+        sigma_0 = xp.exp(self.theta_external[self.theta_keys.index("sigma_0")])
+        sigma_1 = xp.exp(self.theta_external[self.theta_keys.index("sigma_1")])
 
-        lambda_0_1 = self.theta[self.theta_keys.index("lambda_0_1")]
+        lambda_0_1 = self.theta_external[self.theta_keys.index("lambda_0_1")]
 
         if self.n_models == 2:
             q11 = sp.sparse.coo_matrix(
@@ -365,10 +369,10 @@ class CoregionalModel(Model):
             # Qprior_st = sp.sparse.bmat([[q11, q12], [q21, q22]]).tocsc()
 
         elif self.n_models == 3:
-            sigma_2 = xp.exp(self.theta[self.theta_keys.index("sigma_2")])
+            sigma_2 = xp.exp(self.theta_external[self.theta_keys.index("sigma_2")])
 
-            lambda_0_2 = self.theta[self.theta_keys.index("lambda_0_2")]
-            lambda_1_2 = self.theta[self.theta_keys.index("lambda_1_2")]
+            lambda_0_2 = self.theta_external[self.theta_keys.index("lambda_0_2")]
+            lambda_1_2 = self.theta_external[self.theta_keys.index("lambda_1_2")]
 
             q11 = sp.sparse.coo_matrix(
                 (1 / sigma_0**2) * Qu_list[0]
@@ -620,7 +624,7 @@ class CoregionalModel(Model):
                     "eta": eta[
                         self.n_observations_idx[i] : self.n_observations_idx[i + 1]
                     ],
-                    "theta": float(self.theta[self.hyperparameters_idx[i + 1] - 1]),
+                    "theta": float(self.theta_external[self.hyperparameters_idx[i + 1] - 1]),
                 }
             else:
                 kwargs = {
@@ -656,7 +660,7 @@ class CoregionalModel(Model):
             gradient_likelihood = model.likelihood.evaluate_gradient_likelihood(
                 eta=eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
                 y=self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
-                theta=float(self.theta[self.hyperparameters_idx[i + 1] - 1]),
+                theta=float(self.theta_external[self.hyperparameters_idx[i + 1] - 1]),
             )
 
             gradient_vector_list.append(gradient_likelihood)
@@ -685,7 +689,7 @@ class CoregionalModel(Model):
             likelihood += model.likelihood.evaluate_likelihood(
                 eta=eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
                 y=self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
-                theta=float(self.theta[self.hyperparameters_idx[i + 1] - 1]),
+                theta=float(self.theta_external[self.hyperparameters_idx[i + 1] - 1]),
             )
 
         return likelihood
@@ -694,18 +698,12 @@ class CoregionalModel(Model):
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0
 
-        theta_interpret = self.theta
+        theta_interpret = self.theta_external
 
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
             log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
 
         return log_prior
-
-    def get_theta_interpret(self) -> NDArray:
-        # TODO: find long term fix
-        theta_interpret = self.theta.copy()
-
-        return theta_interpret
 
     def __str__(self) -> str:
         """String representation of the model."""

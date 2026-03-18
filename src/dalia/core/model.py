@@ -649,23 +649,6 @@ class Model(ABC):
 
         return theta_likelihood
 
-    def get_theta_interpret(self, direction: str) -> NDArray:
-        theta_interpret = xp.zeros_like(self.theta)
-
-        for i, submodel in enumerate(self.submodels):
-            # print("indices: ", self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1])
-            # print("submodel theta in model: ", self.theta[self.hyperparameters_idx[i] : self.hyperparameters_idx[i + 1]])
-            theta_interpret[
-                self.hyperparameters_idx[i] : self.hyperparameters_idx[i + 1]
-            ] = submodel.rescale_hyperparameters_to_interpret(
-                self.theta[
-                    self.hyperparameters_idx[i] : self.hyperparameters_idx[i + 1]
-                ],
-                direction=direction,
-            )
-
-        return theta_interpret
-
     def rescale_hyperparameters_to_internal(self, theta, direction):
 
         # need to iterate over theta and its prior hyperparameters
