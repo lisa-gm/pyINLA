@@ -103,40 +103,32 @@ if __name__ == "__main__":
     # Compare hyperparameters
     print_msg(
         "Norm (theta - theta_ref):        ",
-        f"{xp.linalg.norm(get_host(results['theta_internal']) - theta_ref):.4e}",
+        f"{np.linalg.norm(get_host(results['theta_internal']) - theta_ref):.4e}",
     )
 
     # Compare latent parameters
-    x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
+    x_ref = np.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
     print_msg(
         "Norm (x - x_ref):                ",
-        f"{xp.linalg.norm(results['x'] - x_ref):.4e}",
+        f"{np.linalg.norm(get_host(results['x']) - x_ref):.4e}",
     )
 
     # Compare marginal variances of latent parameters
-    var_latent_params = results["marginal_variances_latent"]
+    var_latent_params = get_host(results["marginal_variances_latent"])
     dalia.model.theta_internal = results["theta_internal"]
     Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
     Qinv_ref = xp.linalg.inv(Qconditional.toarray())
     print_msg(
         "Norm (marg var latent - ref):    ",
-        f"{xp.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
+        f"{np.linalg.norm(var_latent_params - get_host(xp.diag(Qinv_ref))):.4e}",
     )
-
-    # Compare marginal variances of observations
-    # var_obs = dalia.get_marginal_variances_observations(theta=theta_ref, x_star=x_ref)
-    # var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
-    # print_msg(
-    #     "Norm (var_obs - var_obs_ref):    ",
-    #     f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
-    # )
 
     print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp() 
 
     fig, axes = plot_marginal_distributions_hp(marginals_hp)
     import matplotlib.pyplot as plt
-    plt.savefig(f"gst_small_marginal_distributions_hp.png")
+    plt.savefig("gst_small_marginal_distributions_hp.png")
     
     prec_obs = marginals_hp['hyperparameters']['prec_o']
     quantile_pairs = prec_obs['quantiles']['external']['pairs']
