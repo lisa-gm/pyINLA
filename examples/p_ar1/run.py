@@ -6,19 +6,17 @@ sys.path.append(parent_dir)
 
 import numpy as np
 
-from dalia import xp, sp, backend_flags
+from dalia import xp
 from dalia.configs import likelihood_config, dalia_config, submodels_config
 from dalia.core.model import Model
 from dalia.core.dalia import DALIA
 from dalia.submodels import AR1SubModel, RegressionSubModel
-from dalia.utils import get_host, print_msg, scaled_logit  # , extract_diagonal
-from examples_utils.parser_utils import parse_args
+from dalia.utils import get_host, print_msg  # , extract_diagonal
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
-
     n = 1000
 
     # load reference output
@@ -111,17 +109,17 @@ if __name__ == "__main__":
     print("theta unscaled: ", theta_unscaled)
     theta_original_log = xp.array(
         [
-            theta_original[0],
+            xp.asarray(theta_original[0]),
             xp.log(theta_original[1]),
         ]
     )
     print("theta original log: ", theta_original_log)
 
-    print("norm(x_original - x): ", np.linalg.norm(x_original - results["x"]))
-    print("normalized norm: ", np.linalg.norm(x_original - results["x"]) / np.linalg.norm(x_original))
+    print("norm(x_original - x): ", np.linalg.norm(x_original - get_host(results["x"])))
+    print("normalized norm: ", np.linalg.norm(x_original - get_host(results["x"])) / np.linalg.norm(x_original))
 
-    print("norm(eta_original - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ results["x"]))  
-    print(
-        "normalized norm: ",
-        np.linalg.norm(model.a @ x_original - model.a @ results["x"]) / np.linalg.norm(model.a @ x_original),
-    )
+    # print("norm(eta_original - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ get_host(results["x"])))
+    # print(
+    #     "normalized norm: ",
+    #     np.linalg.norm(model.a @ x_original - model.a @ get_host(results["x"])) / np.linalg.norm(model.a @ x_original),
+    # )
