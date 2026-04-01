@@ -219,6 +219,7 @@ class DALIA:
         self.objective_function_time: ArrayLike = []
         self.solver_time: ArrayLike = []
         self.construction_time: ArrayLike = []
+        self.accepted_iter = 0
 
         # --- Timers
         self.t_construction_qprior = 0.0
@@ -350,6 +351,7 @@ class DALIA:
             "theta_values": minimization_result["theta_values"],
             "cov_theta_internal": self.cov_theta_internal,
             "marginal_variances_latent": marginal_variances_latent,
+            "optimization_iterations": self.accepted_iter,
             # "marginal_variances_observations": get_host(
             #     marginal_variances_observations
             # ),
@@ -386,6 +388,10 @@ class DALIA:
                 "theta": self.model.theta_external,
                 "x": self.model.x,  # [self.model.inverse_permutation_latent_variables],
                 "f": self.f_value,
+                "grad_f": [],
+                "f_values": [],
+                ### these values are in internal scale (!!)
+                "theta_values": [],
             }
 
         else:
