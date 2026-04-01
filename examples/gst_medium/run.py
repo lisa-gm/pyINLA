@@ -29,7 +29,7 @@ if __name__ == "__main__":
         "r_s": 0.0,
         "r_t": 2.2,
         "sigma_st": 1.3,
-        "manifold": "plane",
+        "manifold": "sphere",
         "ph_s": {"type": "penalized_complexity", "alpha": 0.01, "u": 0.5},
         "ph_t": {"type": "penalized_complexity", "alpha": 0.01, "u": 5},
         "ph_st": {"type": "penalized_complexity", "alpha": 0.01, "u": 3},
