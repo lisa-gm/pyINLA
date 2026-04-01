@@ -17,9 +17,9 @@ SCRIPT_DIR = Path(__file__).resolve()
 DALIA_DIR = SCRIPT_DIR.parent.parent.parent.parent
 EXAMPLE_PATH = DALIA_DIR / "examples" / "gst_coreg2_small"
 
-X_TOL = 1e3
-THETA_TOL = 1e2
-TYPICAL_N_ITER = 80
+X_TOL = 1e3 # 1.5e+2
+THETA_TOL = 1e2 # 9.e+1
+TYPICAL_N_ITER = 80 # On Fritz: 86
 
 def test_gcoreg2_itest():
     nv = 2
