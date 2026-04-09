@@ -243,7 +243,7 @@ if __name__ == "__main__":
 
     print_msg(
         "Norm (theta - theta_ref):        ",
-        f"{np.linalg.norm(results['theta'] - get_host(theta_ref)):.4e}",
+        f"{np.linalg.norm(get_host(results['theta']) - get_host(theta_ref)):.4e}",
     )
 
     x_ref = np.load(f"{BASE_DIR}/inputs_nv{nv}_ns{ns}_nt{nt}_nb{nb}/reference_outputs/x_ref.npy")
@@ -254,7 +254,7 @@ if __name__ == "__main__":
     # Compare latent parameters
     print_msg(
         "Norm (x - x_ref):                ",
-        f"{np.linalg.norm(results['x'] - get_host(x_ref)):.4e}",
+        f"{np.linalg.norm(get_host(results['x']) - get_host(x_ref)):.4e}",
     )
 
     # Compare marginal variances of latent parameters
@@ -265,7 +265,7 @@ if __name__ == "__main__":
     Qinv_ref = xp.linalg.inv(Qconditional.toarray())
     print_msg(
         "Norm (marg var latent - ref):    ",
-        f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
+        f"{xp.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
     )
 
     # Compare marginal variances of observations
