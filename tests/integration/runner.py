@@ -1,7 +1,7 @@
 import os
 
 from gst.itest import test_gst_itest
-from gcoreg2.itest import test_gcoreg2_itest
+from gcoreg2.itest import test_gstcoreg2_itest
 from par1.itest import test_par1_itest
 from pr.itest import test_pr_itest
 
@@ -14,7 +14,7 @@ from pr.itest import test_pr_itest
 
 itest_calls = {
     test_gst_itest: ["seq"],
-    test_gcoreg2_itest: ["seq"],
+    test_gstcoreg2_itest: ["seq"],
     test_par1_itest: ["seq"],
     test_pr_itest: ["seq"],
 }
