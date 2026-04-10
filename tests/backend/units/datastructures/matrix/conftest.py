@@ -10,6 +10,18 @@ from dalia.backend.datastructures import DenseMatrix, SparseMatrix
 EXTERNAL_SPARSE_TYPES = ["scipy_csr", "scipy_csc", "scipy_coo"]
 EXTERNAL_DENSE_TYPES = ["numpy"]
 
+# TODO: Change this to use flags instead of try
+try:
+    import cupy as cp
+    import cupyx.scipy.sparse as cu_sp
+    EXTERNAL_DENSE_TYPES.append("cupy")
+    EXTERNAL_SPARSE_TYPES.append("cupy_csr")
+    EXTERNAL_SPARSE_TYPES.append("cupy_csc")
+    EXTERNAL_SPARSE_TYPES.append("cupy_coo")
+
+except ImportError:
+    pass  # CuPy not available, skip GPU tests
+
 
 @pytest.fixture
 def matrix_factory():
@@ -34,6 +46,18 @@ def matrix_factory():
             return sp.coo_array(data)
         if matrix_type == "numpy":
             return data
+        # Cupy types
+        if matrix_type == "cupy_csr":
+            data = sp.csr_matrix(data)
+            return cu_sp.csr_matrix(data, dtype = cp.float64)
+        if matrix_type == "cupy_csc":
+            data = sp.csc_matrix(data)
+            return cu_sp.csc_matrix(data, dtype = cp.float64)
+        if matrix_type == "cupy_coo":
+            data = sp.coo_matrix(data)
+            return cu_sp.coo_matrix(data, dtype = cp.float64)
+        if matrix_type == "cupy":
+            return cp.asarray(data)
 
         raise ValueError(f"Unknown matrix_type: {matrix_type}")
 

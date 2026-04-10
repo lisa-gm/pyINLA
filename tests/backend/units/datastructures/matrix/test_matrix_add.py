@@ -2,6 +2,12 @@
 
 import numpy as np
 import pytest
+# TODO: Change this to use flags instead of try
+try:
+    import cupy as cp
+    import cupyx.scipy.sparse as cu_sp
+except ImportError:
+    pass
 
 from dalia.backend.datastructures import DenseMatrix, SparseMatrix
 from tests.backend import ATOLS, RTOLS
@@ -88,7 +94,10 @@ class TestAddCorrectness:
         left = matrix_factory("SparseMatrix")
         right = matrix_factory(right_type)
         result = left + right
-        reference = left.toarray() + right.toarray()
+        if right_type == "cupy_csr" or right_type == "cupy_csc" or right_type == "cupy_coo":
+            reference = left.toarray() + cp.asnumpy(right.toarray())
+        else:
+            reference = left.toarray() + right.toarray()
         assert np.allclose(
             result.toarray(), reference, rtol=RTOLS["strict"], atol=ATOLS["strict"]
         )
@@ -98,6 +107,8 @@ class TestAddCorrectness:
         left = matrix_factory("SparseMatrix")
         right = matrix_factory(right_type)
         result = left + right
+        if right_type == "cupy":
+            right = cp.asnumpy(right)
         reference = (
             left.toarray() + right.toarray()
             if hasattr(right, "toarray")
@@ -112,6 +123,8 @@ class TestAddCorrectness:
         left = matrix_factory("DenseMatrix")
         right = matrix_factory(right_type)
         result = left + right
+        if right_type == "cupy":
+            right = cp.asnumpy(right)
         reference = (
             left.toarray() + right.toarray()
             if hasattr(right, "toarray")
@@ -126,7 +139,10 @@ class TestAddCorrectness:
         left = matrix_factory("DenseMatrix")
         right = matrix_factory(right_type)
         result = left + right
-        reference = left.toarray() + right.toarray()
+        if right_type == "cupy_csr" or right_type == "cupy_csc" or right_type == "cupy_coo":
+            reference = left.toarray() + cp.asnumpy(right.toarray())
+        else:
+            reference = left.toarray() + right.toarray()
         assert np.allclose(
             result.toarray(), reference, rtol=RTOLS["strict"], atol=ATOLS["strict"]
         )
@@ -137,7 +153,10 @@ class TestAddCorrectness:
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix")
         result = left + right
-        reference = left.toarray() + right.toarray()
+        if left_type == "cupy_csr" or left_type == "cupy_csc" or left_type == "cupy_coo":
+            reference = cp.asnumpy(left.toarray()) + right.toarray()
+        else:
+            reference = left.toarray() + right.toarray()
         assert np.allclose(
             result.toarray(), reference, rtol=RTOLS["strict"], atol=ATOLS["strict"]
         )
@@ -147,6 +166,8 @@ class TestAddCorrectness:
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix")
         result = left + right
+        if left_type == "cupy":
+            left = cp.asnumpy(left)
         reference = (
             left.toarray() + right.toarray()
             if hasattr(left, "toarray")
@@ -161,6 +182,8 @@ class TestAddCorrectness:
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix")
         result = left + right
+        if left_type == "cupy":
+            left = cp.asnumpy(left)
         reference = (
             left.toarray() + right.toarray()
             if hasattr(left, "toarray")
@@ -175,7 +198,10 @@ class TestAddCorrectness:
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix")
         result = left + right
-        reference = left.toarray() + right.toarray()
+        if left_type == "cupy_csr" or left_type == "cupy_csc" or left_type == "cupy_coo":
+            reference = cp.asnumpy(left.toarray()) + right.toarray()
+        else:
+            reference = left.toarray() + right.toarray()
         assert np.allclose(
             result.toarray(), reference, rtol=RTOLS["strict"], atol=ATOLS["strict"]
         )

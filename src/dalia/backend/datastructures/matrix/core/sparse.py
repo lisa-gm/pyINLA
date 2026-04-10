@@ -1,6 +1,12 @@
 # src/dalia/backend/datastructures/matrix/core/sparse.py
 import numpy as np
 import scipy.sparse as sp
+# TODO: Change this to use flags instead of try
+try:
+    import cupy as cp
+    import cupyx.scipy.sparse as cu_sp
+except ImportError:
+    pass
 
 from .matrix import Matrix
 
@@ -60,14 +66,15 @@ class SparseMatrix(Matrix):
             )
 
         # Validate input is sparse
-        if not sp.issparse(data):
+        if not (sp.issparse(data) or cu_sp.issparse(data)):
             raise TypeError(
                 f"SparseMatrix requires scipy.sparse matrix, got {type(data).__name__}"
             )
 
         # Convert to canonical CSR format if needed
-        if not isinstance(data, sp.csr_matrix):
-            data = sp.csr_matrix(data)
+        if not isinstance(data, sp.csr_matrix) or not isinstance(data, cu_sp.csr_matrix):
+            
+            data = data.tocsr()
 
         # Ensure canonical format for optimal performance
         # This sorts indices and removes duplicates if needed
