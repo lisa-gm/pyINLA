@@ -94,7 +94,6 @@ if __name__ == "__main__":
 
     print_msg("\n--- Results ---")
     theta_ref = np.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
-    theta_external = np.array([0.08423457, 2.52313066, 1.46267965, np.exp(1.36076756)])
 
     print_msg("Theta values:\n", results["theta"])
     print_msg("Theta values internal:\n", results["theta_internal"])
@@ -104,7 +103,7 @@ if __name__ == "__main__":
     # Compare hyperparameters
     print_msg(
         "Norm (theta - theta_ref):        ",
-        f"{np.linalg.norm(get_host(results['theta_internal']) - theta_ref):.4e}",
+        f"{np.linalg.norm(get_host(results["theta"]) - theta_ref):.4e}",
     )
 
     # Compare latent parameters
