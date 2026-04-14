@@ -77,6 +77,10 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
         -------
         NDArray or float
             Rescaled hyperparameter values. In this case it is the identity, therefore unchanged.
+
+        Notes
+        -----
+        For Gaussian priors, the rescaling is the identity function since the internal and external representations are the same.
         """
         return super().rescale_hyperparameters_to_internal(theta, direction)
 

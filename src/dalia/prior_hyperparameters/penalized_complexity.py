@@ -45,6 +45,10 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
         # print("lambda_theta: ", self.lambda_theta)
 
     def rescale_hyperparameters_to_internal(self, theta, direction):
+        """Rescale hyperparameters to and from internal scale.
+        
+        TODO: Implement the re-scaling.
+        """
         return super().rescale_hyperparameters_to_internal(theta, direction)
 
     def evaluate_log_prior(self, theta: float, **kwargs) -> float:

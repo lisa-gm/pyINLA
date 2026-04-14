@@ -26,6 +26,7 @@ if __name__ == "__main__":
         "type": "spatio_temporal",
         "input_dir": f"{BASE_DIR}/inputs_spatio_temporal",
         "spatial_domain_dimension": 2,
+        # These hyperparameters are in the internal scale (dalia.py/BFGS)
         "r_s": 0,
         "r_t": 0,
         "sigma_st": 0,

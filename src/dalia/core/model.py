@@ -406,8 +406,12 @@ class Model(ABC):
 
     @theta_external.setter
     def theta_external(self, value):
-        """Set external theta and automatically update internal."""
-
+        """Set external theta and automatically update internal.
+        
+        Notes
+        -----
+        The re-scaling is implemented for all prios but PenalizedComplexity (identity but already in the correct "log" scale).
+        """
         self._theta_external = xp.array(value)
         self._theta_internal = self.rescale_hyperparameters_to_internal(
             self._theta_external, direction="forward"

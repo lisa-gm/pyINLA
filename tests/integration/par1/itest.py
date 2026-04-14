@@ -13,7 +13,7 @@ DALIA_DIR = SCRIPT_DIR.parent.parent.parent.parent
 EXAMPLE_PATH = DALIA_DIR / "examples" / "p_ar1"
 
 X_TOL = 1e2
-THETA_TOL = 1e2
+THETA_TOL = 2e-2
 TYPICAL_N_ITER = 12
 
 def test_par1_itest():
@@ -84,13 +84,14 @@ def test_par1_itest():
         success_msg = "success_less_iters_than_typical"
 
     # Compare hyperparameters
-    print(f"theta_ref: {theta_original}")
-    print(f"theta_dalia: {get_host(results['theta_internal'])}")
+    theta_user = get_host(results["theta"])
+    print("theta_ref: ", theta_original)
+    print("theta user: ", theta_user)
     print_msg(
         "Norm (theta - theta_ref): ",
-        f"{np.linalg.norm(get_host(results['theta_internal']) - theta_original):.4e}",
+        f"{np.linalg.norm(theta_user - theta_original):.4e}",
     )
-    if np.linalg.norm(get_host(results["theta_internal"]) - theta_original) > THETA_TOL:
+    if np.linalg.norm(theta_user - theta_original) > THETA_TOL:
         return "theta_tol_exceeded"
 
     # Compare latent parameters
@@ -107,3 +108,4 @@ def test_par1_itest():
 
 if __name__ == "__main__":
     test_par1_itest()
+    

@@ -98,28 +98,12 @@ if __name__ == "__main__":
         config=dalia_config.parse_config(dalia_dict),
     )
 
-    print("theta external: ", model.theta_external)
-    # print("x : ", model.x)
-    f_value = dalia._evaluate_f(model.theta_external)
-    print("after evaluate f. x: ", model.x)
-
     results = dalia.minimize()
 
-    theta_unscaled = results["theta"]
-    print("theta unscaled: ", theta_unscaled)
-    theta_original_log = xp.array(
-        [
-            xp.asarray(theta_original[0]),
-            xp.log(theta_original[1]),
-        ]
-    )
-    print("theta original log: ", theta_original_log)
-
+    theta_user = results["theta"]
+    print("theta_ref: ", theta_original)
+    print("theta user: ", theta_user)
+    print("norm(theta_original - theta_user): ", np.linalg.norm(theta_original - get_host(theta_user)))
     print("norm(x_original - x): ", np.linalg.norm(x_original - get_host(results["x"])))
     print("normalized norm: ", np.linalg.norm(x_original - get_host(results["x"])) / np.linalg.norm(x_original))
 
-    # print("norm(eta_original - eta_est): ", np.linalg.norm(model.a @ x_original - model.a @ get_host(results["x"])))
-    # print(
-    #     "normalized norm: ",
-    #     np.linalg.norm(model.a @ x_original - model.a @ get_host(results["x"])) / np.linalg.norm(model.a @ x_original),
-    # )
