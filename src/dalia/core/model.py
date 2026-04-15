@@ -34,7 +34,8 @@ from dalia.submodels import (
     SpatioTemporalSubModel,
     AR1SubModel,
 )
-from dalia.utils import add_str_header, boxify
+from dalia.utils import add_str_header, boxify, scaled_logit
+from dalia.utils.scalar_ndarray import ensure_scalar
 
 
 class Model(ABC):
@@ -672,7 +673,20 @@ class Model(ABC):
         return theta_internal
 
     def evaluate_likelihood(self, eta: NDArray, **kwargs) -> float:
-        """Evaluate the likelihood."""
+        """Evaluate the likelihood.
+        
+        Parameters
+        ----------
+        eta : NDArray
+            Linear predictor.
+        kwargs : dict
+            Additional arguments for the likelihood evaluation. These parameters are model dependent.
+
+        Returns
+        -------
+        likelihood : float
+            The evaluated likelihood.
+        """
 
         if isinstance(self.submodels[0], BrainiacSubModel):
             # kwargs["h2"] = float(self.theta[0])
@@ -683,7 +697,9 @@ class Model(ABC):
                 eta, self.y, theta=self.theta_external[self.hyperparameters_idx[-1] :]
             )
 
-        return likelihood
+        return ensure_scalar(likelihood)
+
+        
 
     def __str__(self) -> str:
         """String representation of the model."""

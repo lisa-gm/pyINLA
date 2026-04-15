@@ -36,6 +36,7 @@ from dalia.utils.print_utils import (
 from dalia.utils.spmatrix_utils import bdiag_tiling, extract_diagonal, memory_footprint
 from dalia.utils.print_utils import add_str_header, align_tables_side_by_side, boxify, ascii_logo
 from dalia.utils.plotting import plot_marginal_distributions_hp, plot_prior_hp
+from .scalar_ndarray import ensure_scalar
 
 __all__ = [
     "get_available_devices",

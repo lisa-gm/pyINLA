@@ -21,6 +21,7 @@ from dalia.utils import (
     boxify,
     free_unused_gpu_memory,
 )
+from dalia.utils.scalar_ndarray import ensure_scalar
 
 
 class CoregionalModel(Model):
@@ -674,7 +675,13 @@ class CoregionalModel(Model):
         return information_vector
 
     def is_likelihood_gaussian(self) -> bool:
-        """Check if the likelihood is Gaussian."""
+        """Check if the likelihood is Gaussian.
+        
+        Returns
+        -------
+        is_gaussian : bool
+            True if the likelihood is Gaussian, False otherwise.
+        """
         for model in self.models:
             if not model.is_likelihood_gaussian():
                 return False
@@ -684,6 +691,25 @@ class CoregionalModel(Model):
         self,
         eta: NDArray,
     ) -> float:
+        """Evaluate the likelihood.
+        
+        Parameters
+        ----------
+        eta : NDArray
+            Linear predictor.
+        kwargs : dict
+            Additional arguments for the likelihood evaluation. These parameters are model dependent.
+
+        Returns
+        -------
+        likelihood : float
+            The evaluated likelihood.
+
+        Implementation Notes:
+        ---------------------
+        - The likelihood is evaluated for each model and then summed up to get the total likelihood of the CoregionalModel.
+        - Returned as a scalar for consistency, even if the likelihood is computed as a sum of multiple likelihoods from different models.
+        """
         likelihood: float = 0.0
         for i, model in enumerate(self.models):
             likelihood += model.likelihood.evaluate_likelihood(
@@ -691,8 +717,8 @@ class CoregionalModel(Model):
                 y=self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
                 theta=float(self.theta_external[self.hyperparameters_idx[i + 1] - 1]),
             )
-
-        return likelihood
+   
+        return ensure_scalar(likelihood)
 
     def evaluate_log_prior_hyperparameters(self) -> float:
         """Evaluate the log prior hyperparameters."""
