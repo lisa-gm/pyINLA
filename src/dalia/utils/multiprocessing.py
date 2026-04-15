@@ -1,9 +1,10 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
+from typing import Literal
+
 from dataclasses import dataclass
 
-import numpy as np
 
-from dalia import ArrayLike, backend_flags, comm_rank
+from dalia import ArrayLike, backend_flags, comm_rank, xp
 from dalia.utils.gpu_utils import get_array_module_name, get_device, get_host
 
 if backend_flags["mpi_avail"]:
@@ -220,55 +221,56 @@ def smartsplit(
     return active_comm, comm_new_group, color_new_group
 
 def check_vector_consistency(
-    theta: ArrayLike,
+    value: ArrayLike,
     comm,
+    flag: str,
+    verbose: Literal["No", "Minimal", "Full"] = "No",
+    rtol: float = 1e-10,
 ):
-    """
-    Check if all processes have the same theta.
+    """ Check if all processes have the same value.
 
     Parameters:
     -----------
-    theta (ArrayLike):
-        The theta to check.
+    value (ArrayLike):
+        The value to check.
     comm (CommunicatorType), optional:
-        The communication group. Default is MPI.COMM_WORLD.
-    """
+        The communication group.
+    flag (str):
+        A string to identify the value being checked in the error message.
+    verbose (str):
+        The level of verbosity for the error message. Choose from 'No', 'Minimal', or 'Full'. Default is 'No'.
+    rtol (float):
+        The relative tolerance for the consistency check. Default is 1e-10.
 
+    Raises:
+    -------
+    ValueError:
+        If the value is not consistent across all processes.
+    """
     synchronize(comm = comm)
 
-    theta_ref = theta.copy()
-    bcast(theta_ref, root=0, comm=comm)
+    value_ref = value.copy()
+    bcast(value_ref, root=0, comm=comm)
 
-    if backend_flags["cupy_avail"]:
-        if (
-            get_array_module_name(theta) == "cupy"
-        ):
-            norm_diff = cp.linalg.norm(theta - theta_ref)
-        else:
-            norm_diff = np.linalg.norm(theta - theta_ref)
-    else:
-        norm_diff = np.linalg.norm(theta - theta_ref)
+    norm_diff = xp.linalg.norm(value - value_ref)
 
-    if norm_diff > 1e-10:
-        # Print indices and values where theta and theta_ref differ
-        if backend_flags["cupy_avail"]:
-            if (
-                get_array_module_name(theta) == "cupy"
-            ):
-                diff_indices = cp.where(theta != theta_ref)[0]
-                for idx in diff_indices:
-                    print(f"Process {comm.Get_rank()} difference at index {idx}: theta_ref={theta_ref[idx]}, theta={theta[idx]}")
-            else:
-                diff_indices = np.where(theta != theta_ref)[0]
-                for idx in diff_indices:
-                    print(f"Process {comm.Get_rank()} difference at index {idx}: theta_ref={theta_ref[idx]}, theta={theta[idx]}")
-                    
+    if norm_diff > rtol:
+        # Print indices and values where value and value_ref differ
+        if verbose == "No":
+            raise ValueError(
+                f"Process {comm.Get_rank()} has a different {flag} than the reference process with a norm of the difference of {norm_diff:.4e}."
+            )
+        
+        diff_indices = xp.where(value != value_ref)[0]
+        if verbose == "Minimal":
+            # Only print the first 5 differences, make sure it's 5 or the max number of differences
+            diff_indices = diff_indices[:min(5, len(diff_indices))]
+        elif verbose == "Full":
+            pass
         else:
-            diff_indices = np.where(theta != theta_ref)[0]
-            for idx in diff_indices:
-                print(f"Process {comm.Get_rank()} difference at index {idx}: theta_ref={theta_ref[idx]}, theta={theta[idx]}")
-        raise ValueError(
-            f"Process {comm.Get_rank()} has a different theta than the reference process."
-            f" Expected: {theta_ref}, but got:  {theta}. diff = {norm_diff:.4e}"
-            f""
-        )
+            raise ValueError(
+                f"Invalid verbose option: {verbose}. Choose from 'No', 'Minimal', or 'Full'."
+            )
+
+        for idx in diff_indices:
+            print(f"Process {comm.Get_rank()} difference at index {idx}: {flag}={value_ref[idx]}, value={value[idx]}")

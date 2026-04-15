@@ -4,6 +4,7 @@ import logging
 
 from scipy import optimize
 from tabulate import tabulate
+import copy
 
 from dalia import ArrayLike, NDArray, backend_flags, comm_rank, comm_size, sp, xp
 from dalia.configs.dalia_config import DaliaConfig
@@ -41,6 +42,7 @@ else:
 import time
 
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
+
 
 
 class DALIA:
@@ -316,6 +318,7 @@ class DALIA:
         self.theta_star = minimization_result["theta"]
         self.theta_star_internal = minimization_result["theta_internal"]
         self.x_star = minimization_result["x"]
+
         print("Finished the optimization procedure.")
 
         # need to update theta_star and x_star to be the same across all ranks
@@ -324,8 +327,7 @@ class DALIA:
         bcast(data=self.x_star[:], root=0, comm=self.comm_world)
 
         # compute covariance of the hyperparameters theta at the mode
-        print("theta_star: ", self.theta_star)
-        cov_theta_ = self.compute_covariance_hp(self.theta_star)
+        self.cov_theta_internal = self.compute_covariance_hp(self.theta_star)
         print("Computed covariance of the hyperparameters at the mode.")
 
         # compute marginal variances of the latent parameters
@@ -377,6 +379,8 @@ class DALIA:
         check_vector_consistency(
             self.model.theta_external,
             comm=self.comm_world,
+            flag="self.model.theta_external",
+            verbose="Full",
         )
 
         if len(self.model.theta_external) == 0:
@@ -384,10 +388,10 @@ class DALIA:
             print_msg("No hyperparameters, just running inner iteration.")
             self.f_value = self._evaluate_f(self.model.theta_external)
             self.minimization_result: dict = {
-                "theta_internal": self.model.theta_internal,
-                "theta": self.model.theta_external,
-                "x": self.model.x,  # [self.model.inverse_permutation_latent_variables],
-                "f": self.f_value,
+                "theta_internal": copy.deepcopy(self.model.theta_internal),
+                "theta": copy.deepcopy(self.model.theta_external),
+                "x": copy.deepcopy(self.model.x),  # [self.model.inverse_permutation_latent_variables],
+                "f": copy.deepcopy(self.f_value),
                 "grad_f": [],
                 "f_values": [],
                 ### these values are in internal scale (!!)
@@ -443,12 +447,12 @@ class DALIA:
                         )
 
                         self.minimization_result = {
-                            "theta_internal": self.model.theta_internal,
+                            "theta_internal": copy.deepcopy(self.model.theta_internal),
                             "theta":
-                                self.model.theta_external,
-                            "x": self.model.x,
-                            "f": fun_i,
-                            "grad_f": self.gradient_f,
+                                copy.deepcopy(self.model.theta_external),
+                            "x": copy.deepcopy(self.model.x),
+                            "f": copy.deepcopy(fun_i),
+                            "grad_f": copy.deepcopy(self.gradient_f),
                             "f_values": self.f_values,
                             ### these values are in internal scale (!!)
                             "theta_values": self.theta_values_internal,
@@ -488,10 +492,10 @@ class DALIA:
                                 #     self.model.inverse_permutation_latent_variables
                                 # ]
                             ),
-                            "f": fun_i,
-                            "grad_f": self.gradient_f,
-                            "f_values": self.f_values,
-                            "theta_values": self.theta_values_internal,
+                            "f": copy.deepcopy(fun_i),
+                            "grad_f": copy.deepcopy(self.gradient_f),
+                            "f_values": copy.deepcopy(self.f_values),
+                            "theta_values": copy.deepcopy(self.theta_values_internal),
                         }
 
                         raise OptimizationConvergedEarlyExit()
@@ -541,13 +545,13 @@ class DALIA:
                 )
 
             self.minimization_result: dict = {
-                "theta_internal": self.model.theta_internal, #  scipy_result.x, #
-                "theta": self.model.theta_external,
-                "x": self.model.x,  # [self.model.inverse_permutation_latent_variables]
-                "f": scipy_result.fun,
-                "grad_f": self.gradient_f,
-                "f_values": self.f_values,
-                "theta_values": self.theta_values_internal,
+                "theta_internal": copy.deepcopy(self.model.theta_internal), #  scipy_result.x, #
+                "theta": copy.deepcopy(self.model.theta_external),
+                "x": copy.deepcopy(self.model.x),  # [self.model.inverse_permutation_latent_variables]
+                "f": copy.deepcopy(scipy_result.fun),
+                "grad_f": copy.deepcopy(self.gradient_f),
+                "f_values": copy.deepcopy(self.f_values),
+                "theta_values": copy.deepcopy(self.theta_values_internal),
             }
 
         return self.minimization_result
@@ -818,6 +822,8 @@ class DALIA:
         check_vector_consistency(
             theta_external,
             comm=self.comm_world,
+            flag="theta_external",
+            verbose="Full",
         )
         print_msg(
             f"Computing covariance of hyperparameters at theta_external {theta_external}.",
@@ -833,7 +839,7 @@ class DALIA:
             f"hessian_f: \n {hess_theta_internal}",
             flush=True,
         )
-        self.cov_theta_internal = xp.linalg.inv(hess_theta_internal)
+        cov_theta_internal = xp.linalg.inv(hess_theta_internal)
         
         synchronize(comm=self.comm_world)
         toc = time.perf_counter()
@@ -843,7 +849,7 @@ class DALIA:
             flush=True,
         )
         
-        return self.cov_theta_internal
+        return cov_theta_internal
 
     def _evaluate_hessian_f(
         self,
@@ -1233,8 +1239,8 @@ class DALIA:
                 "BOTH or NEITHER theta and x_star must be provided to compute the marginal variances."
             )
 
-        check_vector_consistency(theta, comm=self.comm_world)
-        check_vector_consistency(x_star, comm=self.comm_world)
+        check_vector_consistency(theta, comm=self.comm_world, flag="theta", verbose="Full")
+        check_vector_consistency(x_star, comm=self.comm_world, flag="x_star", verbose="Minimal")
 
         # check order x_star ... -> potentially need to reorder marginal variances
         self._compute_covariance_latent_parameters(theta, x_star)
@@ -1272,8 +1278,8 @@ class DALIA:
         """
 
         # TODO: implement this for non-Gaussian likelihoods
-        check_vector_consistency(theta_external, comm=self.comm_world)
-        check_vector_consistency(x_star, comm=self.comm_world)
+        check_vector_consistency(theta_external, comm=self.comm_world, flag="theta_external", verbose="Full")
+        check_vector_consistency(x_star, comm=self.comm_world, flag="x_star", verbose="Minimal")
 
         if self.model.is_likelihood_gaussian():
             # TODO: this should be only called by rank 0?
