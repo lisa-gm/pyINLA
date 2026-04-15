@@ -703,7 +703,8 @@ class DALIA:
                 log_prior_hyperparameters: float = (
                     self.model.evaluate_log_prior_hyperparameters()
                 )
-                likelihood: float = float(self.model.evaluate_likelihood(eta=eta))
+
+                likelihood: float = self.model.evaluate_likelihood(eta=eta)
                 prior_latent_parameters: float = (
                     self._evaluate_prior_latent_parameters()
                 )

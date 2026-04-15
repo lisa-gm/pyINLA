@@ -30,6 +30,7 @@ from dalia.utils.print_utils import (
     boxify,
 )
 from dalia.utils.spmatrix_utils import bdiag_tiling, extract_diagonal, memory_footprint
+from .scalar_ndarray import ensure_scalar
 
 __all__ = [
     "get_available_devices",
