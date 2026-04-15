@@ -13,7 +13,7 @@ EXAMPLE_PATH = DALIA_DIR / "examples" / "pr"
 
 X_TOL = 1e-5
 
-def test_pr_itest():
+def pr_itest():
     # Configurations of the regression submodel
     regression_dict = {
         "type": "regression",
@@ -66,4 +66,4 @@ def test_pr_itest():
     return "success"
 
 if __name__ == "__main__":
-    test_pr_itest()
+    pr_itest()

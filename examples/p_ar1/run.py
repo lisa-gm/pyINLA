@@ -20,10 +20,10 @@ if __name__ == "__main__":
     n = 1000
 
     # load reference output
-    theta_original = np.load("reference_outputs/theta_original.npy")
+    theta_original = np.load(f"{BASE_DIR}/reference_outputs/theta_original.npy")
     print("theta original: ", theta_original)
 
-    x_original = np.load("reference_outputs/x_original.npy")
+    x_original = np.load(f"{BASE_DIR}/reference_outputs/x_original.npy")
     print("x original: ", x_original[:10])
     print("dim(x original): ", x_original.shape)
 

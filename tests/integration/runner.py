@@ -1,9 +1,9 @@
 import os
 
-from gst.itest import test_gst_itest
-from gcoreg2.itest import test_gstcoreg2_itest
-from par1.itest import test_par1_itest
-from pr.itest import test_pr_itest
+from gst.itest import gst_itest
+from gstcoreg2.itest import gstcoreg2_itest
+from par1.itest import par1_itest
+from pr.itest import pr_itest
 
 # run_test_scripts = {
 #     "gst/itest.py": ["seq", "par_f", "par_s"],
@@ -13,10 +13,10 @@ from pr.itest import test_pr_itest
 # }
 
 itest_calls = {
-    test_gst_itest: ["seq"],
-    test_gstcoreg2_itest: ["seq"],
-    test_par1_itest: ["seq"],
-    test_pr_itest: ["seq"],
+    gst_itest: ["seq"],
+    gstcoreg2_itest: ["seq"],
+    par1_itest: ["seq"],
+    pr_itest: ["seq"],
 }
 
 os.environ["ARRAY_MODULE"] = "cupy"  # "numpy" or "cupy"

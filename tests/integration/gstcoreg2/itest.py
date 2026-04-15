@@ -21,7 +21,7 @@ X_TOL = 1e3 # 1.5e+2
 THETA_TOL = 1e2 # 9.e+1
 TYPICAL_N_ITER = 80 # On Fritz: 86
 
-def test_gstcoreg2_itest():
+def gstcoreg2_itest():
     nv = 2
     ns = 354
     nt = 12
@@ -231,4 +231,4 @@ def test_gstcoreg2_itest():
     return success_msg
 
 if __name__ == "__main__":
-    test_gstcoreg2_itest()   
+    gstcoreg2_itest()   

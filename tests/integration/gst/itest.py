@@ -15,7 +15,7 @@ X_TOL = 1e-1
 THETA_TOL = 1e1
 TYPICAL_N_ITER = 26
 
-def test_gst_itest():
+def gst_itest():
     spatio_temporal_dict = {
         "type": "spatio_temporal",
         "input_dir": f"{EXAMPLE_PATH}/inputs_spatio_temporal",
@@ -108,4 +108,4 @@ def test_gst_itest():
     return success_msg
 
 if __name__ == "__main__":
-    test_gst_itest()
+    gst_itest()

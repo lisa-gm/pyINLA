@@ -16,7 +16,7 @@ X_TOL = 1e2
 THETA_TOL = 2e-2
 TYPICAL_N_ITER = 12
 
-def test_par1_itest():
+def par1_itest():
     # load reference output
     theta_original = np.load(f"{EXAMPLE_PATH}/reference_outputs/theta_original.npy")
     x_original = np.load(f"{EXAMPLE_PATH}/reference_outputs/x_original.npy")
@@ -107,5 +107,4 @@ def test_par1_itest():
     return success_msg
 
 if __name__ == "__main__":
-    test_par1_itest()
-    
+    par1_itest()
