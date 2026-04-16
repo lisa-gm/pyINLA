@@ -3,7 +3,7 @@ from abc import ABC
 
 from dalia.backend.datastructures.matrix.dispatch import Operation, blas_dispatch
 
-from .utils import toarray, wrap_result
+from .utils import toarray, wrap_result, tocpu, togpu
 
 
 class Matrix(ABC):
@@ -112,7 +112,23 @@ class Matrix(ABC):
     __array_ufunc__ = None  # Disable numpy ufuncs to avoid conflicts
 
     # 2. Initialization
-    def __init__(self, data):
+    def __init__(self, data, device=None):
+        
+        if device is not None and device not in ['cpu', 'gpu']:
+            raise ValueError(f"Invalid device type '{device}'. Supported devices are 'cpu' and 'gpu'.")
+        if device is not None:
+            if device == 'gpu' and 'cupy' not in str(type(data)):
+                data = togpu(data)
+            elif device == 'cpu' and 'cupy' in str(type(data)):
+                data = tocpu(data)
+        else:
+            # Infer device from data type
+            if 'cupy' in str(type(data)):
+                device = 'gpu'
+            else:
+                device = 'cpu'
+        
+        self._device = device
         self._data = data
 
     # 3. Special representation methods
@@ -127,6 +143,10 @@ class Matrix(ABC):
         """
         # pylint: disable=invalid-name
         return wrap_result(self._data.T)
+    
+    def device(self):
+        """Device where the matrix data is stored ('cpu' or 'gpu')"""
+        return self._device
 
     # 5. Comparison operators (if needed)
 
@@ -277,6 +297,22 @@ class Matrix(ABC):
             array([[1, 2]])
         """
         return toarray(self._data)
+    
+    def tocpu(self):
+        if self._device == "cpu":
+            return self
+        else:
+            self._data = tocpu(self._data)
+            self._device = "cpu"
+            return self
+
+    def togpu(self):
+        if self._device == "gpu":
+            return self
+        else:
+            self._data = togpu(self._data)
+            self._device = "gpu"
+            return self
 
     # 11. Private/protected methods (start with _)
     def _wrap_result(self, data):
