@@ -3,21 +3,23 @@ import numpy as np
 import pytest
 
 from dalia.backend.datastructures import DenseMatrix, SparseMatrix
-
+from .conftest import INTERNAL_DEVICE_TYPES
 
 @pytest.mark.parametrize("matrix_type", ["SparseMatrix", "DenseMatrix"])
-def test_transpose_shape(matrix_type, matrix_factory):
+@pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
+def test_transpose_shape(matrix_type, device, matrix_factory):
     """Test that transpose has correct shape"""
-    matrix = matrix_factory(matrix_type, shape=(3, 4))
+    matrix = matrix_factory(matrix_type, device=device, shape=(3, 4))
     transposed = matrix.T
     assert transposed.shape == (4, 3)
 
 
 @pytest.mark.parametrize("matrix_type", ["SparseMatrix", "DenseMatrix"])
-def test_transpose_correctness(matrix_type, matrix_factory):
+@pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
+def test_transpose_correctness(matrix_type, device, matrix_factory):
     """Test that transpose has correct values"""
     data = np.array([[1, 2, 3], [4, 5, 6]])
-    matrix = matrix_factory(matrix_type, shape=data.shape, data=data)
+    matrix = matrix_factory(matrix_type, device=device, shape=data.shape, data=data)
     transposed = matrix.T
 
     # Convert to dense for comparison
@@ -31,10 +33,11 @@ def test_transpose_correctness(matrix_type, matrix_factory):
 
 
 @pytest.mark.parametrize("matrix_type", ["SparseMatrix", "DenseMatrix"])
-def test_transpose_double(matrix_type, matrix_factory):
+@pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
+def test_transpose_double(matrix_type, device, matrix_factory):
     """Test that (A.T).T == A"""
     data = np.array([[1, 2, 3], [4, 5, 6]])
-    matrix = matrix_factory(matrix_type, shape=data.shape, data=data)
+    matrix = matrix_factory(matrix_type, device=device, shape=data.shape, data=data)
     double_transposed = matrix.T.T
 
     # Convert both to dense for comparison
@@ -49,9 +52,10 @@ def test_transpose_double(matrix_type, matrix_factory):
 
 
 @pytest.mark.parametrize("matrix_type", ["SparseMatrix", "DenseMatrix"])
-def test_transpose_type_preserved(matrix_type, matrix_factory):
+@pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
+def test_transpose_type_preserved(matrix_type, device, matrix_factory):
     """Test that transpose returns correct Matrix subclass"""
-    matrix = matrix_factory(matrix_type)
+    matrix = matrix_factory(matrix_type, device=device)
     transposed = matrix.T
 
     if matrix_type == "SparseMatrix":

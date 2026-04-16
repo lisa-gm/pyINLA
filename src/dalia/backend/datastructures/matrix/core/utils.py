@@ -32,5 +32,20 @@ def toarray(data):
     if isinstance(data, cp.ndarray):
         return cp.asnumpy(data)
     if cu_sp.issparse(data):
-        return data.toarray()
+        return cp.asnumpy(data.toarray())
     return np.asarray(data)  # Works for arrays and views
+
+def tocpu(data):
+    """Convert GPU data to a CPU array"""
+    return data.get()
+
+def togpu(data):
+    """Convert CPU data to a GPU array"""
+    if sp.issparse(data):
+        if data.dtype.char not in '?fdFD': 
+            # cupy sparse only supports bool, float32, float64, complex64, complex128
+            # convert to float64 by default if unsupported dtype
+            # Might act weird for non-numeric types
+            return cu_sp.csr_matrix(data, dtype=cp.float64)
+        return cu_sp.csr_matrix(data)
+    return cp.asarray(data)

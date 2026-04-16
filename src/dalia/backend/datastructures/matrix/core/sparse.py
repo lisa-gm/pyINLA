@@ -49,7 +49,7 @@ class SparseMatrix(Matrix):
     # 1. Class attributes (if any)
 
     # 2. Initialization
-    def __init__(self, data):
+    def __init__(self, data, device=None):
         # Reject Matrix objects - use .copy() method instead
         if isinstance(data, Matrix):
             raise TypeError(
@@ -83,7 +83,7 @@ class SparseMatrix(Matrix):
             data.sort_indices()
 
         # Initialize parent with CSR matrix
-        super().__init__(data)
+        super().__init__(data, device)
 
     # 3. Special representation methods
     # 4. Properties (grouped together)
