@@ -89,7 +89,6 @@ if __name__ == "__main__":
     # plot tau
     # theta_interval = [0, 5]
     # prior_hp = model.prior_hyperparameters[1]
-    # fig, ax = plot_prior_hp("tau", theta_interval, prior_hp)
 
     # import matplotlib.pyplot as plt
     # plt.show()
@@ -97,6 +96,7 @@ if __name__ == "__main__":
     # in gaussian case x = 0, thus eta = 0
     x_i = xp.zeros(model.n_latent_parameters)
     eta = model.a @ x_i
+    model.construct_Q_prior()
     Qcond = model.construct_Q_conditional(eta=eta)
     print("Qcond: \n", Qcond.toarray()[:6, :6])
 
@@ -176,9 +176,10 @@ if __name__ == "__main__":
     print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp()
 
-    # fig, axes = plot_marginal_distributions_hp(marginals_hp)
-    # import matplotlib.pyplot as plt
-    # plt.show()
+    fig, axes = plot_marginal_distributions_hp(marginals_hp)
+    import matplotlib.pyplot as plt
+
+    plt.show()
 
     phi = marginals_hp["hyperparameters"]["phi"]
     quantile_pairs = phi["quantiles"]["external"]["pairs"]
