@@ -60,14 +60,6 @@ if __name__ == "__main__":
     )
     print_msg(model)
 
-    print("Qprior\n", model.construct_Q_prior().todense())
-
-    print(
-        "Qconditional\n", model.construct_Q_conditional(eta=model.a @ model.x).todense()
-    )
-
-    # exit()
-
     ## Plot prior of hyperparameter -- identification by [0], [1], ... not amazing but works for now
     theta_interval = [1e-6, 15]
     prior_hp = model.prior_hyperparameters[0]

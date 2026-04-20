@@ -634,6 +634,13 @@ class DALIA:
             )
         self.iter += 1
 
+        print(
+            "theta_i: ",
+            get_host(self.theta_mat[:, 0]),
+            "gradient_f: ",
+            get_host(self.gradient_f),
+        )
+
         return (f_0, grad_f)
 
     def _evaluate_f(
@@ -817,7 +824,7 @@ class DALIA:
             f"Computing covariance of hyperparameters at theta_external {theta_external}.",
             flush=True,
         )
-        
+
         synchronize(comm=self.comm_world)
         tic = time.perf_counter()
         self.model.theta_external = theta_external
@@ -828,7 +835,7 @@ class DALIA:
             flush=True,
         )
         self.cov_theta_internal = xp.linalg.inv(hess_theta_internal)
-        
+
         synchronize(comm=self.comm_world)
         toc = time.perf_counter()
         print_msg(
@@ -836,7 +843,7 @@ class DALIA:
             toc - tic,
             flush=True,
         )
-        
+
         return self.cov_theta_internal
 
     def _evaluate_hessian_f(
