@@ -77,25 +77,19 @@ if __name__ == "__main__":
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
     print_msg(model)
-    
+
     # plot phi
     # theta_interval = [0, 1]
     # prior_hp = model.prior_hyperparameters[0]
     # fig, ax = plot_prior_hp("phi", theta_interval, prior_hp)
 
     # plot tau
-    theta_interval = [0, 5]
-    prior_hp = model.prior_hyperparameters[1]
-    fig, ax = plot_prior_hp("tau", theta_interval, prior_hp)
+    # theta_interval = [0, 5]
+    # prior_hp = model.prior_hyperparameters[1]
+    # fig, ax = plot_prior_hp("tau", theta_interval, prior_hp)
 
-    import matplotlib.pyplot as plt
-    plt.show()
-
-    Qprior = model.construct_Q_prior()
-    print("Qprior: \n", Qprior.toarray()[:6, :6])
-    Qinv = np.linalg.inv(Qprior.toarray())
-    geom_mean = np.exp(np.mean(np.log(Qinv.diagonal())))
-    print("Geometric mean of Qinv diagonal: ", geom_mean)
+    # import matplotlib.pyplot as plt
+    # plt.show()
 
     # in gaussian case x = 0, thus eta = 0
     x_i = np.zeros(model.n_latent_parameters)
@@ -107,7 +101,7 @@ if __name__ == "__main__":
     print("b: ", b[:10])
 
     x_est = np.linalg.solve(Qcond.toarray(), b)
-    #print("x est: ", x_est)
+    # print("x est: ", x_est)
     print("norm(x_original - x_est): ", np.linalg.norm(x_original - x_est))
 
     # Configurations of DALIA
@@ -168,19 +162,19 @@ if __name__ == "__main__":
         "Norm (marg var latent - ref):    ",
         f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
     )
-    
+
     print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp() 
 
-    fig, axes = plot_marginal_distributions_hp(marginals_hp)
-    import matplotlib.pyplot as plt
-    plt.show()
-    
+    # fig, axes = plot_marginal_distributions_hp(marginals_hp)
+    # import matplotlib.pyplot as plt
+    # plt.show()
+
     phi = marginals_hp['hyperparameters']['phi']
     quantile_pairs = phi['quantiles']['external']['pairs']
 
     print("Quantile pairs of phi:")
     for p, q in quantile_pairs:
         print(f"   {p:.3f} quantile: {q:.4f}")
-    
+
     print_msg("\n--- Finished ---")
