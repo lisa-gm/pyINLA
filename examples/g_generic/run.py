@@ -33,8 +33,9 @@ if __name__ == "__main__":
         "type": "generic",
         "input_dir": f"{BASE_DIR}/inputs_generic",
         # initial guess on the precision
-        "tau": 3,  # has to be positive
-        "ph_tau": {"type": "gamma", "alpha": 2.0, "beta": 1.0},
+        "tau": 1.5,  # has to be positive
+        "ph_tau": {"type": "gamma", "alpha": 1.0, "beta": 1e-5},
+        # "ph_tau": {"type": "gaussian", "mean": 5.0, "precision": 1.5},
     }
     generic = GenericSubModel(
         config=submodels_config.parse_config(generic_dict),
@@ -44,8 +45,13 @@ if __name__ == "__main__":
     likelihood_dict = {
         "type": "gaussian",
         "prec_o": 1.0,
-        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
-        # "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
+        "prior_hyperparameters": {"type": "gamma", "alpha": 1.0, "beta": 1e-5},
+        # "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.05},
+        # "prior_hyperparameters": {
+        #     "type": "penalized_complexity",
+        #     "alpha": 0.01,
+        #     "u": 5,
+        # },
     }
     # Creation of the first model by combining the Generic submodel and the likelihood
     model = Model(
@@ -54,20 +60,27 @@ if __name__ == "__main__":
     )
     print_msg(model)
 
+    print("Qprior\n", model.construct_Q_prior().todense())
+
+    print(
+        "Qconditional\n", model.construct_Q_conditional(eta=model.a @ model.x).todense()
+    )
+
+    # exit()
+
     ## Plot prior of hyperparameter -- identification by [0], [1], ... not amazing but works for now
-    theta_interval = [-5, 7]
+    theta_interval = [1e-6, 15]
     prior_hp = model.prior_hyperparameters[0]
 
-    # fig, ax = plot_prior_hp("prec_o", theta_interval, prior_hp)
-    import matplotlib.pyplot as plt
-
-    plt.show()
+    # fig, ax = plot_prior_hp("tau", theta_interval, prior_hp)
+    # import matplotlib.pyplot as plt
+    # plt.show()
 
     # Configurations of DALIA
     dalia_dict = {
         "solver": {"type": "dense"},
         "minimize": {
-            "max_iter": args.max_iter,
+            "max_iter": 50,
             "gtol": 1e-3,
             "disp": True,
         },
@@ -91,10 +104,10 @@ if __name__ == "__main__":
     print_msg("Theta values external:\n", results["theta"])
     print_msg("Theta values internal:\n", results["theta_internal"])
     print_msg("Internal Covariance of theta:\n", results["cov_theta_internal"])
-    print_msg(
-        "Mean of the latent parameters:\n",
-        results["x"],
-    )
+    # print_msg(
+    #     "Mean of the latent parameters:\n",
+    #     results["x"],
+    # )
 
     print_msg("\n--- Comparisons ---")
     # Compare hyperparameters
