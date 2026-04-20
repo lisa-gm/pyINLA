@@ -4,7 +4,7 @@ import tomllib
 from abc import ABC, abstractmethod
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, PositiveFloat
 from typing_extensions import Annotated
 
 from dalia.__init__ import ArrayLike, xp
@@ -60,19 +60,18 @@ class AR1SubModelConfig(SubModelConfig):
     # check inla.doc("pc.cor1")
 
     ## either define tau or sigma2
-    tau: float = None  # Precision
+    tau: PositiveFloat = None  # Precision
     # sigma2: float = None  # Marginal variance
-    
-    
+
     ph_tau: PriorHyperparametersConfig = None
     # ph_sigma2: PriorHyperparametersConfig = None
 
     def read_hyperparameters(self):
 
         # input of phi is in (0,1), rescale to -/+ INF
-        #self.phi_scaled = scaled_logit(self.phi, direction="forward")
+        # self.phi_scaled = scaled_logit(self.phi, direction="forward")
         theta = xp.array([self.phi, self.tau])
-        #theta_internal = xp.array([self.phi, self.tau])
+        # theta_internal = xp.array([self.phi, self.tau])
         theta_keys = ["phi", "tau"]
 
         return theta, theta_keys
@@ -82,9 +81,9 @@ class SpatioTemporalSubModelConfig(SubModelConfig):
     spatial_domain_dimension: PositiveInt = 2
 
     # --- Model hyperparameters in the interpretable scale ---
-    r_s: float = None  # Spatial range
-    r_t: float = None  # Temporal range
-    sigma_st: float = None  # Spatio-temporal variation
+    r_s: PositiveFloat = None  # Spatial range
+    r_t: PositiveFloat = None  # Temporal range
+    sigma_st: PositiveFloat = None  # Spatio-temporal variation
 
     ph_s: PriorHyperparametersConfig = None
     ph_t: PriorHyperparametersConfig = None
