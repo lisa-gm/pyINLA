@@ -11,6 +11,7 @@ from dalia.core.dalia import DALIA
 from dalia.core.model import Model
 from dalia.submodels import BrainiacSubModel
 from dalia.utils import plot_marginal_distributions_hp, print_msg
+from plotting import plot_marginal_distributions_hp_external
 
 if __name__ == "__main__":
     print_msg(f"Running BRAINIAC model on synthetic dataset.")
@@ -26,7 +27,7 @@ if __name__ == "__main__":
     n_features: int = model_params["n_features"]
     n_annotations_per_features: int = model_params["n_annotations_per_features"]
     h2: float = model_params["h2"]
-    sigma_a2: float = model_params["sigma_a2"]
+    sigma_a2: float = 5.0
 
     # 2. Load references
     theta_reference: np.ndarray = np.load(path_reference / "theta.npy")
@@ -35,7 +36,7 @@ if __name__ == "__main__":
     # 3. Create starting values for DALIA
     initial_h2: float = theta_reference[0] - 0.1
     initial_alpha: np.ndarray = theta_reference[1:] + 0.5 * np.random.randn(
-        n_annotations_per_features - 1
+        n_annotations_per_features
     )
 
     # 4. Initialize the Brainiac submodel and the DALIA model
@@ -46,7 +47,7 @@ if __name__ == "__main__":
                 "input_dir": str(path_inputs.resolve()),
                 "h2": initial_h2,
                 "alpha": initial_alpha,
-                "ph_h2": {"type": "beta", "alpha": 5.0, "beta": 1.0},
+                "ph_h2": {"type": "beta", "alpha": 1.0, "beta": 1.0},
                 "ph_alpha": {
                     "type": "gaussian_mvn",
                     "mean": xp.zeros(n_annotations_per_features),
@@ -114,13 +115,18 @@ if __name__ == "__main__":
     marginals_hyperparameters = dalia.marginal_distributions_hp()
 
     # 10. Plot marginal distributions of hyperparameters
-    fig, axes = plot_marginal_distributions_hp(marginals_hyperparameters)
+    # fig, axes = plot_marginal_distributions_hp(marginals_hyperparameters)
+    # plt.savefig("marginal_distributions_hyperparameters.png")
+
+    fig, axes = plot_marginal_distributions_hp_external(
+        marginals_hyperparameters, theta_reference
+    )
     plt.savefig("marginal_distributions_hyperparameters.png")
 
     h2 = marginals_hyperparameters["hyperparameters"]["h2"]
     quantile_pairs = h2["quantiles"]["external"]["pairs"]
 
-    print("Quantile pairs of phi:")
+    print("Quantile pairs of h2:")
     for p, q in quantile_pairs:
         print(f"   {p:.3f} quantile: {q:.4f}")
 

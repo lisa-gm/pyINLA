@@ -7,7 +7,11 @@ from dalia.configs import likelihood_config, dalia_config, submodels_config
 from dalia.core.model import Model
 from dalia.core.dalia import DALIA
 from dalia.submodels import AR1SubModel, RegressionSubModel
-from dalia.utils import print_msg, plot_marginal_distributions_hp, plot_prior_hp  # , extract_diagonal
+from dalia.utils import (
+    print_msg,
+    plot_marginal_distributions_hp,
+    plot_prior_hp,
+)  # , extract_diagonal
 
 BASE_DIR: Path = Path(__file__).parent
 
@@ -22,7 +26,7 @@ if __name__ == "__main__":
         theta_original,
     )
 
-    theta_initial = theta_original #[0.6, 1.0, 3.0]
+    theta_initial = theta_original  # [0.6, 1.0, 3.0]
     print("theta initial: ", theta_initial)
 
     x_original = np.load(BASE_DIR / "reference_outputs" / "x_original.npy")
@@ -35,11 +39,11 @@ if __name__ == "__main__":
         "phi": 0.5,  # has to be between 0 and 1
         "ph_phi": {"type": "beta", "alpha": 5.0, "beta": 1.0},
         # initial guess on the precision
-        "tau": 3, # has to be positive
+        "tau": 3,  # has to be positive
         "ph_tau": {"type": "gamma", "alpha": 2.0, "beta": 1.0},
         # initial guess on the variance
         # "sigma2": 0.33, # has to be positive
-        # "ph_sigma2": {"type": "invgamma", "alpha": 2.0, "beta": 1.0}, 
+        # "ph_sigma2": {"type": "invgamma", "alpha": 2.0, "beta": 1.0},
     }
     ar1 = AR1SubModel(
         config=submodels_config.parse_config(ar1_dict),
@@ -64,33 +68,31 @@ if __name__ == "__main__":
         #     "alpha": 0.01,
         #     "u": 5,
         # },
-        "prior_hyperparameters": {"type": "gaussian", "mean": theta_original[2], "precision": 0.05},
+        "prior_hyperparameters": {
+            "type": "gaussian",
+            "mean": theta_original[2],
+            "precision": 0.05,
+        },
     }
 
     model = Model(
-        submodels=[ar1, regression], #
+        submodels=[ar1, regression],  #
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
     print_msg(model)
-    
+
     # plot phi
     # theta_interval = [0, 1]
     # prior_hp = model.prior_hyperparameters[0]
     # fig, ax = plot_prior_hp("phi", theta_interval, prior_hp)
 
     # plot tau
-    theta_interval = [0, 5]
-    prior_hp = model.prior_hyperparameters[1]
-    fig, ax = plot_prior_hp("tau", theta_interval, prior_hp)
+    # theta_interval = [0, 5]
+    # prior_hp = model.prior_hyperparameters[1]
+    # fig, ax = plot_prior_hp("tau", theta_interval, prior_hp)
 
-    import matplotlib.pyplot as plt
-    plt.show()
-
-    Qprior = model.construct_Q_prior()
-    print("Qprior: \n", Qprior.toarray()[:6, :6])
-    Qinv = xp.linalg.inv(Qprior.toarray())
-    geom_mean = xp.exp(xp.mean(xp.log(Qinv.diagonal())))
-    print("Geometric mean of Qinv diagonal: ", geom_mean)
+    # import matplotlib.pyplot as plt
+    # plt.show()
 
     # in gaussian case x = 0, thus eta = 0
     x_i = xp.zeros(model.n_latent_parameters)
@@ -102,7 +104,7 @@ if __name__ == "__main__":
     print("b: ", b[:10])
 
     x_est = xp.linalg.solve(Qcond.toarray(), b)
-    #print("x est: ", x_est)
+    # print("x est: ", x_est)
     print("norm(x_original - x_est): ", xp.linalg.norm(xp.asarray(x_original) - x_est))
 
     # Configurations of DALIA
@@ -152,8 +154,15 @@ if __name__ == "__main__":
     # print("eta est: ", model.a @ results["x"])
 
     print_msg("\n--- Comparisons ---")
-    print("norm(eta - eta_est): ", xp.linalg.norm(model.a @ xp.asarray(x_original) - model.a @ results["x"]))
-    print("normalized norm(eta - eta_est): ", xp.linalg.norm(model.a @ xp.asarray(x_original) - model.a @ results["x"]) / xp.linalg.norm(model.a @ xp.asarray(x_original)))
+    print(
+        "norm(eta - eta_est): ",
+        xp.linalg.norm(model.a @ xp.asarray(x_original) - model.a @ results["x"]),
+    )
+    print(
+        "normalized norm(eta - eta_est): ",
+        xp.linalg.norm(model.a @ xp.asarray(x_original) - model.a @ results["x"])
+        / xp.linalg.norm(model.a @ xp.asarray(x_original)),
+    )
 
     # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
@@ -163,19 +172,19 @@ if __name__ == "__main__":
         "Norm (marg var latent - ref):    ",
         f"{xp.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
     )
-    
-    print_msg("\n--- Marginal distributions of the hyperparameters ---")
-    marginals_hp = dalia.marginal_distributions_hp() 
 
-    fig, axes = plot_marginal_distributions_hp(marginals_hp)
-    import matplotlib.pyplot as plt
-    plt.show()
-    
-    phi = marginals_hp['hyperparameters']['phi']
-    quantile_pairs = phi['quantiles']['external']['pairs']
+    print_msg("\n--- Marginal distributions of the hyperparameters ---")
+    marginals_hp = dalia.marginal_distributions_hp()
+
+    # fig, axes = plot_marginal_distributions_hp(marginals_hp)
+    # import matplotlib.pyplot as plt
+    # plt.show()
+
+    phi = marginals_hp["hyperparameters"]["phi"]
+    quantile_pairs = phi["quantiles"]["external"]["pairs"]
 
     print("Quantile pairs of phi:")
     for p, q in quantile_pairs:
         print(f"   {p:.3f} quantile: {q:.4f}")
-    
+
     print_msg("\n--- Finished ---")
