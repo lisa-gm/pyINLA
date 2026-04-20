@@ -11,47 +11,39 @@ import scipy.sparse as sp
 
 sys.path.append("..")
 
-np.random.seed(41)
+np.random.seed(44)
 
 path = os.path.dirname(__file__)
 
 if __name__ == "__main__":
-    n_observations = 500
-    n_latent_parameters = 6
+    n_latent_parameters = 300
+    nrep = 1
 
-    # model: y = A @ x + epsilon, with x ~ N(0, 1/tau*Cmatrix) and epsilon ~ N(0, 1/theta_observations*I)
+    q_temp = np.random.randn(n_latent_parameters, n_latent_parameters)
+    q = q_temp @ q_temp.T
 
-    tau = 0.8
-    prec_noise = 5.0
-    theta_ref = [tau, prec_noise]
+    tau = 2.5
+    s = 0.1  # sd, prec 100
+    theta_ref = [tau, 1 / s**2]
 
-    # generate random positive definite matrix for the covariance of x
-    random_matrix = np.random.rand(n_latent_parameters, n_latent_parameters)
-    q = random_matrix @ random_matrix.T + 1e-3 * np.eye(
-        n_latent_parameters
-    )  # make it positive definite
-    # print(f"q: \n{q}")
-    q = sp.coo_matrix(q)
+    Q_scaled = tau * q
 
-    Q_prior = tau * q
-
-    # sample x from the prior distribution
-    L_Q_prior = np.linalg.cholesky(Q_prior.toarray())
+    L_Q_prior = np.linalg.cholesky(Q_scaled)
     z = np.random.normal(size=n_latent_parameters)
-    x = np.linalg.solve(L_Q_prior, z)
+    x = np.linalg.solve(L_Q_prior.T, z)
 
-    a = sp.random(n_observations, n_latent_parameters, density=0.5)
-    # print(f"A: \n{a.toarray()}")
+    # construct projection matrix
+    a = sp.kron(np.ones((nrep, 1)), sp.eye(n_latent_parameters))
 
-    y = a @ x + np.random.normal(scale=1 / prec_noise, size=n_observations)
-    print(f"x: {x}")
-    # print(f"y: {y}")
+    # y = Ax + noise
+    y = (a @ x) + np.random.normal(scale=s, size=n_latent_parameters * nrep)
 
     # save the synthetic data
     np.save(f"{path}/y.npy", y)
 
     # create a subfolder called inputs
     os.makedirs(f"{path}/inputs_generic", exist_ok=True)
+    q = sp.coo_matrix(q)
     sp.save_npz(f"{path}/inputs_generic/q.npz", q)
 
     # save a as .npz
