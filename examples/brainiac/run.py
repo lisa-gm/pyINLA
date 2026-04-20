@@ -11,7 +11,6 @@ from dalia.core.dalia import DALIA
 from dalia.core.model import Model
 from dalia.submodels import BrainiacSubModel
 from dalia.utils import plot_marginal_distributions_hp, print_msg
-from plotting import plot_marginal_distributions_hp_external
 
 if __name__ == "__main__":
     print_msg(f"Running BRAINIAC model on synthetic dataset.")
@@ -118,9 +117,7 @@ if __name__ == "__main__":
     # fig, axes = plot_marginal_distributions_hp(marginals_hyperparameters)
     # plt.savefig("marginal_distributions_hyperparameters.png")
 
-    fig, axes = plot_marginal_distributions_hp_external(
-        marginals_hyperparameters, theta_reference
-    )
+    fig, axes = plot_marginal_distributions_hp(marginals_hyperparameters)
     plt.savefig("marginal_distributions_hyperparameters.png")
 
     h2 = marginals_hyperparameters["hyperparameters"]["h2"]

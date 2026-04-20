@@ -23,7 +23,7 @@ from examples_utils.parser_utils import parse_args  # noqa: E402
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
-    print_msg("--- Example: Gaussian Regression ---")
+    print_msg("--- Example: Gaussian Generic  ---")
 
     # Check for parsed parameters
     args = parse_args()

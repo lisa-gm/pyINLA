@@ -160,9 +160,9 @@ def parse_config(config: dict | str) -> SubModelConfig:
         config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
         config["ph_phi"] = parse_priorhyperparameters_config(config["ph_phi"])
         return AR1SubModelConfig(**config)
-    elif type == "generic":
+    elif model_type == "generic":
         config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
         return GenericSubModelConfig(**config)
     # Add more elif branches for other submodel types
     else:
-        raise ValueError(f"Unknown submodel type: {type}")
+        raise ValueError(f"Unknown submodel type: {model_type}")
