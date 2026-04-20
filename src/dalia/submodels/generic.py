@@ -29,7 +29,6 @@ class GenericSubModel(SubModel):
         except FileNotFoundError:
             # check if dense q matrix exists
             try:
-                print("path to q: ", self.input_path.joinpath("q.npy"))
                 q: NDArray = np.load(self.input_path.joinpath("q.npy"))
                 if xp == np:
                     self.q: NDArray = q
@@ -48,13 +47,12 @@ class GenericSubModel(SubModel):
         print(
             f"Successfully loaded precision matrix of shape {self.q.shape} for generic model."
         )
-        print(f"Q:\n{self.q}")
+        print(f"Q:\n{self.q.todense()}")
 
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
 
         tau = kwargs.get("tau")
-
         self.Q_prior = tau * self.q
 
         return self.Q_prior.tocoo()

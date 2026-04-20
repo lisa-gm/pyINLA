@@ -4,7 +4,7 @@ import tomllib
 from abc import ABC, abstractmethod
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, PositiveFloat
 from typing_extensions import Annotated
 
 from dalia.__init__ import ArrayLike, xp
@@ -61,7 +61,7 @@ class AR1SubModelConfig(SubModelConfig):
     # check inla.doc("pc.cor1")
 
     ## either define tau or sigma2
-    tau: float = None  # Precision
+    tau: PositiveFloat = None  # Precision
     # sigma2: float = None  # Marginal variance
 
     ph_tau: PriorHyperparametersConfig = None
@@ -82,9 +82,9 @@ class SpatioTemporalSubModelConfig(SubModelConfig):
     spatial_domain_dimension: PositiveInt = 2
 
     # --- Model hyperparameters in the interpretable scale ---
-    r_s: float = None  # Spatial range
-    r_t: float = None  # Temporal range
-    sigma_st: float = None  # Spatio-temporal variation
+    r_s: PositiveFloat = None  # Spatial range
+    r_t: PositiveFloat = None  # Temporal range
+    sigma_st: PositiveFloat = None  # Spatio-temporal variation
 
     ph_s: PriorHyperparametersConfig = None
     ph_t: PriorHyperparametersConfig = None
