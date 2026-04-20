@@ -212,9 +212,9 @@ class CoregionalModel(Model):
                 self.latent_parameters_idx[i] : self.latent_parameters_idx[i + 1]
             ] = model.x
 
-            self.y[
-                self.n_observations_idx[i] : self.n_observations_idx[i + 1]
-            ] = model.y
+            self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]] = (
+                model.y
+            )
 
         self.a: sp.sparse.spmatrix = bdiag_tiling(
             [model.a for model in self.models]
@@ -635,9 +635,9 @@ class CoregionalModel(Model):
                 }
 
             # d_list[i] = model.likelihood.evaluate_hessian_likelihood(**kwargs)
-            d_vec[
-                self.n_observations_idx[i] : self.n_observations_idx[i + 1]
-            ] = model.likelihood.evaluate_hessian_likelihood(**kwargs).diagonal()
+            d_vec[self.n_observations_idx[i] : self.n_observations_idx[i + 1]] = (
+                model.likelihood.evaluate_hessian_likelihood(**kwargs).diagonal()
+            )
 
         self.Qconditional = self.custom_Q_ATDA(
             Q=self.Q_prior,

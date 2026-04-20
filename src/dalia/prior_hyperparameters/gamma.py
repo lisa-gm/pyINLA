@@ -141,13 +141,28 @@ class GammaPriorHyperparameters(PriorHyperparameters):
             If theta is not positive (implicitly through log computation).
         """
 
+        if theta <= 0:
+            raise ValueError(
+                f"Theta must be positive for Gamma distribution, got {theta}"
+            )
+
         log_prior = (
             self.normalizing_constant
             + (self.alpha - 1) * xp.log(theta)
             - self.beta * theta
+            + xp.log(
+                xp.abs(
+                    self.rescale_hyperparameters_to_internal(theta, "backward_jacobian")
+                )
+            )
         )
 
+        # print(
+        #     f"Extra jacobian term for transformation: {xp.log(xp.abs(self.rescale_hyperparameters_to_internal(theta, 'backward_jacobian'))):.6f}"
+        # )
+
         return log_prior
+
 
 if __name__ == "__main__":
     """
@@ -344,4 +359,3 @@ if __name__ == "__main__":
     print("the moments of log-normal distributions obtained through gamma")  
     print("prior rescaling transformations.")
     print("=" * 80)
-

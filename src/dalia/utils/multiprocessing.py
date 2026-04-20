@@ -116,7 +116,9 @@ def allgather(
     if backend_flags["mpi_avail"]:
         if get_array_module_name(obj) == "cupy" and not backend_flags["mpi_cuda_aware"]:
             obj_comm = get_host(obj)
-            return get_device(np.concatenate(comm.allgather(obj_comm)))
+            gathered_objs = comm.allgather(obj_comm)
+            # Convert gathered numpy arrays back to cupy arrays
+            return [get_device(arr) for arr in gathered_objs]
         else:
             return comm.allgather(obj)
 

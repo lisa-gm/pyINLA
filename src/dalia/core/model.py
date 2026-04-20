@@ -218,6 +218,17 @@ class Model(ABC):
                         )
                     )
 
+                # doesn't really make sense to allow Gaussian prior on precision
+                # implement proper check to raise error later
+                if isinstance(
+                    submodel.config.ph_tau, GaussianPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_tau,
+                        )
+                    )
+
             elif isinstance(submodel, BrainiacSubModel):
                 # h2 hyperparameters
                 if isinstance(submodel.config.ph_h2, BetaPriorHyperparametersConfig):

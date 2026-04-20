@@ -47,7 +47,6 @@ class GenericSubModel(SubModel):
         print(
             f"Successfully loaded precision matrix of shape {self.q.shape} for generic model."
         )
-        print(f"Q:\n{self.q.todense()}")
 
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""

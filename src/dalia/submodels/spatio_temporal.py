@@ -1,15 +1,16 @@
 # Copyright 2024-2025 DALIA authors. All rights reserved.
 
 import math
-from tabulate import tabulate
 
 import numpy as np
 from scipy.sparse import csc_matrix, load_npz, spmatrix
+from tabulate import tabulate
 
 from dalia import sp, xp
 from dalia.configs.submodels_config import SpatioTemporalSubModelConfig
 from dalia.core.submodel import SubModel
 from dalia.utils import add_str_header
+
 
 class SpatioTemporalSubModel(SubModel):
     """Fit a spatio-temporal model."""
@@ -114,16 +115,15 @@ class SpatioTemporalSubModel(SubModel):
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
 
-        gamma_s, gamma_t, gamma_st = self._interpretable2compute(
+        # print("In construct_Q_prior of SpatioTemporalSubModel with kwargs: ", kwargs)
+
+        ## theta values now coming in interpretable not log-scale
+        exp_gamma_s, exp_gamma_t, exp_gamma_st = self._interpretable2compute(
             r_s=kwargs.get("r_s"),
             r_t=kwargs.get("r_t"),
             sigma_st=kwargs.get("sigma_st", self.sigma_st),
             dim_spatial_domain=2,
         )
-
-        exp_gamma_s = xp.exp(gamma_s)
-        exp_gamma_t = xp.exp(gamma_t)
-        exp_gamma_st = xp.exp(gamma_st)
 
         q1s = pow(exp_gamma_s, 2) * self.c0 + self.g1
         q2s = (
@@ -148,11 +148,16 @@ class SpatioTemporalSubModel(SubModel):
         # TODO: csc()
         return Q_prior.tocoo()
 
+    # expecting r_s, r_t, sigma_st NOT in log scale but in interpretable scale, same for output
     def _interpretable2compute(
         self, r_s: float, r_t: float, sigma_st: float, dim_spatial_domain: int = 2
     ) -> tuple:
         if dim_spatial_domain != 2:
             raise ValueError("Only 2D spatial domain is supported for now.")
+
+        log_r_s = xp.log(r_s)
+        log_r_t = xp.log(r_t)
+        log_sigma_st = xp.log(sigma_st)
 
         # Assumes alphas as fixed for now
         alpha_s = 2
@@ -165,8 +170,8 @@ class SpatioTemporalSubModel(SubModel):
         nu_s = alpha - 1
         nu_t = alpha_t - 0.5
 
-        gamma_s = 0.5 * xp.log(8 * nu_s) - r_s
-        gamma_t = r_t - 0.5 * xp.log(8 * nu_t) + alpha_s * gamma_s
+        gamma_s = 0.5 * xp.log(8 * nu_s) - log_r_s
+        gamma_t = log_r_t - 0.5 * xp.log(8 * nu_t) + alpha_s * gamma_s
 
         if self.manifold == "sphere":
             cR_t = sp.special.gamma(nu_t) / (
@@ -177,7 +182,9 @@ class SpatioTemporalSubModel(SubModel):
                 c_s += (2.0 * k + 1.0) / (
                     4.0 * math.pi * pow(pow(xp.exp(gamma_s), 2) + k * (k + 1), alpha)
                 )
-            gamma_st = 0.5 * xp.log(cR_t) + 0.5 * xp.log(c_s) - 0.5 * gamma_t - sigma_st
+            gamma_st = (
+                0.5 * xp.log(cR_t) + 0.5 * xp.log(c_s) - 0.5 * gamma_t - log_sigma_st
+            )
 
         elif self.manifold == "plane":
             c1_scaling_constant = pow(4 * math.pi, 1.5)
@@ -190,12 +197,13 @@ class SpatioTemporalSubModel(SubModel):
                     * c1_scaling_constant
                 )
             )
-            gamma_st = 0.5 * xp.log(c1) - 0.5 * gamma_t - nu_s * gamma_s - sigma_st
+            gamma_st = 0.5 * xp.log(c1) - 0.5 * gamma_t - nu_s * gamma_s - log_sigma_st
         else:
             raise ValueError("Manifold not supported: ", self.manifold)
 
-        return gamma_s, gamma_t, gamma_st
+        return xp.exp(gamma_s), xp.exp(gamma_t), xp.exp(gamma_st)
 
+    ## CAREFUL THIS IS STILL ALL IN LOG-SCALE
     def convert_theta_from_model2interpret(
         self,
         gamma_s: float,
@@ -268,9 +276,9 @@ class SpatioTemporalSubModel(SubModel):
 
         # --- Make the Submodel table ---
         values = [
-            ["Number of Spatial Nodes", self.ns], 
-            ["Number of Temporal Nodes", self.nt], 
-            ["Manifold", self.manifold.capitalize()], 
+            ["Number of Spatial Nodes", self.ns],
+            ["Number of Temporal Nodes", self.nt],
+            ["Manifold", self.manifold.capitalize()],
             ["Spatial Range (r_s)", f"{self.config.r_s:.3f}"],
             ["Temporal Range (r_t)", f"{self.config.r_t:.3f}"],
             ["Spatio-temporal Variation (sigma_st)", f"{self.sigma_st:.3f}"],
@@ -280,7 +288,7 @@ class SpatioTemporalSubModel(SubModel):
             tablefmt="fancy_grid",
             colalign=("left", "center"),
         )
-        
+
         # Add the header title
         submodel_table = add_str_header(
             title=self.submodel_type.replace("_", " ").title(),
@@ -289,4 +297,3 @@ class SpatioTemporalSubModel(SubModel):
         str_representation += submodel_table
 
         return str_representation
-
