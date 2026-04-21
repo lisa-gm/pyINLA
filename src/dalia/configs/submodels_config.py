@@ -82,9 +82,9 @@ class SpatioTemporalSubModelConfig(SubModelConfig):
     spatial_domain_dimension: PositiveInt = 2
 
     # --- Model hyperparameters in the interpretable scale ---
-    r_s: PositiveFloat = None  # Spatial range
-    r_t: PositiveFloat = None  # Temporal range
-    sigma_st: PositiveFloat = None  # Spatio-temporal variation
+    r_s: float = None  # Spatial range
+    r_t: float = None  # Temporal range
+    sigma_st: float = None  # Spatio-temporal variation
 
     ph_s: PriorHyperparametersConfig = None
     ph_t: PriorHyperparametersConfig = None

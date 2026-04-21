@@ -103,7 +103,7 @@ if __name__ == "__main__":
     # Compare hyperparameters
     print_msg(
         "Norm (theta - theta_ref):        ",
-        f"{np.linalg.norm(get_host(results["theta"]) - theta_ref):.4e}",
+        f"{np.linalg.norm(get_host(results['theta']) - theta_ref):.4e}",
     )
 
     # Compare latent parameters
@@ -129,12 +129,12 @@ if __name__ == "__main__":
     fig, axes = plot_marginal_distributions_hp(marginals_hp)
     import matplotlib.pyplot as plt
     plt.savefig("gst_small_marginal_distributions_hp.png")
-    
+
     prec_obs = marginals_hp['hyperparameters']['prec_o']
     quantile_pairs = prec_obs['quantiles']['external']['pairs']
 
     print("Quantile pairs of prec_o:")
     for p, q in quantile_pairs:
         print(f"   {p:.3f} quantile: {q:.4f}")
-    
+
     print_msg("\n--- Finished ---")

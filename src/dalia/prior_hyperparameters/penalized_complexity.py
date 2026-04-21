@@ -83,54 +83,54 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
 
     #     # print("lambda_theta: ", self.lambda_theta)
 
-    # def rescale_hyperparameters_to_internal(self, theta, direction):
-    #     return super().rescale_hyperparameters_to_internal(theta, direction)
-
     def rescale_hyperparameters_to_internal(self, theta, direction):
-        """
-        Transform between external and internal parameter representations.
+        return super().rescale_hyperparameters_to_internal(theta, direction)
 
-        The Gamma distribution is defined for positive values, but optimization
-        often works better in unconstrained space. This method transforms
-        between theta (positive) and log(theta) (unconstrained).
+    # def rescale_hyperparameters_to_internal(self, theta, direction):
+    #     """
+    #     Transform between external and internal parameter representations.
 
-        Parameters
-        ----------
-        theta : float or NDArray
-            Parameter value(s) to transform.
-        direction : str
-            Transformation direction:
-            - "forward": theta -> log(theta) (external to internal)
-            - "backward": log(theta) -> theta (internal to external)
+    #     The Gamma distribution is defined for positive values, but optimization
+    #     often works better in unconstrained space. This method transforms
+    #     between theta (positive) and log(theta) (unconstrained).
 
-        Returns
-        -------
-        float or NDArray
-            Transformed parameter value(s).
+    #     Parameters
+    #     ----------
+    #     theta : float or NDArray
+    #         Parameter value(s) to transform.
+    #     direction : str
+    #         Transformation direction:
+    #         - "forward": theta -> log(theta) (external to internal)
+    #         - "backward": log(theta) -> theta (internal to external)
 
-        Raises
-        ------
-        ValueError
-            If direction is not "forward" or "backward".
-        """
-        if direction == "forward":
-            theta_scaled = xp.log(theta)
-        elif direction == "backward":
-            theta_scaled = xp.exp(theta)
-        elif direction == "forward_jacobian":
-            theta_scaled = 1 / theta  # d(log(theta))/d(theta) = 1/theta
-        elif direction == "backward_jacobian":
-            theta_scaled = theta  # d(exp(theta))/d(theta) = exp(theta) = theta
-        else:
-            raise ValueError(f"Unknown direction: {direction}")
+    #     Returns
+    #     -------
+    #     float or NDArray
+    #         Transformed parameter value(s).
 
-        return theta_scaled
+    #     Raises
+    #     ------
+    #     ValueError
+    #         If direction is not "forward" or "backward".
+    #     """
+    #     if direction == "forward":
+    #         theta_scaled = xp.log(theta)
+    #     elif direction == "backward":
+    #         theta_scaled = xp.exp(theta)
+    #     elif direction == "forward_jacobian":
+    #         theta_scaled = 1 / theta  # d(log(theta))/d(theta) = 1/theta
+    #     elif direction == "backward_jacobian":
+    #         theta_scaled = theta  # d(exp(theta))/d(theta) = exp(theta) = theta
+    #     else:
+    #         raise ValueError(f"Unknown direction: {direction}")
+
+    #     return theta_scaled
 
     def evaluate_log_prior(self, theta_external: float, **kwargs) -> float:
         """Evaluate the prior hyperparameters."""
         log_prior: float = 0.0
 
-        print("theta_external: ", theta_external)
+        # print("theta_external: ", theta_external)
         ## should be converted to internal scale
         theta = self.rescale_hyperparameters_to_internal(theta_external, "backward")
 
@@ -179,21 +179,21 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
         log_prior = (0.5 * self.lambda_theta) * xp.exp(
             -self.lambda_theta * xp.exp(-0.5 * theta) - 0.5 * theta
         )
-        print("log prior prec o: ", log_prior)
+        # print("log prior prec o: ", log_prior)
 
         # add correction for change of variables
-        print("log prior before jacobian correction: ", log_prior)
+        # print("log prior before jacobian correction: ", log_prior)
         log_prior += xp.log(
             xp.abs(self.rescale_hyperparameters_to_internal(theta, "forward_jacobian"))
         )
-        print("log prior after jacobian correction: ", log_prior)
+        # print("log prior after jacobian correction: ", log_prior)
 
         log_prior1 = (
             xp.log(self.lambda_theta)
             - self.lambda_theta * xp.exp(theta_external)
             + theta_external
         )
-        print("log prior in external scale: ", log_prior1)
+        # print("log prior in external scale: ", log_prior1)
 
         return log_prior
 
