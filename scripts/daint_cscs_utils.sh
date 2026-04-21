@@ -842,6 +842,10 @@ daint_create_conda_env() {
                 if MPICC=$(which mpicc) python -m pip install --no-cache-dir --no-binary=mpi4py mpi4py; then
                     echo "   Successfully installed mpi4py in MPI-enhanced environment."
 
+                    # Update the libcxx given Daint NCCL modules requirements
+                    conda update libstdcxx-ng
+                    conda install -c conda-forge libstdcxx-ng
+
                     # Try to import nccl to ensure it's available
                     echo "   Verifying NCCL installation in MPI-enhanced environment..."
                     if python -c "from cupy.cuda import nccl; nccl.get_unique_id()"; then
