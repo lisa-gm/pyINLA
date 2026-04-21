@@ -140,13 +140,27 @@ def bcast(
     comm (CommunicatorType), optional:
         The communication group. Default is MPI.COMM_WORLD.
     """
+    # Need to check data module and MPI capabilities
+    d2h2d_needed : bool = (
+        backend_flags["mpi_avail"] and get_array_module_name(data) == "cupy"
+    )
 
     if backend_flags["mpi_avail"]:
-        if data.ndim == 0:
-            comm.Bcast(data, root=root)
+        if d2h2d_needed:
+            data_comm = get_host(data)
         else:
-            comm.Bcast(data[:], root=root)
+            data_comm = data
 
+        if data.ndim == 0:
+            comm.Bcast(data_comm, root=root)
+        else:
+            comm.Bcast(data_comm[:], root=root)
+
+        if d2h2d_needed:
+            if data.ndim == 0:
+                data[...] = get_device(data_comm)
+            else:
+                data[:] = get_device(data_comm)
 
 def get_active_comm(
     comm,
@@ -250,7 +264,8 @@ def check_vector_consistency(
     synchronize(comm = comm)
 
     value_ref = value.copy()
-    bcast(value_ref, root=0, comm=comm)
+
+    bcast(data=value_ref[:], root=0, comm=comm)
 
     norm_diff = xp.linalg.norm(value - value_ref)
 

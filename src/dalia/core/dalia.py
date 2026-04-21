@@ -375,9 +375,9 @@ class DALIA:
         minimization_result : scipy.optimize.OptimizeResult
             Result of the optimization procedure.
         """
-        # ensure that all ranks are initialized to the same theta
+        # Ensure that all ranks are initialized to the same theta
         check_vector_consistency(
-            self.model.theta_external,
+            value=self.model.theta_external,
             comm=self.comm_world,
             flag="self.model.theta_external",
             verbose="Full",

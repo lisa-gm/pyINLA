@@ -66,7 +66,7 @@ if __name__ == "__main__":
     dalia_dict = {
         "solver": {
             "type": "serinv", 
-            "min_processes": 1,
+            "min_processes": args.solver_min_p,
         },
         "minimize": {
             "max_iter": args.max_iter, 
