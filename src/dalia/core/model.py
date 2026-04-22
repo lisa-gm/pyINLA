@@ -33,6 +33,7 @@ from dalia.submodels import (
     SpatialSubModel,
     SpatioTemporalSubModel,
     AR1SubModel,
+    GenericSubModel,
 )
 from dalia.utils import add_str_header, boxify, scaled_logit
 from dalia.utils.scalar_ndarray import ensure_scalar
@@ -194,8 +195,39 @@ class Model(ABC):
                             config=submodel.config.ph_tau,
                         )
                     )
-                else:
-                    raise ValueError("Unknown prior hyperparameter type for ph_tau")
+
+            elif isinstance(submodel, GenericSubModel):
+                print(
+                    "Generic submodel detected. Initializing prior hyperparameters for generic submodel."
+                )
+                print(submodel.config.ph_tau)
+                if isinstance(submodel.config.ph_tau, GammaPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GammaPriorHyperparameters(
+                            config=submodel.config.ph_tau,
+                        )
+                    )
+                if isinstance(
+                    submodel.config.ph_tau,
+                    PenalizedComplexityPriorHyperparametersConfig,
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_tau,
+                            hyperparameter_type="tau",
+                        )
+                    )
+
+                # doesn't really make sense to allow Gaussian prior on precision
+                # implement proper check to raise error later
+                if isinstance(
+                    submodel.config.ph_tau, GaussianPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_tau,
+                        )
+                    )
 
             elif isinstance(submodel, BrainiacSubModel):
                 # h2 hyperparameters
@@ -477,6 +509,14 @@ class Model(ABC):
                             self.theta_external[hp_idx]
                         )
                         # kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
+                elif isinstance(submodel, GenericSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(
+                            self.theta_external[hp_idx]
+                        )
+
                 elif isinstance(submodel, RegressionSubModel):
                     ...
 
@@ -537,6 +577,13 @@ class Model(ABC):
                             self.theta_external[hp_idx]
                         )
                         # kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
+                elif isinstance(submodel, GenericSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(
+                            self.theta_external[hp_idx]
+                        )
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
 
