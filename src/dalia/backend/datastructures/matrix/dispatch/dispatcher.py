@@ -39,11 +39,6 @@ def _device_handler(data, device, type):
     # Moves data to other device
     if device == "cpu":
         if type == "sparse":
-            if data.dtype.char not in '?fdFD': 
-                # cupy sparse only supports bool, float32, float64, complex64, complex128
-                # convert to float64 by default if unsupported dtype
-                # Might act weird for non-numeric types
-                return cu_sp.csr_matrix(data, dtype=cp.float64)
             return cu_sp.csr_matrix(data)
         if type == "dense":
             return cp.asarray(data)

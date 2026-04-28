@@ -3,7 +3,7 @@ from abc import ABC
 
 from dalia.backend.datastructures.matrix.dispatch import Operation, blas_dispatch
 
-from .utils import toarray, wrap_result, tocpu, togpu
+from .utils import toarray, wrap_result, tohost, toaccelerator
 
 
 class Matrix(ABC):
@@ -112,23 +112,23 @@ class Matrix(ABC):
     __array_ufunc__ = None  # Disable numpy ufuncs to avoid conflicts
 
     # 2. Initialization
-    def __init__(self, data, device=None):
+    def __init__(self, data, hw_target='host'): # TODO: create config to define default target
         
-        if device is not None and device not in ['cpu', 'gpu']:
-            raise ValueError(f"Invalid device type '{device}'. Supported devices are 'cpu' and 'gpu'.")
-        if device is not None:
-            if device == 'gpu' and 'cupy' not in str(type(data)):
-                data = togpu(data)
-            elif device == 'cpu' and 'cupy' in str(type(data)):
-                data = tocpu(data)
+        if hw_target is not None and hw_target not in ['host', 'accelerator']:
+            raise ValueError(f"Invalid hardware target type '{hw_target}'. Supported target types are 'host' and 'accelerator'.")
+        if hw_target is not None:
+            if hw_target == 'accelerator' and 'cupy' not in str(type(data)):
+                data = toaccelerator(data)
+            elif hw_target == 'host' and 'cupy' in str(type(data)):
+                data = tohost(data)
         else:
-            # Infer device from data type
+            # Infer hardware target from data type
             if 'cupy' in str(type(data)):
-                device = 'gpu'
+                hw_target = 'accelerator'
             else:
-                device = 'cpu'
+                hw_target = 'host'
         
-        self._device = device
+        self._hw_target = hw_target
         self._data = data
 
     # 3. Special representation methods
@@ -144,9 +144,9 @@ class Matrix(ABC):
         # pylint: disable=invalid-name
         return wrap_result(self._data.T)
     
-    def device(self):
-        """Device where the matrix data is stored ('cpu' or 'gpu')"""
-        return self._device
+    def hw_target(self):
+        """Hardware where the matrix data is stored ('host' or 'accelerator')"""
+        return self._hw_target
 
     # 5. Comparison operators (if needed)
 
@@ -298,20 +298,42 @@ class Matrix(ABC):
         """
         return toarray(self._data)
     
-    def tocpu(self):
-        if self._device == "cpu":
+    def tohost(self):
+        """Transfer Matrix to host
+        
+        This method provides explicit transfer of data from anywhere to the host.
+
+        When to use:
+            - Necessary relocation to host
+            - Contingency to ensure location on host
+        
+        Returns:
+            Matrix with data on host
+        """
+        if self._hw_target == "host":
             return self
         else:
-            self._data = tocpu(self._data)
-            self._device = "cpu"
+            self._data = tohost(self._data)
+            self._hw_target = "host"
             return self
 
-    def togpu(self):
-        if self._device == "gpu":
+    def toaccelerator(self):
+        """Transfer Matrix to accelerator
+        
+        This method provides explicit transfer of data from anywhere to an accelerator.
+
+        When to use:
+            - Necessary relocation to accelerator
+            - Contingency to ensure location on accelerator
+        
+        Returns:
+            Matrix with data on accelerator
+        """
+        if self._hw_target == "accelerator":
             return self
         else:
-            self._data = togpu(self._data)
-            self._device = "gpu"
+            self._data = toaccelerator(self._data)
+            self._hw_target = "accelerator"
             return self
 
     # 11. Private/protected methods (start with _)
