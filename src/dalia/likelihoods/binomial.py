@@ -19,7 +19,7 @@ class BinomialLikelihood(Likelihood):
         config: BinomialLikelihoodConfig,
     ) -> None:
         """Initializes the Binomial likelihood."""
-        super().__init__(config, n_observations)
+        super().__init__(n_observations, config)
 
         # Load the extra coeficients for Binomial likelihood
         try:
@@ -31,11 +31,11 @@ class BinomialLikelihood(Likelihood):
         except FileNotFoundError:
             self.n_trials: NDArray = xp.ones((n_observations), dtype=int)
 
-        if config.model.likelihood.link_function == "sigmoid":
+        if config.link_function == "sigmoid":
             self.link_function = sigmoid
         else:
             raise NotImplementedError(
-                f"Link function {config.model.likelihood.link_function} not implemented."
+                f"Link function {config.link_function} not implemented."
             )
 
     def evaluate_likelihood(
