@@ -546,18 +546,8 @@ class Model(ABC):
 
         return self.Q_prior
 
-    def construct_Q_conditional(
-        self,
-        eta: NDArray,
-    ):
-        """Construct the conditional precision matrix.
-
-        Note
-        ----
-        Input of the hessian of the likelihood is a diagonal matrix.
-        The negative hessian is required, therefore the minus in front.
-
-        """
+    def construct_ATDA(self, eta: NDArray) -> sp.sparse.spmatrix:
+        """Construct the A^T D A matrix where D is the diagonal matrix of second derivatives of the likelihood."""
 
         if self.likelihood_config.type == "gaussian":
             kwargs = {
@@ -580,20 +570,37 @@ class Model(ABC):
         # if self.a is sparse -> Q_conditional should be sparse, else dense
         if sp.sparse.issparse(self.a):
             if self.aTa is not None:
-                self.Q_conditional = self.Q_prior - d_matrix.diagonal()[0] * self.aTa
+                ATDA = d_matrix.diagonal()[0] * self.aTa
             else:
-                self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
+                ATDA = self.a.T @ d_matrix @ self.a
             # self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
         else:
             if self.aTa is not None:
-                self.Q_conditional = (
-                    self.Q_prior.toarray() - d_matrix.diagonal()[0] * self.aTa
-                )
+                ATDA = d_matrix.diagonal()[0] * self.aTa
             else:
-                self.Q_conditional = (
-                    self.Q_prior.toarray() - self.a.T @ d_matrix @ self.a
-                )
+                ATDA = self.a.T @ d_matrix @ self.a
             # self.Q_conditional = self.Q_prior.toarray() - self.a.T @ d_matrix @ self.a
+
+        return ATDA
+
+    def construct_Q_conditional(
+        self, eta: NDArray, x: NDArray = None
+    ) -> sp.sparse.spmatrix:
+        """Construct the conditional precision matrix.
+
+        Note
+        ----
+        Input of the hessian of the likelihood is a diagonal matrix.
+        The negative hessian is required, therefore the minus in front.
+
+        """
+
+        # overwrite eta if x is provided as eta can be private
+        if x is not None:
+            eta = self.a @ x
+
+        ATDA = self.construct_ATDA(eta)
+        self.Q_conditional = self.Q_prior - ATDA
 
         return self.Q_conditional
 
@@ -698,8 +705,6 @@ class Model(ABC):
             )
 
         return ensure_scalar(likelihood)
-
-        
 
     def __str__(self) -> str:
         """String representation of the model."""
