@@ -5,17 +5,13 @@ import numpy as np
 import pandas as pd
 
 from dalia import xp
-from dalia.configs import (
-    dalia_config,
-    likelihood_config,
-    models_config,
-    submodels_config,
-)
+from dalia.configs import dalia_config, likelihood_config, submodels_config
 from dalia.core.dalia import DALIA
 from dalia.core.model import Model
-from dalia.models.federated_model import FederatedModel
 from dalia.submodels import RegressionSubModel
-from dalia.utils import print_msg
+from dalia.utils import (
+    print_msg,
+)
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
@@ -24,13 +20,13 @@ from examples_utils.parser_utils import parse_args  # noqa: E402
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
-    print_msg("--- Example: Federated Binomial Model ---")
+    print_msg("--- Example: Gaussian Regression ---")
 
     # Check for parsed parameters
     args = parse_args()
 
-    data_type = "trauma"
-    family = "binomial"
+    data_type = "nurses_hom"
+    family = "gaussian"
 
     # Configurations of the regression submodel
     regression_dict = {
@@ -44,63 +40,19 @@ if __name__ == "__main__":
     )
 
     # Likelihood
+    ### prior not exactly matching yet?!
     likelihood_dict = {
-        "type": "binomial",
-        "input_dir": f"{BASE_DIR}/{data_type}_{family}",
+        "type": "gaussian",
+        "prec_o": 1.0,
+        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+        # "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
     }
     # Creation of the first model by combining the Regression submodel and the likelihood
-    model1 = Model(
+    model = Model(
         submodels=[regression],
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
-    print_msg(model1)
-
-    # Minimal federated setup with a single local model and explicit Q_prior construction.
-    federated_dict = {
-        "type": "federated",
-        "n_models": 1,
-        "theta": model1.theta_external.tolist(),
-        "theta_keys": list(model1.theta_keys),
-    }
-    federated_model = FederatedModel(
-        models=[model1],
-        federated_model_config=models_config.parse_config(federated_dict),
-    )
-    # Q_prior = federated_model.construct_Q_prior()
-    # print_msg("Constructed federated Q_prior with shape:", Q_prior.shape)
-    # print_msg("Qprior:\n", Q_prior.toarray())
-
-    # print("\nConstructing federated Q_conditional...")
-    # print("dim(model.a):", model.a.shape)
-    # print("dim(model.x):", federated_model.x.shape)
-    # Q_conditional = federated_model.construct_Q_conditional(
-    #     eta=model.a @ federated_model.x
-    # )
-    # print("Q_conditional: \n", Q_conditional)
-
-    # ADTA = model.construct_ATDA(eta=model.a @ federated_model.x)
-    # print("ATDA:\n", ADTA)
-    # print("Q_cond manual: \n", Q_prior.toarray() - ADTA)
-
-    # information_vector_fed = model.construct_information_vector(
-    #     model.a @ federated_model.x,
-    #     federated_model.x,
-    # )
-    # print("Information vector:\n", information_vector_fed)
-    # information_vector_single = model.construct_information_vector(
-    #     model.a @ federated_model.x, federated_model.x
-    # )
-    # print("Information vector single model:\n", information_vector_single)
-
-    # log_lik_fed = federated_model.evaluate_likelihood(eta=model.a @ federated_model.x)
-    # print("Evaluated likelihood for federated model. log-likelihood:", log_lik_fed)
-    # log_lik_single = model.evaluate_likelihood(eta=model.a @ federated_model.x)
-    # print("Evaluated likelihood for single model. log-likelihood:", log_lik_single)
-
-    # log_prior_fed = federated_model.evaluate_log_prior_hyperparameters()
-    # print("Evaluated log-prior for federated model:", log_prior_fed)
-    # log_prior_single = model.evaluate_log_prior_hyperparameters()
-    # print("Evaluated log-prior for single model:", log_prior_single)
+    print_msg(model)
 
     # Configurations of DALIA
     dalia_dict = {
@@ -116,7 +68,7 @@ if __name__ == "__main__":
         "simulation_dir": ".",
     }
     dalia = DALIA(
-        model=federated_model,
+        model=model,
         config=dalia_config.parse_config(dalia_dict),
     )
 
@@ -126,7 +78,10 @@ if __name__ == "__main__":
     results = dalia.run()
 
     print_msg("\n--- Results ---")
-    fixed_effects_mean = results["x"][-federated_model.n_fixed_effects :]
+    print_msg("Theta values external:\n", results["theta"])
+    print_msg("Theta values internal:\n", results["theta_internal"])
+    print_msg("Internal Covariance of theta:\n", results["cov_theta_internal"])
+    fixed_effects_mean = results["x"][-model.submodels[-1].n_fixed_effects :]
     print_msg(
         "Mean of the fixed effects:\n",
         fixed_effects_mean,
@@ -150,7 +105,7 @@ if __name__ == "__main__":
 
     # # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
-    fixed_effects_var = var_latent_params[-federated_model.n_fixed_effects :]
+    fixed_effects_var = var_latent_params[-model.submodels[-1].n_fixed_effects :]
     fixed_effects_sd = np.sqrt(fixed_effects_var)
     ci_lower = fixed_effects_mean - 1.96 * fixed_effects_sd
     ci_upper = fixed_effects_mean + 1.96 * fixed_effects_sd
@@ -178,29 +133,48 @@ if __name__ == "__main__":
     #     f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
     # )
 
+    print_msg("\n--- Marginal distributions of the hyperparameters ---")
+    marginals_hp = dalia.marginal_distributions_hp()
+
+    prec_obs = marginals_hp["hyperparameters"]["prec_o"]
+    quantile_pairs = prec_obs["quantiles"]["external"]["pairs"]
+
+    ## convert to sigma2 values
+    print("\nQuantile pairs of sigma2_o:")
+    sigma2_quantile_pairs = sorted(
+        ((1.0 - p, 1.0 / q) for p, q in quantile_pairs),
+        key=lambda pair: pair[0],
+    )
+    for p, sigma2_q in sigma2_quantile_pairs:
+        print(f"   {p:.3f} quantile: {sigma2_q:.4f}")
+
     # store parameters in matching format as needed in R
     # make dataframe with columns:
     # - lower (2.5% quantile)
     # - upper (97.5% quantile)
     # - mean (mean of the fixed effect)
     # - Method (DALIA)
-    # - covariate (intercept), gender, age, ISS, GCS
+    # - covariate (intercept), gender, age, experience, wardtype, sigma2
+    sigma2_lower = sigma2_quantile_pairs[0][1]
+    sigma2_upper = sigma2_quantile_pairs[-1][1]
+    sigma2_mean = 1.0 / results["theta"]
 
     df_dalia = pd.DataFrame(
         {
-            "lower": ci_lower,
-            "upper": ci_upper,
-            "Estimate": fixed_effects_mean,
+            "lower": np.append(ci_lower, sigma2_lower),
+            "upper": np.append(ci_upper, sigma2_upper),
+            "Estimate": np.append(fixed_effects_mean, sigma2_mean),
             "Method": "DALIA",
             "Covariate": [
                 "(Intercept)",
-                "sex",
+                "gender",
                 "age",
-                "ISS",
-                "GCS",
+                "experience",
+                "wardtype",
+                "sigma2",
             ],
         }
     )
-    df_dalia.to_csv(f"{BASE_DIR}/dalia_summary_{data_type}.csv", index=False)
+    df_dalia.to_csv(f"{BASE_DIR}/dalia_summary_{data_type}_joint.csv", index=False)
 
     print_msg("\n--- Finished ---")

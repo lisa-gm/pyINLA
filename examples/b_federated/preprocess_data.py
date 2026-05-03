@@ -37,10 +37,12 @@ X = np.hstack((np.ones((X.shape[0], 1)), X))
 folder_name = f"{data_type}_{family}"
 current_dir = Path(__file__).resolve().parent
 output_dir = current_dir / folder_name
+sub_output_dir = output_dir / "inputs"
 output_dir.mkdir(parents=True, exist_ok=True)
+sub_output_dir.mkdir(parents=True, exist_ok=True)
 
-np.save(current_dir / "y.npy", y)
-np.save(output_dir / "a.npy", X)
+np.save(output_dir / "y.npy", y)
+np.save(sub_output_dir / "a.npy", X)
 
-print(f"Saved y to {current_dir / 'y.npy'} with shape {y.shape}")
-print(f"Saved X to {output_dir / 'a.npy'} with shape {X.shape}")
+print(f"Saved y to {output_dir / 'y.npy'} with shape {y.shape}")
+print(f"Saved X to {sub_output_dir / 'a.npy'} with shape {X.shape}")

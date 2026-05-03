@@ -1209,7 +1209,7 @@ class DALIA:
 
         synchronize_gpu()
         tic = time.perf_counter()
-        self.model.construct_Q_conditional(eta)
+        self.model.construct_Q_conditional(eta, self.model.x)
         synchronize_gpu()
         toc = time.perf_counter()
         self.t_construction_qconditional += toc - tic
@@ -1353,7 +1353,7 @@ class DALIA:
 
             synchronize_gpu()
             tic = time.perf_counter()
-            Q_conditional = self.model.construct_Q_conditional(eta)
+            Q_conditional = self.model.construct_Q_conditional(eta, x=x_star)
             synchronize_gpu()
             toc = time.perf_counter()
             self.t_construction_qconditional += toc - tic
@@ -1370,6 +1370,15 @@ class DALIA:
             )
 
             x_i_norm = xp.linalg.norm(x_update)
+            print(
+                "Inner iteration: ",
+                counter,
+                ", norm(x_update): ",
+                x_i_norm,
+                ", logdet(Q_conditional): ",
+                self.solver.logdet(sparsity="bta"),
+                flush=True,
+            )
             counter += 1
 
         return Q_conditional, x_star, eta
