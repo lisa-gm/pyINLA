@@ -32,21 +32,21 @@ def matrix_factory():
     def _make_matrix(matrix_type, shape=(3, 3), data=None, device=None):
         if data is None:
             data = np.arange(1, shape[0] * shape[1] + 1).reshape(shape)
-            data.astype(float)
+            data = data.astype(np.float64)
 
         # Handle Internal types
         if matrix_type == "SparseMatrix":
-            return SparseMatrix(sp.csr_matrix(data, dtype=float), device=device)
+            return SparseMatrix(sp.csr_matrix(data, dtype=np.float64), device=device)
         if matrix_type == "DenseMatrix":
             return DenseMatrix(data, device=device)
 
         # Handle External types
         if matrix_type == "scipy_csr":
-            return sp.csr_array(data, dtype=float)
+            return sp.csr_array(data, dtype=np.float64)
         if matrix_type == "scipy_csc":
-            return sp.csc_array(data, dtype=float)
+            return sp.csc_array(data, dtype=np.float64)
         if matrix_type == "scipy_coo":
-            return sp.coo_array(data, dtype=float)
+            return sp.coo_array(data, dtype=np.float64)
         if matrix_type == "numpy":
             return data
         # Cupy types
@@ -60,7 +60,7 @@ def matrix_factory():
             data = sp.coo_matrix(data)
             return cu_sp.coo_matrix(data, dtype = cp.float64)
         if matrix_type == "cupy":
-            return cp.asarray(data)
+            return cp.asarray(data, dtype=cp.float64)
 
         raise ValueError(f"Unknown matrix_type: {matrix_type}")
 

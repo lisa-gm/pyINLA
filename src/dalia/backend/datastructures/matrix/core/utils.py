@@ -44,3 +44,21 @@ def toaccelerator(data):
     if sp.issparse(data):
         return cu_sp.csr_matrix(data)
     return cp.asarray(data)
+
+def settarget (data, hw_target):
+    """Set the hardware target for the data, transferring it if necessary"""
+    if hw_target is not None and hw_target not in ['host', 'accelerator']:
+        raise ValueError(f"Invalid hardware target type '{hw_target}'. Supported target types are 'host' and 'accelerator'.")
+    if hw_target is not None:
+        if hw_target == 'accelerator' and 'cupy' not in str(type(data)):
+            data = toaccelerator(data)
+        elif hw_target == 'host' and 'cupy' in str(type(data)):
+            data = tohost(data)
+    else:
+        # Infer hardware target from data type
+        if 'cupy' in str(type(data)):
+            hw_target = 'accelerator'
+        else:
+            hw_target = 'host'
+
+    return data, hw_target

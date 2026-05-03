@@ -3,7 +3,7 @@ from abc import ABC
 
 from dalia.backend.datastructures.matrix.dispatch import Operation, blas_dispatch
 
-from .utils import toarray, wrap_result, tohost, toaccelerator
+from .utils import toarray, wrap_result, tohost, toaccelerator, settarget
 
 
 class Matrix(ABC):
@@ -113,20 +113,8 @@ class Matrix(ABC):
 
     # 2. Initialization
     def __init__(self, data, hw_target='host'): # TODO: create config to define default target
-        
-        if hw_target is not None and hw_target not in ['host', 'accelerator']:
-            raise ValueError(f"Invalid hardware target type '{hw_target}'. Supported target types are 'host' and 'accelerator'.")
-        if hw_target is not None:
-            if hw_target == 'accelerator' and 'cupy' not in str(type(data)):
-                data = toaccelerator(data)
-            elif hw_target == 'host' and 'cupy' in str(type(data)):
-                data = tohost(data)
-        else:
-            # Infer hardware target from data type
-            if 'cupy' in str(type(data)):
-                hw_target = 'accelerator'
-            else:
-                hw_target = 'host'
+
+        data, hw_target = settarget(data, hw_target)
         
         self._hw_target = hw_target
         self._data = data
@@ -144,6 +132,7 @@ class Matrix(ABC):
         # pylint: disable=invalid-name
         return wrap_result(self._data.T)
     
+    @property
     def hw_target(self):
         """Hardware where the matrix data is stored ('host' or 'accelerator')"""
         return self._hw_target
