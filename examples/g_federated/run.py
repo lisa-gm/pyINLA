@@ -5,9 +5,15 @@ import numpy as np
 import pandas as pd
 
 from dalia import xp
-from dalia.configs import dalia_config, likelihood_config, submodels_config
+from dalia.configs import (
+    dalia_config,
+    likelihood_config,
+    submodels_config,
+    models_config,
+)
 from dalia.core.dalia import DALIA
 from dalia.core.model import Model
+from dalia.models.federated_model import FederatedModel
 from dalia.submodels import RegressionSubModel
 from dalia.utils import (
     print_msg,
@@ -31,7 +37,7 @@ if __name__ == "__main__":
     # Configurations of the regression submodel
     regression_dict = {
         "type": "regression",
-        "input_dir": f"{BASE_DIR}/{data_type}_{family}",
+        "input_dir": f"{BASE_DIR}/{data_type}_{family}/inputs",
         "n_fixed_effects": 5,
         "fixed_effects_prior_precision": 0.001,
     }
@@ -48,11 +54,58 @@ if __name__ == "__main__":
         # "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
     }
     # Creation of the first model by combining the Regression submodel and the likelihood
-    model = Model(
+    model1 = Model(
         submodels=[regression],
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
-    print_msg(model)
+    print_msg(model1)
+
+    # Minimal federated setup with a single local model and explicit Q_prior construction.
+    federated_dict = {
+        "type": "federated",
+        "n_models": 1,
+        "theta": model1.theta_external.tolist(),
+        "theta_keys": list(model1.theta_keys),
+    }
+    federated_model = FederatedModel(
+        models=[model1],
+        federated_model_config=models_config.parse_config(federated_dict),
+    )
+    Q_prior = federated_model.construct_Q_prior()
+    print_msg("Constructed federated Q_prior with shape:", Q_prior.shape)
+    print_msg("Qprior:\n", Q_prior.toarray())
+
+    print("\nConstructing federated Q_conditional...")
+    print("dim(model.a):", model1.a.shape)
+    print("dim(model.x):", federated_model.x.shape)
+    Q_conditional = federated_model.construct_Q_conditional(
+        eta=model1.a @ federated_model.x
+    )
+    print("Q_conditional: \n", Q_conditional)
+
+    ADTA = model1.construct_ATDA(eta=model1.a @ federated_model.x)
+    print("ATDA:\n", ADTA)
+    print("Q_cond manual: \n", Q_prior.toarray() - ADTA)
+
+    information_vector_fed = model1.construct_information_vector(
+        model1.a @ federated_model.x,
+        federated_model.x,
+    )
+    print("Information vector:\n", information_vector_fed)
+    information_vector_single = model1.construct_information_vector(
+        model1.a @ federated_model.x, federated_model.x
+    )
+    print("Information vector single model:\n", information_vector_single)
+
+    log_lik_fed = federated_model.evaluate_likelihood(eta=model1.a @ federated_model.x)
+    print("Evaluated likelihood for federated model. log-likelihood:", log_lik_fed)
+    log_lik_single = model1.evaluate_likelihood(eta=model1.a @ federated_model.x)
+    print("Evaluated likelihood for single model. log-likelihood:", log_lik_single)
+
+    log_prior_fed = federated_model.evaluate_log_prior_hyperparameters()
+    print("Evaluated log-prior for federated model:", log_prior_fed)
+    log_prior_single = model1.evaluate_log_prior_hyperparameters()
+    print("Evaluated log-prior for single model:", log_prior_single)
 
     # Configurations of DALIA
     dalia_dict = {
@@ -68,7 +121,7 @@ if __name__ == "__main__":
         "simulation_dir": ".",
     }
     dalia = DALIA(
-        model=model,
+        model=federated_model,
         config=dalia_config.parse_config(dalia_dict),
     )
 
@@ -81,7 +134,7 @@ if __name__ == "__main__":
     print_msg("Theta values external:\n", results["theta"])
     print_msg("Theta values internal:\n", results["theta_internal"])
     print_msg("Internal Covariance of theta:\n", results["cov_theta_internal"])
-    fixed_effects_mean = results["x"][-model.submodels[-1].n_fixed_effects :]
+    fixed_effects_mean = results["x"][-federated_model.n_fixed_effects :]
     print_msg(
         "Mean of the fixed effects:\n",
         fixed_effects_mean,
@@ -105,7 +158,7 @@ if __name__ == "__main__":
 
     # # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
-    fixed_effects_var = var_latent_params[-model.submodels[-1].n_fixed_effects :]
+    fixed_effects_var = var_latent_params[-federated_model.n_fixed_effects :]
     fixed_effects_sd = np.sqrt(fixed_effects_var)
     ci_lower = fixed_effects_mean - 1.96 * fixed_effects_sd
     ci_upper = fixed_effects_mean + 1.96 * fixed_effects_sd

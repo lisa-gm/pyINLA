@@ -44,7 +44,6 @@ import time
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
 
 
-
 class DALIA:
     """DALIA is a Python implementation of the Integrated Nested
     Laplace Approximation (INLA) method.
@@ -829,7 +828,7 @@ class DALIA:
             f"Computing covariance of hyperparameters at theta_external {theta_external}.",
             flush=True,
         )
-        
+
         synchronize(comm=self.comm_world)
         tic = time.perf_counter()
         self.model.theta_external = theta_external
@@ -840,7 +839,7 @@ class DALIA:
             flush=True,
         )
         cov_theta_internal = xp.linalg.inv(hess_theta_internal)
-        
+
         synchronize(comm=self.comm_world)
         toc = time.perf_counter()
         print_msg(
@@ -848,7 +847,7 @@ class DALIA:
             toc - tic,
             flush=True,
         )
-        
+
         return cov_theta_internal
 
     def _evaluate_hessian_f(
@@ -1210,7 +1209,7 @@ class DALIA:
 
         synchronize_gpu()
         tic = time.perf_counter()
-        self.model.construct_Q_conditional(eta)
+        self.model.construct_Q_conditional(eta, self.model.x)
         synchronize_gpu()
         toc = time.perf_counter()
         self.t_construction_qconditional += toc - tic
@@ -1352,7 +1351,7 @@ class DALIA:
 
             synchronize_gpu()
             tic = time.perf_counter()
-            Q_conditional = self.model.construct_Q_conditional(eta)
+            Q_conditional = self.model.construct_Q_conditional(eta, x=x_star)
             synchronize_gpu()
             toc = time.perf_counter()
             self.t_construction_qconditional += toc - tic
@@ -1369,6 +1368,15 @@ class DALIA:
             )
 
             x_i_norm = xp.linalg.norm(x_update)
+            print(
+                "Inner iteration: ",
+                counter,
+                ", norm(x_update): ",
+                x_i_norm,
+                ", logdet(Q_conditional): ",
+                self.solver.logdet(sparsity="bta"),
+                flush=True,
+            )
             counter += 1
 
         return Q_conditional, x_star, eta

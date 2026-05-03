@@ -49,58 +49,11 @@ if __name__ == "__main__":
         "input_dir": f"{BASE_DIR}/{data_type}_{family}",
     }
     # Creation of the first model by combining the Regression submodel and the likelihood
-    model1 = Model(
+    model = Model(
         submodels=[regression],
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
-    print_msg(model1)
-
-    # Minimal federated setup with a single local model and explicit Q_prior construction.
-    federated_dict = {
-        "type": "federated",
-        "n_models": 1,
-        "theta": model1.theta_external.tolist(),
-        "theta_keys": list(model1.theta_keys),
-    }
-    federated_model = FederatedModel(
-        models=[model1],
-        federated_model_config=models_config.parse_config(federated_dict),
-    )
-    # Q_prior = federated_model.construct_Q_prior()
-    # print_msg("Constructed federated Q_prior with shape:", Q_prior.shape)
-    # print_msg("Qprior:\n", Q_prior.toarray())
-
-    # print("\nConstructing federated Q_conditional...")
-    # print("dim(model.a):", model.a.shape)
-    # print("dim(model.x):", federated_model.x.shape)
-    # Q_conditional = federated_model.construct_Q_conditional(
-    #     eta=model.a @ federated_model.x
-    # )
-    # print("Q_conditional: \n", Q_conditional)
-
-    # ADTA = model.construct_ATDA(eta=model.a @ federated_model.x)
-    # print("ATDA:\n", ADTA)
-    # print("Q_cond manual: \n", Q_prior.toarray() - ADTA)
-
-    # information_vector_fed = model.construct_information_vector(
-    #     model.a @ federated_model.x,
-    #     federated_model.x,
-    # )
-    # print("Information vector:\n", information_vector_fed)
-    # information_vector_single = model.construct_information_vector(
-    #     model.a @ federated_model.x, federated_model.x
-    # )
-    # print("Information vector single model:\n", information_vector_single)
-
-    # log_lik_fed = federated_model.evaluate_likelihood(eta=model.a @ federated_model.x)
-    # print("Evaluated likelihood for federated model. log-likelihood:", log_lik_fed)
-    # log_lik_single = model.evaluate_likelihood(eta=model.a @ federated_model.x)
-    # print("Evaluated likelihood for single model. log-likelihood:", log_lik_single)
-
-    # log_prior_fed = federated_model.evaluate_log_prior_hyperparameters()
-    # print("Evaluated log-prior for federated model:", log_prior_fed)
-    # log_prior_single = model.evaluate_log_prior_hyperparameters()
-    # print("Evaluated log-prior for single model:", log_prior_single)
+    print_msg(model)
 
     # Configurations of DALIA
     dalia_dict = {
@@ -116,7 +69,7 @@ if __name__ == "__main__":
         "simulation_dir": ".",
     }
     dalia = DALIA(
-        model=federated_model,
+        model=model,
         config=dalia_config.parse_config(dalia_dict),
     )
 
@@ -126,7 +79,7 @@ if __name__ == "__main__":
     results = dalia.run()
 
     print_msg("\n--- Results ---")
-    fixed_effects_mean = results["x"][-federated_model.n_fixed_effects :]
+    fixed_effects_mean = results["x"][-model.submodels[-1].n_fixed_effects :]
     print_msg(
         "Mean of the fixed effects:\n",
         fixed_effects_mean,
@@ -150,7 +103,7 @@ if __name__ == "__main__":
 
     # # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
-    fixed_effects_var = var_latent_params[-federated_model.n_fixed_effects :]
+    fixed_effects_var = var_latent_params[-model.submodels[-1].n_fixed_effects :]
     fixed_effects_sd = np.sqrt(fixed_effects_var)
     ci_lower = fixed_effects_mean - 1.96 * fixed_effects_sd
     ci_upper = fixed_effects_mean + 1.96 * fixed_effects_sd
@@ -201,6 +154,6 @@ if __name__ == "__main__":
             ],
         }
     )
-    df_dalia.to_csv(f"{BASE_DIR}/dalia_summary_{data_type}.csv", index=False)
+    df_dalia.to_csv(f"{BASE_DIR}/dalia_summary_{data_type}_joint.csv", index=False)
 
     print_msg("\n--- Finished ---")
