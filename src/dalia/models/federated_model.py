@@ -202,16 +202,14 @@ class FederatedModel(Model):
 
         for i, model in enumerate(self.models):
             model.theta_external = self.theta_external
-
+            # TODO: move this inside the model and pass only x
+            # overwrite eta if x is provided as eta is private in federated setting
             if x is not None:
-                eta_i = model.a @ x
-            else:
-                eta_i = eta[
-                    self.n_observations_idx[i] : self.n_observations_idx[i + 1]
-                ]
-
+                eta = model.a @ x
+                # print("norm(model.a) in loop: ", xp.linalg.norm(model.a))
+                # print("norm(eta) in loop: ", xp.linalg.norm(eta))
             # negative hessian, therefore minus in front
-            self.Q_conditional -= model.construct_ATDA(eta=eta_i)
+            self.Q_conditional -= model.construct_ATDA(eta=eta)
 
         return self.Q_conditional
 
@@ -230,11 +228,12 @@ class FederatedModel(Model):
         information_vector = -1 * self.Q_prior @ x_i
 
         for i, model in enumerate(self.models):
-            eta_i = eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]]
+            # TODO:move this inside the model and pass only x
+            eta = model.a @ x_i
             information_vector += (
                 model.a.T
                 @ model.likelihood.evaluate_gradient_likelihood(
-                    eta=eta_i,
+                    eta=eta,
                     y=model.y,
                     theta=self.theta_external[self.hyperparameters_idx[-1] :],
                 )
@@ -280,9 +279,10 @@ class FederatedModel(Model):
         """
         likelihood: float = 0.0
         for i, model in enumerate(self.models):
-            eta_i = eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]]
+            # TODO: move this inside the model and pass only x, also y needs to stay local
+            eta = model.a @ self.x
             likelihood += model.likelihood.evaluate_likelihood(
-                eta=eta_i,
+                eta=eta,
                 y=model.y,
                 theta=self.theta_external[self.hyperparameters_idx[-1] :],
             )
