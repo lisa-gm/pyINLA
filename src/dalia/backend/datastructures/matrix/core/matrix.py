@@ -2,6 +2,7 @@
 from abc import ABC
 
 from dalia.backend.datastructures.matrix.dispatch import Operation, blas_dispatch
+from dalia.backend.config import default_hw_target
 
 from .utils import toarray, wrap_result, tohost, toaccelerator, settarget
 
@@ -112,8 +113,11 @@ class Matrix(ABC):
     __array_ufunc__ = None  # Disable numpy ufuncs to avoid conflicts
 
     # 2. Initialization
-    def __init__(self, data, hw_target='host'): # TODO: create config to define default target
+    def __init__(self, data, hw_target=default_hw_target):
 
+        if data.dtype.char not in 'fdFD':
+            raise TypeError(f"Unsupported data type '{data.dtype}'. Only float32 and float64 are supported.")
+        
         data, hw_target = settarget(data, hw_target)
         
         self._hw_target = hw_target
@@ -136,6 +140,16 @@ class Matrix(ABC):
     def hw_target(self):
         """Hardware where the matrix data is stored ('host' or 'accelerator')"""
         return self._hw_target
+    
+    @hw_target.setter
+    def hw_target(self, hw_target):
+        """Set hardware target for the matrix data
+
+        Args:
+            hw_target (str): 'host' or 'accelerator'
+        """
+        self._data, self._hw_target = settarget(self._data, hw_target)
+        
 
     # 5. Comparison operators (if needed)
 

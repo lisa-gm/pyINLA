@@ -2,14 +2,15 @@
 
 import numpy as np
 import pytest
-# TODO: Change this to use flags instead of try
-try:
+
+from dalia import cupy_version
+from dalia.backend.datastructures import DenseMatrix, SparseMatrix
+
+if cupy_version is not None:
     import cupy as cp
     import cupyx.scipy.sparse as cu_sp
-except ImportError:
-    pass
 
-from dalia.backend.datastructures import DenseMatrix, SparseMatrix
+
 from tests.backend import ATOLS, RTOLS
 
 from .conftest import EXTERNAL_DENSE_TYPES, EXTERNAL_SPARSE_TYPES, INTERNAL_DEVICE_TYPES

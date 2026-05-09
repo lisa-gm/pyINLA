@@ -8,14 +8,14 @@ from scipy.linalg.blas import get_blas_funcs
 from scipy.linalg._misc import _datacopied
 from scipy.linalg._decomp import _asarray_validated
 
-# TODO: Change this to use flags instead of try
-try:
+from dalia import cupy_version
+
+if cupy_version is not None:
     import cupy as cp
     from cupy.cuda import cublas
     from cupy.cuda import device
     from cupy.linalg import _util
-except (ImportError, ImportWarning, ModuleNotFoundError):
-    pass
+
 
 def trsm(a, b, hw_target, trans=0, lower = False, unit_diagonal=False,
                             overwrite_b=True, check_finite=False, side=0):

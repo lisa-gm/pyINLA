@@ -1,14 +1,14 @@
 # tests/backend/units/datastructures/matrix/test_matrix_sub.py
 import numpy as np
 import pytest
-# TODO: Change this to use flags instead of try
-try:
+
+from dalia import cupy_version
+from dalia.backend.datastructures import DenseMatrix, SparseMatrix
+
+if cupy_version is not None:
     import cupy as cp
     import cupyx.scipy.sparse as cu_sp
-except ImportError:
-    pass
 
-from dalia.backend.datastructures import DenseMatrix, SparseMatrix
 from tests.backend import ATOLS, RTOLS
 
 from .conftest import EXTERNAL_DENSE_TYPES, EXTERNAL_SPARSE_TYPES, INTERNAL_DEVICE_TYPES
@@ -164,7 +164,6 @@ class TestSubCorrectness:
     def test_sparse_rsub_sparse(self, left_type, device, matrix_factory):
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", device=device)
-        print(type(left.data), type(right._data))
         result = left - right
         if left_type == "cupy_csr" or left_type == "cupy_csc" or left_type == "cupy_coo":
             reference = cp.asnumpy(left.toarray()) - right.toarray()

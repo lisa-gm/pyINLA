@@ -1,12 +1,11 @@
 # src/dalia/backend/datastructures/matrix/core/sparse.py
 import numpy as np
 import scipy.sparse as sp
+from dalia import cupy_version
 # TODO: Change this to use flags instead of try
-try:
+if cupy_version is not None:
     import cupy as cp
     import cupyx.scipy.sparse as cu_sp
-except ImportError:
-    pass
 
 from .matrix import Matrix
 
@@ -64,9 +63,24 @@ class SparseMatrix(Matrix):
                 "Use DenseMatrix instead, or convert to sparse format first with "
                 "scipy.sparse.csr_matrix(array)."
             )
+        
+        if cupy_version is not None:
+            if isinstance(data, cp.ndarray):
+                raise TypeError(
+                    "Cannot create SparseMatrix from dense cupy array. "
+                    "Use DenseMatrix instead, or convert to sparse format first with "
+                    "cupyx.scipy.sparse.csr_matrix(array)."
+                )
 
         # Validate input is sparse
         if not (sp.issparse(data) or cu_sp.issparse(data)):
+            
+            if cupy_version is not None:
+                if not cu_sp.issparse(data):
+                    raise TypeError(
+                        f"SparseMatrix requires either scipy.sparse or cupyx.scipy.sparse matrix, got {type(data).__name__}"
+                    )
+
             raise TypeError(
                 f"SparseMatrix requires scipy.sparse matrix, got {type(data).__name__}"
             )

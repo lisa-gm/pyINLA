@@ -8,14 +8,16 @@ from scipy.linalg.blas import get_blas_funcs
 from scipy.linalg._misc import _datacopied
 from scipy.linalg._decomp import _asarray_validated
 
+
+from dalia import cupy_version
+
 # TODO: Change this to use flags instead of try
-try:
+if cupy_version is not None:
     import cupy as cp
     from cupy_backends.cuda.libs import cublas
     from cupy import _core
     from cupy.cuda import device
-except (ImportError, ImportWarning, ModuleNotFoundError):
-    pass
+
 
 def gemm (a, b, hw_target, c=None, alpha=1.0, beta=0.0, trans_a ='N', trans_b ='N'):
     """Wrapper to call GeMM for host or device"""

@@ -1,12 +1,13 @@
 # src/dalia/backend/datastructures/matrix/core/utils.py
 import numpy as np
 import scipy.sparse as sp
-# TODO: Change this to use flags instead of try
-try:
+from dalia import cupy_version, target_list
+
+
+if cupy_version is not None:
     import cupy as cp
     import cupyx.scipy.sparse as cu_sp
-except ImportError:
-    pass
+
 
 def wrap_result(data):
     """Wrap the result data in the appropriate Matrix subclass"""
@@ -29,15 +30,18 @@ def toarray(data):
     """Convert data to a dense numpy array"""
     if sp.issparse(data):
         return data.toarray()
-    if isinstance(data, cp.ndarray):
-        return cp.asnumpy(data)
-    if cu_sp.issparse(data):
-        return cp.asnumpy(data.toarray())
+    if cupy_version is not None:
+        if isinstance(data, cp.ndarray):
+            return cp.asnumpy(data)
+        if cu_sp.issparse(data):
+            return cp.asnumpy(data.toarray())
     return np.asarray(data)  # Works for arrays and views
+
 
 def tohost(data):
     """Transfer data from accelerator to host"""
     return data.get()
+
 
 def toaccelerator(data):
     """Transfer data from host to accelerator"""
@@ -45,10 +49,11 @@ def toaccelerator(data):
         return cu_sp.csr_matrix(data)
     return cp.asarray(data)
 
+
 def settarget (data, hw_target):
     """Set the hardware target for the data, transferring it if necessary"""
-    if hw_target is not None and hw_target not in ['host', 'accelerator']:
-        raise ValueError(f"Invalid hardware target type '{hw_target}'. Supported target types are 'host' and 'accelerator'.")
+    if hw_target is not None and hw_target not in target_list:
+        raise ValueError(f"Invalid hardware target type '{hw_target}'. Supported target types are {target_list}.")
     if hw_target is not None:
         if hw_target == 'accelerator' and 'cupy' not in str(type(data)):
             data = toaccelerator(data)
