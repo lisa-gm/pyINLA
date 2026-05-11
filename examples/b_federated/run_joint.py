@@ -12,7 +12,7 @@ from dalia.configs import (
 )
 from dalia.core.dalia import DALIA
 from dalia.core.model import Model
-from dalia.submodels import RegressionSubModel
+from dalia.submodels import RegressionSubModel, GenericSubModel
 from dalia.utils import print_msg
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -27,16 +27,18 @@ if __name__ == "__main__":
     # Check for parsed parameters
     args = parse_args()
 
+    # random site-specific intercept
+    random_intercept = True
+
     data_type = "trauma"
     family = "binomial"
-    joint_folder = f"joint_{data_type}_{family}"
 
-    # random site-specific intercept
-    random_intercept = False
     if random_intercept:
         n_fixed_effects = 4  ## no global intercept, only covariates
+        joint_folder = f"joint_{data_type}_{family}_site_specific_intercept"
     else:
         n_fixed_effects = 5  ## this includes global intercept
+        joint_folder = f"joint_{data_type}_{family}_global_intercept"
 
     # Configurations of the regression submodel
     regression_dict = {
@@ -49,22 +51,35 @@ if __name__ == "__main__":
         config=submodels_config.parse_config(regression_dict),
     )
 
-    # if random_intercept:
-    #     # setup generic submodel for random intercept
-    #     generic_dict = {
-    #         "type": "generic",
-    #         "input_dir": f"{BASE_DIR}/{joint_folder}/inputs_generic",
-
     # Likelihood
     likelihood_dict = {
         "type": "binomial",
         "input_dir": f"{BASE_DIR}/{joint_folder}",
     }
-    # Creation of the first model by combining the Regression submodel and the likelihood
-    model = Model(
-        submodels=[regression],
-        likelihood_config=likelihood_config.parse_config(likelihood_dict),
-    )
+
+    if random_intercept:
+        # setup generic submodel for random intercept
+        generic_dict = {
+            "type": "generic",
+            "input_dir": f"{BASE_DIR}/{joint_folder}/inputs_generic",
+            "tau": 4,  # has to be positive
+            "ph_tau": {"type": "gamma", "alpha": 1.0, "beta": 1e-5},
+        }
+        generic = GenericSubModel(
+            config=submodels_config.parse_config(generic_dict),
+        )
+
+        model = Model(
+            submodels=[regression, generic],
+            likelihood_config=likelihood_config.parse_config(likelihood_dict),
+        )
+    else:
+        # Creation of the first model by combining the Regression submodel and the likelihood
+        model = Model(
+            submodels=[regression],
+            likelihood_config=likelihood_config.parse_config(likelihood_dict),
+        )
+
     print_msg(model)
 
     # Configurations of DALIA

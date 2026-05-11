@@ -25,15 +25,14 @@ if __name__ == "__main__":
     # Check for parsed parameters
     args = parse_args()
 
-    data_type = "Nurses"
-    # data_type = "nurses_hom"
+    data_type = "nurses_hom"
     family = "gaussian"
     joint_folder = f"joint_{data_type}_{family}"
 
     # Configurations of the regression submodel
     regression_dict = {
         "type": "regression",
-        "input_dir": f"{BASE_DIR}/{joint_folder}/inputs",
+        "input_dir": f"{BASE_DIR}/{joint_folder}/inputs_regression",
         "n_fixed_effects": 5,
         "fixed_effects_prior_precision": 0.001,
     }

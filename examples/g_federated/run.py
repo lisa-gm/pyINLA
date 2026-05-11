@@ -48,7 +48,7 @@ if __name__ == "__main__":
     for hospital_dir in hospital_dirs:
         regression_dict = {
             "type": "regression",
-            "input_dir": f"{hospital_dir}/inputs",
+            "input_dir": f"{hospital_dir}/inputs_regression",
             "n_fixed_effects": 5,
             "fixed_effects_prior_precision": 0.001,
         }
