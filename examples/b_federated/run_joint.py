@@ -34,9 +34,9 @@ if __name__ == "__main__":
     # random site-specific intercept
     random_intercept = False
     if random_intercept:
-        n_fixed_effects = 5  ## this includes global intercept
-    else:
         n_fixed_effects = 4  ## no global intercept, only covariates
+    else:
+        n_fixed_effects = 5  ## this includes global intercept
 
     # Configurations of the regression submodel
     regression_dict = {
