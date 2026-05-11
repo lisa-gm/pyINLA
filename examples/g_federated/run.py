@@ -33,85 +33,62 @@ if __name__ == "__main__":
 
     data_type = "nurses_hom"
     family = "gaussian"
+    split_folder = f"split_{data_type}_{family}"
 
-    # Configurations of the regression submodel
-    regression_dict = {
-        "type": "regression",
-        "input_dir": f"{BASE_DIR}/{data_type}_{family}/inputs",
-        "n_fixed_effects": 5,
-        "fixed_effects_prior_precision": 0.001,
-    }
-    regression = RegressionSubModel(
-        config=submodels_config.parse_config(regression_dict),
+    split_root = os.path.join(BASE_DIR, split_folder)
+    hospital_dirs = sorted(
+        [
+            os.path.join(split_root, d)
+            for d in os.listdir(split_root)
+            if d.startswith("hospital_") and os.path.isdir(os.path.join(split_root, d))
+        ]
     )
 
-    # Likelihood
-    ### prior not exactly matching yet?!
-    likelihood_dict = {
-        "type": "gaussian",
-        "prec_o": 1.0,
-        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
-        # "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
-    }
-    # Creation of the first model by combining the Regression submodel and the likelihood
-    model1 = Model(
-        submodels=[regression],
-        likelihood_config=likelihood_config.parse_config(likelihood_dict),
-    )
-    print_msg(model1)
+    models = []
+    for hospital_dir in hospital_dirs:
+        regression_dict = {
+            "type": "regression",
+            "input_dir": f"{hospital_dir}/inputs",
+            "n_fixed_effects": 5,
+            "fixed_effects_prior_precision": 0.001,
+        }
+        regression = RegressionSubModel(
+            config=submodels_config.parse_config(regression_dict),
+        )
 
-    # Minimal federated setup with a single local model and explicit Q_prior construction.
+        likelihood_dict = {
+            "type": "gaussian",
+            "prec_o": 1.0,
+            "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+            # "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
+        }
+        model_local = Model(
+            submodels=[regression],
+            likelihood_config=likelihood_config.parse_config(likelihood_dict),
+            input_dir=hospital_dir,
+        )
+        models.append(model_local)
+
+    print_msg(f"Constructed {len(models)} local models from split data")
+
     federated_dict = {
         "type": "federated",
-        "n_models": 1,
-        "theta": model1.theta_external.tolist(),
-        "theta_keys": list(model1.theta_keys),
+        "n_models": len(models),
+        "theta": models[0].theta_external.tolist(),
+        "theta_keys": list(models[0].theta_keys),
     }
     federated_model = FederatedModel(
-        models=[model1],
+        models=models,
         federated_model_config=models_config.parse_config(federated_dict),
     )
-    Q_prior = federated_model.construct_Q_prior()
-    print_msg("Constructed federated Q_prior with shape:", Q_prior.shape)
-    print_msg("Qprior:\n", Q_prior.toarray())
 
-    print("\nConstructing federated Q_conditional...")
-    print("dim(model.a):", model1.a.shape)
-    print("dim(model.x):", federated_model.x.shape)
-    Q_conditional = federated_model.construct_Q_conditional(
-        eta=model1.a @ federated_model.x
-    )
-    print("Q_conditional: \n", Q_conditional)
-
-    ADTA = model1.construct_ATDA(eta=model1.a @ federated_model.x)
-    print("ATDA:\n", ADTA)
-    print("Q_cond manual: \n", Q_prior.toarray() - ADTA)
-
-    information_vector_fed = model1.construct_information_vector(
-        model1.a @ federated_model.x,
-        federated_model.x,
-    )
-    print("Information vector:\n", information_vector_fed)
-    information_vector_single = model1.construct_information_vector(
-        model1.a @ federated_model.x, federated_model.x
-    )
-    print("Information vector single model:\n", information_vector_single)
-
-    log_lik_fed = federated_model.evaluate_likelihood(eta=model1.a @ federated_model.x)
-    print("Evaluated likelihood for federated model. log-likelihood:", log_lik_fed)
-    log_lik_single = model1.evaluate_likelihood(eta=model1.a @ federated_model.x)
-    print("Evaluated likelihood for single model. log-likelihood:", log_lik_single)
-
-    log_prior_fed = federated_model.evaluate_log_prior_hyperparameters()
-    print("Evaluated log-prior for federated model:", log_prior_fed)
-    log_prior_single = model1.evaluate_log_prior_hyperparameters()
-    print("Evaluated log-prior for single model:", log_prior_single)
+    print_msg(federated_model)
 
     # Configurations of DALIA
     dalia_dict = {
         "solver": {"type": "dense"},
         "minimize": {
-            "max_iter": args.max_iter,
+            "max_iter": 100,
             "gtol": 1e-3,
             "disp": True,
         },
@@ -140,22 +117,6 @@ if __name__ == "__main__":
         fixed_effects_mean,
     )
 
-    # print_msg("\n--- Comparisons ---")
-    # # Compare hyperparameters
-    # theta_ref = xp.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
-    # print_msg("Reference theta:", theta_ref)
-    # print_msg(
-    #     "Norm (theta - theta_ref):        ",
-    #     f"{xp.linalg.norm(results['theta'] - theta_ref):.4e}",
-    # )
-
-    # # Compare latent parameters
-    # x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
-    # print_msg(
-    #     "Norm (x - x_ref):                ",
-    #     f"{xp.linalg.norm(results['x'] - x_ref):.4e}",
-    # )
-
     # # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
     fixed_effects_var = var_latent_params[-federated_model.n_fixed_effects :]
@@ -163,43 +124,15 @@ if __name__ == "__main__":
     ci_lower = fixed_effects_mean - 1.96 * fixed_effects_sd
     ci_upper = fixed_effects_mean + 1.96 * fixed_effects_sd
 
-    print_msg("95% credible intervals of fixed effects (from marginal variances):")
-    for i, (mean_i, low_i, up_i) in enumerate(
-        zip(fixed_effects_mean, ci_lower, ci_upper), start=1
-    ):
-        print_msg(f"  x[{i}] mean={mean_i:.6f}, CI95=[{low_i:.6f}, {up_i:.6f}]")
-
-    # Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
-    # Qinv_ref = xp.linalg.inv(Qconditional.toarray())
-    # print_msg(
-    #     "Norm (marg var latent - ref):    ",
-    #     f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
-    # )
-
-    # # Compare marginal variances of observations
-    # var_obs = dalia.get_marginal_variances_observations(
-    #     theta_external=theta_ref, x_star=x_ref
-    # )
-    # var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
-    # print_msg(
-    #     "Norm (var_obs - var_obs_ref):    ",
-    #     f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
-    # )
-
-    print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp()
-
     prec_obs = marginals_hp["hyperparameters"]["prec_o"]
     quantile_pairs = prec_obs["quantiles"]["external"]["pairs"]
 
     ## convert to sigma2 values
-    print("\nQuantile pairs of sigma2_o:")
     sigma2_quantile_pairs = sorted(
         ((1.0 - p, 1.0 / q) for p, q in quantile_pairs),
         key=lambda pair: pair[0],
     )
-    for p, sigma2_q in sigma2_quantile_pairs:
-        print(f"   {p:.3f} quantile: {sigma2_q:.4f}")
 
     # store parameters in matching format as needed in R
     # make dataframe with columns:
@@ -217,7 +150,7 @@ if __name__ == "__main__":
             "lower": np.append(ci_lower, sigma2_lower),
             "upper": np.append(ci_upper, sigma2_upper),
             "Estimate": np.append(fixed_effects_mean, sigma2_mean),
-            "Method": "DALIA",
+            "Method": "DALIA-FED",
             "Covariate": [
                 "(Intercept)",
                 "gender",
@@ -229,5 +162,6 @@ if __name__ == "__main__":
         }
     )
     df_dalia.to_csv(f"{BASE_DIR}/dalia_summary_{data_type}.csv", index=False)
+    print_msg(df_dalia)
 
     print_msg("\n--- Finished ---")
