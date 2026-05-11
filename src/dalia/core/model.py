@@ -384,9 +384,6 @@ class Model(ABC):
         theta_external.append(lh_hyperparameters)
         self.theta_external = xp.concatenate(theta_external)
 
-        print("Initial hyperparameters (external scale): ", self.theta_external)
-        print("Initial hyperparameters (internal scale): ", self.theta_internal)
-
         theta_keys += lh_hyperparameters_keys
         self.theta_keys: NDArray = theta_keys
 
@@ -679,7 +676,7 @@ class Model(ABC):
 
         return theta_internal
 
-    def evaluate_likelihood(self, eta: NDArray, **kwargs) -> float:
+    def evaluate_likelihood(self, eta: NDArray, x: NDArray = None, **kwargs) -> float:
         """Evaluate the likelihood.
         
         Parameters

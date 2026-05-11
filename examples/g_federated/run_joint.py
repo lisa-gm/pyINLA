@@ -25,13 +25,15 @@ if __name__ == "__main__":
     # Check for parsed parameters
     args = parse_args()
 
-    data_type = "nurses_hom"
+    data_type = "Nurses"
+    # data_type = "nurses_hom"
     family = "gaussian"
+    joint_folder = f"joint_{data_type}_{family}"
 
     # Configurations of the regression submodel
     regression_dict = {
         "type": "regression",
-        "input_dir": f"{BASE_DIR}/{data_type}_{family}/inputs",
+        "input_dir": f"{BASE_DIR}/{joint_folder}/inputs",
         "n_fixed_effects": 5,
         "fixed_effects_prior_precision": 0.001,
     }
@@ -87,22 +89,6 @@ if __name__ == "__main__":
         fixed_effects_mean,
     )
 
-    # print_msg("\n--- Comparisons ---")
-    # # Compare hyperparameters
-    # theta_ref = xp.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
-    # print_msg("Reference theta:", theta_ref)
-    # print_msg(
-    #     "Norm (theta - theta_ref):        ",
-    #     f"{xp.linalg.norm(results['theta'] - theta_ref):.4e}",
-    # )
-
-    # # Compare latent parameters
-    # x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
-    # print_msg(
-    #     "Norm (x - x_ref):                ",
-    #     f"{xp.linalg.norm(results['x'] - x_ref):.4e}",
-    # )
-
     # # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
     fixed_effects_var = var_latent_params[-model.submodels[-1].n_fixed_effects :]
@@ -110,43 +96,15 @@ if __name__ == "__main__":
     ci_lower = fixed_effects_mean - 1.96 * fixed_effects_sd
     ci_upper = fixed_effects_mean + 1.96 * fixed_effects_sd
 
-    print_msg("95% credible intervals of fixed effects (from marginal variances):")
-    for i, (mean_i, low_i, up_i) in enumerate(
-        zip(fixed_effects_mean, ci_lower, ci_upper), start=1
-    ):
-        print_msg(f"  x[{i}] mean={mean_i:.6f}, CI95=[{low_i:.6f}, {up_i:.6f}]")
-
-    # Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
-    # Qinv_ref = xp.linalg.inv(Qconditional.toarray())
-    # print_msg(
-    #     "Norm (marg var latent - ref):    ",
-    #     f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
-    # )
-
-    # # Compare marginal variances of observations
-    # var_obs = dalia.get_marginal_variances_observations(
-    #     theta_external=theta_ref, x_star=x_ref
-    # )
-    # var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
-    # print_msg(
-    #     "Norm (var_obs - var_obs_ref):    ",
-    #     f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
-    # )
-
-    print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp()
-
     prec_obs = marginals_hp["hyperparameters"]["prec_o"]
     quantile_pairs = prec_obs["quantiles"]["external"]["pairs"]
 
     ## convert to sigma2 values
-    print("\nQuantile pairs of sigma2_o:")
     sigma2_quantile_pairs = sorted(
         ((1.0 - p, 1.0 / q) for p, q in quantile_pairs),
         key=lambda pair: pair[0],
     )
-    for p, sigma2_q in sigma2_quantile_pairs:
-        print(f"   {p:.3f} quantile: {sigma2_q:.4f}")
 
     # store parameters in matching format as needed in R
     # make dataframe with columns:
@@ -176,5 +134,6 @@ if __name__ == "__main__":
         }
     )
     df_dalia.to_csv(f"{BASE_DIR}/dalia_summary_{data_type}_joint.csv", index=False)
+    print_msg(df_dalia)
 
     print_msg("\n--- Finished ---")

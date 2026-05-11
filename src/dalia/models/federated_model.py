@@ -106,9 +106,6 @@ class FederatedModel(Model):
             # but I also need it to weight the contributions
             self.n_observations += model.n_observations
             self.n_observations_idx.append(self.n_observations)
-            print(
-                f"Model {i} has {model.n_observations} observations. Total so far: {self.n_observations}"
-            )
 
         self.n_latent_parameters = self.n_fixed_effects
 
@@ -132,39 +129,6 @@ class FederatedModel(Model):
         )
 
         self.construct_Q_prior()
-
-    # ########################################################################
-    # @property
-    # def theta_external(self):
-    #     """External/user/interpretable scale theta."""
-    #     # the copy is important to make sure that in place operations still trigger updating
-    #     return self._theta_external.copy()
-
-    # @theta_external.setter
-    # def theta_external(self, value):
-    #     """Set external theta and automatically update internal.
-
-    #     Notes
-    #     -----
-    #     The re-scaling is implemented for all prios but PenalizedComplexity (identity but already in the correct "log" scale).
-    #     """
-    #     self._theta_external = xp.array(value)
-    #     self._theta_internal = self.rescale_hyperparameters_to_internal(
-    #         self._theta_external, direction="forward"
-    #     )
-
-    # @property
-    # def theta_internal(self):
-    #     """Internal/BFGS scale theta."""
-    #     return self._theta_internal.copy()
-
-    # @theta_internal.setter
-    # def theta_internal(self, value):
-    #     """Set internal theta and automatically update external."""
-    #     self._theta_internal = xp.array(value)
-    #     self._theta_external = self.rescale_hyperparameters_to_internal(
-    #         self._theta_internal, direction="backward"
-    #     )
 
     def construct_Q_prior(self) -> sp.sparse.spmatrix:
         """Construct the prior precision matrix.
@@ -257,6 +221,7 @@ class FederatedModel(Model):
     def evaluate_likelihood(
         self,
         eta: NDArray,
+        x: NDArray = None,
     ) -> float:
         """Evaluate the likelihood.
 
@@ -280,7 +245,7 @@ class FederatedModel(Model):
         likelihood: float = 0.0
         for i, model in enumerate(self.models):
             # TODO: move this inside the model and pass only x, also y needs to stay local
-            eta = model.a @ self.x
+            eta = model.a @ x
             likelihood += model.likelihood.evaluate_likelihood(
                 eta=eta,
                 y=model.y,
@@ -320,44 +285,39 @@ class FederatedModel(Model):
 
     def __str__(self) -> str:
         """String representation of the model."""
-        str_representation = ""
-
-        # --- Make the Coregional Model() table ---
         headers = [
+            "Federated Type",
+            "Number of Models",
             "Number of Hyperparameters",
             "Number of Latent Parameters",
+            "Number of Fixed Effects",
             "Number of Observations",
         ]
-        values = [self.n_hyperparameters, self.n_latent_parameters, self.n_observations]
+        values = [
+            self.federated_type,
+            self.n_models,
+            self.n_hyperparameters,
+            self.n_latent_parameters,
+            self.n_fixed_effects,
+            self.n_observations,
+        ]
 
-        model_table = tabulate(
+        federated_table = tabulate(
             [headers, values],
             tablefmt="fancy_grid",
-            colalign=("center", "center", "center"),
+            colalign=("center", "center", "center", "center", "center", "center"),
         )
+        federated_table = add_str_header("Federated Model", federated_table)
 
-        # Add the header title
-        model_table = add_str_header(
-            f"Coregional Model ({self.n_models} variates)", model_table
-        )
-
-        # --- Add the model information ---
-        # Create headers and values for the model table
         models_str_representation = []
         for model in self.models:
             models_str_representation.append(str(model))
 
-        # Create the model table
         model_jointed_representation = align_tables_side_by_side(
             models_str_representation
         )
-
-        # Add the model header title
         model_jointed_representation = add_str_header(
-            "Models", model_jointed_representation
+            "Local Models", model_jointed_representation
         )
 
-        # Combine the model and model tables
-        str_representation = model_table + "\n" + boxify(model_jointed_representation)
-
-        return str_representation
+        return federated_table + "\n" + boxify(model_jointed_representation)

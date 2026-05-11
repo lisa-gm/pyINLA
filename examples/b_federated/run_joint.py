@@ -8,12 +8,10 @@ from dalia import xp
 from dalia.configs import (
     dalia_config,
     likelihood_config,
-    models_config,
     submodels_config,
 )
 from dalia.core.dalia import DALIA
 from dalia.core.model import Model
-from dalia.models.federated_model import FederatedModel
 from dalia.submodels import RegressionSubModel
 from dalia.utils import print_msg
 
@@ -31,22 +29,36 @@ if __name__ == "__main__":
 
     data_type = "trauma"
     family = "binomial"
+    joint_folder = f"joint_{data_type}_{family}"
+
+    # random site-specific intercept
+    random_intercept = False
+    if random_intercept:
+        n_fixed_effects = 5  ## this includes global intercept
+    else:
+        n_fixed_effects = 4  ## no global intercept, only covariates
 
     # Configurations of the regression submodel
     regression_dict = {
         "type": "regression",
-        "input_dir": f"{BASE_DIR}/{data_type}_{family}/inputs",
-        "n_fixed_effects": 5,
+        "input_dir": f"{BASE_DIR}/{joint_folder}/inputs_regression",
+        "n_fixed_effects": n_fixed_effects,
         "fixed_effects_prior_precision": 0.001,
     }
     regression = RegressionSubModel(
         config=submodels_config.parse_config(regression_dict),
     )
 
+    # if random_intercept:
+    #     # setup generic submodel for random intercept
+    #     generic_dict = {
+    #         "type": "generic",
+    #         "input_dir": f"{BASE_DIR}/{joint_folder}/inputs_generic",
+
     # Likelihood
     likelihood_dict = {
         "type": "binomial",
-        "input_dir": f"{BASE_DIR}/{data_type}_{family}",
+        "input_dir": f"{BASE_DIR}/{joint_folder}",
     }
     # Creation of the first model by combining the Regression submodel and the likelihood
     model = Model(
@@ -79,57 +91,18 @@ if __name__ == "__main__":
     results = dalia.run()
 
     print_msg("\n--- Results ---")
-    fixed_effects_mean = results["x"][-model.submodels[-1].n_fixed_effects :]
+    fixed_effects_mean = results["x"][-model.n_fixed_effects :]
     print_msg(
         "Mean of the fixed effects:\n",
         fixed_effects_mean,
     )
 
-    # print_msg("\n--- Comparisons ---")
-    # # Compare hyperparameters
-    # theta_ref = xp.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
-    # print_msg("Reference theta:", theta_ref)
-    # print_msg(
-    #     "Norm (theta - theta_ref):        ",
-    #     f"{xp.linalg.norm(results['theta'] - theta_ref):.4e}",
-    # )
-
-    # # Compare latent parameters
-    # x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
-    # print_msg(
-    #     "Norm (x - x_ref):                ",
-    #     f"{xp.linalg.norm(results['x'] - x_ref):.4e}",
-    # )
-
-    # # Compare marginal variances of latent parameters
+    # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
-    fixed_effects_var = var_latent_params[-model.submodels[-1].n_fixed_effects :]
+    fixed_effects_var = var_latent_params[-model.n_fixed_effects :]
     fixed_effects_sd = np.sqrt(fixed_effects_var)
     ci_lower = fixed_effects_mean - 1.96 * fixed_effects_sd
     ci_upper = fixed_effects_mean + 1.96 * fixed_effects_sd
-
-    print_msg("95% credible intervals of fixed effects (from marginal variances):")
-    for i, (mean_i, low_i, up_i) in enumerate(
-        zip(fixed_effects_mean, ci_lower, ci_upper), start=1
-    ):
-        print_msg(f"  x[{i}] mean={mean_i:.6f}, CI95=[{low_i:.6f}, {up_i:.6f}]")
-
-    # Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
-    # Qinv_ref = xp.linalg.inv(Qconditional.toarray())
-    # print_msg(
-    #     "Norm (marg var latent - ref):    ",
-    #     f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
-    # )
-
-    # # Compare marginal variances of observations
-    # var_obs = dalia.get_marginal_variances_observations(
-    #     theta_external=theta_ref, x_star=x_ref
-    # )
-    # var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
-    # print_msg(
-    #     "Norm (var_obs - var_obs_ref):    ",
-    #     f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
-    # )
 
     # store parameters in matching format as needed in R
     # make dataframe with columns:
@@ -155,5 +128,6 @@ if __name__ == "__main__":
         }
     )
     df_dalia.to_csv(f"{BASE_DIR}/dalia_summary_{data_type}_joint.csv", index=False)
+    print_msg(df_dalia)
 
     print_msg("\n--- Finished ---")
