@@ -107,49 +107,90 @@ print(data.head())
 
 current_dir = Path(__file__).resolve().parent
 
-# 1) Joint dataset (renamed): joint_trauma_binomial
-joint_folder = current_dir / f"joint_{data_type}_{family}"
+# 1) Joint datasets with explicit intercept type in folder name
+joint_folder_global = current_dir / f"joint_{data_type}_{family}_global_intercept"
+joint_folder_site_specific = (
+    current_dir / f"joint_{data_type}_{family}_site_specific_intercept"
+)
 hospital_values = sorted(data["hospital"].unique().tolist())
-y_joint, x_joint_regression, x_joint_generic = construct_site_data(
+y_joint_global, x_joint_global_regression, x_joint_global_generic = construct_site_data(
+    data,
+    intercept_mode="global",
+    hospital_order=hospital_values,
+)
+save_dataset(
+    joint_folder_global,
+    y_joint_global,
+    x_joint_global_regression,
+    x_joint_global_generic,
+)
+
+print(
+    f"Saved joint y to {joint_folder_global / 'y.npy'} with shape {y_joint_global.shape}"
+)
+print(
+    f"Saved joint regression X to {joint_folder_global / 'inputs_regression' / 'a.npy'} with shape {x_joint_global_regression.shape}"
+)
+
+y_joint_site_specific, x_joint_regression, x_joint_generic = construct_site_data(
     data,
     intercept_mode="site_specific",
     hospital_order=hospital_values,
 )
 save_dataset(
-    joint_folder,
-    y_joint,
+    joint_folder_site_specific,
+    y_joint_site_specific,
     x_joint_regression,
     x_joint_generic,
 )
 
-print(f"Saved joint y to {joint_folder / 'y.npy'} with shape {y_joint.shape}")
 print(
-    f"Saved joint regression X to {joint_folder / 'inputs_regression' / 'a.npy'} with shape {x_joint_regression.shape}"
+    f"Saved joint y to {joint_folder_site_specific / 'y.npy'} with shape {y_joint_site_specific.shape}"
+)
+print(
+    f"Saved joint regression X to {joint_folder_site_specific / 'inputs_regression' / 'a.npy'} with shape {x_joint_regression.shape}"
 )
 if x_joint_generic is not None:
     print(
-        f"Saved joint generic X to {joint_folder / 'inputs_generic' / 'a.npy'} with shape {x_joint_generic.shape}"
+        f"Saved joint generic X to {joint_folder_site_specific / 'inputs_generic' / 'a.npy'} with shape {x_joint_generic.shape}"
     )
 
-# 2) Split dataset by hospital: split_trauma_binomial/hospital_*/
-split_root = current_dir / f"split_{data_type}_{family}"
+# 2) Split datasets by hospital with explicit intercept type in folder name
+split_root_global = current_dir / f"split_{data_type}_{family}_global_intercept"
+split_root_site_specific = (
+    current_dir / f"split_{data_type}_{family}_site_specific_intercept"
+)
 
 for idx, hospital in enumerate(hospital_values, start=1):
     row_positions = np.flatnonzero(data["hospital"].to_numpy() == hospital)
-    y_h = y_joint[row_positions]
-    x_h_regression = x_joint_regression[row_positions, :]
-    x_h_generic = None
+
+    # Global-intercept split dataset
+    y_h_global = y_joint_global[row_positions]
+    x_h_global_regression = x_joint_global_regression[row_positions, :]
+    hospital_dir_global = split_root_global / f"hospital_{idx}"
+    save_dataset(hospital_dir_global, y_h_global, x_h_global_regression, None)
+    print(
+        f"Saved global hospital_{idx} ({hospital}) y to {hospital_dir_global / 'y.npy'} with shape {y_h_global.shape}"
+    )
+    print(
+        f"Saved global hospital_{idx} ({hospital}) regression X to {hospital_dir_global / 'inputs_regression' / 'a.npy'} with shape {x_h_global_regression.shape}"
+    )
+
+    # Site-specific-intercept split dataset
+    y_h_site = y_joint_site_specific[row_positions]
+    x_h_site_regression = x_joint_regression[row_positions, :]
+    x_h_site_generic = None
     if x_joint_generic is not None:
-        x_h_generic = x_joint_generic[row_positions, :]
-    hospital_dir = split_root / f"hospital_{idx}"
-    save_dataset(hospital_dir, y_h, x_h_regression, x_h_generic)
+        x_h_site_generic = x_joint_generic[row_positions, :]
+    hospital_dir_site = split_root_site_specific / f"hospital_{idx}"
+    save_dataset(hospital_dir_site, y_h_site, x_h_site_regression, x_h_site_generic)
     print(
-        f"Saved hospital_{idx} ({hospital}) y to {hospital_dir / 'y.npy'} with shape {y_h.shape}"
+        f"Saved site-specific hospital_{idx} ({hospital}) y to {hospital_dir_site / 'y.npy'} with shape {y_h_site.shape}"
     )
     print(
-        f"Saved hospital_{idx} ({hospital}) regression X to {hospital_dir / 'inputs_regression' / 'a.npy'} with shape {x_h_regression.shape}"
+        f"Saved site-specific hospital_{idx} ({hospital}) regression X to {hospital_dir_site / 'inputs_regression' / 'a.npy'} with shape {x_h_site_regression.shape}"
     )
-    if x_h_generic is not None:
+    if x_h_site_generic is not None:
         print(
-            f"Saved hospital_{idx} ({hospital}) generic X to {hospital_dir / 'inputs_generic' / 'a.npy'} with shape {x_h_generic.shape}"
+            f"Saved site-specific hospital_{idx} ({hospital}) generic X to {hospital_dir_site / 'inputs_generic' / 'a.npy'} with shape {x_h_site_generic.shape}"
         )
