@@ -16,7 +16,7 @@ def extract_site_data(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
 
 
 def save_dataset(base_dir: Path, y: np.ndarray, x: np.ndarray) -> None:
-    inputs_dir = base_dir / "inputs"
+    inputs_dir = base_dir / "inputs_regression"
     base_dir.mkdir(parents=True, exist_ok=True)
     inputs_dir.mkdir(parents=True, exist_ok=True)
     np.save(base_dir / "y.npy", y)
@@ -44,7 +44,7 @@ y_joint, x_joint = extract_site_data(data)
 save_dataset(joint_folder, y_joint, x_joint)
 print(f"Saved joint y to {joint_folder / 'y.npy'} with shape {y_joint.shape}")
 print(
-    f"Saved joint X to {joint_folder / 'inputs' / 'a.npy'} with shape {x_joint.shape}"
+    f"Saved joint X to {joint_folder / 'inputs_regression' / 'a.npy'} with shape {x_joint.shape}"
 )
 
 # 2) Split dataset by hospital: split_trauma_binomial/hospital_*/
@@ -62,5 +62,5 @@ for idx, hospital in enumerate(hospital_values, start=1):
         f"Saved hospital_{idx} ({hospital}) y to {hospital_dir / 'y.npy'} with shape {y_h.shape}"
     )
     print(
-        f"Saved hospital_{idx} ({hospital}) X to {hospital_dir / 'inputs' / 'a.npy'} with shape {x_h.shape}"
+        f"Saved hospital_{idx} ({hospital}) X to {hospital_dir / 'inputs_regression' / 'a.npy'} with shape {x_h.shape}"
     )
