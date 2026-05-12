@@ -44,7 +44,6 @@ import time
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
 
 
-
 class DALIA:
     """DALIA is a Python implementation of the Integrated Nested
     Laplace Approximation (INLA) method.
@@ -829,7 +828,7 @@ class DALIA:
             f"Computing covariance of hyperparameters at theta_external {theta_external}.",
             flush=True,
         )
-        
+
         synchronize(comm=self.comm_world)
         tic = time.perf_counter()
         self.model.theta_external = theta_external
@@ -840,7 +839,7 @@ class DALIA:
             flush=True,
         )
         cov_theta_internal = xp.linalg.inv(hess_theta_internal)
-        
+
         synchronize(comm=self.comm_world)
         toc = time.perf_counter()
         print_msg(
@@ -848,7 +847,7 @@ class DALIA:
             toc - tic,
             flush=True,
         )
-        
+
         return cov_theta_internal
 
     def _evaluate_hessian_f(
@@ -1250,7 +1249,9 @@ class DALIA:
             sp.sparse.eye(self.model.n_latent_parameters, dtype=xp.float64),
             sparsity="bta",
         )
+
         marginal_variances = extract_diagonal(marginal_variances_sp)
+
         return marginal_variances
 
     def get_marginal_variances_observations(

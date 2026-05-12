@@ -131,24 +131,126 @@ class SparseSolver(Solver):
 
         return float(log_det_U)
 
-    def selected_inversion(self, **kwargs) -> NDArray:
-        L_inv = sp.linalg.solve_triangular(
-            self.LU_factor.L, xp.eye(self.LU_factor.L.shape[0]), lower=True, overwrite_b=False
-        )
-        U_inv = sp.linalg.solve_triangular(
-            self.LU_factor.U, xp.eye(self.LU_factor.U.shape[0]), lower=False, overwrite_b=False
-        )
-        self.A_inv = U_inv @ L_inv
+    def selected_inversion(self, batch_size: int = 64, **kwargs) -> sp.sparse.spmatrix:
+        """Compute selected entries of the inverse using sparsity pattern of L and U factors.
+
+        This implementation:
+        - Processes the matrix in batches to avoid storing full dense inverse in memory
+        - Leverages the existing self.solve() method with sparse LU factors
+        - Only stores entries matching the sparsity pattern of L and U
+
+        Parameters
+        ----------
+        batch_size : int, optional
+            Number of columns to process in each batch (default: 64).
+            Smaller batches use less memory but may be slower.
+
+        Returns
+        -------
+        sp.sparse.spmatrix
+            Sparse matrix with the inverse entries at positions where L or U have non-zeros
+        """
+
+        n = self.LU_factor.L.shape[0]
+
+        # Get the combined sparsity pattern of L and U factors
+        # This determines which entries of A_inv we need to extract
+        L_coo = self.LU_factor.L.tocoo()
+        U_coo = self.LU_factor.U.tocoo()
+
+        # Combine patterns: collect all (row, col) pairs where L or U have non-zeros
+        # . move to CPU if on GPU to handle set operations
+        if xp.__name__ == "cupy":
+            L_rows = L_coo.row.get()
+            L_cols = L_coo.col.get()
+            U_rows = U_coo.row.get()
+            U_cols = U_coo.col.get()
+        else:
+            L_rows = L_coo.row
+            L_cols = L_coo.col
+            U_rows = U_coo.row
+            U_cols = U_coo.col
+
+        # Combine patterns and remove duplicates
+        pattern_set = set()
+        for r, c in zip(L_rows, L_cols):
+            pattern_set.add((int(r), int(c)))
+        for r, c in zip(U_rows, U_cols):
+            pattern_set.add((int(r), int(c)))
+
+        # Create a set for fast lookup: entries to extract
+        pattern_entries = pattern_set
+
+        # Storage for sparse result
+        data = []
+        row_indices = []
+        col_indices = []
+
+        # Process matrix in batches of columns
+        for batch_start in range(0, n, batch_size):
+            batch_end = min(batch_start + batch_size, n)
+            batch_cols = batch_end - batch_start
+
+            # Build batched RHS: identity columns for this batch
+            rhs_batch = xp.zeros((n, batch_cols))
+            for i in range(batch_cols):
+                rhs_batch[batch_start + i, i] = 1.0
+
+            # Solve A @ X = RHS using the existing batched solve method
+            # This leverages the sparse LU factorization efficiently
+            X = self.solve(rhs_batch)
+
+            # Extract only the entries that match the sparsity pattern
+            for row, col in pattern_entries:
+                # Check if this (row, col) pair is in the current batch
+                if batch_start <= col < batch_end:
+                    batch_idx = col - batch_start
+                    # Move to CPU if on GPU for data extraction
+                    if xp.__name__ == "cupy":
+                        value = float(X[row, batch_idx].get())
+                    else:
+                        value = float(X[row, batch_idx])
+                    data.append(value)
+                    row_indices.append(row)
+                    col_indices.append(col)
+
+        # Convert lists to proper 1D arrays for sparse matrix construction
+        data_array = xp.array(data, dtype=xp.float64)
+        row_array = xp.array(row_indices, dtype=xp.int32)
+        col_array = xp.array(col_indices, dtype=xp.int32)
+
+        # Create sparse matrix from the selected entries
+        self.A_inv = sp.sparse.coo_matrix(
+            (data_array, (row_array, col_array)), shape=(n, n)
+        ).tocsr()
 
         return self.A_inv
 
     def _structured_to_spmatrix(
         self, A: sp.sparse.spmatrix, **kwargs
     ) -> sp.sparse.spmatrix:
-        B = A.tocoo()
-        B.data = self.A_inv[B.row, B.col]
+        """Convert the A_inv matrix to a sparse matrix masked using the given sparsity pattern A.
 
-        return B
+        Extracts entries from self.A_inv at positions specified by the non-zero pattern of A,
+        maintaining sparsity throughout the operation.
+
+        Parameters
+        ----------
+        A : sp.sparse.spmatrix
+            Sparse matrix defining the sparsity pattern to extract.
+
+        Returns
+        -------
+        sp.sparse.spmatrix
+            Sparse matrix with values from A_inv at positions matching A's pattern.
+        """
+
+        B = A.tocoo()
+        # Extract values from A_inv using element-wise indexing
+        B.data = xp.array(
+            [float(self.A_inv[int(r), int(c)]) for r, c in zip(B.row, B.col)]
+        )
+        return B.tocsr()
 
     def get_solver_memory(self) -> int:
         """Return the memory used by the solver in number of bytes"""
