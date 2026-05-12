@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
     # Configurations of DALIA
     dalia_dict = {
-        "solver": {"type": "scipy"},
+        "solver": {"type": "dense"},
         "minimize": {
             "max_iter": args.max_iter,
             "gtol": 1e-3,
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     print_msg("Internal Covariance of theta:\n", results["cov_theta_internal"])
     print_msg(
         "Mean of the fixed effects:\n",
-        results["x"][-model.submodels[-1].n_fixed_effects :],
+        get_host(results["x"][-model.submodels[-1].n_fixed_effects :]),
     )
 
     print_msg("\n--- Comparisons ---")
@@ -98,14 +98,14 @@ if __name__ == "__main__":
     theta_ref = np.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
     print_msg(
         "Norm (theta - theta_ref):        ",
-        f"{np.linalg.norm(results['theta_internal'] - get_host(theta_ref)):.4e}",
+        f"{np.linalg.norm(get_host(results['theta_internal']) - get_host(theta_ref)):.4e}",
     )
 
     # Compare latent parameters
     x_ref = np.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
     print_msg(
         "Norm (x - x_ref):                ",
-        f"{np.linalg.norm(results['x'] - get_host(x_ref)):.4e}",
+        f"{np.linalg.norm(get_host(results['x']) - get_host(x_ref)):.4e}",
     )
 
     # Compare marginal variances of latent parameters
