@@ -27,6 +27,8 @@ if __name__ == "__main__":
     path_inputs.mkdir(parents=True, exist_ok=True)
     path_reference.mkdir(parents=True, exist_ok=True)
 
+    save_precision_matrices: bool = False
+
     # 1. Generate random Z matrix
     z = np.random.rand(n_features, n_annotations_per_features)
 
@@ -99,9 +101,11 @@ if __name__ == "__main__":
 
     # Save BRAINIAC references
     np.save(path_reference / "theta.npy", theta)
-    sp.save_npz(path_reference / "Q_prior.npz", Q_prior)
     np.save(path_reference / "beta.npy", beta)
-    if model_format == "dense":
-        np.save(path_reference / "Q_conditional.npy", Q_conditional)
-    elif model_format == "sparse":
-        sp.save_npz(path_reference / "Q_conditional.npz", Q_conditional)
+
+    if save_precision_matrices:
+        sp.save_npz(path_reference / "Q_prior.npz", Q_prior)
+        if model_format == "dense":
+            np.save(path_reference / "Q_conditional.npy", Q_conditional)
+        elif model_format == "sparse":
+            sp.save_npz(path_reference / "Q_conditional.npz", Q_conditional)
