@@ -32,7 +32,7 @@ class SubModelConfig(BaseModel, ABC):
 
 
 class RegressionSubModelConfig(SubModelConfig):
-    n_fixed_effects: Annotated[int, Field(strict=True, ge=1)] = 1
+    n_fixed_effects: Annotated[int | None, Field(strict=True, ge=1)] = None
     fixed_effects_prior_precision: float = 0.001
 
     def read_hyperparameters(self):
