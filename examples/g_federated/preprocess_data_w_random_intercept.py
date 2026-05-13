@@ -1,5 +1,3 @@
-## preprocess data to add random intercept for each hospital
-
 # load .csv dataframe and save everything in DALIA suitable format
 
 import os
@@ -15,9 +13,9 @@ def construct_site_data(
     intercept_mode: str = "none",
     hospital_order: list | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
-    # mortality is the response variable y, all remaining non-hospital columns are covariates X
-    y = df["mortality"].to_numpy()
-    x_cov = df.drop(columns=["mortality", "hospital"]).to_numpy()
+    # stress is the response variable y, all remaining non-hospital columns are covariates X
+    y = df["stress"].to_numpy()
+    x_cov = df.drop(columns=["stress", "hospital"]).to_numpy()
 
     if intercept_mode == "global":
         x_regression = np.hstack((np.ones((x_cov.shape[0], 1)), x_cov))
@@ -52,13 +50,6 @@ def build_site_intercept_projection_matrix(
     """Build a site-specific intercept projection matrix A.
 
     A[i, j] = 1 if observation y_i belongs to hospital j, otherwise 0.
-
-    Returns
-    -------
-    A : np.ndarray
-        Binary matrix of shape (n_observations, n_hospitals).
-    hospitals : list
-        Ordered hospital labels corresponding to the columns of A.
     """
     if hospital_order is None:
         hospitals = sorted(df[hospital_column].unique().tolist())
@@ -96,8 +87,8 @@ def save_dataset(
 
 
 ### load .csv file
-data_type = "trauma"
-family = "binomial"
+data_type = "nurses_hom"
+family = "gaussian"
 
 folder_path = "/Users/lisa/icloud/uni/repositories/federated_learning/confeR/paper/data/summarized"
 file_path = os.path.join(folder_path, f"data_{data_type}_{family}.csv")
@@ -116,6 +107,7 @@ joint_folder_site_specific = (
     current_dir / f"joint_{data_type}_{family}_site_specific_intercept"
 )
 hospital_values = sorted(data["hospital"].unique().tolist())
+
 y_joint_global, x_joint_global_regression, x_joint_global_generic = construct_site_data(
     data,
     intercept_mode="global",
@@ -167,7 +159,6 @@ split_root_site_specific = (
 for idx, hospital in enumerate(hospital_values, start=1):
     row_positions = np.flatnonzero(data["hospital"].to_numpy() == hospital)
 
-    # Global-intercept split dataset
     y_h_global = y_joint_global[row_positions]
     x_h_global_regression = x_joint_global_regression[row_positions, :]
     hospital_dir_global = split_root_global / f"hospital_{idx}"
@@ -179,7 +170,6 @@ for idx, hospital in enumerate(hospital_values, start=1):
         f"Saved global hospital_{idx} ({hospital}) regression X to {hospital_dir_global / 'inputs_regression' / 'a.npy'} with shape {x_h_global_regression.shape}"
     )
 
-    # Site-specific-intercept split dataset
     y_h_site = y_joint_site_specific[row_positions]
     x_h_site_regression = x_joint_regression[row_positions, :]
     x_h_site_generic = None

@@ -1,10 +1,6 @@
 import os
 import sys
 
-import numpy as np
-import pandas as pd
-
-from dalia import xp
 from dalia.configs import (
     dalia_config,
     likelihood_config,
@@ -14,7 +10,7 @@ from dalia.configs import (
 from dalia.core.dalia import DALIA
 from dalia.core.model import Model
 from dalia.models.federated_model import FederatedModel
-from dalia.submodels import RegressionSubModel
+from dalia.submodels import GenericSubModel, RegressionSubModel
 from dalia.utils import print_msg
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -29,9 +25,17 @@ if __name__ == "__main__":
     # Check for parsed parameters
     args = parse_args()
 
+    # random site-specific intercept
+    random_intercept = True
+
     data_type = "trauma"
     family = "binomial"
-    split_folder = f"split_{data_type}_{family}"
+    if random_intercept:
+        n_fixed_effects = 4  # no global intercept, only covariates
+        split_folder = f"split_{data_type}_{family}_site_specific_intercept"
+    else:
+        n_fixed_effects = 5  # includes global intercept
+        split_folder = f"split_{data_type}_{family}_global_intercept"
 
     split_root = os.path.join(BASE_DIR, split_folder)
     hospital_dirs = [
@@ -45,19 +49,32 @@ if __name__ == "__main__":
         regression_dict = {
             "type": "regression",
             "input_dir": f"{hospital_dir}/inputs_regression",
-            "n_fixed_effects": 5,
-            "fixed_effects_prior_precision": 0.001,
+            "n_fixed_effects": n_fixed_effects,
+            "fixed_effects_prior_precision": 0.1,
         }
         regression = RegressionSubModel(
             config=submodels_config.parse_config(regression_dict),
         )
+
+        submodels = [regression]
+        if random_intercept:
+            generic_dict = {
+                "type": "generic",
+                "input_dir": f"{hospital_dir}/inputs_generic",
+                "tau": 4,
+                "ph_tau": {"type": "gamma", "alpha": 1.0, "beta": 1e-5},
+            }
+            generic = GenericSubModel(
+                config=submodels_config.parse_config(generic_dict),
+            )
+            submodels = [generic, regression]
 
         likelihood_dict = {
             "type": "binomial",
             "input_dir": hospital_dir,
         }
         model_local = Model(
-            submodels=[regression],
+            submodels=submodels,
             likelihood_config=likelihood_config.parse_config(likelihood_dict),
         )
         models.append(model_local)
@@ -94,50 +111,14 @@ if __name__ == "__main__":
         config=dalia_config.parse_config(dalia_dict),
     )
 
-    # theta_ref = xp.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
-    # x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
-
     results = dalia.run()
 
     print_msg("\n--- Results ---")
     fixed_effects_mean = results["x"][-federated_model.n_fixed_effects :]
-    print_msg(
-        "Mean of the fixed effects:\n",
-        fixed_effects_mean,
-    )
+    print_msg("Mean of the fixed effects:\n", fixed_effects_mean)
 
-    # # Compare marginal variances of latent parameters
-    var_latent_params = results["marginal_variances_latent"]
-    fixed_effects_var = var_latent_params[-federated_model.n_fixed_effects :]
-    fixed_effects_sd = np.sqrt(fixed_effects_var)
-    ci_lower = fixed_effects_mean - 1.96 * fixed_effects_sd
-    ci_upper = fixed_effects_mean + 1.96 * fixed_effects_sd
-
-    # store parameters in matching format as needed in R
-    # make dataframe with columns:
-    # - lower (2.5% quantile)
-    # - upper (97.5% quantile)
-    # - mean (mean of the fixed effect)
-    # - Method (DALIA)
-    # - covariate (intercept), gender, age, ISS, GCS
-
-    df_dalia = pd.DataFrame(
-        {
-            "lower": ci_lower,
-            "upper": ci_upper,
-            "Estimate": fixed_effects_mean,
-            "Method": "DALIA-FED",
-            "Covariate": [
-                "(Intercept)",
-                "sex",
-                "age",
-                "ISS",
-                "GCS",
-            ],
-        }
-    )
-    df_dalia.to_csv(f"{BASE_DIR}/dalia_summary_{data_type}.csv", index=False)
-
-    print_msg(df_dalia)
+    if random_intercept:
+        n_random = models[0].submodels[0].n_latent_parameters
+        print_msg("Mean of the random intercepts:\n", results["x"][:n_random])
 
     print_msg("\n--- Finished ---")
