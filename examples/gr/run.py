@@ -113,7 +113,10 @@ if __name__ == "__main__":
     )
 
     # Compare marginal variances of observations
-    var_obs = dalia.get_marginal_variances_observations(theta_external=theta_ref, x_star=x_ref)
+    var_obs = dalia.get_marginal_variances_observations(
+        theta_external=theta_ref, x_star=x_ref
+    )
+
     var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
     print_msg(
         "Norm (var_obs - var_obs_ref):    ",
@@ -126,7 +129,7 @@ if __name__ == "__main__":
     fig, axes = plot_marginal_distributions_hp(marginals_hp)
     import matplotlib.pyplot as plt
     plt.savefig(f"gr_marginal_distributions_hp.png")
-    
+
     prec_obs = marginals_hp['hyperparameters']['prec_o']
     quantile_pairs = prec_obs['quantiles']['external']['pairs']
 

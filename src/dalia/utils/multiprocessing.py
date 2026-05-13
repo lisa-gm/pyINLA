@@ -263,6 +263,14 @@ def check_vector_consistency(
     """
     synchronize(comm = comm)
 
+    # A vector might for some models be passed as a scalar, or simply a list
+    # . In these cases we convert it to an array for the consistency check.
+    if value is not None:
+        if not isinstance(value, list):
+            value = xp.array([value])
+        elif not isinstance(value, xp.ndarray):
+            value = xp.array(value)
+
     value_ref = value.copy()
 
     bcast(data=value_ref[:], root=0, comm=comm)
@@ -275,7 +283,7 @@ def check_vector_consistency(
             raise ValueError(
                 f"Process {comm.Get_rank()} has a different {flag} than the reference process with a norm of the difference of {norm_diff:.4e}."
             )
-        
+
         diff_indices = xp.where(value != value_ref)[0]
         if verbose == "Minimal":
             # Only print the first 5 differences, make sure it's 5 or the max number of differences
