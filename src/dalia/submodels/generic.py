@@ -25,7 +25,7 @@ class GenericSubModel(SubModel):
         # accept sparse or dense input for the precision matrix
         try:
             q: spmatrix = load_npz(self.input_path.joinpath("q.npz"))
-            self.q = sp.sparse.csc_matrix(q)
+            self.q = sp.sparse.coo_matrix(q)
         except FileNotFoundError:
             # check if dense q matrix exists
             try:
@@ -54,7 +54,7 @@ class GenericSubModel(SubModel):
         tau = kwargs.get("tau")
         self.Q_prior = tau * self.q
 
-        return self.Q_prior.tocoo()
+        return self.Q_prior
 
     def __str__(self) -> str:
         """String representation of the submodel."""
