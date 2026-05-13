@@ -3,6 +3,9 @@ import sys
 
 import numpy as np
 
+from pathlib import Path
+
+
 from dalia import xp, sp
 from dalia.configs import dalia_config, likelihood_config, submodels_config
 from dalia.core.dalia import DALIA
@@ -18,7 +21,9 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
 from examples_utils.parser_utils import parse_args  # noqa: E402
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = Path(__file__).resolve().parent / "synthetic_data"
+
 
 if __name__ == "__main__":
     print_msg("--- Example: Bee Genomics  ---")
@@ -53,7 +58,6 @@ if __name__ == "__main__":
     regression_dict = {
         "type": "regression",
         "input_dir": f"{BASE_DIR}/inputs_fixed_effects",
-        "n_fixed_effects": 761,
         "fixed_effects_prior_precision": 0.001,
     }
     regression = RegressionSubModel(
@@ -72,36 +76,6 @@ if __name__ == "__main__":
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
     )
     print_msg(model)
-
-    # load theta reference and set theta_internal to reference values
-    theta_ref_internal = xp.load(f"{BASE_DIR}/reference_outputs/theta_internal.npy")
-    model.theta_internal = theta_ref_internal
-    print_msg("Loaded theta_internal reference:", theta_ref_internal)
-
-    # construct Qprior
-    q_prior = model.construct_Q_prior()
-    print_msg("Constructed Q_prior with shape:", q_prior.shape)
-    print_msg("qprior[:5, :5]:\n", q_prior[:5, :5].toarray())
-
-    # construct Q_conditional using x_reference
-    x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x.npy")
-    eta_ref = model.a @ x_ref
-    q_conditional = model.construct_Q_conditional(eta=eta_ref)
-    print_msg("Constructed Q_conditional with shape:", q_conditional.shape)
-    print_msg("qconditional[:5, :5]:\n", q_conditional[:5, :5])
-
-    q_prior_ref = sp.sparse.load_npz(f"{BASE_DIR}/reference_outputs/qprior.npz")
-    q_conditional_ref = sp.sparse.load_npz(f"{BASE_DIR}/reference_outputs/qcond.npz")
-
-    diff = xp.linalg.norm(q_prior.toarray() - q_prior_ref.toarray())
-    print_msg(
-        f"Norm of difference between constructed Q_prior and reference: {diff:.4e}"
-    )
-
-    diff = xp.linalg.norm(q_conditional - q_conditional_ref.toarray())
-    print_msg(
-        f"Norm of difference between constructed Q_conditional and reference: {diff:.4e}"
-    )
 
     # Configurations of DALIA
     dalia_dict = {
@@ -123,6 +97,10 @@ if __name__ == "__main__":
 
     results = dalia.run()
 
+    # load theta reference and set theta_internal to reference values
+    theta_ref_internal = xp.load(f"{BASE_DIR}/reference_outputs/theta_internal.npy")
+    x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x.npy")
+
     print_msg("\n--- Results ---")
     print_msg("theta reference internal:\n", theta_ref_internal)
     print_msg("Theta values external:\n", results["theta"])
@@ -143,8 +121,8 @@ if __name__ == "__main__":
 
     # Compare latent parameters
     print_msg(
-        "Norm (x - x_ref):                ",
-        f"{xp.linalg.norm(results['x'] - x_ref):.4e}",
+        "Norm (x - x_ref)/Norm(x_ref):                ",
+        f"{xp.linalg.norm(results['x'] - x_ref) / xp.linalg.norm(x_ref):.4e}",
     )
 
     # Compare marginal variances of latent parameters
@@ -156,23 +134,8 @@ if __name__ == "__main__":
         f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
     )
 
-    # Compare marginal variances of observations
-    var_obs = dalia.get_marginal_variances_observations(
-        theta_external=model.theta_external, x_star=x_ref
-    )
-    var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
-    print_msg(
-        "Norm (var_obs - var_obs_ref):    ",
-        f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
-    )
-
     print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp()
-
-    fig, axes = plot_marginal_distributions_hp(marginals_hp)
-    import matplotlib.pyplot as plt
-
-    plt.savefig(f"gr_marginal_distributions_hp.png")
 
     prec_obs = marginals_hp["hyperparameters"]["prec_o"]
     quantile_pairs = prec_obs["quantiles"]["external"]["pairs"]
