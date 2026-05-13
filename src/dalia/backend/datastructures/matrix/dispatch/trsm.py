@@ -8,7 +8,7 @@ from scipy.linalg.blas import get_blas_funcs
 from scipy.linalg._misc import _datacopied
 from scipy.linalg._decomp import _asarray_validated
 
-from dalia import cupy_version
+from dalia.backend.config import cupy_version
 
 if cupy_version is not None:
     import cupy as cp

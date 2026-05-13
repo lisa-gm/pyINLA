@@ -146,10 +146,10 @@ class Matrix(ABC):
         """Set hardware target for the matrix data
 
         Args:
-            hw_target (str): 'host' or 'accelerator'
+            hw_target (str): 'host' or if supported by the system: 'accelerator'.
         """
-        self._data, self._hw_target = settarget(self._data, hw_target)
-        
+        if self._hw_target != hw_target:
+            self._data, self._hw_target = settarget(self._data, hw_target)
 
     # 5. Comparison operators (if needed)
 
@@ -300,44 +300,6 @@ class Matrix(ABC):
             array([[1, 2]])
         """
         return toarray(self._data)
-    
-    def tohost(self):
-        """Transfer Matrix to host
-        
-        This method provides explicit transfer of data from anywhere to the host.
-
-        When to use:
-            - Necessary relocation to host
-            - Contingency to ensure location on host
-        
-        Returns:
-            Matrix with data on host
-        """
-        if self._hw_target == "host":
-            return self
-        else:
-            self._data = tohost(self._data)
-            self._hw_target = "host"
-            return self
-
-    def toaccelerator(self):
-        """Transfer Matrix to accelerator
-        
-        This method provides explicit transfer of data from anywhere to an accelerator.
-
-        When to use:
-            - Necessary relocation to accelerator
-            - Contingency to ensure location on accelerator
-        
-        Returns:
-            Matrix with data on accelerator
-        """
-        if self._hw_target == "accelerator":
-            return self
-        else:
-            self._data = toaccelerator(self._data)
-            self._hw_target = "accelerator"
-            return self
 
     # 11. Private/protected methods (start with _)
     def _wrap_result(self, data):

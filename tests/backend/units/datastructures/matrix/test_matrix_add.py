@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from dalia import cupy_version
+from dalia.backend.config import cupy_version
 from dalia.backend.datastructures import DenseMatrix, SparseMatrix
 
 if cupy_version is not None:

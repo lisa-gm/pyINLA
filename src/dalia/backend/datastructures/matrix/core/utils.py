@@ -1,7 +1,7 @@
 # src/dalia/backend/datastructures/matrix/core/utils.py
 import numpy as np
 import scipy.sparse as sp
-from dalia import cupy_version, target_list
+from dalia.backend.config import cupy_version, target_list
 
 
 if cupy_version is not None:

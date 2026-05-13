@@ -1,8 +1,8 @@
 # src/dalia/backend/datastructures/matrix/core/sparse.py
 import numpy as np
 import scipy.sparse as sp
-from dalia import cupy_version
-# TODO: Change this to use flags instead of try
+from dalia.backend.config import cupy_version
+
 if cupy_version is not None:
     import cupy as cp
     import cupyx.scipy.sparse as cu_sp

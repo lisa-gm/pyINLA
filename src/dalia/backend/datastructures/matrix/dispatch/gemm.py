@@ -9,7 +9,7 @@ from scipy.linalg._misc import _datacopied
 from scipy.linalg._decomp import _asarray_validated
 
 
-from dalia import cupy_version
+from dalia.backend.config import cupy_version
 
 # TODO: Change this to use flags instead of try
 if cupy_version is not None:

@@ -1,11 +1,96 @@
 
-default_hw_target = None
+default_hw_target = "host"
+memory_regime = "auto"
+cupy_version = None
+target_list = ["host"]
+regime_list = ["auto", "manual"]
+
+def check_cupy_availability():
+    """Check if CuPy is available.
+    
+    Returns:
+        str or None: The version of CuPy if available, otherwise None.
+    """
+    global cupy_version
+    try:
+        import cupy
+         
+        cupy_version= cupy.__version__
+
+        global target_list
+        if "accelerator" not in target_list:
+            target_list.append("accelerator")
+    except ImportError:
+        pass
+    return cupy_version
 
 def set_default_hw_target(hw_target):
-    """Detect the default hardware target based on the availability of cupy."""
+    """Set the default hardware target.
+
+    'host' will use the CPU and 'accelerator' will use an accelerator like a GPU if available. 
+    If 'accelerator' is selected but not available, it will raise an error.
+    
+    Args:
+        hw_target (str): 'host' or if supported by the system: 'accelerator'.
+
+    Returns:
+        str: The set hardware target.
+
+    Raises:
+        ValueError: If an invalid hardware target is provided.
+    """
+    global default_hw_target
+    global target_list
+    
+    if hw_target not in target_list:
+        raise ValueError(f"Invalid hardware target type '{hw_target}'. Supported target types are {target_list}.")
     default_hw_target = hw_target
     return default_hw_target
 
+def set_memory_regime(regime):
+    """Set the memory regime for the backend.
+
+    Automatic memory management ('auto') will try to calculate everything on the accelerator,
+    as long as there is enough memory available. If ther isn't enough memory, it will fall back to the host.
+
+    Manual memorry management ('manual') will determine the calcualtion location based on the left operand.
+    
+    Args:
+        regime (str): 'auto' for automatic memory management, 'manual' for user-controlled memory management.
+
+    Returns:
+        str: The set memory regime.
+
+    Raises:
+        ValueError: If an invalid memory regime is provided.
+    """
+    global regime_list
+    if regime not in regime_list: 
+        raise ValueError(f"Invalid memory regime. Supported regimes are {regime_list}.")
+    global memory_regime 
+    memory_regime = regime
+    return memory_regime
+
 __all__ = [
     "default_hw_target",
+    "memory_regime",
+    "cupy_version",
+    "target_list",
 ]
+
+
+"""
+pip install GPUtil pyamdgpuinfo
+
+try:
+    import GPUtil
+
+    gpus = GPUtil.getGPUs()
+
+    for gpu in gpus:
+        print(f"{gpu.name}: {gpu.memoryTotal} MB")
+
+except Exception:
+    pass
+
+"""
