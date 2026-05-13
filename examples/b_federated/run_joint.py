@@ -28,7 +28,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     # random site-specific intercept
-    random_intercept = True
+    random_intercept = False  # True
 
     data_type = "trauma"
     family = "binomial"
@@ -45,7 +45,7 @@ if __name__ == "__main__":
         "type": "regression",
         "input_dir": f"{BASE_DIR}/{joint_folder}/inputs_regression",
         "n_fixed_effects": n_fixed_effects,
-        "fixed_effects_prior_precision": 0.001,
+        "fixed_effects_prior_precision": 0.1,
     }
     regression = RegressionSubModel(
         config=submodels_config.parse_config(regression_dict),
@@ -70,7 +70,7 @@ if __name__ == "__main__":
         )
 
         model = Model(
-            submodels=[regression, generic],
+            submodels=[generic, regression],
             likelihood_config=likelihood_config.parse_config(likelihood_dict),
         )
     else:
@@ -111,37 +111,88 @@ if __name__ == "__main__":
         "Mean of the fixed effects:\n",
         fixed_effects_mean,
     )
+    if random_intercept:
+        print_msg(
+            "Mean of the random intercepts:\n",
+            results["x"][: model.submodels[0].n_latent_parameters :],
+        )
 
     # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
-    fixed_effects_var = var_latent_params[-model.n_fixed_effects :]
-    fixed_effects_sd = np.sqrt(fixed_effects_var)
-    ci_lower = fixed_effects_mean - 1.96 * fixed_effects_sd
-    ci_upper = fixed_effects_mean + 1.96 * fixed_effects_sd
+    marginals_hp = dalia.marginal_distributions_hp()
 
-    # store parameters in matching format as needed in R
-    # make dataframe with columns:
-    # - lower (2.5% quantile)
-    # - upper (97.5% quantile)
-    # - mean (mean of the fixed effect)
-    # - Method (DALIA)
-    # - covariate (intercept), gender, age, ISS, GCS
+    if random_intercept:
+        n_random = model.submodels[0].n_latent_parameters
+        random_effects_mean = results["x"][:n_random]
+        random_sd = np.sqrt(var_latent_params[:n_random])
+        random_ci_lower = random_effects_mean - 1.96 * random_sd
+        random_ci_upper = random_effects_mean + 1.96 * random_sd
 
-    df_dalia = pd.DataFrame(
-        {
-            "lower": ci_lower,
-            "upper": ci_upper,
-            "Estimate": fixed_effects_mean,
-            "Method": "DALIA",
-            "Covariate": [
-                "(Intercept)",
-                "sex",
-                "age",
-                "ISS",
-                "GCS",
-            ],
-        }
-    )
+        fixed_sd = np.sqrt(
+            var_latent_params[n_random : n_random + model.n_fixed_effects]
+        )
+        fixed_covariates = ["sex", "age", "ISS", "GCS"]
+        random_covariates = [f"site_intercept_{idx}" for idx in range(1, n_random + 1)]
+
+        tau_idx = list(model.theta_keys).index("tau")
+        tau_estimate = float(results["theta"][tau_idx])
+        tau_quantile_pairs = marginals_hp["hyperparameters"]["tau"]["quantiles"][
+            "external"
+        ]["pairs"]
+        tau_ci_lower = float(tau_quantile_pairs[0][1])
+        tau_ci_upper = float(tau_quantile_pairs[-1][1])
+        tau_rows = [
+            {
+                "Estimate": tau_estimate,
+                "lower": tau_ci_lower,
+                "upper": tau_ci_upper,
+                "Method": "DALIA",
+                "Covariate": "precision_random_intercept",
+            }
+        ]
+    else:
+        fixed_sd = np.sqrt(var_latent_params[: model.n_fixed_effects])
+        fixed_covariates = ["(Intercept)", "sex", "age", "ISS", "GCS"]
+        random_effects_mean = np.array([])
+        random_ci_lower = np.array([])
+        random_ci_upper = np.array([])
+        random_covariates = []
+        tau_rows = []
+
+    fixed_ci_lower = fixed_effects_mean - 1.96 * fixed_sd
+    fixed_ci_upper = fixed_effects_mean + 1.96 * fixed_sd
+
+    summary_rows = []
+
+    for covariate, lower, upper, estimate in zip(
+        fixed_covariates, fixed_ci_lower, fixed_ci_upper, fixed_effects_mean
+    ):
+        summary_rows.append(
+            {
+                "Estimate": estimate,
+                "lower": lower,
+                "upper": upper,
+                "Method": "DALIA",
+                "Covariate": covariate,
+            }
+        )
+
+    for covariate, lower, upper, estimate in zip(
+        random_covariates, random_ci_lower, random_ci_upper, random_effects_mean
+    ):
+        summary_rows.append(
+            {
+                "lower": lower,
+                "upper": upper,
+                "Estimate": estimate,
+                "Method": "DALIA",
+                "Covariate": covariate,
+            }
+        )
+
+    summary_rows.extend(tau_rows)
+
+    df_dalia = pd.DataFrame(summary_rows)
     df_dalia.to_csv(f"{BASE_DIR}/dalia_summary_{data_type}_joint.csv", index=False)
     print_msg(df_dalia)
 

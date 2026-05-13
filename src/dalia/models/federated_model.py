@@ -1,8 +1,5 @@
 # Copyright 2024-2026 DALIA authors. All rights reserved.
 
-import re
-
-import numpy as np
 from tabulate import tabulate
 
 from dalia import ArrayLike, NDArray, sp, xp
@@ -12,14 +9,10 @@ from dalia.core.prior_hyperparameters import PriorHyperparameters
 from dalia.prior_hyperparameters import (
     GaussianMVNPriorHyperparameters,
 )
-from dalia.submodels import RegressionSubModel
-from dalia.submodels.brainiac import BrainiacSubModel
 from dalia.utils import (
     add_str_header,
     align_tables_side_by_side,
-    bdiag_tiling,
     boxify,
-    free_unused_gpu_memory,
 )
 from dalia.utils.scalar_ndarray import ensure_scalar
 
@@ -36,10 +29,8 @@ class FederatedModel(Model):
         """Initializes the model."""
         self.models: list[Model] = models
 
-        # Check the federated type (for now only regression)
+        # Federated model over structurally identical local models
         self.federated_type = "regression"
-        ## need to check that all submodels have the same number of fixed effects
-        ## as they are all estimating the same parameters (for now, later allow custom)
 
         self.n_models: int = federated_model_config.n_models
         assert self.n_models == len(
@@ -48,13 +39,14 @@ class FederatedModel(Model):
 
         # simply set theta according to first model
         first_model = self.models[0]
-        if len(first_model.submodels) != 1:
-            raise ValueError("Only one submodel per model is allowed for now.")
-        if not isinstance(first_model.submodels[0], RegressionSubModel):
-            raise ValueError("For now only regression submodels are allowed.")
 
-        self.n_fixed_effects = first_model.submodels[0].n_fixed_effects
-        ref_submodel_type = type(first_model.submodels[0])
+        self.n_fixed_effects = first_model.n_fixed_effects
+        ref_n_submodels = len(first_model.submodels)
+        ref_submodel_types = [type(submodel) for submodel in first_model.submodels]
+        ref_latent_parameters_idx = list(first_model.latent_parameters_idx)
+        ref_hyperparameters_idx = list(first_model.hyperparameters_idx)
+        ref_theta_keys = list(first_model.theta_keys)
+        ref_likelihood_type = type(first_model.likelihood)
         ref_n_latent_parameters = first_model.n_latent_parameters
         ref_n_hyperparameters = first_model.n_hyperparameters
 
@@ -74,20 +66,25 @@ class FederatedModel(Model):
         self.n_observations: int = 0
         self.n_observations_idx: list[int] = [0]
 
-        ## need to check that all models have the same type of submodel and the same size of submodel
-        ## needs to be regression for now
+        ## ensure all local models have the same structure
         for i, model in enumerate(self.models):
-            if len(model.submodels) != 1:
+            if len(model.submodels) != ref_n_submodels:
                 raise ValueError(
-                    f"Model {model} has more than one submodel. Only one submodel per model is allowed for now."
+                    f"Model {i} has a different number of submodels. "
+                    f"Expected {ref_n_submodels}, got {len(model.submodels)}."
                 )
-            if type(model.submodels[0]) is not ref_submodel_type:
+
+            model_submodel_types = [type(submodel) for submodel in model.submodels]
+            if model_submodel_types != ref_submodel_types:
                 raise ValueError(
-                    f"Model {model} has a different submodel type. Expected {ref_submodel_type.__name__}, got {type(model.submodels[0]).__name__}."
+                    f"Model {i} has different submodel types/order than the reference model. "
+                    f"Expected {[t.__name__ for t in ref_submodel_types]}, got {[t.__name__ for t in model_submodel_types]}."
                 )
-            if self.n_fixed_effects != model.submodels[0].n_fixed_effects:
+
+            if self.n_fixed_effects != model.n_fixed_effects:
                 raise ValueError(
-                    f"Model {model} has a different number of fixed effects than allowed. Expected {self.n_fixed_effects}, got {model.submodels[0].n_fixed_effects}."
+                    f"Model {i} has a different number of fixed effects. "
+                    f"Expected {self.n_fixed_effects}, got {model.n_fixed_effects}."
                 )
 
             if model.n_latent_parameters != ref_n_latent_parameters:
@@ -102,12 +99,36 @@ class FederatedModel(Model):
                     f"Expected {ref_n_hyperparameters}, got {model.n_hyperparameters}."
                 )
 
+            if list(model.latent_parameters_idx) != ref_latent_parameters_idx:
+                raise ValueError(
+                    f"Model {i} has different latent parameter block indices. "
+                    f"Expected {ref_latent_parameters_idx}, got {list(model.latent_parameters_idx)}."
+                )
+
+            if list(model.hyperparameters_idx) != ref_hyperparameters_idx:
+                raise ValueError(
+                    f"Model {i} has different hyperparameter block indices. "
+                    f"Expected {ref_hyperparameters_idx}, got {list(model.hyperparameters_idx)}."
+                )
+
+            if list(model.theta_keys) != ref_theta_keys:
+                raise ValueError(
+                    f"Model {i} has different theta_keys/order. "
+                    f"Expected {ref_theta_keys}, got {list(model.theta_keys)}."
+                )
+
+            if type(model.likelihood) is not ref_likelihood_type:
+                raise ValueError(
+                    f"Model {i} has a different likelihood type. "
+                    f"Expected {ref_likelihood_type.__name__}, got {type(model.likelihood).__name__}."
+                )
+
             # would be best if number of observations could be kept private to each model?
             # but I also need it to weight the contributions
             self.n_observations += model.n_observations
             self.n_observations_idx.append(self.n_observations)
 
-        self.n_latent_parameters = self.n_fixed_effects
+        self.n_latent_parameters = ref_n_latent_parameters
 
         # private to each model: self.model.y, self.model.a
         # self.model.x shared across all
@@ -115,7 +136,7 @@ class FederatedModel(Model):
         self.y: NDArray = xp.zeros(self.n_observations)
 
         ### for compatibility initialize dummy a
-        self.a = sp.sparse.csc_matrix((self.n_observations, self.n_fixed_effects))
+        self.a = sp.sparse.csc_matrix((self.n_observations, self.n_latent_parameters))
 
         # set them to none to make sure they are not used
         for model in self.models:
