@@ -57,7 +57,7 @@ def blas_dispatch(operation: Operation, left, right):
     return dispatch_func(left, right, left_type, right_type, left_hw_target)
 
 def _hw_target_handler(data, hw_target, matrix_type):
-    # Moves data to other hw_target
+    # Moves data to hw_target
     if hw_target == "accelerator":
         if matrix_type == "sparse":
             return cu_sp.csr_matrix(data)

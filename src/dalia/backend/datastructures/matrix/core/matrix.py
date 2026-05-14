@@ -117,7 +117,7 @@ class Matrix(ABC):
 
         if data.dtype.char not in 'fdFD':
             raise TypeError(f"Unsupported data type '{data.dtype}'. Only float32 and float64 are supported.")
-        
+
         data, hw_target = settarget(data, hw_target)
         
         self._hw_target = hw_target

@@ -21,7 +21,7 @@ if cupy_version is not None:
     EXTERNAL_SPARSE_TYPES.append("cupy_csc")
     EXTERNAL_SPARSE_TYPES.append("cupy_coo")
     INTERNAL_DEVICE_TYPES.append("accelerator")
-    MEMORY_REGIMES.append("auto")
+    # MEMORY_REGIMES.append("auto")
 
 
 
@@ -29,16 +29,16 @@ if cupy_version is not None:
 def matrix_factory():
     """Factory to create test matrices of different types"""
 
-    def _make_matrix(matrix_type, shape=(3, 3), data=None, device=None):
+    def _make_matrix(matrix_type, shape=(3, 3), data=None, hw_target=None):
         if data is None:
             data = np.arange(1, shape[0] * shape[1] + 1).reshape(shape)
             data = data.astype(np.float64)
 
         # Handle Internal types
         if matrix_type == "SparseMatrix":
-            return SparseMatrix(sp.csr_matrix(data, dtype=np.float64), device=device)
+            return SparseMatrix(sp.csr_matrix(data, dtype=np.float64), hw_target=hw_target)
         if matrix_type == "DenseMatrix":
-            return DenseMatrix(data, device=device)
+            return DenseMatrix(data, hw_target=hw_target)
 
         # Handle External types
         if matrix_type == "scipy_csr":

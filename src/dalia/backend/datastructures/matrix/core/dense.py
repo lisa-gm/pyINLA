@@ -2,6 +2,12 @@
 import scipy.sparse as sp
 
 from .matrix import Matrix
+from dalia.backend.config import default_hw_target, cupy_version
+
+import numpy as np
+if cupy_version is not None:
+    import cupy as cp
+    import cupyx.scipy.sparse as cu_sp
 
 
 class DenseMatrix(Matrix):
@@ -39,7 +45,8 @@ class DenseMatrix(Matrix):
     # 1. Class attributes (if any)
 
     # 2. Initialization
-    def __init__(self, data, device=None):
+    def __init__(self, data, hw_target=default_hw_target, force_order=True):
+        print(data.flags.f_contiguous)
         # Reject Matrix objects - use .copy() method instead
         if isinstance(data, Matrix):
             raise TypeError(
@@ -54,9 +61,26 @@ class DenseMatrix(Matrix):
                 "Use SparseMatrix instead, or convert to dense format first with "
                 "sparse_matrix.toarray()."
             )
+        
+        if isinstance(data, np.ndarray) and data.flags.c_contiguous and force_order:
+            data = np.asfortranarray(data)
+
+        
+        if cupy_version is not None:
+            if cu_sp.issparse(data):
+                raise TypeError(
+                    "Cannot create DenseMatrix from sparse matrix. "
+                    "Use SparseMatrix instead, or convert to dense format first with "
+                    "sparse_matrix.toarray()."
+                )
+            
+            if isinstance(data, cp.ndarray) and data.flags.c_contiguous and force_order:
+                data = cp.asfortranarray(data)
+            
+        
 
         # Initialize parent with dense array
-        super().__init__(data, device)
+        super().__init__(data, hw_target)
 
     # 3. Special representation methods
     # 4. Properties (grouped together)

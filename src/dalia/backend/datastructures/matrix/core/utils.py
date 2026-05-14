@@ -16,11 +16,11 @@ def wrap_result(data):
     from .sparse import SparseMatrix
 
     if isinstance(data, np.ndarray):
-        return DenseMatrix(data)
+        return DenseMatrix(data, force_order=False)  # Preserve original order
     if sp.issparse(data):
         return SparseMatrix(data)
     if isinstance(data, cp.ndarray):
-        return DenseMatrix(data)
+        return DenseMatrix(data, force_order=False)  # Preserve original order
     if cu_sp.issparse(data):
         return SparseMatrix(data)
     raise TypeError(f"Unknown matrix type: {type(data)}")
@@ -29,13 +29,13 @@ def wrap_result(data):
 def toarray(data):
     """Convert data to a dense numpy array"""
     if sp.issparse(data):
-        return data.toarray()
+        return data.toarray(order="C")
     if cupy_version is not None:
         if isinstance(data, cp.ndarray):
-            return cp.asnumpy(data)
+            return cp.asnumpy(data, order="C")
         if cu_sp.issparse(data):
-            return cp.asnumpy(data.toarray())
-    return np.asarray(data)  # Works for arrays and views
+            return cp.asnumpy(data.toarray(), order="C")
+    return np.asarray(data, order="C")  # Works for arrays and views
 
 
 def tohost(data):
