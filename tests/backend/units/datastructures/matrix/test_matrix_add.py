@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from dalia.backend.config import cupy_version
+from dalia.backend.config import cupy_version, set_memory_regime
 from dalia.backend.datastructures import DenseMatrix, SparseMatrix
 
 if cupy_version is not None:
@@ -13,7 +13,7 @@ if cupy_version is not None:
 
 from tests.backend import ATOLS, RTOLS
 
-from .conftest import EXTERNAL_DENSE_TYPES, EXTERNAL_SPARSE_TYPES, INTERNAL_DEVICE_TYPES
+from .conftest import EXTERNAL_DENSE_TYPES, EXTERNAL_SPARSE_TYPES, INTERNAL_DEVICE_TYPES, MEMORY_REGIMES
 
 # Test-specific: Expected results for add
 ADD_EXPECTED = {
@@ -30,7 +30,9 @@ class TestAddReturnTypes:
     # Tests __add__ for all combinations of internal and external types
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_add_sparse(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_add_sparse(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left + right
@@ -38,7 +40,9 @@ class TestAddReturnTypes:
 
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_add_dense(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_add_dense(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left + right
@@ -46,7 +50,9 @@ class TestAddReturnTypes:
 
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_add_dense(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_add_dense(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left + right
@@ -54,7 +60,9 @@ class TestAddReturnTypes:
 
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_add_sparse(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_add_sparse(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left + right
@@ -63,7 +71,9 @@ class TestAddReturnTypes:
     # Tests __radd__ for all combinations of internal and external types
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_radd_sparse(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_radd_sparse(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", device=device)
         result = left + right
@@ -71,7 +81,9 @@ class TestAddReturnTypes:
 
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_radd_sparse(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_radd_sparse(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", device=device)
         result = left + right
@@ -79,7 +91,9 @@ class TestAddReturnTypes:
 
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_radd_dense(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_radd_dense(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", device=device)
         result = left + right
@@ -87,7 +101,9 @@ class TestAddReturnTypes:
 
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_radd_dense(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_radd_dense(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", device=device)
         result = left + right
@@ -100,7 +116,9 @@ class TestAddCorrectness:
     # Tests __add__ for all combinations of internal and external types
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_add_sparse(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_add_sparse(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left + right
@@ -114,7 +132,9 @@ class TestAddCorrectness:
 
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_add_dense(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_add_dense(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left + right
@@ -131,7 +151,9 @@ class TestAddCorrectness:
 
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_add_dense(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_add_dense(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left + right
@@ -148,7 +170,9 @@ class TestAddCorrectness:
 
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_add_sparse(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_add_sparse(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left + right
@@ -163,7 +187,9 @@ class TestAddCorrectness:
     # Tests __radd__ for all combinations of internal and external types
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_radd_sparse(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_radd_sparse(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", device=device)
         result = left + right
@@ -177,7 +203,9 @@ class TestAddCorrectness:
 
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_radd_sparse(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_radd_sparse(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", device=device)
         result = left + right
@@ -194,7 +222,9 @@ class TestAddCorrectness:
 
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_radd_dense(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_radd_dense(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", device=device)
         result = left + right
@@ -211,7 +241,9 @@ class TestAddCorrectness:
 
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_radd_dense(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_radd_dense(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", device=device)
         result = left + right

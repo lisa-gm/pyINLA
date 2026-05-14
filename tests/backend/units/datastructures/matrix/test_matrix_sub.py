@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from dalia.backend.config import cupy_version
+from dalia.backend.config import cupy_version, set_memory_regime
 from dalia.backend.datastructures import DenseMatrix, SparseMatrix
 
 if cupy_version is not None:
@@ -11,7 +11,7 @@ if cupy_version is not None:
 
 from tests.backend import ATOLS, RTOLS
 
-from .conftest import EXTERNAL_DENSE_TYPES, EXTERNAL_SPARSE_TYPES, INTERNAL_DEVICE_TYPES
+from .conftest import EXTERNAL_DENSE_TYPES, EXTERNAL_SPARSE_TYPES, INTERNAL_DEVICE_TYPES, MEMORY_REGIMES
 
 # Test-specific: Expected results for sub
 SUB_EXPECTED = {
@@ -28,7 +28,9 @@ class TestSubReturnTypes:
     # Tests __sub__ for all combinations of internal and external types
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_sub_sparse(self, device, right_type, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_sub_sparse(self, device, right_type, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left - right
@@ -36,7 +38,9 @@ class TestSubReturnTypes:
 
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_sub_dense(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_sub_dense(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left - right
@@ -44,7 +48,9 @@ class TestSubReturnTypes:
 
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_sub_dense(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_sub_dense(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left - right
@@ -52,7 +58,9 @@ class TestSubReturnTypes:
 
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_sub_sparse(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_sub_sparse(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left - right
@@ -61,7 +69,9 @@ class TestSubReturnTypes:
     # Tests __rsub__ for all combinations of internal and external types
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_rsub_sparse(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_rsub_sparse(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", device=device)
         result = left - right
@@ -69,7 +79,9 @@ class TestSubReturnTypes:
 
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_rsub_sparse(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_rsub_sparse(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", device=device)
         result = left - right
@@ -77,7 +89,9 @@ class TestSubReturnTypes:
 
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_rsub_dense(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_rsub_dense(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", device=device)
         result = left - right
@@ -85,7 +99,9 @@ class TestSubReturnTypes:
 
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_rsub_dense(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_rsub_dense(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", device=device)
         result = left - right
@@ -98,7 +114,9 @@ class TestSubCorrectness:
     # Tests __sub__ for all combinations of internal and external types
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_sub_sparse(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_sub_sparse(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left - right
@@ -112,7 +130,9 @@ class TestSubCorrectness:
 
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_sub_dense(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_sub_dense(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left - right
@@ -129,7 +149,9 @@ class TestSubCorrectness:
 
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_sub_dense(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_sub_dense(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left - right
@@ -146,7 +168,9 @@ class TestSubCorrectness:
 
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_sub_sparse(self, right_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_sub_sparse(self, right_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", device=device)
         right = matrix_factory(right_type)
         result = left - right
@@ -161,7 +185,9 @@ class TestSubCorrectness:
     # Tests __rsub__ for all combinations of internal and external types
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_rsub_sparse(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_rsub_sparse(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", device=device)
         result = left - right
@@ -175,7 +201,9 @@ class TestSubCorrectness:
 
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_rsub_sparse(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_rsub_sparse(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", device=device)
         result = left - right
@@ -192,7 +220,9 @@ class TestSubCorrectness:
 
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_dense_rsub_dense(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_dense_rsub_dense(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", device=device)
         result = left - right
@@ -209,7 +239,9 @@ class TestSubCorrectness:
 
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("device", INTERNAL_DEVICE_TYPES)
-    def test_sparse_rsub_dense(self, left_type, device, matrix_factory):
+    @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
+    def test_sparse_rsub_dense(self, left_type, device, memory_regime, matrix_factory):
+        set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", device=device)
         result = left - right

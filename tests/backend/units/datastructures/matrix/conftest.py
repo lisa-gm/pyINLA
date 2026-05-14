@@ -5,14 +5,15 @@ import pytest
 import scipy.sparse as sp
 
 from dalia.backend.datastructures import DenseMatrix, SparseMatrix
+from dalia.backend.config import cupy_version
 
 # Type groups - reusable across all tests
 EXTERNAL_SPARSE_TYPES = ["scipy_csr", "scipy_csc", "scipy_coo"]
 EXTERNAL_DENSE_TYPES = ["numpy"]
 INTERNAL_DEVICE_TYPES = ["host"]
+MEMORY_REGIMES = ["manual"]
 
-# TODO: Change this to use flags instead of try
-try:
+if cupy_version is not None:
     import cupy as cp
     import cupyx.scipy.sparse as cu_sp
     EXTERNAL_DENSE_TYPES.append("cupy")
@@ -20,9 +21,8 @@ try:
     EXTERNAL_SPARSE_TYPES.append("cupy_csc")
     EXTERNAL_SPARSE_TYPES.append("cupy_coo")
     INTERNAL_DEVICE_TYPES.append("accelerator")
+    MEMORY_REGIMES.append("auto")
 
-except ImportError:
-    pass  # CuPy not available, skip GPU tests
 
 
 @pytest.fixture

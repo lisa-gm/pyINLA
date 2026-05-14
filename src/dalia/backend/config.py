@@ -1,6 +1,7 @@
 
 default_hw_target = "host"
 memory_regime = "auto"
+memory_threshold = 0.95
 cupy_version = None
 target_list = ["host"]
 regime_list = ["auto", "manual"]
@@ -71,9 +72,28 @@ def set_memory_regime(regime):
     memory_regime = regime
     return memory_regime
 
+def set_memory_threshold(threshold):
+    """Set memory threshold for automatic memory management.
+
+    This threshold determines the maximum percentage of accelerator memory that can be used for calculations.
+
+    Args:
+        threshold (float): A value between 0 and 1 representing the percentage of accelerator memory.
+    Returns:
+        float: The set memory threshold.
+    Raises:
+        ValueError: If the threshold is not between 0 and 1.
+    """
+    global memory_threshold
+    if not (threshold > 0 and threshold <= 1):
+        raise ValueError("Memory threshold must be a value between 0 and 1.")
+    memory_threshold = threshold
+    return memory_threshold
+
 __all__ = [
     "default_hw_target",
     "memory_regime",
+    "memory_threshold",
     "cupy_version",
     "target_list",
 ]
