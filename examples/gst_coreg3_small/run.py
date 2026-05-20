@@ -266,7 +266,7 @@ if __name__ == "__main__":
             "max_iter": args.max_iter,
             "gtol": 1e-3,
             "disp": True,
-            "maxcor": len(coreg_model.theta),
+            "maxcor": len(coreg_model.theta_external),
         },
         "f_reduction_tol": 1e-3,
         "theta_reduction_tol": 1e-4,
@@ -288,7 +288,7 @@ if __name__ == "__main__":
 
     print_msg("results['theta']: ", results["theta"])
 
-    print_msg("cov_theta: \n", results["cov_theta"])
+    print_msg("Internal Covariance of theta:\n", results["cov_theta_internal"])
     print_msg("mean of the fixed effects: ", results["x"][-nb:])
     print_msg(
         "marginal variances of the fixed effects: ",

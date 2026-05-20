@@ -1,9 +1,9 @@
-import os
 import time
+from pathlib import Path
 
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
-import scipy.sparse as scsp
+import scipy.sparse as sp
 
 from dalia import xp
 from dalia.configs import dalia_config, likelihood_config, submodels_config
@@ -11,92 +11,120 @@ from dalia.core.dalia import DALIA
 from dalia.core.model import Model
 from dalia.submodels import BrainiacSubModel
 from dalia.utils import print_msg
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+from plotting import plot_marginal_distributions_hp_external
 
 if __name__ == "__main__":
-    print_msg("--- Example: Brainiac Submodel ---")
+    print_msg(f"Running BRAINIAC model on synthetic dataset.")
 
-    base_dir_data = BASE_DIR + "/inputs_brainiac_cmPRS"
+    path_inputs: Path = Path(__file__).parent / "inputs_brainiac"
+    path_reference: Path = path_inputs / "reference"
 
-    m = 2  # number of annotations per feature
-    b = 1000  # number of latent variables / number of features
-    sigma_a2 = 1.0 / 1.0
-    precision_mat = sigma_a2 * scsp.eye(m)
+    # 1. Load model parameters
+    model_params: dict = np.load(
+        path_inputs / "model_params.npy", allow_pickle=True
+    ).item()
+    n_observations: int = model_params["n_observations"]
+    n_features: int = model_params["n_features"]
+    n_annotations_per_features: int = model_params["n_annotations_per_features"]
+    h2: float = model_params["h2"]
+    sigma_a2: float = 5.0
 
-    theta_ref = xp.load(f"{base_dir_data}/theta_original.npy")
-    x_ref = np.load(f"{base_dir_data}/beta_original.npy")
+    # 2. Load references
+    theta_reference: np.ndarray = np.load(path_reference / "theta.npy")
+    x_reference: np.ndarray = np.load(path_reference / "beta.npy")
 
-    xp.random.seed(5)
-    # has to be between 0 and 1
-    initial_h2 = theta_ref[0] - 0.1
-    initial_alpha = theta_ref[1:] + 0.5 * xp.random.randn(m - 1)
-
-    brainiac_dict = {
-        "type": "brainiac",
-        "input_dir": f"{base_dir_data}/inputs_brainiac",
-        "h2": initial_h2,
-        "alpha": initial_alpha,
-        "ph_h2": {"type": "beta", "alpha": 5.0, "beta": 1.0},
-        "ph_alpha": {
-            "type": "gaussian_mvn",
-            "mean": theta_ref[1:],
-            "precision": precision_mat,  # sp.sparse.csc_matrix(precision_mat),
-        },
-    }
-    brainiac = BrainiacSubModel(
-        config=submodels_config.parse_config(brainiac_dict),
+    # 3. Create starting values for DALIA
+    initial_h2: float = theta_reference[0] - 0.1
+    initial_alpha: np.ndarray = theta_reference[1:] + 0.5 * np.random.randn(
+        n_annotations_per_features
     )
-    print(brainiac)
 
-    print("SubModel initialized.")
-
-    likelihood_dict = {"type": "gaussian", "fix_hyperparameters": True}
+    # 4. Initialize the Brainiac submodel and the DALIA model
+    brainiac = BrainiacSubModel(
+        config=submodels_config.parse_config(
+            {
+                "type": "brainiac",
+                "input_dir": str(path_inputs.resolve()),
+                "h2": initial_h2,
+                "alpha": initial_alpha,
+                "ph_h2": {"type": "beta", "alpha": 1.0, "beta": 1.0},
+                "ph_alpha": {
+                    "type": "gaussian_mvn",
+                    "mean": xp.zeros(n_annotations_per_features),
+                    "precision": (1.0 / sigma_a2) * sp.eye(n_annotations_per_features),
+                },
+            }
+        )
+    )
     model = Model(
         submodels=[brainiac],
-        likelihood_config=likelihood_config.parse_config(likelihood_dict),
+        likelihood_config=likelihood_config.parse_config(
+            {"type": "gaussian", "fix_hyperparameters": True}
+        ),
     )
+    print_msg(model)
 
-    print(model)
-
-    print("Model initialized.")
-
-    dalia_dict = {
-        "solver": {"type": "dense"},
-        "minimize": {
-            "max_iter": 50,
-            "gtol": 1e-3,
-            "disp": True,
-        },
-        "inner_iteration_max_iter": 50,
-        "eps_inner_iteration": 1e-3,
-        "eps_gradient_f": 1e-3,
-        "simulation_dir": ".",
-    }
+    # 5. Initialize DALIA
     dalia = DALIA(
         model=model,
-        config=dalia_config.parse_config(dalia_dict),
+        config=dalia_config.parse_config(
+            {
+                "solver": {"type": "dense"},
+                "minimize": {
+                    "max_iter": 50,
+                    "gtol": 1e-3,
+                    "disp": True,
+                },
+                "inner_iteration_max_iter": 50,
+                "eps_inner_iteration": 1e-3,
+                "eps_gradient_f": 1e-3,
+                "simulation_dir": ".",
+            }
+        ),
     )
 
-    tic = time.time()
+    # 6. Run inference
+    tic = time.perf_counter()
     result = dalia.run()
-    toc = time.time()
-    print("Elapsed time dalia.run(): ", toc - tic)
+    toc = time.perf_counter()
+    print_msg(f"DALIA finished in {toc - tic:.2f} seconds.")
 
-    print("\n------ Compare to reference solution ------\n")
-    print("theta_ref: ", theta_ref)
+    # 7. Compare to reference solution
+    print_msg("\n------ Compare to reference solution ------\n")
+    print_msg("theta_reference: ", theta_reference)
+    print_msg("theta dalia:", result["theta"])
 
-    theta = result["theta_interpret"]
-    print("theta_interpret:", theta)
+    print_msg("norm(x_reference - x) = ", np.linalg.norm(xp.asarray(x_reference) - result["x"]))
 
-    x = result["x"]
-    print("norm(x_ref - x) = ", np.linalg.norm(x_ref - x))
-
-    # marginal variances latent parameters
+    # 8. Check marginal variances of latent parameters
     var_latent_params = result["marginal_variances_latent"]
-    Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
-    Qinv_ref = xp.linalg.inv(Qconditional)
+    Q_conditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
+
+    if sp.issparse(Q_conditional):
+        Q_inv_ref = xp.linalg.inv(Q_conditional.toarray())
+    else:
+        Q_inv_ref = xp.linalg.inv(Q_conditional)
     print_msg(
-        "Norm (marg var latent - ref):    ",
-        f"{np.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
+        f"Norm (marginal variances of latent parameters - reference): {xp.linalg.norm(var_latent_params - xp.diag(Q_inv_ref)):.4e}",
     )
+
+    # 9. Compute marginal distributions of the hyperparameters
+    marginals_hyperparameters = dalia.marginal_distributions_hp()
+
+    # 10. Plot marginal distributions of hyperparameters
+    # fig, axes = plot_marginal_distributions_hp(marginals_hyperparameters)
+    # plt.savefig("marginal_distributions_hyperparameters.png")
+
+    fig, axes = plot_marginal_distributions_hp_external(
+        marginals_hyperparameters, theta_reference
+    )
+    plt.savefig("marginal_distributions_hyperparameters.png")
+
+    h2 = marginals_hyperparameters["hyperparameters"]["h2"]
+    quantile_pairs = h2["quantiles"]["external"]["pairs"]
+
+    print("Quantile pairs of h2:")
+    for p, q in quantile_pairs:
+        print(f"   {p:.3f} quantile: {q:.4f}")
+
+    print_msg("\n--- Finished ---")

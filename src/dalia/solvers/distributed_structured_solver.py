@@ -279,6 +279,9 @@ class DistSerinvSolver(Solver):
         synchronize(comm=self.comm)
         tic = time.perf_counter()
 
+        # Store the original shape of rhs to reshape the solution back after solving
+        in_rhs_shape = rhs.shape
+
         # Ensure rhs is a 2D array
         if rhs.ndim == 1:
             rhs = rhs[:, None]
@@ -330,6 +333,10 @@ class DistSerinvSolver(Solver):
         synchronize(comm=self.comm)
         toc = time.perf_counter()
         self.t_solve += toc - tic
+
+        # Reshape the solution back to the original shape if needed
+        if in_rhs_shape != rhs.shape:
+            rhs = rhs.reshape(in_rhs_shape)
 
         return rhs
 

@@ -16,15 +16,13 @@ from dalia.configs.priorhyperparameters_config import (
 from dalia.configs.priorhyperparameters_config import (
     parse_config as parse_priorhyperparameters_config,
 )
-from dalia.utils import scaled_logit
-
 
 class SubModelConfig(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     # Input folder for this specific submodel
     input_dir: str = None
-    type: Literal["spatio_temporal", "spatial", "regression", "brainiac"] = None
+    type: Literal["spatio_temporal", "spatial", "regression", "brainiac", "ar1"] = None
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
@@ -36,6 +34,34 @@ class RegressionSubModelConfig(SubModelConfig):
 
     def read_hyperparameters(self):
         return xp.array([]), []
+
+
+class AR1SubModelConfig(SubModelConfig):
+
+    ## prior on phi
+    phi: float = None  # AR(1) coefficient
+    phi_scaled: float = None
+    ph_phi: PriorHyperparametersConfig = None
+    ## check that phi is between -1 and 1 (use pc prior)
+    # check inla.doc("pc.cor1")
+
+    ## either define tau or sigma2
+    tau: float = None  # Precision
+    # sigma2: float = None  # Marginal variance
+    
+    
+    ph_tau: PriorHyperparametersConfig = None
+    # ph_sigma2: PriorHyperparametersConfig = None
+
+    def read_hyperparameters(self):
+
+        # input of phi is in (0,1), rescale to -/+ INF
+        #self.phi_scaled = scaled_logit(self.phi, direction="forward")
+        theta = xp.array([self.phi, self.tau])
+        #theta_internal = xp.array([self.phi, self.tau])
+        theta_keys = ["phi", "tau"]
+
+        return theta, theta_keys
 
 
 class SpatioTemporalSubModelConfig(SubModelConfig):
@@ -90,36 +116,35 @@ class BrainiacSubModelConfig(SubModelConfig):
     ph_alpha: GaussianMVNPriorHyperparametersConfig = None
 
     def read_hyperparameters(self):
-        # input of h2 is in (0,1), rescale to -/+ INF
-        self.h2_scaled = scaled_logit(self.h2, direction="forward")
-
-        theta = xp.concatenate([xp.array([self.h2_scaled]), xp.array(self.alpha)])
+        theta = xp.concatenate([xp.array([self.h2]), xp.array(self.alpha)])
         theta_keys = ["h2"] + [f"alpha_{i}" for i in range(len(self.alpha))]
 
         return theta, theta_keys
+
 
 
 def parse_config(config: dict | str) -> SubModelConfig:
     if isinstance(config, str):
         with open(config, "rb") as f:
             config = tomllib.load(f)
-
-    type = config.get("type")
-    if type == "spatio_temporal":
+    model_type = config.get("type")
+    if model_type == "spatio_temporal":
         config["ph_s"] = parse_priorhyperparameters_config(config["ph_s"])
         config["ph_t"] = parse_priorhyperparameters_config(config["ph_t"])
         config["ph_st"] = parse_priorhyperparameters_config(config["ph_st"])
         return SpatioTemporalSubModelConfig(**config)
-    elif type == "spatial":
+    if model_type == "spatial":
         config["ph_s"] = parse_priorhyperparameters_config(config["ph_s"])
         config["ph_e"] = parse_priorhyperparameters_config(config["ph_e"])
         return SpatialSubModelConfig(**config)
-    elif type == "regression":
+    if model_type == "regression":
         return RegressionSubModelConfig(**config)
-    elif type == "brainiac":
+    if model_type == "brainiac":
         config["ph_h2"] = parse_priorhyperparameters_config(config["ph_h2"])
         config["ph_alpha"] = parse_priorhyperparameters_config(config["ph_alpha"])
         return BrainiacSubModelConfig(**config)
-    # Add more elif branches for other submodel types
-    else:
-        raise ValueError(f"Unknown submodel type: {type}")
+    if model_type == "ar1":
+        config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
+        config["ph_phi"] = parse_priorhyperparameters_config(config["ph_phi"])
+        return AR1SubModelConfig(**config)
+    raise ValueError(f"Unknown submodel type: {model_type}")

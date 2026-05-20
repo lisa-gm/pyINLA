@@ -13,7 +13,9 @@ from dalia.__init__ import NDArray
 class PriorHyperparametersConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    type: Literal["gaussian", "penalized_complexity", "beta", "gaussian_mvn"] = None
+    type: Literal[
+        "gaussian", "penalized_complexity", "beta", "gaussian_mvn", "gamma", "inverse_gamma"
+    ] = None
 
 
 class GaussianPriorHyperparametersConfig(PriorHyperparametersConfig):
@@ -44,15 +46,27 @@ class BetaPriorHyperparametersConfig(PriorHyperparametersConfig):
     beta: float = None
 
 
+class GammaPriorHyperparametersConfig(PriorHyperparametersConfig):
+    alpha: float = None
+    beta: float = None
+    
+class InverseGammaPriorHyperparametersConfig(PriorHyperparametersConfig):
+    alpha: float = None
+    beta: float = None
+
+
 def parse_config(config: dict) -> PriorHyperparametersConfig:
     prior_type = config.get("type")
     if prior_type == "gaussian":
         return GaussianPriorHyperparametersConfig(**config)
-    elif prior_type == "gaussian_mvn":
+    if prior_type == "gaussian_mvn":
         return GaussianMVNPriorHyperparametersConfig(**config)
-    elif prior_type == "penalized_complexity":
+    if prior_type == "penalized_complexity":
         return PenalizedComplexityPriorHyperparametersConfig(**config)
-    elif prior_type == "beta":
+    if prior_type == "beta":
         return BetaPriorHyperparametersConfig(**config)
-    else:
-        raise ValueError(f"Unknown prior hyperparameters config type: {prior_type}")
+    if prior_type == "gamma":
+        return GammaPriorHyperparametersConfig(**config)
+    if prior_type == "inverse_gamma":
+        return InverseGammaPriorHyperparametersConfig(**config)
+    raise ValueError(f"Unknown prior hyperparameters config type: {prior_type}")

@@ -38,16 +38,25 @@ if backend_flags["array_module"] is not None:
             xp.abs(1)
 
         except (ImportError, ImportWarning, ModuleNotFoundError) as e:
-            warn(f"'CuPy' is unavailable, defaulting to 'NumPy'. ({e})")
+            warn(
+                f"'CuPy' backend selected but unavailable: defaulting to 'NumPy'. ({e})"
+            )
             import numpy as xp
             import scipy as sp
 
             xp_host = xp
     else:
-        raise ValueError(f"Unrecognized ARRAY_MODULE '{backend_flags['array_module']}'")
+        warn(
+            f"Unrecognized ARRAY_MODULE '{backend_flags['array_module']}', defaulting to 'NumPy'."
+        )
+
+        import numpy as xp
+        import scipy as sp
+
+        xp_host = xp
 else:
     # If the user does not specify the array module, prioritize numpy.
-    warn("No `ARRAY_MODULE` specified, DALIA.core defaulting to 'NumPy'.")
+    # LOG: warn("No `ARRAY_MODULE` specified, DALIA.core defaulting to 'NumPy'.")
     import numpy as xp
     import scipy as sp
 
@@ -63,7 +72,8 @@ try:
 
     backend_flags["cupy_avail"] = True
 except (ImportError, ImportWarning, ModuleNotFoundError) as e:
-    warn(f"No 'CuPy' backend detected. ({e})")
+    ...
+    # LOG: warn(f"No 'CuPy' backend detected. ({e})")
 
 
 try:
@@ -114,12 +124,14 @@ try:
             nccl_id = nccl.get_unique_id()
             backend_flags["nccl_avail"] = True
         except (ImportError, ImportWarning, ModuleNotFoundError) as e:
-            warn(f"No 'NCCL' backend detected. ({e})")
+            warn(
+                f"'NCCL' backend requested but unavailable, NCCL will not be used. ({e})"
+            )
         except (RuntimeError, OSError) as e:
-            warn(f"NCCL test failed: {e}, NCCL will be disabled.")
+            warn(f"NCCL test failed: {e}, NCCL will not be used.")
 
 except (ImportError, ImportWarning, ModuleNotFoundError) as e:
-    warn(f"No 'MPI' backend detected. ({e})")
+    # LOG: warn(f"No 'MPI' backend detected. ({e})")
 
     comm_rank = 0
     comm_size = 1

@@ -40,34 +40,44 @@ source ../scripts/dalia_job_utils.sh && dalia_set_perfenv && dalia_print_job_con
 #                    solver. The default is 1. The maximum number of processes is
 # `--max_iter` : The maximum number of iterations of the minimization.
 
-# --- Run Regression Example ---
-echo "Regression Example..."
-srun python ./gr/run.py --max_iter 100
+# --- Brainiac Example ---
+srun python ./brainiac/run.py --max_iter 100
 
-# --- Run Spatial Examples ---
-#echo "Spatial Example (small)..."
-#srun python ./gs_small/run.py --max_iter 100
+# --- Gaussian AR1 Example ---
+# srun python ./g_ar1/run.py --max_iter 100
 
-# --- Run Spatio-temporal Examples ---
-# echo "Spatio-temporal Example (small)..."
-# srun python ./gst_small/run.py --solver_min_p 1 --max_iter 100
+# --- Gaussian Regression Example ---
+# srun python ./gr/run.py --max_iter 100
 
-# echo "Spatio-temporal Example (medium)..."
+# --- Gaussian Spatial Coregional 2 Models (Small) Example ---
+# srun python ./gs_coreg2_small/run.py --max_iter 100
+
+# --- Gaussian Spatial Coregional 3 Models (Small) Example ---
+# srun python ./gs_coreg3_small/run.py --max_iter 100
+
+# --- Gaussian Spatial Model (Small) Example ---
+# srun python ./gs_small/run.py --max_iter 100
+
+# --- Gaussian Spatio-temporal Coregional 2 Models (Small) Example ---
+# srun python ./gst_coreg2_small/run.py --solver_min_p 1 --max_iter 100
+
+# --- Gaussian Spatio-temporal Coregional 3 Models (Small) Example ---
+# srun python ./gst_coreg3_small/run.py --solver_min_p 1 --max_iter 100
+
+# --- Gaussian Spatio-temporal Model (Large) Example ---
+# srun python ./gst_large/run.py --solver_min_p 1 --max_iter 100
+
+# --- Gaussian Spatio-temporal Model (Medium) Example ---
 # srun python ./gst_medium/run.py --solver_min_p 1 --max_iter 100
 
-#echo "Spatio-temporal Example (large)..."
-#srun python ./gst_large/run.py --solver_min_p 1 --max_iter 100
+# --- Gaussian Spatio-temporal Model (Small) Example ---
+# srun python ./gst_small/run.py --solver_min_p 1 --max_iter 100
 
-# --- Run Coregional (Spatial) Examples ---
-#echo "Coregional Spatial Example (2 models)..."
-#srun python ./gs_coreg2_small/run.py --max_iter 100
+# --- Poisson AR1 Example ---
+# srun python ./p_ar1/run.py --max_iter 100
 
-#echo "Coregional Spatial Example (3 models)..."
-#srun python ./gs_coreg3_small/run.py --max_iter 100
+# --- Poisson Regression Example ---
+# srun python ./pr/run.py --max_iter 100
 
-# --- Run Coregional (Spatio-temporal) Examples ---
-#echo "Coregional Spatio-temporal Example (2 models)..."
-#srun python ./gst_coreg2_small/run.py --solver_min_p 1 --max_iter 100
-
-#echo "Coregional Spatio-temporal Example (3 models)..."
-#srun python ./gst_coreg3_small/run.py --solver_min_p 1 --max_iter 100
+# --- Poisson Spatio-temporal Model (Small) Example ---
+# srun python ./pst_small/run.py --solver_min_p 1 --max_iter 100

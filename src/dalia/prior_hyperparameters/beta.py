@@ -6,6 +6,7 @@ from dalia.configs.priorhyperparameters_config import (
     GaussianPriorHyperparametersConfig,
 )
 from dalia.core.prior_hyperparameters import PriorHyperparameters
+from dalia.utils.link_functions import scaled_logit
 
 
 class BetaPriorHyperparameters(PriorHyperparameters):
@@ -20,6 +21,24 @@ class BetaPriorHyperparameters(PriorHyperparameters):
 
         self.alpha: float = config.alpha
         self.beta: float = config.beta
+
+
+    def rescale_hyperparameters_to_internal(self, theta, direction):
+
+        ### TODO: on longer term make scaled_logit default but let it be configurable in config
+        ## beta prior is defined on [0,1], while BFGS works on (-inf, inf)
+        if direction == "forward":
+            theta_scaled = scaled_logit(theta, direction="forward")
+        elif direction == "backward":
+            theta_scaled = scaled_logit(theta, direction="backward")
+        elif direction == "forward_jacobian":
+            theta_scaled = scaled_logit(theta, direction="forward_jacobian")
+        elif direction == "backward_jacobian":
+            theta_scaled = scaled_logit(theta, direction="backward_jacobian")
+        else:
+            raise ValueError(f"Unknown direction: {direction}")
+
+        return theta_scaled
 
     def evaluate_log_prior(self, theta: float, **kwargs) -> float:
         """Evaluate the log prior hyperparameters."""

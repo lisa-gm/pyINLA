@@ -842,6 +842,10 @@ daint_create_conda_env() {
                 if MPICC=$(which mpicc) python -m pip install --no-cache-dir --no-binary=mpi4py mpi4py; then
                     echo "   Successfully installed mpi4py in MPI-enhanced environment."
 
+                    # Update the libcxx given Daint NCCL modules requirements
+                    conda update libstdcxx-ng
+                    conda install -c conda-forge libstdcxx-ng
+
                     # Try to import nccl to ensure it's available
                     echo "   Verifying NCCL installation in MPI-enhanced environment..."
                     if python -c "from cupy.cuda import nccl; nccl.get_unique_id()"; then
@@ -1037,7 +1041,7 @@ daint_set_perfenv() {
     
     export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
     export CUDA_VISIBLE_DEVICES=$SLURM_LOCALID
-    export MPICH_GPU_SUPPORT_ENABLED=1
+    export MPICH_GPU_SUPPORT_ENABLED=0
 
     # NCCL Performance Configuration
     # More can be found: https://docs.cscs.ch/software/communication/nccl/#using-nccl
@@ -1060,8 +1064,12 @@ daint_set_perfenv() {
     # performance on the Alps network across a wide range of applications. Specific
     # applications may perform better with other values.
     export FI_CXI_DEFAULT_CQ_SIZE=131072
-    export FI_CXI_DEFAULT_TX_SIZE=32768
+    export FI_CXI_DEFAULT_TX_SIZE=16384
     export FI_CXI_DISABLE_HOST_REGISTER=1
     export FI_CXI_RX_MATCH_MODE=software
     export FI_MR_CACHE_MONITOR=userfaultfd
+
+    export FI_CXI_RDZV_GET_MIN=0
+    export FI_CXI_RDZV_THRESHOLD=0
+    export FI_CXI_RDZV_EAGER_SIZE=0
 }
