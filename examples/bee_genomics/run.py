@@ -12,9 +12,7 @@ from dalia.core.dalia import DALIA
 from dalia.core.model import Model
 from dalia.submodels import GenericSubModel, RegressionSubModel
 from dalia.utils import (
-    extract_diagonal,
     print_msg,
-    plot_marginal_distributions_hp,
 )
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -23,7 +21,6 @@ from examples_utils.parser_utils import parse_args  # noqa: E402
 
 # BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = Path(__file__).resolve().parent / "synthetic_data"
-
 
 if __name__ == "__main__":
     print_msg("--- Example: Bee Genomics  ---")
