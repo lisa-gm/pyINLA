@@ -2,4 +2,6 @@
 examples/**/*.npz filter=lfs diff=lfs merge=lfs -text
 examples/**/*.npy filter=lfs diff=lfs merge=lfs -text
 examples/**/*.dat filter=lfs diff=lfs merge=lfs -text
+#track one csv file from which federated subfolders are generated
+examples/**/data/*.csv filter=lfs diff=lfs merge=lfs -text 
 

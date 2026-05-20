@@ -26,7 +26,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     # random site-specific intercept
-    random_intercept = True
+    random_intercept = False  # True
 
     data_type = "trauma"
     family = "binomial"

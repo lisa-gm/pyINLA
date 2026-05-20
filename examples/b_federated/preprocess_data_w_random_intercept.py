@@ -99,16 +99,16 @@ def save_dataset(
 data_type = "trauma"
 family = "binomial"
 
-folder_path = "/Users/lisa/icloud/uni/repositories/federated_learning/confeR/paper/data/summarized"
-file_path = os.path.join(folder_path, f"data_{data_type}_{family}.csv")
+current_dir = Path(__file__).resolve().parent
+
+folder_path = current_dir / "data"
+file_path = folder_path / f"data_{data_type}_{family}.csv"
 data = pd.read_csv(file_path)
 
 first_column = data.columns[0]
 data[first_column] = data[first_column].astype("string")
 
 print(data.head())
-
-current_dir = Path(__file__).resolve().parent
 
 # 1) Joint datasets with explicit intercept type in folder name
 joint_folder_global = current_dir / f"joint_{data_type}_{family}_global_intercept"
