@@ -20,7 +20,14 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
     log p(sigma) = log(2) - log(pi) - log(scale) - log(1 + (sigma / scale)^2)
 
     where sigma is a positive scale parameter, typically the standard deviation.
-    The model is typically defined for precision p = 1/sigma^2.
+
+    We use the internal parameterization:
+
+    theta = log(1 / sigma^2) = -2 * log(sigma)
+
+    and evaluate the prior in internal space through change of variables:
+
+    log p(theta) = log p(sigma(theta)) + log(|d sigma / d theta|)
 
     Parameters
     ----------
@@ -32,7 +39,7 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
     scale : float. scale > 0. Default is 25.0.
         Scale parameter of the Half-Cauchy distribution.
     normalizing_constant : float
-        Precomputed constant term for log probability evaluation.
+        Precomputed constant term for log probability evaluation in internal theta-space.
     """
 
     def __init__(
@@ -67,9 +74,11 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
         """
         Transform between external and internal parameter representations.
 
-        The Half-Cauchy distribution is defined for positive values, but optimization
-        works in unconstrained space. This method transforms
-        between theta (positive) and log(theta) (unconstrained).
+        The Half-Cauchy prior is defined on sigma > 0 and the internal variable is
+        chosen as log precision:
+
+        theta = log(1 / sigma^2) = -2 * log(sigma),
+        sigma = exp(-0.5 * theta).
 
         Parameters
         ----------
@@ -77,9 +86,8 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
             Parameter value(s) to transform.
         direction : str
             Transformation direction:
-            - "forward": theta -> log(theta) (external to internal)
-            - "backward": log(theta) -> theta (internal to external)
-
+            - "forward": from external sigma to internal theta
+            - "backward": from internal theta to external sigma
         Returns
         -------
         float or NDArray
@@ -91,13 +99,15 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
             If direction is not recognized.
         """
         if direction == "forward":
-            theta_scaled = xp.log(theta)
+            theta_scaled = -2.0 * xp.log(theta)
         elif direction == "backward":
-            theta_scaled = xp.exp(theta)
-        elif direction == "forward_jacobian":
-            theta_scaled = 1 / theta  # d(log(theta))/d(theta) = 1/theta
+            theta_scaled = xp.exp(-0.5 * theta)
+        elif (
+            direction == "forward_jacobian"
+        ):  ## for better naming should be log jacobian
+            theta_scaled = -2.0 / theta
         elif direction == "backward_jacobian":
-            theta_scaled = theta  # d(exp(theta))/d(theta) = exp(theta) = theta
+            theta_scaled = -xp.log(2.0) - 0.5 / theta
         else:
             raise ValueError(f"Unknown direction: {direction}")
 
@@ -107,32 +117,42 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
         """
         Evaluate the log prior probability density.
 
-        Computes the log probability density of the Half-Cauchy distribution
-        at the given theta value in its external/user representation.
+        Computes the log probability density in external space where
+        theta = sigma.
 
         Parameters
         ----------
         theta : float
-            Parameter value at which to evaluate the log prior.
-            Must be positive (external/user representation).
+            External value theta = sigma
         **kwargs
             Additional keyword arguments (unused).
 
         Returns
         -------
         float
-            Log prior probability density at theta.
+            Log prior probability density at internal theta.
         """
 
-        z = theta / self.scale
-        log_prior = self.normalizing_constant - xp.log(1 + z * z)
+        theta_internal = self.rescale_hyperparameters_to_internal(theta, "forward")
+
+        print(
+            f"Evaluating Half-Cauchy log prior at sigma = {theta:.3f} with jacobian = {self.rescale_hyperparameters_to_internal(theta_internal, 'backward_jacobian'):.6f}"
+        )
+
+        log_prior = (
+            self.normalizing_constant
+            - xp.log(1 + (theta / self.scale) ** 2)
+            + self.rescale_hyperparameters_to_internal(
+                theta_internal, direction="backward_jacobian"
+            )
+        )
 
         return log_prior
 
 
 if __name__ == "__main__":
     """
-    Basic checks for Half-Cauchy prior implementation.
+    Basic checks for Half-Cauchy prior implementation in internal theta-space.
     """
 
     from scipy.stats import halfcauchy
@@ -145,13 +165,27 @@ if __name__ == "__main__":
         half_cauchy_prior = HalfCauchyPriorHyperparameters(config=config)
 
         test_values = [0.1, 0.5, 1.0, 2.0, 5.0]
-        print("Comparing log prior evaluations with scipy.stats.halfcauchy:")
-        for val in test_values:
-            logp_dalia = half_cauchy_prior.evaluate_log_prior(val)
-            logp_scipy = halfcauchy.logpdf(val, loc=0.0, scale=scale)
+        print(
+            "Comparing log prior evaluations in internal theta-space with scipy.stats.halfcauchy + Jacobian:"
+        )
+        for sigma in test_values:
+            theta_internal = half_cauchy_prior.rescale_hyperparameters_to_internal(
+                sigma, "forward"
+            )
+            log_jac = xp.log(
+                xp.abs(-0.5 * np.exp(-theta_internal / 2.0))
+            )  # np.log(np.abs(-0.5 * sigma))  # log(|d sigma / d theta|)
             print(
-                f"  theta = {val:4.1f}: DALIA logp = {logp_dalia:.6f}, "
-                f"scipy logp = {logp_scipy:.6f}, diff = {abs(logp_dalia - logp_scipy):.2e}"
+                " Testing sigma = {:.1f} (theta_internal = {:.3f}), log_jac = {:.6f}:".format(
+                    sigma, theta_internal, log_jac
+                )
+            )
+
+            logp_dalia = half_cauchy_prior.evaluate_log_prior(sigma)
+            logp_scipy = halfcauchy.logpdf(sigma, loc=0.0, scale=scale) + log_jac
+            print(
+                f"  sigma = {sigma:4.1f}: DALIA logp = {logp_dalia:.6f}, "
+                f"scipy logp = {logp_scipy:.6f}, diff = {abs(logp_dalia - logp_scipy):.6e}"
             )
             if abs(logp_dalia - logp_scipy) > 1e-6:
                 raise ValueError(

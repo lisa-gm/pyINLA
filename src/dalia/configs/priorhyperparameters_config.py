@@ -14,7 +14,13 @@ class PriorHyperparametersConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     type: Literal[
-        "gaussian", "penalized_complexity", "beta", "gaussian_mvn", "gamma", "inverse_gamma"
+        "gaussian",
+        "penalized_complexity",
+        "beta",
+        "gaussian_mvn",
+        "gamma",
+        "inverse_gamma",
+        "half_cauchy",
     ] = None
 
 
@@ -49,10 +55,14 @@ class BetaPriorHyperparametersConfig(PriorHyperparametersConfig):
 class GammaPriorHyperparametersConfig(PriorHyperparametersConfig):
     alpha: float = None
     beta: float = None
-    
+
 class InverseGammaPriorHyperparametersConfig(PriorHyperparametersConfig):
     alpha: float = None
     beta: float = None
+
+
+class HalfCauchyPriorHyperparametersConfig(PriorHyperparametersConfig):
+    scale: float = 25.0
 
 
 def parse_config(config: dict) -> PriorHyperparametersConfig:
@@ -69,4 +79,6 @@ def parse_config(config: dict) -> PriorHyperparametersConfig:
         return GammaPriorHyperparametersConfig(**config)
     if prior_type == "inverse_gamma":
         return InverseGammaPriorHyperparametersConfig(**config)
+    if prior_type == "half_cauchy":
+        return HalfCauchyPriorHyperparametersConfig(**config)
     raise ValueError(f"Unknown prior hyperparameters config type: {prior_type}")
