@@ -40,13 +40,16 @@ def main() -> None:
     for p in [inputs_iid_dir, inputs_dense_dir, inputs_fixed_dir, ref_dir]:
         p.mkdir(parents=True, exist_ok=True)
 
-    # 1) IID generic component: one-hot design matrix and identity precision.
+    # 1) IID generic component
     group_idx = make_balanced_group_indices(n_obs, n_iid)
     rows = np.arange(n_obs)
     cols = group_idx
     data = np.ones(n_obs, dtype=float)
     a_iid = sparse.coo_matrix((data, (rows, cols)), shape=(n_obs, n_iid)).tocsc()
     q_iid = sparse.identity(n_iid, format="csc")
+
+    # True latent effects
+    u_iid = rng.normal(loc=0.0, scale=np.sqrt(1.0 / tau_iid_true), size=n_iid)
 
     # 2) Dense generic component: random design and SPD precision matrix.
     a_dense = rng.normal(loc=0.0, scale=1.0 / np.sqrt(n_dense), size=(n_obs, n_dense))
@@ -55,17 +58,14 @@ def main() -> None:
     q_dense_np = m.T @ m + np.eye(n_dense)
     q_dense = sparse.csc_matrix(q_dense_np)
 
+    cov_dense = np.linalg.inv(tau_dense_true * q_dense_np)
+    l_dense = np.linalg.cholesky(cov_dense)
+    u_dense = l_dense @ rng.normal(size=n_dense)
+
     # 3) Regression component: intercept + near-orthonormal covariates.
     x_raw = rng.normal(size=(n_obs, n_fixed - 1))
     q_cov, _ = np.linalg.qr(x_raw, mode="reduced")
     a_fixed = np.column_stack([np.ones(n_obs), q_cov])
-
-    # True latent effects
-    u_iid = rng.normal(loc=0.0, scale=np.sqrt(1.0 / tau_iid_true), size=n_iid)
-
-    cov_dense = np.linalg.inv(tau_dense_true * q_dense_np)
-    l_dense = np.linalg.cholesky(cov_dense)
-    u_dense = l_dense @ rng.normal(size=n_dense)
 
     # Sparse signal setting: only a few fixed effects are nonzero.
     beta_true = np.zeros(n_fixed)
