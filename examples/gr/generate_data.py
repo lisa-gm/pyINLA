@@ -17,7 +17,7 @@ np.random.seed(41)
 path = os.path.dirname(__file__)
 
 if __name__ == "__main__":
-    n_observations = 20
+    n_observations = 50
     n_latent_parameters = 6
 
     z = np.random.normal(size=n_latent_parameters)

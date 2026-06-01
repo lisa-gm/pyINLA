@@ -93,16 +93,19 @@ class GammaPriorHyperparameters(PriorHyperparameters):
         Raises
         ------
         ValueError
-            If direction is not "forward" or "backward".
+            If direction is not "forward" or "backward", "forward_jacobian" or "backward_log_jacobian".
         """
+
         if direction == "forward":
             theta_scaled = xp.log(theta)
         elif direction == "backward":
             theta_scaled = xp.exp(theta)
         elif direction == "forward_jacobian":
-            theta_scaled = 1 / theta  # d(log(theta))/d(theta) = 1/theta
-        elif direction == "backward_jacobian":
-            theta_scaled = theta  # d(exp(theta))/d(theta) = exp(theta) = theta 
+            theta_scaled = 1 / theta  #
+        elif direction == "backward_log_jacobian":
+            theta_scaled = (
+                theta  # log |d(exp(theta))/d(theta)| = log |exp(theta)| = theta
+            )
         else:
             raise ValueError(f"Unknown direction: {direction}")
 
@@ -141,10 +144,16 @@ class GammaPriorHyperparameters(PriorHyperparameters):
             If theta is not positive (implicitly through log computation).
         """
 
+        theta_internal = self.rescale_hyperparameters_to_internal(theta, "forward")
+
         log_prior = (
             self.normalizing_constant
             + (self.alpha - 1) * xp.log(theta)
             - self.beta * theta
+            # add jacobian correction for tranformation
+            + self.rescale_hyperparameters_to_internal(
+                theta_internal, direction="backward_log_jacobian"
+            )
         )
 
         return log_prior
@@ -158,13 +167,13 @@ if __name__ == "__main__":
     that get reparametrized to external space (positive) using the gamma prior's 
     rescaling function.
     """
-    
+
     from dalia.utils.gaussian_quadrature import compute_variance_gauss_hermite
-    
+
     print("=" * 80)
     print("Testing Gaussian Quadrature with Gamma Prior Rescaling")
     print("=" * 80)
-        
+
     # Create a inverse gamma prior configuration
     alpha_values = [1.0, 3.0, 5.0]
     beta_values = [0.5, 1.0, 2.0]
@@ -173,46 +182,47 @@ if __name__ == "__main__":
         print(f"\nTesting alpha={alpha}, beta={beta}")
         config = GammaPriorHyperparametersConfig(alpha=alpha, beta=beta)
         gamma_prior = GammaPriorHyperparameters(config=config)
-        
+
         ## compare against scipy implementation
         from scipy.stats import gamma
-        
+
         test_values = [0.1, 0.5, 1.0, 2.0, 5.0]
         print("Comparing log prior evaluations with scipy.stats.gamma:")
         for val in test_values:
             logp_dalia = gamma_prior.evaluate_log_prior(val)
             ## note: scipy's gamma takes scale = 1/beta
-            logp_scipy = gamma.logpdf(val, a=alpha, scale=1/beta)
+            logp_jac = xp.log(val)  # Jacobian correction for log(theta) -> theta
+            logp_scipy = gamma.logpdf(val, a=alpha, scale=1 / beta) + logp_jac
             print(f"  θ = {val:4.1f}: DALIA logp = {logp_dalia:.6f}, "
                 f"scipy logp = {logp_scipy:.6f}, diff = {abs(logp_dalia - logp_scipy):.2e}")
             if abs(logp_dalia - logp_scipy) > 1e-6:
                 raise ValueError("Log prior evaluation does not match scipy implementation.")
-    
+
     print()
     print("All tests passed!")
-    
+
     # Create a gamma prior configuration
     config = GammaPriorHyperparametersConfig(alpha=2.0, beta=1.0)
     gamma_prior = GammaPriorHyperparameters(config=config)
-    
+
     # Define parameters for the normal distribution in internal space
     # These represent log(theta) where theta > 0 is the gamma-distributed parameter
     mean_internal = 0.5  # Mean of log(theta)
     variance_internal = 0.25  # Variance of log(theta)
-    
+
     print(f"Internal space (log-scale) parameters:")
     print(f"  Mean: {mean_internal}")
     print(f"  Variance: {variance_internal}")
     print(f"  Standard deviation: {xp.sqrt(variance_internal)}")
     print()
-    
+
     # Test 1: Compute statistics using Gaussian quadrature
     print("1. Computing statistics using Gaussian quadrature:")
-    
+
     # Use the rescaling function as the transform
     def transform_func(x, direction):
         return gamma_prior.rescale_hyperparameters_to_internal(x, direction)
-    
+
     # Compute statistics using different numbers of quadrature points
     for n_points in [10, 20, 30, 50]:
         result = compute_variance_gauss_hermite(
@@ -221,122 +231,122 @@ if __name__ == "__main__":
             transform_func, 
             n_points=n_points
         )
-        
+
         print(f"  n_points = {n_points:2d}: Mean = {result['mean']:.6f}, "
               f"Std = {result['std']:.6f}, Var = {result['variance']:.6f}")
-    
+
     print()
-    
+
     # Test 2: Compare with analytical solution
     print("2. Comparison with analytical log-normal distribution:")
     print("   For log(Y) ~ N(μ, σ²), we have:")
     print("   E[Y] = exp(μ + σ²/2)")
     print("   Var[Y] = (exp(σ²) - 1) * exp(2μ + σ²)")
-    
+
     # Analytical moments for log-normal distribution
     mu = mean_internal
     sigma2 = variance_internal
-    
+
     analytical_mean = xp.exp(mu + sigma2/2)
     analytical_variance = (xp.exp(sigma2) - 1) * xp.exp(2*mu + sigma2)
     analytical_std = xp.sqrt(analytical_variance)
-    
+
     print(f"   Analytical mean: {analytical_mean:.6f}")
     print(f"   Analytical std:  {analytical_std:.6f}")
     print(f"   Analytical var:  {analytical_variance:.6f}")
     print()
-    
+
     # Compare with quadrature result (using 50 points)
     quad_result = compute_variance_gauss_hermite(
         mean_internal, variance_internal, transform_func, n_points=50
     )
-    
+
     print("3. Comparison of quadrature vs analytical:")
     print(f"   Mean difference: {abs(quad_result['mean'] - analytical_mean):.2e}")
     print(f"   Std difference:  {abs(quad_result['std'] - analytical_std):.2e}")
     print(f"   Var difference:  {abs(quad_result['variance'] - analytical_variance):.2e}")
-    
+
     # Relative errors
     mean_rel_error = abs(quad_result['mean'] - analytical_mean) / analytical_mean
     std_rel_error = abs(quad_result['std'] - analytical_std) / analytical_std
     var_rel_error = abs(quad_result['variance'] - analytical_variance) / analytical_variance
-    
+
     print(f"   Mean rel. error: {mean_rel_error:.2e}")
     print(f"   Std rel. error:  {std_rel_error:.2e}")
     print(f"   Var rel. error:  {var_rel_error:.2e}")
     print()
-    
+
     # Test 3: Test with different internal parameters
     print("4. Testing with different internal parameters:")
-    
+
     test_cases = [
         {"mean": 0.0, "var": 0.1, "name": "Small variance"},
         {"mean": 1.0, "var": 0.5, "name": "Medium variance"},
         {"mean": -0.5, "var": 1.0, "name": "Large variance"},
         {"mean": 2.0, "var": 0.01, "name": "Large mean, small variance"}
     ]
-    
+
     for case in test_cases:
         mu_test = case["mean"]
         var_test = case["var"]
-        
+
         # Quadrature result
         quad_result = compute_variance_gauss_hermite(
             mu_test, var_test, transform_func, n_points=30
         )
-        
+
         # Analytical result
         anal_mean = xp.exp(mu_test + var_test/2)
         anal_var = (xp.exp(var_test) - 1) * xp.exp(2*mu_test + var_test)
-        
+
         rel_mean_error = abs(quad_result['mean'] - anal_mean) / anal_mean
         rel_var_error = abs(quad_result['variance'] - anal_var) / anal_var
-        
+
         print(f"   {case['name']:25s}: Mean rel. err = {rel_mean_error:.2e}, "
               f"Var rel. err = {rel_var_error:.2e}")
-    
+
     print()
-    
+
     # Test 4: Test the rescaling function directions
     print("5. Testing rescaling function directions:")
-    
+
     # Test some values
     test_values = [0.1, 0.5, 1.0, 2.0, 5.0]
-    
+
     print("   Testing forward (external -> internal) and backward (internal -> external):")
     for theta in test_values:
         # Forward: theta -> log(theta)
         log_theta = gamma_prior.rescale_hyperparameters_to_internal(theta, "forward")
-        
-        # Backward: log(theta) -> theta  
+
+        # Backward: log(theta) -> theta
         theta_recovered = gamma_prior.rescale_hyperparameters_to_internal(log_theta, "backward")
-        
+
         error = abs(theta - theta_recovered)
         print(f"   θ = {theta:4.1f} -> log(θ) = {log_theta:6.3f} -> θ = {theta_recovered:6.3f}, "
               f"error = {error:.2e}")
-    
+
     print()
-    
+
     # Test 5: Convergence study
     print("6. Convergence study (increasing number of quadrature points):")
-    
+
     mu_conv = 0.3
     var_conv = 0.4
     analytical_mean_conv = xp.exp(mu_conv + var_conv/2)
-    
+
     n_points_list = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100]
-    
+
     print("   n_points   |   Mean      |  Rel. Error")
     print("   -----------|-------------|------------")
-    
+
     for n in n_points_list:
         result = compute_variance_gauss_hermite(
             mu_conv, var_conv, transform_func, n_points=n
         )
         rel_error = abs(result['mean'] - analytical_mean_conv) / analytical_mean_conv
-        
+
         print(f"   {n:8d}   | {result['mean']:10.6f} | {rel_error:.3e}")
-    
+
     print()
     print("=" * 80)
     print("Test completed successfully!")
@@ -344,4 +354,3 @@ if __name__ == "__main__":
     print("the moments of log-normal distributions obtained through gamma")  
     print("prior rescaling transformations.")
     print("=" * 80)
-

@@ -9,6 +9,7 @@ from dalia.prior_hyperparameters.beta import BetaPriorHyperparameters
 from dalia.prior_hyperparameters.gamma import GammaPriorHyperparameters
 from dalia.prior_hyperparameters.inverse_gamma import InverseGammaPriorHyperparameters
 from dalia.prior_hyperparameters.half_cauchy import HalfCauchyPriorHyperparameters
+from dalia.prior_hyperparameters.half_normal import HalfNormalPriorHyperparameters
 
 __all__ = [
     "GaussianPriorHyperparameters",
@@ -18,4 +19,5 @@ __all__ = [
     "GammaPriorHyperparameters",
     "InverseGammaPriorHyperparameters",
     "HalfCauchyPriorHyperparameters",
+    "HalfNormalPriorHyperparameters",
 ]

@@ -21,6 +21,7 @@ class PriorHyperparametersConfig(BaseModel):
         "gamma",
         "inverse_gamma",
         "half_cauchy",
+        "half_normal",
     ] = None
 
 
@@ -65,6 +66,10 @@ class HalfCauchyPriorHyperparametersConfig(PriorHyperparametersConfig):
     scale: float = 25.0
 
 
+class HalfNormalPriorHyperparametersConfig(PriorHyperparametersConfig):
+    precision: float = 0.001
+
+
 def parse_config(config: dict) -> PriorHyperparametersConfig:
     prior_type = config.get("type")
     if prior_type == "gaussian":
@@ -81,4 +86,6 @@ def parse_config(config: dict) -> PriorHyperparametersConfig:
         return InverseGammaPriorHyperparametersConfig(**config)
     if prior_type == "half_cauchy":
         return HalfCauchyPriorHyperparametersConfig(**config)
+    if prior_type == "half_normal":
+        return HalfNormalPriorHyperparametersConfig(**config)
     raise ValueError(f"Unknown prior hyperparameters config type: {prior_type}")

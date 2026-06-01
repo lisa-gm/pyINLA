@@ -101,7 +101,7 @@ class InverseGammaPriorHyperparameters(PriorHyperparameters):
             theta_scaled = xp.exp(theta)
         elif direction == "forward_jacobian":
             theta_scaled = 1 / theta  # d(log(theta))/d(theta) = 1/theta
-        elif direction == "backward_jacobian":
+        elif direction == "backward_log_jacobian":
             theta_scaled = theta  
         else:
             raise ValueError(f"Unknown direction: {direction}")
@@ -158,9 +158,9 @@ if __name__ == "__main__":
     that get reparametrized to external space (positive) using the gamma prior's 
     rescaling function.
     """
-    
+
     from dalia.utils.gaussian_quadrature import compute_variance_gauss_hermite
-    
+
     print("=" * 80)
     print("Testing Gaussian Quadrature with Inverse Gamma Prior Rescaling")
     print("=" * 80)
@@ -173,10 +173,10 @@ if __name__ == "__main__":
         print(f"\nTesting alpha={alpha}, beta={beta}")
         config = InverseGammaPriorHyperparametersConfig(alpha=alpha, beta=beta)
         inverse_gamma_prior = InverseGammaPriorHyperparameters(config=config)
-        
+
         ## compare against scipy implementation
         from scipy.stats import invgamma
-        
+
         test_values = [0.1, 0.5, 1.0, 2.0, 5.0]
         print("Comparing log prior evaluations with scipy.stats.invgamma:")
         for val in test_values:
@@ -186,7 +186,6 @@ if __name__ == "__main__":
                 f"scipy logp = {logp_scipy:.6f}, diff = {abs(logp_dalia - logp_scipy):.2e}")
             if abs(logp_dalia - logp_scipy) > 1e-6:
                 raise ValueError("Log prior evaluation does not match scipy implementation.")
-    
+
     print()
     print("All tests passed!")
-    

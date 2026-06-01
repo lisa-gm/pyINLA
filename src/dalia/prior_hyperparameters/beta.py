@@ -22,6 +22,11 @@ class BetaPriorHyperparameters(PriorHyperparameters):
         self.alpha: float = config.alpha
         self.beta: float = config.beta
 
+        self.normalizing_constant = (
+            sp.special.gammaln(self.alpha)
+            + sp.special.gammaln(self.beta)
+            - sp.special.gammaln(self.alpha + self.beta)
+        )
 
     def rescale_hyperparameters_to_internal(self, theta, direction):
 
@@ -33,7 +38,7 @@ class BetaPriorHyperparameters(PriorHyperparameters):
             theta_scaled = scaled_logit(theta, direction="backward")
         elif direction == "forward_jacobian":
             theta_scaled = scaled_logit(theta, direction="forward_jacobian")
-        elif direction == "backward_jacobian":
+        elif direction == "backward_log_jacobian":
             theta_scaled = scaled_logit(theta, direction="backward_jacobian")
         else:
             raise ValueError(f"Unknown direction: {direction}")
@@ -48,15 +53,10 @@ class BetaPriorHyperparameters(PriorHyperparameters):
                 "Beta distribution is defined on the interval [0, 1]. theta: {theta}"
             )
 
-        log_beta = (
-            sp.special.gammaln(self.alpha)
-            + sp.special.gammaln(self.beta)
-            - sp.special.gammaln(self.alpha + self.beta)
-        )
         log_prior = (
             (self.alpha - 1) * xp.log(theta)
             + (self.beta - 1) * xp.log(1 - theta)
-            - log_beta
+            - self.normalizing_constant
         )
 
         return log_prior

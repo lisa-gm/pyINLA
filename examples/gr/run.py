@@ -37,8 +37,10 @@ if __name__ == "__main__":
     likelihood_dict = {
         "type": "gaussian",
         "prec_o": 1.0,
-        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
-        #"prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
+        # "prior_hyperparameters": {"type": "half_cauchy", "scale": 25},
+        "prior_hyperparameters": {"type": "half_normal", "precision": 0.01},
+        # "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+        # "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
     }
     # Creation of the first model by combining the Regression submodel and the likelihood
     model = Model(
@@ -49,6 +51,7 @@ if __name__ == "__main__":
 
     ## Plot prior of hyperparameter -- identification by [0], [1], ... not amazing but works for now
     theta_interval = [-5, 7]
+    print(model.prior_hyperparameters)
     prior_hp = model.prior_hyperparameters[0]
 
     fig, ax = plot_prior_hp("prec_o", theta_interval, prior_hp)
@@ -128,7 +131,8 @@ if __name__ == "__main__":
 
     fig, axes = plot_marginal_distributions_hp(marginals_hp)
     import matplotlib.pyplot as plt
-    plt.savefig(f"gr_marginal_distributions_hp.png")
+    # plt.savefig(f"gr_marginal_distributions_hp.png")
+    plt.show()
 
     prec_obs = marginals_hp['hyperparameters']['prec_o']
     quantile_pairs = prec_obs['quantiles']['external']['pairs']

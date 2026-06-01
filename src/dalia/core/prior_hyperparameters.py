@@ -23,17 +23,21 @@ class PriorHyperparameters(ABC):
 
         Args:
             theta: Hyperparameter
-            direction: "forward", "backward", "forward_jacobian", "backward_jacobian"
+            direction: "forward", "backward", "forward_jacobian", "backward_log_jacobian"
         Returns:
             Rescaled hyperparameter.
 
         """
-        
+
         if direction == "forward" or direction == "backward":
             return theta
-        elif direction == "forward_jacobian" or direction == "backward_jacobian":
+        elif direction == "forward_jacobian":
             return xp.ones_like(theta)
-        
+        elif direction == "backward_log_jacobian":
+            return xp.zeros_like(theta)
+        else:
+            raise ValueError(f"Invalid direction: {direction}")
+
     @abstractmethod
     def evaluate_log_prior(self, theta: float) -> float:
         """Evaluate the log prior hyperparameters."""

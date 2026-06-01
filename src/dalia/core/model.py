@@ -15,6 +15,8 @@ from dalia.configs.priorhyperparameters_config import (
     GaussianPriorHyperparametersConfig,
     PenalizedComplexityPriorHyperparametersConfig,
     GammaPriorHyperparametersConfig,
+    HalfCauchyPriorHyperparametersConfig,
+    HalfNormalPriorHyperparametersConfig,
 )
 from dalia.core.likelihood import Likelihood
 from dalia.core.prior_hyperparameters import PriorHyperparameters
@@ -26,6 +28,8 @@ from dalia.prior_hyperparameters import (
     GaussianPriorHyperparameters,
     PenalizedComplexityPriorHyperparameters,
     GammaPriorHyperparameters,
+    HalfCauchyPriorHyperparameters,
+    HalfNormalPriorHyperparameters,
 )
 from dalia.submodels import (
     BrainiacSubModel,
@@ -391,6 +395,24 @@ class Model(ABC):
             ):
                 self.prior_hyperparameters.append(
                     GammaPriorHyperparameters(
+                        config=likelihood_config.prior_hyperparameters,
+                    )
+                )
+            elif isinstance(
+                likelihood_config.prior_hyperparameters,
+                HalfCauchyPriorHyperparametersConfig,
+            ):
+                self.prior_hyperparameters.append(
+                    HalfCauchyPriorHyperparameters(
+                        config=likelihood_config.prior_hyperparameters,
+                    )
+                )
+            elif isinstance(
+                likelihood_config.prior_hyperparameters,
+                HalfNormalPriorHyperparametersConfig,
+            ):
+                self.prior_hyperparameters.append(
+                    HalfNormalPriorHyperparameters(
                         config=likelihood_config.prior_hyperparameters,
                     )
                 )
