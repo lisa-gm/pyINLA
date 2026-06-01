@@ -74,7 +74,7 @@ if __name__ == "__main__":
                 "type": "generic",
                 "input_dir": f"{hospital_dir}/inputs_generic",
                 "tau": 4,
-                "ph_tau": {"type": "gamma", "alpha": 1.0, "beta": 1e-5},
+                "ph_tau": {"type": "gamma", "alpha": 1.0, "beta": 0.1},
             }
             generic = GenericSubModel(
                 config=submodels_config.parse_config(generic_dict),
@@ -84,7 +84,7 @@ if __name__ == "__main__":
         likelihood_dict = {
             "type": "gaussian",
             "prec_o": 1.0,
-            "prior_hyperparameters": {"type": "gamma", "alpha": 1.0, "beta": 1e-5},
+            "prior_hyperparameters": {"type": "gamma", "alpha": 1.0, "beta": 0.1},
             # "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
         }
         model_local = Model(
