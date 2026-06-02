@@ -157,7 +157,6 @@ def matmul_gemm_accelerator(transa, transb, a, b, out=None, alpha=1.0, beta=0.0)
     assert a.ndim == b.ndim == 2
     assert a.dtype == b.dtype
     dtype = a.dtype.char
-    print(dtype)
     if dtype == 'f':
         func = cublas.sgemm
     elif dtype == 'd':

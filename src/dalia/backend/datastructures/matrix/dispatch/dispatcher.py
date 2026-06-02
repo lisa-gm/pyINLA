@@ -28,7 +28,6 @@ def blas_dispatch(operation: Operation, left, right):
     # Type checking
     left_type, left_hw_target = _get_matrix_type(left)
     right_type, right_hw_target = _get_matrix_type(right)
-    print(left_hw_target, right_hw_target)
     if left_hw_target != right_hw_target:
         # Handle hw_target mismatch
         # TODO: Make this work for different aproaches
@@ -43,9 +42,12 @@ def blas_dispatch(operation: Operation, left, right):
                 right = _hw_target_handler(right, target, right_type)
                 right_hw_target = target
         elif memory_regime == "manual":
-            target = left_hw_target
-            right = _hw_target_handler(right, target, right_type)
-            right_hw_target = target
+            try:
+                target = left_hw_target
+                right = _hw_target_handler(right, target, right_type)
+                right_hw_target = target
+            except:
+                raise ValueError(f"Out of memory, try using automatic memory management.")
         else:
             raise ValueError(f"Invalid memory regime '{memory_regime}'. Supported regimes are {regime_list}.")
             # This should never happen here

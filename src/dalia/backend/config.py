@@ -1,6 +1,6 @@
 
 default_hw_target = "host"
-memory_regime = "auto"
+memory_regime = "manual"
 memory_threshold = 0.95
 cupy_version = None
 target_list = ["host"]
@@ -97,20 +97,3 @@ __all__ = [
     "cupy_version",
     "target_list",
 ]
-
-
-"""
-pip install GPUtil pyamdgpuinfo
-
-try:
-    import GPUtil
-
-    gpus = GPUtil.getGPUs()
-
-    for gpu in gpus:
-        print(f"{gpu.name}: {gpu.memoryTotal} MB")
-
-except Exception:
-    pass
-
-"""

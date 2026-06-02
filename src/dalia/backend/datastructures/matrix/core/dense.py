@@ -46,7 +46,6 @@ class DenseMatrix(Matrix):
 
     # 2. Initialization
     def __init__(self, data, hw_target=default_hw_target, force_order=True):
-        print(data.flags.f_contiguous)
         # Reject Matrix objects - use .copy() method instead
         if isinstance(data, Matrix):
             raise TypeError(

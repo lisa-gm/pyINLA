@@ -72,7 +72,6 @@ def test_dense_transpose_is_view():
     
     matrix = DenseMatrix(original_data)  # Copy to avoid side effects
     transposed = matrix.T
-    print(np.shares_memory(matrix._data, transposed._data))
     # Modify transpose
     transposed[1, 0] = 999
 
