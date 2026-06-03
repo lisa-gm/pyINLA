@@ -304,6 +304,17 @@ class FederatedModel(Model):
 
         return log_prior
 
+    def construct_a_predict(self) -> sp.sparse.spmatrix:
+        # Build global prediction matrix by stacking local prediction rows.
+        for i, model in enumerate(self.models):
+            model.construct_a_predict()
+
+        self.a_predict: sp.sparse.spmatrix = sp.sparse.vstack(
+            [model.a_predict for model in self.models], format="csc"
+        )
+
+        return self.a_predict
+
     def __str__(self) -> str:
         """String representation of the model."""
         headers = [
