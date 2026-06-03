@@ -37,24 +37,36 @@ if __name__ == "__main__":
 
     data_type = "nurses_hom"
     family = "gaussian"
+    # covariates excluding intercept
+    # covariate_names = ["gender", "age", "experience", "wardtype"]
+    covariate_names = ["age"]
 
     if random_intercept:
-        n_fixed_effects = 4  # no global intercept, only covariates
+        n_fixed_effects = len(covariate_names)  # no global intercept, only covariates
         split_folder = f"split_{data_type}_{family}_site_specific_intercept"
         intercept_tag = "site_specific_intercept"
     else:
-        n_fixed_effects = 5  # includes global intercept
+        n_fixed_effects = 1 + len(covariate_names)  # includes global intercept
         split_folder = f"split_{data_type}_{family}_global_intercept"
         intercept_tag = "global_intercept"
 
     split_root = os.path.join(BASE_DIR, split_folder)
+    hospital_dirs = [
+        os.path.join(split_root, d)
+        for d in os.listdir(split_root)
+        if d.startswith("hospital_") and os.path.isdir(os.path.join(split_root, d))
+    ]
     hospital_dirs = sorted(
-        [
-            os.path.join(split_root, d)
-            for d in os.listdir(split_root)
-            if d.startswith("hospital_") and os.path.isdir(os.path.join(split_root, d))
-        ]
+        hospital_dirs,
+        key=lambda p: int(os.path.basename(p).split("_")[-1]),
     )
+    hospital_ids = [int(os.path.basename(p).split("_")[-1]) for p in hospital_dirs]
+
+    if len(hospital_dirs) == 0:
+        raise ValueError(f"No hospital folders found in {split_root}.")
+
+    first_a = np.load(os.path.join(hospital_dirs[0], "inputs_regression", "a.npy"))
+    print_msg(f"Detected n_fixed_effects={n_fixed_effects} from first hospital a.npy")
 
     models = []
     for hospital_dir in hospital_dirs:
@@ -62,7 +74,7 @@ if __name__ == "__main__":
             "type": "regression",
             "input_dir": f"{hospital_dir}/inputs_regression",
             "n_fixed_effects": n_fixed_effects,
-            "fixed_effects_prior_precision": 0.1,
+            "fixed_effects_prior_precision": 0.001,
         }
         regression = RegressionSubModel(
             config=submodels_config.parse_config(regression_dict),
@@ -176,7 +188,7 @@ if __name__ == "__main__":
         random_sd = np.sqrt(var_latent_params[:n_random])
         random_ci_lower = random_effects_mean - 1.96 * random_sd
         random_ci_upper = random_effects_mean + 1.96 * random_sd
-        fixed_covariates = ["gender", "age", "experience", "wardtype"]
+        fixed_covariates = covariate_names
         random_covariates = [f"site_intercept_{idx}" for idx in range(1, n_random + 1)]
 
         tau_idx = list(federated_model.theta_keys).index("tau")
@@ -199,7 +211,7 @@ if __name__ == "__main__":
         random_effects_mean = np.array([])
         random_ci_lower = np.array([])
         random_ci_upper = np.array([])
-        fixed_covariates = ["(Intercept)", "gender", "age", "experience", "wardtype"]
+        fixed_covariates = ["(Intercept)"] + covariate_names
         random_covariates = []
         tau_rows = []
 
@@ -248,5 +260,46 @@ if __name__ == "__main__":
         index=False,
     )
     print_msg(df_dalia)
+
+    # Predict using global federated a_predict and construct hospital_idx from local row counts.
+    rows_per_hospital = []
+    for hospital_id, model_local in zip(hospital_ids, models):
+        try:
+            model_local.construct_a_predict()
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"Missing apr.npz for hospital_{hospital_id}. Please run preprocessing first."
+            )
+        rows_per_hospital.append(model_local.a_predict.shape[0])
+
+    a_predict_global = federated_model.construct_a_predict()
+    eta_predict_global = np.asarray(
+        a_predict_global @ results["x"], dtype=float
+    ).reshape(-1)
+
+    hospital_idx_vec = np.repeat(np.array(hospital_ids), rows_per_hospital)
+
+    if hospital_idx_vec.shape[0] != eta_predict_global.shape[0]:
+        raise ValueError(
+            "Mismatch between hospital_idx vector length and eta_predict rows: "
+            f"{hospital_idx_vec.shape[0]} vs {eta_predict_global.shape[0]}"
+        )
+
+    df_predict = pd.DataFrame(
+        {
+            "hospital_idx": hospital_idx_vec,
+            "mean_predict": eta_predict_global,
+        }
+    )
+
+    if not df_predict.empty:
+        predictions_path = (
+            f"{BASE_DIR}/dalia_predictions_{data_type}_{intercept_tag}.csv"
+        )
+        df_predict.to_csv(predictions_path, index=False)
+        print_msg(f"Saved predictions to {predictions_path}")
+        print_msg(df_predict.head(10))
+    else:
+        print_msg("No prediction rows generated. Make sure apr.npz files exist.")
 
     print_msg("\n--- Finished ---")

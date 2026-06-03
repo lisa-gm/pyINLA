@@ -1,6 +1,9 @@
 import os
 import sys
 
+import numpy as np
+import pandas as pd
+
 from dalia.configs import (
     dalia_config,
     likelihood_config,
@@ -26,23 +29,31 @@ if __name__ == "__main__":
     args = parse_args()
 
     # random site-specific intercept
-    random_intercept = False  # True
+    random_intercept = True  # True
 
     data_type = "trauma"
     family = "binomial"
     if random_intercept:
         n_fixed_effects = 4  # no global intercept, only covariates
         split_folder = f"split_{data_type}_{family}_site_specific_intercept"
+        intercept_tag = "site_specific_intercept"
     else:
         n_fixed_effects = 5  # includes global intercept
         split_folder = f"split_{data_type}_{family}_global_intercept"
+        intercept_tag = "global_intercept"
 
     split_root = os.path.join(BASE_DIR, split_folder)
     hospital_dirs = [
-        os.path.join(split_root, "hospital_1"),
-        os.path.join(split_root, "hospital_2"),
-        os.path.join(split_root, "hospital_3"),
+        os.path.join(split_root, d)
+        for d in os.listdir(split_root)
+        if d.startswith("hospital_") and os.path.isdir(os.path.join(split_root, d))
     ]
+    hospital_dirs = sorted(
+        hospital_dirs,
+        key=lambda p: int(os.path.basename(p).split("_")[-1]),
+    )
+    if len(hospital_dirs) == 0:
+        raise ValueError(f"No hospital folders found in {split_root}.")
 
     models = []
     for hospital_dir in hospital_dirs:
@@ -93,6 +104,8 @@ if __name__ == "__main__":
         federated_model_config=models_config.parse_config(federated_dict),
     )
 
+    print_msg(federated_model)
+
     # Configurations of DALIA
     dalia_dict = {
         "solver": {"type": "dense"},
@@ -119,6 +132,85 @@ if __name__ == "__main__":
 
     if random_intercept:
         n_random = models[0].submodels[0].n_latent_parameters
-        print_msg("Mean of the random intercepts:\n", results["x"][:n_random])
+        random_effects_mean = results["x"][:n_random]
+        print_msg("Mean of the random intercepts:\n", random_effects_mean)
+
+    # Summarize fixed/random effects and save to file.
+    var_latent_params = results["marginal_variances_latent"]
+    marginals_hp = dalia.marginal_distributions_hp()
+
+    if random_intercept:
+        random_sd = np.sqrt(var_latent_params[:n_random])
+        random_ci_lower = random_effects_mean - 1.96 * random_sd
+        random_ci_upper = random_effects_mean + 1.96 * random_sd
+
+        fixed_sd = np.sqrt(
+            var_latent_params[n_random : n_random + federated_model.n_fixed_effects]
+        )
+        fixed_covariates = ["sex", "age", "ISS", "GCS"]
+        random_covariates = [f"site_intercept_{idx}" for idx in range(1, n_random + 1)]
+
+        tau_idx = list(federated_model.theta_keys).index("tau")
+        tau_estimate = float(results["theta"][tau_idx])
+        tau_quantile_pairs = marginals_hp["hyperparameters"]["tau"]["quantiles"][
+            "external"
+        ]["pairs"]
+        tau_ci_lower = float(tau_quantile_pairs[0][1])
+        tau_ci_upper = float(tau_quantile_pairs[-1][1])
+        tau_rows = [
+            {
+                "Estimate": tau_estimate,
+                "lower": tau_ci_lower,
+                "upper": tau_ci_upper,
+                "Method": "DALIA-FED",
+                "Covariate": "precision_random_intercept",
+            }
+        ]
+    else:
+        fixed_sd = np.sqrt(var_latent_params[: federated_model.n_fixed_effects])
+        fixed_covariates = ["(Intercept)", "sex", "age", "ISS", "GCS"]
+        random_effects_mean = np.array([])
+        random_ci_lower = np.array([])
+        random_ci_upper = np.array([])
+        random_covariates = []
+        tau_rows = []
+
+    fixed_ci_lower = fixed_effects_mean - 1.96 * fixed_sd
+    fixed_ci_upper = fixed_effects_mean + 1.96 * fixed_sd
+
+    summary_rows = []
+    for covariate, lower, upper, estimate in zip(
+        fixed_covariates, fixed_ci_lower, fixed_ci_upper, fixed_effects_mean
+    ):
+        summary_rows.append(
+            {
+                "Estimate": estimate,
+                "lower": lower,
+                "upper": upper,
+                "Method": "DALIA-FED",
+                "Covariate": covariate,
+            }
+        )
+
+    for covariate, lower, upper, estimate in zip(
+        random_covariates, random_ci_lower, random_ci_upper, random_effects_mean
+    ):
+        summary_rows.append(
+            {
+                "Estimate": estimate,
+                "lower": lower,
+                "upper": upper,
+                "Method": "DALIA-FED",
+                "Covariate": covariate,
+            }
+        )
+
+    summary_rows.extend(tau_rows)
+
+    df_dalia = pd.DataFrame(summary_rows)
+    summary_path = f"{BASE_DIR}/dalia_summary_{data_type}_{intercept_tag}.csv"
+    df_dalia.to_csv(summary_path, index=False)
+    print_msg(f"Saved summary to {summary_path}")
+    print_msg(df_dalia)
 
     print_msg("\n--- Finished ---")
