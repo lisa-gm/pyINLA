@@ -29,13 +29,16 @@ if __name__ == "__main__":
 
     data_type = "nurses_hom"
     family = "gaussian"
+    # covariates excluding intercept
+    # covariate_names = ["gender", "age", "experience", "wardtype"]
+    covariate_names = ["age"]
 
     if random_intercept:
-        n_fixed_effects = 4  # no global intercept, only covariates
+        n_fixed_effects = len(covariate_names)  # no global intercept, only covariates
         joint_folder = f"joint_{data_type}_{family}_site_specific_intercept"
         intercept_tag = "site_specific_intercept"
     else:
-        n_fixed_effects = 5  # includes global intercept
+        n_fixed_effects = 1 + len(covariate_names)  # includes global intercept
         joint_folder = f"joint_{data_type}_{family}_global_intercept"
         intercept_tag = "global_intercept"
 
@@ -152,7 +155,7 @@ if __name__ == "__main__":
         random_sd = np.sqrt(var_latent_params[:n_random])
         random_ci_lower = random_effects_mean - 1.96 * random_sd
         random_ci_upper = random_effects_mean + 1.96 * random_sd
-        fixed_covariates = ["gender", "age", "experience", "wardtype"]
+        fixed_covariates = covariate_names
         random_covariates = [f"site_intercept_{idx}" for idx in range(1, n_random + 1)]
 
         tau_idx = list(model.theta_keys).index("tau")
@@ -175,7 +178,7 @@ if __name__ == "__main__":
         random_effects_mean = np.array([])
         random_ci_lower = np.array([])
         random_ci_upper = np.array([])
-        fixed_covariates = ["(Intercept)", "gender", "age", "experience", "wardtype"]
+        fixed_covariates = ["(Intercept)"] + covariate_names
         random_covariates = []
         tau_rows = []
 
