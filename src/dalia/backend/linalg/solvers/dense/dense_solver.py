@@ -1,7 +1,12 @@
 # src/dalia/backend/linalg/solvers/dense/dense_linear_solver.py
 
+from dalia.backend.config import cupy_version
+
 import numpy as np
 from scipy.linalg import cholesky, get_lapack_funcs, solve_triangular
+
+if cupy_version is not None:
+    import cupy as cp
 
 from dalia.backend.linalg.solvers.linear_solver import LinearSolver
 
