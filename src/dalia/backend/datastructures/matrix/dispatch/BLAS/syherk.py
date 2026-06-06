@@ -9,14 +9,16 @@ from scipy.linalg._misc import _datacopied
 from scipy.linalg._decomp import _asarray_validated
 
 
-from dalia.backend.config import cupy_version
-
+from dalia.backend.config import cupy_version, nvmath_version
+from .gemm import matmul_gemm_accelerator
 
 if cupy_version is not None:
     import cupy as cp
     from cupy_backends.cuda.libs import cublas
     from cupy import _core
     from cupy.cuda import device
+
+if nvmath_version is not None:
     from nvmath.bindings import cublas as nvcublas
 
 def syherk(a, hw_target,c=None, alpha=1.0, beta=0.0, trans=0, lower=False, cu_chol=False):
@@ -122,13 +124,18 @@ def matmul_syherk_accelerator(a, trans='N', out=None, alpha=1.0, beta=0.0, lower
         try:
             func = cublas.cherk
         except(AttributeError):
-            func = nvcublas.cherk
+            if nvmath_version is not None:
+                func = nvcublas.cherk
+            else:
+                matmul_gemm_accelerator(a, a, out, trans_b='C', alpha=alpha, beta=beta)
     elif dtype == 'D':
         try:
             func = cublas.zherk
         except(AttributeError):
-            func = nvcublas.zherk
-            return out
+            if nvmath_version is not None:
+                func = nvcublas.zherk
+            else:
+                matmul_gemm_accelerator(a, a, out, trans_b='C', alpha=alpha, beta=beta)
     else:
         raise TypeError('invalid dtype')
     

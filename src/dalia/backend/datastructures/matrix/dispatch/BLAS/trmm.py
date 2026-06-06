@@ -9,7 +9,8 @@ from scipy.linalg._misc import _datacopied
 from scipy.linalg._decomp import _asarray_validated
 
 
-from dalia.backend.config import cupy_version
+from dalia.backend.config import cupy_version, nvmath_version
+from .gemm import matmul_gemm_accelerator
 
 # TODO: Change this to use flags instead of try
 if cupy_version is not None:
@@ -17,6 +18,8 @@ if cupy_version is not None:
     from cupy_backends.cuda.libs import cublas
     from cupy import _core
     from cupy.cuda import device
+
+if nvmath_version is not None:
     from nvmath.bindings import cublas as nvcublas
 
 
@@ -155,6 +158,9 @@ def matmul_trmm_accelerator(transa, transb, a, b, out=None, alpha=1.0, beta=0.0)
     op(b) = b if transb is 'N', op(b) = b.T if transb is 'T',
     op(b) = b.T.conj() if transb is 'C'.
     """
+    if nvmath_version is not None:
+        matmul_gemm_accelerator(transa, transb, a, b, out, alpha, beta)
+    
     assert a.ndim == b.ndim == 2
     assert a.dtype == b.dtype
     dtype = a.dtype.char

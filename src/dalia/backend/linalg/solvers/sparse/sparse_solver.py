@@ -37,8 +37,8 @@ class SparseSolver(LinearSolver):
 
         Returns
         -------
-        L : numpy.ndarray
-            Lower triangular Cholesky factor.
+        L : superLU object
+             SuperLU factorization object containing L and U factors.
         """
         # TODO: maybe just say that there is no cholesky decomposition
         # pylint: disable=protected-access
@@ -47,7 +47,7 @@ class SparseSolver(LinearSolver):
         factors = splu(
             self._matrix._data.tocsc()
         )
-        return factors.L
+        return factors
     
     def _solve_system(self, b: np.ndarray):
         """Solve Ax = b using Cholesky factors.
@@ -69,9 +69,7 @@ class SparseSolver(LinearSolver):
         # Forward solve L y = b
 
         # Backward solve L^T x = y
-        x = spsolve(
-            self._matrix._data,
-            b
+        x = self._factors.solve(b
         )
 
         return x

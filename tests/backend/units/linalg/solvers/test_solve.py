@@ -49,9 +49,8 @@ class TestSolve:
         M = matrix_factory("SparseMatrix", shape=(3, 3), hw_target="accelerator")
         E = matrix_factory("SparseMatrix", shape=(3, 3), data=np.eye(3), hw_target="accelerator")
         A = M.T @ M + E  # Make it symmetric positive definite
-        b = np.array([1, 2, 3], dtype=np.float64)
+        b = np.array([1., 2., 3.], dtype=np.float64)
         solver = CuDSS(A)
-        solver.factorize()
         x = solver.solve(b)
         # Verify the solution is correct
         x = x.get()
