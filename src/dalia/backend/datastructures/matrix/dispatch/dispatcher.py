@@ -52,10 +52,8 @@ def blas_dispatch(operation: Operation, left, right):
             raise ValueError(f"Invalid memory regime '{memory_regime}'. Supported regimes are {regime_list}.")
             # This should never happen here
 
-    print(left_hw_target, right_hw_target)
     # Dispatch based on operation
     dispatch_func = _OPERATION_MAP[operation]
-    print()
     return dispatch_func(left, right, left_type, right_type, left_hw_target)
 
 def _hw_target_handler(data, hw_target, matrix_type):

@@ -17,6 +17,7 @@ if cupy_version is not None:
     from cupy_backends.cuda.libs import cublas
     from cupy import _core
     from cupy.cuda import device
+    from nvmath.bindings import cublas as nvcublas
 
 def syherk(a, hw_target,c=None, alpha=1.0, beta=0.0, trans=0, lower=False, cu_chol=False):
     """Wrapper for the trsm function to call depending on wheter the solve happens on the host or the device
@@ -121,13 +122,12 @@ def matmul_syherk_accelerator(a, trans='N', out=None, alpha=1.0, beta=0.0, lower
         try:
             func = cublas.cherk
         except(AttributeError):
-            out = gemm(a, a, out, trans_b='C', alpha=alpha, beta=beta)
-            return out
+            func = nvcublas.cherk
     elif dtype == 'D':
         try:
             func = cublas.zherk
         except(AttributeError):
-            out = gemm(a, a, out, trans_b='C', alpha=alpha, beta=beta)
+            func = nvcublas.zherk
             return out
     else:
         raise TypeError('invalid dtype')

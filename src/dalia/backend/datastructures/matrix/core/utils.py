@@ -9,18 +9,18 @@ if cupy_version is not None:
     import cupyx.scipy.sparse as cu_sp
 
 
-def wrap_result(data):
+def wrap_result(data, hw_target=None):
     """Wrap the result data in the appropriate Matrix subclass"""
     # pylint: disable=import-outside-toplevel
     from .dense import DenseMatrix
     from .sparse import SparseMatrix
 
     if isinstance(data, np.ndarray):
-        return DenseMatrix(data, force_order=False)  # Preserve original order
+        return DenseMatrix(data, hw_target=hw_target, force_order=False)  # Preserve original order
     if sp.issparse(data):
         return SparseMatrix(data)
     if isinstance(data, cp.ndarray):
-        return DenseMatrix(data, force_order=False)  # Preserve original order
+        return DenseMatrix(data, hw_target=hw_target, force_order=False)  # Preserve original order
     if cu_sp.issparse(data):
         return SparseMatrix(data)
     raise TypeError(f"Unknown matrix type: {type(data)}")

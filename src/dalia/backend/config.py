@@ -3,6 +3,7 @@ default_hw_target = "host"
 memory_regime = "manual"
 memory_threshold = 0.95
 cupy_version = None
+nvmath_version = None
 target_list = ["host"]
 regime_list = ["auto", "manual"]
 
@@ -24,6 +25,20 @@ def check_cupy_availability():
     except ImportError:
         pass
     return cupy_version
+
+def check_nvmath_availability():
+    """Check if NVIDIA Math Libraries are available.
+    
+    Returns:
+        str or None: The version of NVIDIA Math Libraries if available, otherwise None.
+    """
+    global nvmath_version
+    try:
+        import nvmath
+        nvmath_version = nvmath.__version__
+    except ImportError:
+        pass
+    return nvmath_version
 
 def set_default_hw_target(hw_target):
     """Set the default hardware target.
@@ -95,5 +110,6 @@ __all__ = [
     "memory_regime",
     "memory_threshold",
     "cupy_version",
+    "nvmath_version",
     "target_list",
 ]

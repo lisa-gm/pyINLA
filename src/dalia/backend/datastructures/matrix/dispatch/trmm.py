@@ -17,6 +17,7 @@ if cupy_version is not None:
     from cupy_backends.cuda.libs import cublas
     from cupy import _core
     from cupy.cuda import device
+    from nvmath.bindings import cublas as nvcublas
 
 
 def trmm (a, b, hw_target, c=None, alpha=1.0, beta=0.0, trans_a ='N', trans_b ='N'):
@@ -158,13 +159,13 @@ def matmul_trmm_accelerator(transa, transb, a, b, out=None, alpha=1.0, beta=0.0)
     assert a.dtype == b.dtype
     dtype = a.dtype.char
     if dtype == 'f':
-        func = cublas.strmm
+        func = nvcublas.strmm
     elif dtype == 'd':
-        func = cublas.dtrmm
+        func = nvcublas.dtrmm
     elif dtype == 'F':
-        func = cublas.ctrmm
+        func = nvcublas.ctrmm
     elif dtype == 'D':
-        func = cublas.ztrmm
+        func = nvcublas.ztrmm
     else:
         raise TypeError('invalid dtype')
     

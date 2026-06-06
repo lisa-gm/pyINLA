@@ -2,5 +2,6 @@
 from .dense.dense_solver import DenseSolver
 from .linear_solver import LinearSolver
 from .sparse.sparse_solver import SparseSolver
+from .sparse.cudss import CuDSS
 
-__all__ = ["LinearSolver", "DenseSolver", "SparseSolver"]
+__all__ = ["LinearSolver", "DenseSolver", "SparseSolver", "CuDSS"]

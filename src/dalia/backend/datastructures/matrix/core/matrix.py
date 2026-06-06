@@ -304,4 +304,4 @@ class Matrix(ABC):
     # 11. Private/protected methods (start with _)
     def _wrap_result(self, data):
         """Wrap the result data in the appropriate Matrix subclass"""
-        return wrap_result(data)
+        return wrap_result(data, hw_target=self._hw_target)

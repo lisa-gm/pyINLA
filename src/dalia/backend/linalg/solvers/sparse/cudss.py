@@ -1,9 +1,10 @@
 # src/dalia/backend/linalg/solvers/sparse/cudss.py
 from .sparse_solver import SparseSolver
-from dalia.backend.config import cupy_version
+from dalia.backend.config import cupy_version, nvmath_version
 
 if cupy_version is not None:
     import cupy as cp
+if nvmath_version is not None:
     import nvmath.bindings.cudss as nm
 
 class CuDSS(SparseSolver):

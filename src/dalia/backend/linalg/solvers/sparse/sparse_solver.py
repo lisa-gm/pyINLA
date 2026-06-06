@@ -1,15 +1,18 @@
 # src/dalia/backend/linalg/solvers/sparse/sparse_linear_solver.py
 
-from dalia.backend.config import cupy_version
+
 
 import numpy as np
 import scipy.sparse as sp
 from scipy.sparse.linalg import spsolve, splu
 
+from dalia.backend.linalg.solvers.linear_solver import LinearSolver
+from dalia.backend.config import cupy_version
+
 if cupy_version is not None:
     import cupy as cp
 
-class SparseSolver:
+class SparseSolver(LinearSolver):
     ...
     # 1. Class attributes (if any)
     # 2. Initialization
@@ -39,8 +42,10 @@ class SparseSolver:
         """
         # TODO: maybe just say that there is no cholesky decomposition
         # pylint: disable=protected-access
+        if self._target == "accelerator":
+            raise NotImplementedError("SparseSolver does not support accelerators. Use CuDSS instead.")
         factors = splu(
-            self._matrix._data, lower=True, overwrite_a=overwrite, check_finite=False
+            self._matrix._data.tocsc()
         )
         return factors.L
     
@@ -59,6 +64,8 @@ class SparseSolver:
         x : numpy.ndarray
             Solution vector or matrix.
         """
+        if self._target == "accelerator":
+            raise NotImplementedError("SparseSolver does not support accelerators. Use CuDSS instead.")
         # Forward solve L y = b
 
         # Backward solve L^T x = y
@@ -68,3 +75,11 @@ class SparseSolver:
         )
 
         return x
+    
+    def _compute_selected_inverse(self):
+
+        return NotImplementedError("Selected inversion not implemented for sparse solver yet.")
+    
+    def _compute_logdet(self):
+
+        return NotImplementedError("Log determinant not implemented for sparse solver yet.")
