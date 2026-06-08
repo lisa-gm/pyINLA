@@ -21,7 +21,7 @@ if cupy_version is not None:
 if nvmath_version is not None:
     from nvmath.bindings import cublas as nvcublas
 
-def syherk(a, hw_target,c=None, alpha=1.0, beta=0.0, trans=0, lower=False, cu_chol=False):
+def syherk(a, hw_target,c=None, alpha=1.0, beta=0.0, trans=0, lower=0, overwrite_c=0):
     """Wrapper for the trsm function to call depending on wheter the solve happens on the host or the device
     
         For Compatibility this function accepts exactly the same parameters as what the scipy and cupy implementations accept
@@ -29,9 +29,9 @@ def syherk(a, hw_target,c=None, alpha=1.0, beta=0.0, trans=0, lower=False, cu_ch
     """
     
     if  hw_target == "host":
-        return matmul_syherk_host(a, c, alpha, beta, trans, lower)
+        return matmul_syherk_host(a, c, alpha, beta, trans, lower, overwrite_c)
     elif hw_target == "accelerator":
-        return matmul_syherk_accelerator(a, trans, c, alpha, beta, lower, cu_chol)
+        return matmul_syherk_accelerator(a, c, alpha, beta, trans, lower, overwrite_c)
     else:
         ModuleNotFoundError("Unknown Module")
 
@@ -41,6 +41,10 @@ def matmul_syherk_host(a, c=None, alpha=1.0, beta=1.0, trans=0, lower=False,
 
     op(a) = a if transa is 'N', op(a) = a.T if transa is 'T',
     op(a) = a.T.conj() if transa is 'C'.
+    
+    lower specifies  whether  the  upper  or  lower triangular
+    part  of the  array  out  is to be  referenced
+    overwrite_c determines if out will overwrite c
     """
 
     a1 = _asarray_validated(a, check_finite=check_finite)
@@ -106,13 +110,15 @@ def _get_scalar_ptr(a, dtype):
     return a, a_ptr
 # Util functions for cupy gemm end
 
-def matmul_syherk_accelerator(a, trans='N', out=None, alpha=1.0, beta=0.0, lower=False, cu_chol=False):
+def matmul_syherk_accelerator(a, c=None, alpha=1.0, beta=0.0, trans='N', lower=False, overwrite_c=0):
     """Computes out := alpha*op1(a)*op2(a) + beta*out
 
     op1(a) = a if trans is 'N', op2(a) = a.T if transa is 'N'
     op1(a) = a.T if trans is 'T', op2(a) = a if transa is 'T'
+    
     lower specifies  whether  the  upper  or  lower triangular
     part  of the  array  out  is to be  referenced
+    overwrite_c determines if out will overwrite c
     """
     assert a.ndim == 2
     dtype = a.dtype.char
@@ -138,20 +144,21 @@ def matmul_syherk_accelerator(a, trans='N', out=None, alpha=1.0, beta=0.0, lower
                 matmul_gemm_accelerator(a, a, out, trans_b='C', alpha=alpha, beta=beta)
     else:
         raise TypeError('invalid dtype')
-    
-    # If this is run in combination with cholesky, it will be necessary to flip lower
-    if cu_chol:
-        lower = not lower
 
     trans = _trans_to_cublas_op(trans)
     if trans == cublas.CUBLAS_OP_N:
         n, k = a.shape
     else:
         k, n = a.shape
-    if out is None:
+    out = None
+    if c is None:
         out = cp.zeros((n, n), dtype=dtype, order='F')
         beta = 0.0
     else:
+        if overwrite_c:
+            out = c
+        else:
+            out = c.copy(order='F')
         assert out.ndim == 2
         assert out.shape == (n, n)
         assert out.dtype == dtype

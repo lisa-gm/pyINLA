@@ -28,45 +28,37 @@ def trmm (a, b, hw_target, alpha=1.0, side=0, lower=0, trans_a ='N', diag=0, ove
     
 
     if hw_target == "host":
-        return matmul_trmm_host(a, b, alpha, side, lower, trans_a, diag, overwrite_b)
+        return matmul_trmm_host(a, b, alpha, trans_a, side, lower, diag, overwrite_b)
     elif hw_target == "accelerator":
-        return matmul_trmm_accelerator(trans_a, a, b, alpha, side, lower, diag, overwrite_b)
+        return matmul_trmm_accelerator(a, b, alpha, trans_a, side, lower, diag, overwrite_b)
     else:
         ModuleNotFoundError("Unknown Module")
 
 
-def matmul_trmm_host(a, b, alpha=1.0, side=0, lower=0, trans_a=0, diag=0, overwrite_b=0, check_finite=False):
-    """Computes out = alpha * op(a) @ op(b) + beta * out
+def matmul_trmm_host(a, b, alpha=1.0, trans_a=0, side=0, lower=0, diag=0, overwrite_b=0, check_finite=False):
+    """Computes out = alpha * op(a) @ b or alpha * b @ op(a) where a is a triangluar matrix
 
-    op(a) = a if transa is 'N', op(a) = a.T if transa is 'T',
+    op(a) = a if transa is 'N', op(a) = a.T if transa is 'T' or 'C',
     op(a) = a.T.conj() if transa is 'C'.
-    op(b) = b if transb is 'N', op(b) = b.T if transb is 'T',
-    op(b) = b.T.conj() if transb is 'C'.
+
+    side determines if a is on the left or on the right
+    lower determines if a is an upper or lower triangular matrix
+    diag determines if a is unit triangluar
+    overwrite_b determines if out will overwrite b
     """
 
     a1 = _asarray_validated(a, check_finite=check_finite)
     b1 = _asarray_validated(b, check_finite=check_finite)
 
-    transa = True
-    transb = False
-    if trans_a == 'N':
-        transa = False
 
-    if not transa and not transb:
-        if a1.shape[1] != b1.shape[0]:
-            raise ValueError(f'shapes of a {a1.shape} and b {b1.shape} are incompatible (1,0)')
-        
-    elif transa and not transb:
+    if a1.shape[0] != a1.shape[1]:
+        raise ValueError(f'a {a1.shape} is not a square matrix')
+    if not side:
         if a1.shape[0] != b1.shape[0]:
-            raise ValueError(f'shapes of a {a1.shape} and b {b1.shape} are incompatible (0,0)')
-        
-    elif not transa and transb:
-        if a1.shape[1] != b1.shape[1]:
-            raise ValueError(f'shapes of a {a1.shape} and b {b1.shape} are incompatible (1,1)')
-        
+            raise ValueError(f'shapes of a {a1.shape} and b {b1.shape} are incompatible')
     else:
         if a1.shape[0] != b1.shape[1]:
-            raise ValueError(f'shapes of a {a1.shape} and b {b1.shape} are incompatible (0,1)')
+            raise ValueError(f'shapes of a {a1.shape} and b {b1.shape} are incompatible')
 
     # accommodate empty arrays
     if b1.size == 0:
@@ -135,16 +127,19 @@ def _get_scalar_ptr(a, dtype):
 # Util functions for cupy gemm end
 
 
-def matmul_trmm_accelerator(transa, a, b, alpha=1.0, side=0, lower=0, diag=0, overwrite_b=0):
-    """Computes out := alpha*op1(a)*op2(a)
+def matmul_trmm_accelerator(a, b, alpha=1.0, transa=0, side=0, lower=0, diag=0, overwrite_b=0):
+    """Computes out = alpha * op(a) @ b or alpha * b @ op(a) where a is a triangular matrix
 
-    op1(a) = a if trans is 'N', op2(a) = a.T if transa is 'N'
-    op1(a) = a.T if trans is 'T', op2(a) = a if transa is 'T'
-    lower specifies  whether  the  upper  or  lower triangular
-    part  of the  array  out  is to be  referenced
+    op(a) = a if transa is 'N', op(a) = a.T if transa is 'T' or 'C',
+    op(a) = a.T.conj() if transa is 'C'.
+
+    side determines if a is on the left or on the right
+    lower determines if a is an upper or lower triangular matrix
+    diag determines if a is unit triangluar
+    overwrite_b determines if out will overwrite b
     """
     if nvmath_version is not None:
-        matmul_gemm_accelerator(transa, "N", a, b, alpha=alpha)
+        matmul_gemm_accelerator(a, b, alpha=alpha, transa=transa, transb="N")
 
     assert a.ndim == b.ndim == 2
     assert a.dtype == b.dtype

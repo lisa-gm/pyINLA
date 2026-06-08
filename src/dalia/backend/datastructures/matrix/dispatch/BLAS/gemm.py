@@ -19,25 +19,27 @@ if cupy_version is not None:
     from cupy.cuda import device
 
 
-def gemm (a, b, hw_target, c=None, alpha=1.0, beta=0.0, trans_a ='N', trans_b ='N'):
+def gemm (a, b, hw_target, c=None, alpha=1.0, beta=0.0, trans_a ='N', trans_b ='N', overwrite_c = 0):
     """Wrapper to call GeMM for host or device"""
     
 
     if hw_target == "host":
-        return matmul_gemm_host(a, b, alpha, beta, c, trans_a, trans_b)
+        return matmul_gemm_host(a, b, c, alpha, beta, trans_a, trans_b, overwrite_c)
     elif hw_target == "accelerator":
-        return matmul_gemm_accelerator(trans_a, trans_b, a, b, c, alpha, beta)
+        return matmul_gemm_accelerator(a, b, c, alpha, beta, trans_a, trans_b, overwrite_c)
     else:
         ModuleNotFoundError("Unknown Module")
 
 
-def matmul_gemm_host(a, b, alpha=1.0, beta=0.0, c=None, trans_a=0, trans_b=0, overwrite_c=0, check_finite=False):
-    """Computes out = alpha * op(a) @ op(b) + beta * out
+def matmul_gemm_host(a, b, c=None, alpha=1.0, beta=0.0, trans_a=0, trans_b=0, overwrite_c=0, check_finite=False):
+    """Computes out = alpha * op(a) @ op(b) + beta * c
 
     op(a) = a if transa is 'N', op(a) = a.T if transa is 'T',
     op(a) = a.T.conj() if transa is 'C'.
     op(b) = b if transb is 'N', op(b) = b.T if transb is 'T',
     op(b) = b.T.conj() if transb is 'C'.
+    
+    overwrite_c determines if out will overwrite c
     """
 
     a1 = _asarray_validated(a, check_finite=check_finite)
@@ -146,13 +148,15 @@ def _get_scalar_ptr(a, dtype):
 # Util functions for cupy gemm end
 
 
-def matmul_gemm_accelerator(transa, transb, a, b, out=None, alpha=1.0, beta=0.0):
-    """Computes out = alpha * op(a) @ op(b) + beta * out
+def matmul_gemm_accelerator(a, b, c=None, alpha=1.0, beta=0.0, transa=0, transb=0, overwrite_c=0):
+    """Computes out = alpha * op(a) @ op(b) + beta * c
 
     op(a) = a if transa is 'N', op(a) = a.T if transa is 'T',
     op(a) = a.T.conj() if transa is 'C'.
     op(b) = b if transb is 'N', op(b) = b.T if transb is 'T',
     op(b) = b.T.conj() if transb is 'C'.
+    
+    overwrite_c determines if out will overwrite c
     """
     assert a.ndim == b.ndim == 2
     assert a.dtype == b.dtype
@@ -181,10 +185,16 @@ def matmul_gemm_accelerator(transa, transb, a, b, out=None, alpha=1.0, beta=0.0)
     else:
         n = b.shape[0]
         assert b.shape[1] == k
-    if out is None:
+
+    out = None
+    if c is None:
         out = cp.empty((m, n), dtype=dtype, order='F')
         beta = 0.0
     else:
+        if overwrite_c:
+            out = c
+        else:
+            out = c.copy(order='F')
         assert out.ndim == 2
         assert out.shape == (m, n)
         assert out.dtype == dtype
