@@ -73,22 +73,26 @@ class SparseMatrix(Matrix):
                 )
 
         # Validate input is sparse
-        if not (sp.issparse(data) or cu_sp.issparse(data)):
+        if not (sp.issparse(data)):
             
             if cupy_version is not None:
                 if not cu_sp.issparse(data):
                     raise TypeError(
                         f"SparseMatrix requires either scipy.sparse or cupyx.scipy.sparse matrix, got {type(data).__name__}"
                     )
-
-            raise TypeError(
-                f"SparseMatrix requires scipy.sparse matrix, got {type(data).__name__}"
-            )
+            else:
+                raise TypeError(
+                    f"SparseMatrix requires scipy.sparse matrix, got {type(data).__name__}"
+                )
 
         # Convert to canonical CSR format if needed
-        if not isinstance(data, sp.csr_matrix) or not isinstance(data, cu_sp.csr_matrix):
+        if not isinstance(data, sp.csr_matrix):
             
-            data = data.tocsr()
+            if cupy_version is not None:
+                if not isinstance(data, cu_sp.csr_matrix):
+                    data = data.tocsr()
+            else:
+                data = data.tocsr()
 
         # Ensure canonical format for optimal performance
         # This sorts indices and removes duplicates if needed

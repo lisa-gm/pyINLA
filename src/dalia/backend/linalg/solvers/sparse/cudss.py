@@ -41,7 +41,7 @@ class CuDSS(SparseSolver):
         # TODO: add warning or logging
         return None # cuDSS does not support separate factorization step, so we return None
 
-    def _solve_system(self, b: cp.ndarray):
+    def _solve_system(self, b):
 
         if isinstance(b, np.ndarray):
             b = cp.asarray(b)

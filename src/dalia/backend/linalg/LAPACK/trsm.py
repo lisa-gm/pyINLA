@@ -3,12 +3,13 @@
 # and scipy.linal.solve_triangular: https://github.com/scipy/scipy/blob/v1.15.3/scipy/linalg/_basic.py#L411
 
 import numpy as np
+import math as math
 
 from scipy.linalg.blas import get_blas_funcs
 from scipy.linalg._misc import _datacopied
 from scipy.linalg._decomp import _asarray_validated
 
-from dalia.backend.config import cupy_version
+from dalia.backend.config import cupy_version, target_list
 
 if cupy_version is not None:
     import cupy as cp
@@ -29,7 +30,7 @@ def trsm(a, b, hw_target, trans=0, lower = False, unit_diagonal=False,
     elif hw_target == "accelerator":
         return solve_triangular_accelerator(a, b, trans, lower, unit_diagonal, overwrite_b, check_finite, side)
     else:
-        ModuleNotFoundError("Unknown Module")
+        raise ValueError(f"Invalid hardware target type '{hw_target}'. Supported target types are {target_list}.")
     
 
 

@@ -30,7 +30,6 @@ class TestSolve:
         M = matrix_factory("SparseMatrix", shape=(3, 3), hw_target=device_type)
         E = matrix_factory("SparseMatrix", shape=(3, 3), data=np.eye(3), hw_target=device_type)
         A = M.T @ M + E  # Make it symmetric positive definite
-        print(type(A))
         b = np.array([1, 2, 3], dtype=np.float64)
         solver = SparseSolver(A)
         solver.factorize()

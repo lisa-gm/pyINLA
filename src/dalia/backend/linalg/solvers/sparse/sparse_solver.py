@@ -76,8 +76,8 @@ class SparseSolver(LinearSolver):
     
     def _compute_selected_inverse(self):
 
-        return NotImplementedError("Selected inversion not implemented for sparse solver yet.")
+        raise NotImplementedError("Selected inversion not implemented for sparse solver yet.")
     
     def _compute_logdet(self):
 
-        return NotImplementedError("Log determinant not implemented for sparse solver yet.")
+        raise NotImplementedError("Log determinant not implemented for sparse solver yet.")

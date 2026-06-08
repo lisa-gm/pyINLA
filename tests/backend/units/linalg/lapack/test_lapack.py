@@ -27,8 +27,8 @@ class TestLapack:
         X = gemm(A, B, device_type, c=C, alpha=alpha, beta=beta)
         # Verify the result is correct
         if device_type == "accelerator":
-            X.get()
-        
+            X = X.get()
+            expected = expected.get()
         assert np.allclose(X, expected)
 
     @pytest.mark.parametrize("data_type", DATA_TYPES)
@@ -45,13 +45,18 @@ class TestLapack:
         C = array_factory(data_type, shape=(3, 3), device_type=device_type)
         alpha = 1.5
         beta = 1.5
+        if device_type == "host":
+            xp = np
+        elif device_type == "accelerator":
+            xp = cp
         C_copy = C.copy()
-        C_copy[np.triu_indices_from(C)] *= beta
-        expected = np.triu(alpha * A @ A.conj().T) + C_copy
+        C_copy[xp.triu_indices_from(C)] *= beta
+        expected = xp.triu(alpha * A @ A.conj().T) + C_copy
         X = syherk(A, device_type, c=C, alpha=alpha, beta=beta)
         # Verify the result is correct
         if device_type == "accelerator":
-            X.get()
+            X = X.get()
+            expected = expected.get()
         assert np.allclose(X, expected)
 
     @pytest.mark.parametrize("data_type", DATA_TYPES)
@@ -62,10 +67,15 @@ class TestLapack:
             pytest.skip("nvmath needed for TRMM")
         A = array_factory(data_type, shape=(3, 3), device_type=device_type)
         B = array_factory(data_type, shape=(3, 3), device_type=device_type)
-        alpha = 1.5    
-        expected = alpha * np.triu(A) @ B
+        if device_type == "host":
+            xp = np
+        elif device_type == "accelerator":
+            xp = cp
+        alpha = 1.0    
+        expected = alpha * xp.triu(A) @ B
         X = trmm(A, B, device_type, alpha=alpha)
         # Verify the result is correct
         if device_type == "accelerator":
-            X.get()
+            X = X.get()
+            expected = expected.get()
         assert np.allclose(X, expected) 

@@ -48,7 +48,7 @@ def matmul_trmm_host(a, b, alpha=1.0, side=0, lower=0, trans_a=0, diag=0, overwr
     b1 = _asarray_validated(b, check_finite=check_finite)
 
     transa = True
-    transb = True
+    transb = False
     if trans_a == 'N':
         transa = False
 
@@ -145,7 +145,7 @@ def matmul_trmm_accelerator(transa, a, b, alpha=1.0, side=0, lower=0, diag=0, ov
     """
     if nvmath_version is not None:
         matmul_gemm_accelerator(transa, "N", a, b, alpha=alpha)
-    
+
     assert a.ndim == b.ndim == 2
     assert a.dtype == b.dtype
     dtype = a.dtype.char
@@ -161,12 +161,10 @@ def matmul_trmm_accelerator(transa, a, b, alpha=1.0, side=0, lower=0, diag=0, ov
         raise TypeError('invalid dtype')
 
     transa = _trans_to_cublas_op(transa)
-    if transa == cublas.CUBLAS_OP_N:
-        m, k = a.shape
-    else:
-        k, m = a.shape
-    n = b.shape[1]
-    assert b.shape[0] == k
+    assert a.shape[0] == a.shape[1]
+    lda = a.shape[0]
+    m, n = b.shape
+    ldb = m
     out = None
     if overwrite_b:
         out = b
@@ -175,6 +173,10 @@ def matmul_trmm_accelerator(transa, a, b, alpha=1.0, side=0, lower=0, diag=0, ov
         assert out.dtype == dtype
     else:
         out = cp.zeros((m, n), dtype=dtype, order='F')
+    if a._c_contiguous:
+        a = a.copy(order='F')
+    if b._c_contiguous:
+        b = b.copy(order='F')
     if lower:
         uplo = cublas.CUBLAS_FILL_MODE_LOWER
     else:
@@ -182,8 +184,10 @@ def matmul_trmm_accelerator(transa, a, b, alpha=1.0, side=0, lower=0, diag=0, ov
 
     if side:
         side = cublas.CUBLAS_SIDE_RIGHT
+        assert lda == n
     else:
         side = cublas.CUBLAS_SIDE_LEFT
+        assert lda == m
 
     if diag:
         diag = cublas.CUBLAS_DIAG_UNIT
@@ -194,42 +198,10 @@ def matmul_trmm_accelerator(transa, a, b, alpha=1.0, side=0, lower=0, diag=0, ov
     handle = device.get_cublas_handle()
     orig_mode = cublas.getPointerMode(handle)
     if isinstance(alpha, cp.ndarray):
-        if not isinstance(alpha, cp.ndarray):
-            alpha = cp.array(alpha)
-            alpha_ptr = alpha.data.ptr
         cublas.setPointerMode(handle, cublas.CUBLAS_POINTER_MODE_DEVICE)
     else:
         cublas.setPointerMode(handle, cublas.CUBLAS_POINTER_MODE_HOST)
 
-    if a._c_contiguous:
-        a = a.copy(order='F')
-    if b._c_contiguous:
-        b = b.copy(order='F')
-        
-    lda, transa = _decide_ld_and_trans(a, transa)
-    ldb, transb = _decide_ld_and_trans(b, cublas.CUBLAS_OP_N)
-
-    if not (lda is None or ldb is None):
-        if out._f_contiguous:
-            try:
-                func(handle, side, uplo, transa, diag, m, n, alpha_ptr,
-                     a.data.ptr, lda, b.data.ptr, ldb, out.data.ptr,
-                     ldb)
-            finally:
-                cublas.setPointerMode(handle, orig_mode)
-            return out
-        elif out._c_contiguous:
-            # Computes out.T = alpha * b.T @ a.T + beta * out.T
-            try:
-                func(handle, side, uplo, transa, diag, n, m, alpha_ptr,
-                     b.data.ptr, ldb, a.data.ptr, lda, out.data.ptr,
-                     n)
-            finally:
-                cublas.setPointerMode(handle, orig_mode)
-            return out.T.copy(order='C') #TODO: clean this up!
-
-    a, lda = _change_order_if_necessary(a, lda)
-    b, ldb = _change_order_if_necessary(b, ldb)
     c = out
     if not out._f_contiguous:
         c = out.copy(order='F')

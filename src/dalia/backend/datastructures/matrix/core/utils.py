@@ -19,10 +19,11 @@ def wrap_result(data, hw_target=None):
         return DenseMatrix(data, hw_target=hw_target, force_order=False)  # Preserve original order
     if sp.issparse(data):
         return SparseMatrix(data)
-    if isinstance(data, cp.ndarray):
-        return DenseMatrix(data, hw_target=hw_target, force_order=False)  # Preserve original order
-    if cu_sp.issparse(data):
-        return SparseMatrix(data)
+    if cupy_version is not None:
+        if isinstance(data, cp.ndarray):
+            return DenseMatrix(data, hw_target=hw_target, force_order=False)  # Preserve original order
+        if cu_sp.issparse(data):
+            return SparseMatrix(data)
     raise TypeError(f"Unknown matrix type: {type(data)}")
 
 
