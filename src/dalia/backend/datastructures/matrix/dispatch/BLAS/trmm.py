@@ -23,19 +23,19 @@ if nvmath_version is not None:
     from nvmath.bindings import cublas as nvcublas
 
 
-def trmm (a, b, hw_target, c=None, alpha=1.0, beta=0.0, trans_a ='N', trans_b ='N'):
+def trmm (a, b, hw_target, alpha=1.0, side=0, lower=0, trans_a ='N', diag=0, overwrite_b=0):
     """Wrapper to call GeMM for host or device"""
     
 
     if hw_target == "host":
-        return matmul_trmm_host(a, b, alpha, beta, c, trans_a, trans_b)
+        return matmul_trmm_host(a, b, alpha, side, lower, trans_a, diag, overwrite_b)
     elif hw_target == "accelerator":
-        return matmul_trmm_accelerator(trans_a, trans_b, a, b, c, alpha, beta)
+        return matmul_trmm_accelerator(trans_a, a, b, alpha, side, lower, diag, overwrite_b)
     else:
         ModuleNotFoundError("Unknown Module")
 
 
-def matmul_trmm_host(a, b, alpha=1.0, beta=0.0, c=None, trans_a=0, trans_b=0, overwrite_c=0, check_finite=False):
+def matmul_trmm_host(a, b, alpha=1.0, side=0, lower=0, trans_a=0, diag=0, overwrite_b=0, check_finite=False):
     """Computes out = alpha * op(a) @ op(b) + beta * out
 
     op(a) = a if transa is 'N', op(a) = a.T if transa is 'T',
@@ -46,17 +46,11 @@ def matmul_trmm_host(a, b, alpha=1.0, beta=0.0, c=None, trans_a=0, trans_b=0, ov
 
     a1 = _asarray_validated(a, check_finite=check_finite)
     b1 = _asarray_validated(b, check_finite=check_finite)
-    if c is None:
-        c1 = None
-    else:
-        c1 = _asarray_validated(c, check_finite=check_finite)
 
     transa = True
     transb = True
     if trans_a == 'N':
         transa = False
-    if trans_b == 'N':
-        transb = False
 
     if not transa and not transb:
         if a1.shape[1] != b1.shape[0]:
@@ -73,9 +67,6 @@ def matmul_trmm_host(a, b, alpha=1.0, beta=0.0, c=None, trans_a=0, trans_b=0, ov
     else:
         if a1.shape[0] != b1.shape[1]:
             raise ValueError(f'shapes of a {a1.shape} and b {b1.shape} are incompatible (0,1)')
-    
-    if beta != 0 and c1 is None:
-        raise ValueError('expected C matrix')
 
     # accommodate empty arrays
     if b1.size == 0:
@@ -84,24 +75,18 @@ def matmul_trmm_host(a, b, alpha=1.0, beta=0.0, c=None, trans_a=0, trans_b=0, ov
         ).dtype
         return np.empty_like(b1, dtype=dt_nonempty)
     
-    if c1 is not None:
-        overwrite_c = overwrite_c or _datacopied(c1, c)
-    
-    x = _matmul_trmm(a1, b1, alpha, beta, c1, trans_a, trans_b, overwrite_c)
+    x = _matmul_trmm(a1, b1, alpha, side, lower, trans_a, diag, overwrite_b)
     return x
 
 
 # trmm without the input validation
-def _matmul_trmm(a1, b1, alpha=1.0, beta=0.0, c1=None, trans_a=0, trans_b=0, overwrite_c=0):
+def _matmul_trmm(a1, b1, alpha=1.0, side=0, lower=0, trans_a=0, diag=0, overwrite_b=0):
 
     trans_a = {'N': 0, 'T': 1, 'C': 2}.get(trans_a, trans_a)
-    trans_b = {'N': 0, 'T': 1, 'C': 2}.get(trans_b, trans_b)
     trmm, = get_blas_funcs(('trmm',), (a1, b1))
 
-    if beta == 0:
-        out = trmm(alpha, a1, b1, beta=beta, trans_a=trans_a, trans_b=trans_b, overwrite_c=overwrite_c)
-    else:
-        out = trmm(alpha, a1, b1, beta, c1, trans_a, trans_b, overwrite_c)
+    
+    out = trmm(alpha, a1, b1, side, lower, trans_a, diag, overwrite_b)
     
 
     return out
@@ -150,16 +135,16 @@ def _get_scalar_ptr(a, dtype):
 # Util functions for cupy gemm end
 
 
-def matmul_trmm_accelerator(transa, transb, a, b, out=None, alpha=1.0, beta=0.0):
-    """Computes out = alpha * op(a) @ op(b) + beta * out
+def matmul_trmm_accelerator(transa, a, b, alpha=1.0, side=0, lower=0, diag=0, overwrite_b=0):
+    """Computes out := alpha*op1(a)*op2(a)
 
-    op(a) = a if transa is 'N', op(a) = a.T if transa is 'T',
-    op(a) = a.T.conj() if transa is 'C'.
-    op(b) = b if transb is 'N', op(b) = b.T if transb is 'T',
-    op(b) = b.T.conj() if transb is 'C'.
+    op1(a) = a if trans is 'N', op2(a) = a.T if transa is 'N'
+    op1(a) = a.T if trans is 'T', op2(a) = a if transa is 'T'
+    lower specifies  whether  the  upper  or  lower triangular
+    part  of the  array  out  is to be  referenced
     """
     if nvmath_version is not None:
-        matmul_gemm_accelerator(transa, transb, a, b, out, alpha, beta)
+        matmul_gemm_accelerator(transa, "N", a, b, alpha=alpha)
     
     assert a.ndim == b.ndim == 2
     assert a.dtype == b.dtype
@@ -174,63 +159,74 @@ def matmul_trmm_accelerator(transa, transb, a, b, out=None, alpha=1.0, beta=0.0)
         func = nvcublas.ztrmm
     else:
         raise TypeError('invalid dtype')
-    
 
     transa = _trans_to_cublas_op(transa)
-    transb = _trans_to_cublas_op(transb)
     if transa == cublas.CUBLAS_OP_N:
         m, k = a.shape
     else:
         k, m = a.shape
-    if transb == cublas.CUBLAS_OP_N:
-        n = b.shape[1]
-        assert b.shape[0] == k
-    else:
-        n = b.shape[0]
-        assert b.shape[1] == k
-    if out is None:
-        out = cp.empty((m, n), dtype=dtype, order='F')
-        beta = 0.0
-    else:
+    n = b.shape[1]
+    assert b.shape[0] == k
+    out = None
+    if overwrite_b:
+        out = b
         assert out.ndim == 2
         assert out.shape == (m, n)
         assert out.dtype == dtype
+    else:
+        out = cp.zeros((m, n), dtype=dtype, order='F')
+    if lower:
+        uplo = cublas.CUBLAS_FILL_MODE_LOWER
+    else:
+        uplo = cublas.CUBLAS_FILL_MODE_UPPER
+
+    if side:
+        side = cublas.CUBLAS_SIDE_RIGHT
+    else:
+        side = cublas.CUBLAS_SIDE_LEFT
+
+    if diag:
+        diag = cublas.CUBLAS_DIAG_UNIT
+    else:
+        diag = cublas.CUBLAS_DIAG_NON_UNIT
 
     alpha, alpha_ptr = _get_scalar_ptr(alpha, a.dtype)
-    beta, beta_ptr = _get_scalar_ptr(beta, a.dtype)
     handle = device.get_cublas_handle()
     orig_mode = cublas.getPointerMode(handle)
-    if isinstance(alpha, cp.ndarray) or isinstance(beta, cp.ndarray):
+    if isinstance(alpha, cp.ndarray):
         if not isinstance(alpha, cp.ndarray):
             alpha = cp.array(alpha)
             alpha_ptr = alpha.data.ptr
-        if not isinstance(beta, cp.ndarray):
-            beta = cp.array(beta)
-            beta_ptr = beta.data.ptr
         cublas.setPointerMode(handle, cublas.CUBLAS_POINTER_MODE_DEVICE)
     else:
         cublas.setPointerMode(handle, cublas.CUBLAS_POINTER_MODE_HOST)
 
+    if a._c_contiguous:
+        a = a.copy(order='F')
+    if b._c_contiguous:
+        b = b.copy(order='F')
+        
     lda, transa = _decide_ld_and_trans(a, transa)
-    ldb, transb = _decide_ld_and_trans(b, transb)
+    ldb, transb = _decide_ld_and_trans(b, cublas.CUBLAS_OP_N)
+
     if not (lda is None or ldb is None):
         if out._f_contiguous:
             try:
-                func(handle, transa, transb, m, n, k, alpha_ptr,
-                     a.data.ptr, lda, b.data.ptr, ldb, beta_ptr, out.data.ptr,
-                     m)
+                func(handle, side, uplo, transa, diag, m, n, alpha_ptr,
+                     a.data.ptr, lda, b.data.ptr, ldb, out.data.ptr,
+                     ldb)
             finally:
                 cublas.setPointerMode(handle, orig_mode)
             return out
         elif out._c_contiguous:
             # Computes out.T = alpha * b.T @ a.T + beta * out.T
             try:
-                func(handle, 1 - transb, 1 - transa, n, m, k, alpha_ptr,
-                     b.data.ptr, ldb, a.data.ptr, lda, beta_ptr, out.data.ptr,
+                func(handle, side, uplo, transa, diag, n, m, alpha_ptr,
+                     b.data.ptr, ldb, a.data.ptr, lda, out.data.ptr,
                      n)
             finally:
                 cublas.setPointerMode(handle, orig_mode)
-            return out
+            return out.T.copy(order='C') #TODO: clean this up!
 
     a, lda = _change_order_if_necessary(a, lda)
     b, ldb = _change_order_if_necessary(b, ldb)
@@ -238,8 +234,8 @@ def matmul_trmm_accelerator(transa, transb, a, b, out=None, alpha=1.0, beta=0.0)
     if not out._f_contiguous:
         c = out.copy(order='F')
     try:
-        func(handle, transa, transb, m, n, k, alpha_ptr, a.data.ptr, lda,
-             b.data.ptr, ldb, beta_ptr, c.data.ptr, m)
+        func(handle, side, uplo, transa, diag, m, n, alpha_ptr, a.data.ptr, lda,
+             b.data.ptr, ldb, c.data.ptr, m)
     finally:
         cublas.setPointerMode(handle, orig_mode)
     if not out._f_contiguous:
