@@ -23,9 +23,9 @@ def main() -> None:
 
     # Keep model structure identical to run.py, but generate stable synthetic data.
     n_obs = 4000
-    n_fixed = 50
+    n_fixed = 10
     n_iid = 40
-    n_dense = 60
+    n_dense = 40
 
     tau_iid_true = 3.0
     tau_dense_true = 10.0
@@ -94,6 +94,7 @@ def main() -> None:
     x_true = np.concatenate([u_iid, u_dense, beta_true])
 
     np.save(ref_dir / "theta_internal.npy", theta_internal_true)
+    np.save(ref_dir / "theta_external.npy", theta_external_true)
     np.save(ref_dir / "x.npy", x_true)
 
     q_prior = sparse.block_diag(
