@@ -4,7 +4,7 @@ import tomllib
 from abc import ABC, abstractmethod
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, PositiveFloat
 
 from dalia.__init__ import ArrayLike, xp
 from dalia.configs.priorhyperparameters_config import (
@@ -30,7 +30,9 @@ class LikelihoodConfig(BaseModel, ABC):
 
 
 class GaussianLikelihoodConfig(LikelihoodConfig):
-    prec_o: float = None  # Observation precision
+    prec_o: PositiveFloat = (
+        4.0  # Observation precision, has to be positive, offer initial guess
+    )
 
     def read_hyperparameters(self):
         if self.fix_hyperparameters:
