@@ -34,7 +34,7 @@ if __name__ == "__main__":
         "type": "generic",
         "input_dir": f"{BASE_DIR}/inputs_iid",
         "tau": 4,  # has to be positive
-        "ph_tau": {"type": "gamma", "alpha": 1.0, "beta": 5 * 1e-5},
+        "ph_tau": {"type": "gamma", "alpha": 1.0, "beta": 1e-1},
     }
     generic_iid = GenericSubModel(
         config=submodels_config.parse_config(generic_dict_iid),
@@ -44,8 +44,7 @@ if __name__ == "__main__":
     generic_dict_queenGRMinv = {
         "type": "generic",
         "input_dir": f"{BASE_DIR}/inputs_queenGRMinv",
-        "tau": 4,  # has to be positive
-        "ph_tau": {"type": "gamma", "alpha": 1.0, "beta": 5 * 1e-5},
+        "ph_tau": {"type": "gamma", "alpha": 1.0, "beta": 1e-1},
     }
     generic_queenGRMinv = GenericSubModel(
         config=submodels_config.parse_config(generic_dict_queenGRMinv),
@@ -55,7 +54,6 @@ if __name__ == "__main__":
     regression_dict = {
         "type": "regression",
         "input_dir": f"{BASE_DIR}/inputs_fixed_effects",
-        "fixed_effects_prior_precision": 0.001,
     }
     regression = RegressionSubModel(
         config=submodels_config.parse_config(regression_dict),
@@ -64,8 +62,7 @@ if __name__ == "__main__":
     # Likelihood
     likelihood_dict = {
         "type": "gaussian",
-        "prec_o": 1.0,
-        "prior_hyperparameters": {"type": "gamma", "alpha": 1.0, "beta": 5 * 1e-5},
+        "prior_hyperparameters": {"type": "gamma", "alpha": 1.0, "beta": 1e-1},
     }
     # Creation of the first model by combining the Generic submodel and the likelihood
     model = Model(
@@ -77,15 +74,6 @@ if __name__ == "__main__":
     # Configurations of DALIA
     dalia_dict = {
         "solver": {"type": "dense"},
-        "minimize": {
-            "max_iter": 50,
-            "gtol": 1e-3,
-            "disp": True,
-        },
-        "inner_iteration_max_iter": 50,
-        "eps_inner_iteration": 1e-3,
-        "eps_gradient_f": 1e-3,
-        "simulation_dir": ".",
     }
     dalia = DALIA(
         model=model,
@@ -96,21 +84,22 @@ if __name__ == "__main__":
 
     # load theta reference and set theta_internal to reference values
     theta_ref_internal = xp.load(f"{BASE_DIR}/reference_outputs/theta_internal.npy")
+    theta_ref_external = xp.load(f"{BASE_DIR}/reference_outputs/theta_external.npy")
     x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x.npy")
 
     print_msg("\n--- Results ---")
-    print_msg("theta reference internal:\n", theta_ref_internal)
     print_msg("Theta values external:\n", results["theta"])
     print_msg("Theta values internal:\n", results["theta_internal"])
     print_msg("Internal Covariance of theta:\n", results["cov_theta_internal"])
-    # print_msg(
-    #     "Mean of the latent parameters:\n",
-    #     results["x"],
-    # )
 
     print_msg("\n--- Comparisons ---")
     # Compare hyperparameters
-    print_msg("Reference theta internal:", theta_ref_internal)
+    print_msg("Theta reference external:\n", theta_ref_external)
+    print_msg("Theta values external:\n", results["theta"])
+    print_msg(
+        "Norm (theta external - theta_ref_external):        ",
+        f"{xp.linalg.norm(results['theta'] - theta_ref_external):.4e}",
+    )
     print_msg(
         "Norm (theta internal - theta_ref_internal):        ",
         f"{xp.linalg.norm(results['theta_internal'] - theta_ref_internal):.4e}",
@@ -140,5 +129,50 @@ if __name__ == "__main__":
     print("Quantile pairs of prec_o:")
     for p, q in quantile_pairs:
         print(f"   {p:.3f} quantile: {q:.4f}")
+
+    # extract variances of relevant indices
+    # randomly sample subset of indices
+    sample_size = 10
+    sub_indices = np.sort(
+        np.random.choice(np.arange(len(var_latent_params)), sample_size, replace=False)
+    )
+    print_msg("Subindices: ", sub_indices)
+    print_msg("\n--- Marginal variances of a subset of latent parameters ---")
+    for idx in sub_indices:
+        print(f"Idx {idx}: var = {var_latent_params[idx]:.4e}")
+
+    # Compute variance of custom linear combination of 2 latent variables
+    n_iid_latent = generic_iid.n_latent_parameters
+    print_msg("Number of latent parameters in the iid component: ", n_iid_latent)
+
+    # we have that Var(u_iid_i + u_generic_i) = Var(u_iid_i) + Var(u_generic_i) + 2*Cov(u_iid_i, u_generic_i)
+    # since we used the dense solver, all terms available in the covariance matrix:
+    # Compute this directly, extract index tuples
+    sample_size = 5
+    iid_indices = np.sort(
+        np.random.choice(np.arange(n_iid_latent), sample_size, replace=False)
+    )
+    # compute generic indices corresponding to the same latent variables
+    # NOTE: check that the iid submodel is actually first in the model, then generic & that they have the same number
+    if generic_queenGRMinv.n_latent_parameters != n_iid_latent:
+        raise ValueError(
+            "The number of latent parameters in the generic submodel should be the same as in the iid submodel for this."
+        )
+    generic_indices = iid_indices + n_iid_latent
+    print_msg("Randomly sampled iid indices: ", iid_indices)
+    print_msg("Corresponding generic indices: ", generic_indices)
+
+    # compute variance of the sum of the 2 latent variables for each index tuple
+    # Var(u_iid_i + u_generic_i) = Var(u_iid_i) + Var(u_generic_i) + 2*Cov(u_iid_i, u_generic_i)
+    var_lin_comb = np.zeros(len(iid_indices))
+    for i, (idx_iid, idx_generic) in enumerate(zip(iid_indices, generic_indices)):
+        var_lin_comb[i] = (
+            dalia.solver.A_inv[idx_iid, idx_iid]
+            + dalia.solver.A_inv[idx_generic, idx_generic]
+            + 2 * dalia.solver.A_inv[idx_iid, idx_generic]
+        )
+        print_msg(
+            f"Variance of u_iid_{idx_iid} + u_generic_{idx_generic - n_iid_latent}: {var_lin_comb[i]:.4e}"
+        )
 
     print_msg("\n--- Finished ---")

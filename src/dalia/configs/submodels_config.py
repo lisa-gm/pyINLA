@@ -41,7 +41,9 @@ class RegressionSubModelConfig(SubModelConfig):
 
 
 class GenericSubModelConfig(SubModelConfig):
-    tau: float = None  # Precision of the Gaussian prior on the latent parameters
+    tau: PositiveFloat = (
+        4.0  # Precision of the Gaussian prior on the latent parameters, offer initial guess, has to be positive
+    )
 
     ph_tau: PriorHyperparametersConfig = None
 
