@@ -82,23 +82,23 @@ if __name__ == "__main__":
 
     results = dalia.run()
 
-    import matplotlib.pyplot as plt
+    # import matplotlib.pyplot as plt
 
-    # plot spy of prior and conditional precision matrices
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    axes[0].set_title("Prior precision matrix")
-    axes[0].spy(model.Q_prior, markersize=1)
-    axes[1].set_title("Conditional precision matrix")
-    axes[1].spy(model.construct_Q_conditional(eta=model.a @ model.x), markersize=1)
-    plt.tight_layout()
-    plt.savefig(BASE_DIR / "precision_matrices.png")
+    # # plot spy of prior and conditional precision matrices
+    # fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    # axes[0].set_title("Prior precision matrix")
+    # axes[0].spy(model.Q_prior, markersize=1)
+    # axes[1].set_title("Conditional precision matrix")
+    # axes[1].spy(model.construct_Q_conditional(eta=model.a @ model.x), markersize=1)
+    # plt.tight_layout()
+    # plt.show()
 
-    # plot the spy of the model.a matrix
-    fig, ax = plt.subplots(figsize=(12, 5))
-    ax.set_title("Design matrix")
-    ax.spy(model.a, markersize=1)
-    plt.tight_layout()
-    plt.savefig(BASE_DIR / "design_matrix.png")
+    # # plot the spy of the model.a matrix
+    # fig, ax = plt.subplots(figsize=(12, 5))
+    # ax.set_title("Design matrix")
+    # ax.spy(model.a, markersize=1)
+    # plt.tight_layout()
+    # plt.savefig(BASE_DIR / "design_matrix.png")
 
     # load theta reference and set theta_internal to reference values
     theta_ref_internal = xp.load(f"{BASE_DIR}/reference_outputs/theta_internal.npy")

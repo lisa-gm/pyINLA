@@ -280,19 +280,19 @@ class Model(ABC):
 
         self.x: NDArray = xp.zeros(self.n_latent_parameters)
 
-        # check if all a are sparse -> if not construct dense a
-        for i, submodel in enumerate(self.submodels):
-            print(
-                f"Submodel {submodel.submodel_type} has design matrix of type {type(submodel.a)}"
-            )
-            import matplotlib.pyplot as plt
+        # # check if all a are sparse -> if not construct dense a
+        # for i, submodel in enumerate(self.submodels):
+        #     print(
+        #         f"Submodel {submodel.submodel_type} has design matrix of type {type(submodel.a)}"
+        #     )
+        #     import matplotlib.pyplot as plt
 
-            # savefig the spy of the design matrix of the submodel
-            fig, ax = plt.subplots(figsize=(12, 5))
-            ax.set_title(f"Design matrix of submodel {submodel.submodel_type}")
-            ax.spy(submodel.a, markersize=1)
-            plt.tight_layout()
-            plt.savefig(f"design_matrix_n{i}_{submodel.submodel_type}.png")
+        #     # savefig the spy of the design matrix of the submodel
+        #     fig, ax = plt.subplots(figsize=(12, 5))
+        #     ax.set_title(f"Design matrix of submodel {submodel.submodel_type}")
+        #     ax.spy(submodel.a, markersize=1)
+        #     plt.tight_layout()
+        #     plt.show()
 
         if all(sp.sparse.issparse(submodel.a) for submodel in self.submodels):
             data = []
@@ -331,12 +331,19 @@ class Model(ABC):
 
             self.a: NDArray = xp.concatenate(data, axis=1)
 
+        # # show spy of self.a
+        # fig, ax = plt.subplots(figsize=(12, 5))
+        # ax.set_title("Design matrix of the full model")
+        # ax.spy(self.a, markersize=1)
+        # plt.tight_layout()
+        # plt.show()
+
         self.permutation_latent_variables = xp.arange(0, self.n_latent_parameters, 1)
         self.inverse_permutation_latent_variables = xp.arange(
             0, self.n_latent_parameters, 1
         )
 
-        # if data is gaussian compute t(A)*A once
+        # perf-opt: if data is gaussian pre-compute a^Ta
         if likelihood_config.type == "gaussian":
             self.aTa = self.a.T @ self.a
         else:
@@ -620,40 +627,39 @@ class Model(ABC):
         """
 
         if self.likelihood_config.type == "gaussian":
-            kwargs = {
-                "eta": eta,
-                "theta": float(self.theta_external[-1]),
-            }
+            # Gaussian Likelihood Case
+            # . for Gaussian likelihood, the D matrix is diagonal with constant value
+            #   theta (precision of the likelihood) on the diagonal), in this case
+            #   a^Ta has been precomputed at init() and we can directly compute Aa^T D A
+            #   as theta_likelihood * a^Ta.
+            daTa = -self.get_theta_likelihood() * self.aTa
         else:
+            # General Likelihood Case
+            # . we need to assemble the D matrix at every iteration as it depends on
+            #   the current value of theta and on the current value of eta (and not
+            #   only on theta as for the Gaussian case).
             kwargs = {
                 "eta": eta,
             }
 
-        if isinstance(self.submodels[0], BrainiacSubModel):
-            # Brainiac specific rule
-            kwargs["h2"] = float(self.theta_external[0])
-            d_matrix = self.submodels[0].evaluate_d_matrix(**kwargs)
-        else:
-            # General rules
-            d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
+            # Assemble the D matrix
+            if isinstance(self.submodels[0], BrainiacSubModel):
+                # . brainiac specific rule
+                kwargs["h2"] = float(self.theta_external[0])
+                d_matrix = self.submodels[0].evaluate_d_matrix(**kwargs)
+            else:
+                # . general rules
+                d_matrix = self.likelihood.evaluate_hessian_likelihood(**kwargs)
 
-        # if self.a is sparse -> Q_conditional should be sparse, else dense
+            daTa = self.a.T @ d_matrix @ self.a
+
+        # Assemble the conditional precision matrix Q_cond = Q_prior + A^T D A
+        # . if self.a is sparse, we consider Q_cond to be sparse
+        # . if self.a is dense, we consider Q_cond to be dense (even if Q_prior is sparse)
         if sp.sparse.issparse(self.a):
-            if self.aTa is not None:
-                self.Q_conditional = self.Q_prior - d_matrix.diagonal()[0] * self.aTa
-            else:
-                self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
-            # self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
+            self.Q_conditional = self.Q_prior - daTa
         else:
-            if self.aTa is not None:
-                self.Q_conditional = (
-                    self.Q_prior.toarray() - d_matrix.diagonal()[0] * self.aTa
-                )
-            else:
-                self.Q_conditional = (
-                    self.Q_prior.toarray() - self.a.T @ d_matrix @ self.a
-                )
-            # self.Q_conditional = self.Q_prior.toarray() - self.a.T @ d_matrix @ self.a
+            self.Q_conditional = self.Q_prior.toarray() - daTa
 
         return self.Q_conditional
 
