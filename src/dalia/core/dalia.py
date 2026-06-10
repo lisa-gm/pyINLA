@@ -44,7 +44,6 @@ import time
 xp.set_printoptions(precision=8, suppress=True, linewidth=150)
 
 
-
 class DALIA:
     """DALIA is a Python implementation of the Integrated Nested
     Laplace Approximation (INLA) method.
@@ -829,7 +828,7 @@ class DALIA:
             f"Computing covariance of hyperparameters at theta_external {theta_external}.",
             flush=True,
         )
-        
+
         synchronize(comm=self.comm_world)
         tic = time.perf_counter()
         self.model.theta_external = theta_external
@@ -840,7 +839,7 @@ class DALIA:
             flush=True,
         )
         cov_theta_internal = xp.linalg.inv(hess_theta_internal)
-        
+
         synchronize(comm=self.comm_world)
         toc = time.perf_counter()
         print_msg(
@@ -848,7 +847,7 @@ class DALIA:
             toc - tic,
             flush=True,
         )
-        
+
         return cov_theta_internal
 
     def _evaluate_hessian_f(
@@ -1315,6 +1314,48 @@ class DALIA:
         raise NotImplementedError(
             "in compute marginals observations: Only Gaussian likelihood is currently supported."
         )
+
+    def sample_posterior_latent_parameters(
+        self, n_samples: int = 1000, random_seed: int = 33
+    ) -> NDArray:
+        """Sample from the posterior distribution of the latent parameters x.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples to draw.
+
+        Returns
+        -------
+        samples : NDArray[n_latent_parameters, n_samples]
+            Samples from the posterior distribution of the latent parameters x.
+
+        Notes
+        -----
+        Based on the factorization of the conditional precision matrix Q_conditional at theta_star and x_star.
+        """
+
+        if self.theta_star is None or self.x_star is None:
+            raise ValueError(
+                "theta_star and x_star must be computed calling minimize() before calling sample_posterior_latent_parameters()."
+            )
+
+        # sample iid standard normal
+        rng = xp.random.default_rng(seed=random_seed)
+        iid_samples = rng.standard_normal(
+            size=(self.model.n_latent_parameters, n_samples)
+        )
+
+        # compute the corresponding samples in the original space using the covariance matrix
+        Q_conditional = self.model.construct_Q_conditional(
+            eta=self.model.a @ self.x_star
+        )
+        self.solver.factorize(Q_conditional)
+        samples = xp.reshape(self.x_star, (-1, 1)) + sp.linalg.solve_triangular(
+            self.solver.L.T, iid_samples, lower=False
+        )
+
+        return samples
 
     def _inner_iteration(
         self,

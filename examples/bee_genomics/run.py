@@ -130,28 +130,18 @@ if __name__ == "__main__":
     for p, q in quantile_pairs:
         print(f"   {p:.3f} quantile: {q:.4f}")
 
-    # extract variances of relevant indices
-    # randomly sample subset of indices
-    sample_size = 10
-    sub_indices = np.sort(
-        np.random.choice(np.arange(len(var_latent_params)), sample_size, replace=False)
-    )
-    print_msg("Subindices: ", sub_indices)
-    print_msg("\n--- Marginal variances of a subset of latent parameters ---")
-    for idx in sub_indices:
-        print(f"Idx {idx}: var = {var_latent_params[idx]:.4e}")
+    no_samples = 5000
+    samples = dalia.sample_posterior_latent_parameters(n_samples=no_samples)
 
-    # Compute variance of custom linear combination of 2 latent variables
     n_iid_latent = generic_iid.n_latent_parameters
-    print_msg("Number of latent parameters in the iid component: ", n_iid_latent)
 
-    # we have that Var(u_iid_i + u_generic_i) = Var(u_iid_i) + Var(u_generic_i) + 2*Cov(u_iid_i, u_generic_i)
-    # since we used the dense solver, all terms available in the covariance matrix:
-    # Compute this directly, extract index tuples
-    sample_size = 5
+    # randomly sample subset of indices
+    no_sub_indices = 10
     iid_indices = np.sort(
-        np.random.choice(np.arange(n_iid_latent), sample_size, replace=False)
+        np.random.choice(np.arange(n_iid_latent), no_sub_indices, replace=False)
     )
+    print_msg("Subindices: ", iid_indices)
+
     # compute generic indices corresponding to the same latent variables
     # NOTE: check that the iid submodel is actually first in the model, then generic & that they have the same number
     if generic_queenGRMinv.n_latent_parameters != n_iid_latent:
@@ -162,17 +152,16 @@ if __name__ == "__main__":
     print_msg("Randomly sampled iid indices: ", iid_indices)
     print_msg("Corresponding generic indices: ", generic_indices)
 
-    # compute variance of the sum of the 2 latent variables for each index tuple
-    # Var(u_iid_i + u_generic_i) = Var(u_iid_i) + Var(u_generic_i) + 2*Cov(u_iid_i, u_generic_i)
-    var_lin_comb = np.zeros(len(iid_indices))
-    for i, (idx_iid, idx_generic) in enumerate(zip(iid_indices, generic_indices)):
-        var_lin_comb[i] = (
-            dalia.solver.A_inv[idx_iid, idx_iid]
-            + dalia.solver.A_inv[idx_generic, idx_generic]
-            + 2 * dalia.solver.A_inv[idx_iid, idx_generic]
-        )
-        print_msg(
-            f"Variance of u_iid_{idx_iid} + u_generic_{idx_generic - n_iid_latent}: {var_lin_comb[i]:.4e}"
-        )
+    # extract subset of relevant samples from different latent components
+    relevant_latent_idd = results["x"][iid_indices]
+    relevant_latent_generic = results["x"][generic_indices]
+    samples_iid = samples[iid_indices, :]
+    samples_generic = samples[generic_indices, :]
+
+    # check sample means are close to the relevant latent parameters
+    print_msg("Mean of samples (iid)           : ", np.mean(samples_iid, axis=1))
+    print_msg("Relevant latent parameters (iid): ", relevant_latent_idd)
+    print_msg("Mean of samples (generic)       : ", np.mean(samples_generic, axis=1))
+    print_msg("Relevant latent parameters (generic): ", relevant_latent_generic)
 
     print_msg("\n--- Finished ---")
