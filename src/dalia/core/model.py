@@ -281,6 +281,19 @@ class Model(ABC):
         self.x: NDArray = xp.zeros(self.n_latent_parameters)
 
         # check if all a are sparse -> if not construct dense a
+        for i, submodel in enumerate(self.submodels):
+            print(
+                f"Submodel {submodel.submodel_type} has design matrix of type {type(submodel.a)}"
+            )
+            import matplotlib.pyplot as plt
+
+            # savefig the spy of the design matrix of the submodel
+            fig, ax = plt.subplots(figsize=(12, 5))
+            ax.set_title(f"Design matrix of submodel {submodel.submodel_type}")
+            ax.spy(submodel.a, markersize=1)
+            plt.tight_layout()
+            plt.savefig(f"design_matrix_n{i}_{submodel.submodel_type}.png")
+
         if all(sp.sparse.issparse(submodel.a) for submodel in self.submodels):
             data = []
             rows = []
@@ -440,7 +453,7 @@ class Model(ABC):
     @theta_external.setter
     def theta_external(self, value):
         """Set external theta and automatically update internal.
-        
+
         Notes
         -----
         The re-scaling is implemented for all prios but PenalizedComplexity (identity but already in the correct "log" scale).
@@ -721,7 +734,7 @@ class Model(ABC):
 
     def evaluate_likelihood(self, eta: NDArray, **kwargs) -> float:
         """Evaluate the likelihood.
-        
+
         Parameters
         ----------
         eta : NDArray
@@ -745,8 +758,6 @@ class Model(ABC):
             )
 
         return ensure_scalar(likelihood)
-
-        
 
     def __str__(self) -> str:
         """String representation of the model."""
