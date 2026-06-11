@@ -3,11 +3,13 @@ import numpy as np
 import scipy.sparse as sp
 
 
-from dalia.backend.config import cupy_version, memory_regime, memory_threshold, regime_list
+from dalia.backend.config import cupy_version, memory_regime, memory_threshold, regime_list, gputil_version
 
 if cupy_version is not None:
     import cupy as cp
     import cupyx.scipy.sparse as cu_sp
+    
+if gputil_version is not None:
     import GPUtil
 
 

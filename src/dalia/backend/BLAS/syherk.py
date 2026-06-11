@@ -21,30 +21,44 @@ if cupy_version is not None:
 if nvmath_version is not None:
     from nvmath.bindings import cublas as nvcublas
 
-def syherk(a, hw_target,c=None, alpha=1.0, beta=0.0, trans=0, lower=0, overwrite_c=0):
-    """Wrapper for the trsm function to call depending on wheter the solve happens on the host or the device
-    
-        For Compatibility this function accepts exactly the same parameters as what the scipy and cupy implementations accept
-        plus the side parameter which can either be 0 or 1 for left or right hand side
+def syherk(a, hw_target,c=None, alpha=1.0, beta=0.0, trans_a=0, lower=0, overwrite_c=0):
+    """Wrapper for the SYRK and HERK function to call depending on wheter the operation happens on the host or the device
+
+        Computes out = alpha * op(a) @ op(a)^T + beta * b
+
+        op(a) = a if trans is 'N', op(a) = a.T if trans is 'T',
+        op(a) = a.T.conj() if trans is 'C'.
+
+        Args:
+            a:              Matrix to be rank-updated
+            hw_target:      Hardware target, either "host" or "accelerator" depending on the current location of a
+            c:              Matrix that will be added to the result
+            alpha:          Scalar to be multiplied with a
+            beta:           Scalar to be multiplied with c
+            trans_a:          {'N','T','C'} or {'0','1','2'} respectively determines op(a)
+            lower:          Bool determining wheter the upper or lower result should be referenced
+            overwrite_c:    Bool determining wheter the result should overwrite Matrix c
+        
+        Returns:
+            out:            Resulting Matrix
+
+        Raises:
+            ModuelNotFoundError:    If the hw_target is not in {"host","accelerator"}
+            TypeError:              If the Matrix has an invalid dtype or another parameter cannot be recognized
     """
     
     if  hw_target == "host":
-        return matmul_syherk_host(a, c, alpha, beta, trans, lower, overwrite_c)
+        return matmul_syherk_host(a, c, alpha, beta, trans_a, lower, overwrite_c)
     elif hw_target == "accelerator":
-        return matmul_syherk_accelerator(a, c, alpha, beta, trans, lower, overwrite_c)
+        return matmul_syherk_accelerator(a, c, alpha, beta, trans_a, lower, overwrite_c)
     else:
         ModuleNotFoundError("Unknown Module")
 
 def matmul_syherk_host(a, c=None, alpha=1.0, beta=1.0, trans=0, lower=False,
                      overwrite_c=False, check_finite=True,):
-    """Computes out = alpha * op(a) @ op(a)^T + beta * b
+    """Computes SYRK and HERK on the host
 
-    op(a) = a if transa is 'N', op(a) = a.T if transa is 'T',
-    op(a) = a.T.conj() if transa is 'C'.
-    
-    lower specifies  whether  the  upper  or  lower triangular
-    part  of the  array  out  is to be  referenced
-    overwrite_c determines if out will overwrite c
+    additional Argument check_finite that checks if a is finite
     """
 
     a1 = _asarray_validated(a, check_finite=check_finite)
@@ -76,7 +90,7 @@ def _syherk(a1, c1=None, alpha=1.0, beta=0.0, trans=0, lower=False,
 
 
 
-# Util functions for cupy gemm
+# Util functions for cuda syherk
 def _trans_to_cublas_op(trans):
     if trans == 'N' or trans == cublas.CUBLAS_OP_N:
         trans = cublas.CUBLAS_OP_N
@@ -108,17 +122,12 @@ def _get_scalar_ptr(a, dtype):
             a = np.array(a, dtype=dtype)
         a_ptr = a.ctypes.data
     return a, a_ptr
-# Util functions for cupy gemm end
+# Util functions for cuda syherk end
 
 def matmul_syherk_accelerator(a, c=None, alpha=1.0, beta=0.0, trans='N', lower=False, overwrite_c=0):
-    """Computes out := alpha*op1(a)*op2(a) + beta*out
-
-    op1(a) = a if trans is 'N', op2(a) = a.T if transa is 'N'
-    op1(a) = a.T if trans is 'T', op2(a) = a if transa is 'T'
+    """Computes SYRK and HERK on a cuda accelerator
     
-    lower specifies  whether  the  upper  or  lower triangular
-    part  of the  array  out  is to be  referenced
-    overwrite_c determines if out will overwrite c
+    if nvmath is not installed HERK will call GEMM instead
     """
     assert a.ndim == 2
     dtype = a.dtype.char

@@ -24,7 +24,33 @@ if nvmath_version is not None:
 
 
 def trmm (a, b, hw_target, alpha=1.0, side=0, lower=0, trans_a ='N', diag=0, overwrite_b=0):
-    """Wrapper to call GeMM for host or device"""
+    """Wrapper to call TRMM for host or accelerator
+    
+    Computes out = alpha * op(a) @ b or alpha * b @ op(a) where a is a triangluar matrix
+
+    op(a) = a if transa is 'N', op(a) = a.T if transa is 'T' or 'C',
+    op(a) = a.T.conj() if transa is 'C'.
+
+    if nvmath is not installed GEMM will be called for acclerator execution
+
+    Args:
+            a:              Triangular Matrix
+            b:              General Matrix
+            hw_target:      Hardware target, either "host" or "accelerator" depending on the current location of a
+            alpha:          Scalar to be multiplied with a
+            side:           Bool determining wheter a is multiplied on the left(False) or the right(True) side of b
+            lower:          Bool determining wheter a is an upper(False) or lower(True) triangular Matrix
+            trans_a:        {'N','T','C'} or {'0','1','2'} respectively determines op(a)
+            diag:           Bool determining wheter a is unit diagonal
+            overwrite_c:    Bool determining wheter the result should overwrite Matrix b
+        
+        Returns:
+            out:            Resulting Matrix
+
+        Raises:
+            ModuelNotFoundError:    If the hw_target is not in {"host","accelerator"}
+            TypeError:              If the Matrix has an invalid dtype or another parameter cannot be recognized
+    """
     
 
     if hw_target == "host":
@@ -38,13 +64,7 @@ def trmm (a, b, hw_target, alpha=1.0, side=0, lower=0, trans_a ='N', diag=0, ove
 def matmul_trmm_host(a, b, alpha=1.0, trans_a=0, side=0, lower=0, diag=0, overwrite_b=0, check_finite=False):
     """Computes out = alpha * op(a) @ b or alpha * b @ op(a) where a is a triangluar matrix
 
-    op(a) = a if transa is 'N', op(a) = a.T if transa is 'T' or 'C',
-    op(a) = a.T.conj() if transa is 'C'.
-
-    side determines if a is on the left or on the right
-    lower determines if a is an upper or lower triangular matrix
-    diag determines if a is unit triangluar
-    overwrite_b determines if out will overwrite b
+    additional Argument check_finite that checks if a and b are finite
     """
 
     a1 = _asarray_validated(a, check_finite=check_finite)
@@ -84,7 +104,7 @@ def _matmul_trmm(a1, b1, alpha=1.0, side=0, lower=0, trans_a=0, diag=0, overwrit
     return out
 
 
-# Util functions for cupy gemm
+# Util functions for cuda trmm
 def _trans_to_cublas_op(trans):
     if trans == 'N' or trans == cublas.CUBLAS_OP_N:
         trans = cublas.CUBLAS_OP_N
@@ -96,24 +116,6 @@ def _trans_to_cublas_op(trans):
         raise TypeError('invalid trans (actual: {})'.format(trans))
     return trans
 
-def _decide_ld_and_trans(a, trans):
-    ld = None
-    if trans in (cublas.CUBLAS_OP_N, cublas.CUBLAS_OP_T):
-        if a._f_contiguous:
-            ld = a.shape[0]
-        elif a._c_contiguous:
-            ld = a.shape[1]
-            trans = 1 - trans
-    return ld, trans
-
-
-def _change_order_if_necessary(a, lda):
-    if lda is None:
-        lda = a.shape[0]
-        if not a._f_contiguous:
-            a = a.copy(order='F')
-    return a, lda
-
 def _get_scalar_ptr(a, dtype):
     if isinstance(a, cp.ndarray):
         if a.dtype != dtype:
@@ -124,19 +126,13 @@ def _get_scalar_ptr(a, dtype):
             a = np.array(a, dtype=dtype)
         a_ptr = a.ctypes.data
     return a, a_ptr
-# Util functions for cupy gemm end
+# Util functions for cuda trmm end
 
 
 def matmul_trmm_accelerator(a, b, alpha=1.0, transa=0, side=0, lower=0, diag=0, overwrite_b=0):
-    """Computes out = alpha * op(a) @ b or alpha * b @ op(a) where a is a triangular matrix
+    """Computes TRMM on a cuda accelerator
 
-    op(a) = a if transa is 'N', op(a) = a.T if transa is 'T' or 'C',
-    op(a) = a.T.conj() if transa is 'C'.
-
-    side determines if a is on the left or on the right
-    lower determines if a is an upper or lower triangular matrix
-    diag determines if a is unit triangluar
-    overwrite_b determines if out will overwrite b
+    if nvmath is not installed TRMM will call GEMM instead
     """
     if nvmath_version is not None:
         matmul_gemm_accelerator(a, b, alpha=alpha, transa=transa, transb="N")

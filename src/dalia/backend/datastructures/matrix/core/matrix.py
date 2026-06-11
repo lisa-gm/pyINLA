@@ -115,6 +115,7 @@ class Matrix(ABC):
     # 2. Initialization
     def __init__(self, data, hw_target=default_hw_target):
 
+        
         if data.dtype.char not in 'fdFD':
             raise TypeError(f"Unsupported data type '{data.dtype}'. Only float32 and float64 are supported.")
 
@@ -231,6 +232,9 @@ class Matrix(ABC):
     def __setitem__(self, key, value):
         """Set matrix elements"""
         self._data[key] = value
+
+    def __repr__(self):
+        return self._data
 
     # 10. Public methods
     def copy(self):

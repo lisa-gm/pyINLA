@@ -4,8 +4,9 @@ memory_regime = "manual"
 memory_threshold = 0.95
 cupy_version = None
 nvmath_version = None
+gputil_version = None
 target_list = ["host"]
-regime_list = ["auto", "manual"]
+regime_list = ["manual"]
 
 def check_cupy_availability():
     """Check if CuPy is available.
@@ -39,6 +40,24 @@ def check_nvmath_availability():
     except ImportError:
         pass
     return nvmath_version
+
+def check_gputil_availability():
+    """Check if NVIDIA Math Libraries are available.
+    
+    Returns:
+        str or None: The version of NVIDIA Math Libraries if available, otherwise None.
+    """
+    global gputil_version
+    try:
+        import gputil
+        gputil_version = gputil.__version__
+
+        global regime_list
+        if "auto" not in regime_list:
+            regime_list.append("auto")
+    except ImportError:
+        pass
+    return gputil_version
 
 def set_default_hw_target(hw_target):
     """Set the default hardware target.

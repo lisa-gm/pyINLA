@@ -3,9 +3,11 @@
 from .gemm import gemm
 from .syherk import syherk
 from .trmm import trmm
+from .trsm import trsm
 
 __all__ = [
     "gemm",
     "syherk",
     "trmm",
+    "trsm",
 ]

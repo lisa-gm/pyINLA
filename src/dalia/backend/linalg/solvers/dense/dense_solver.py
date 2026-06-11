@@ -12,7 +12,7 @@ if cupy_version is not None:
     import cupy.linalg as cp_la
 
 from dalia.backend.linalg.solvers.linear_solver import LinearSolver
-from dalia.backend.linalg.LAPACK.trsm import trsm
+from dalia.backend.BLAS import trsm
 
 class DenseSolver(LinearSolver):
     """Base Dense linear solver class.

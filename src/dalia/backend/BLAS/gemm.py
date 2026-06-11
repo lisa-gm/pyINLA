@@ -11,7 +11,6 @@ from scipy.linalg._decomp import _asarray_validated
 
 from dalia.backend.config import cupy_version
 
-# TODO: Change this to use flags instead of try
 if cupy_version is not None:
     import cupy as cp
     from cupy_backends.cuda.libs import cublas
@@ -20,7 +19,33 @@ if cupy_version is not None:
 
 
 def gemm (a, b, hw_target, c=None, alpha=1.0, beta=0.0, trans_a ='N', trans_b ='N', overwrite_c = 0):
-    """Wrapper to call GeMM for host or device"""
+    """Wrapper to call GEMM for host or device
+    
+    Computes out = alpha * op(a) @ op(b) + beta * c
+
+    op(a) = a if transa is 'N', op(a) = a.T if transa is 'T',
+    op(a) = a.T.conj() if transa is 'C'.
+    op(b) = b if transb is 'N', op(b) = b.T if transb is 'T',
+    op(b) = b.T.conj() if transb is 'C'.
+
+    Args:
+            a:              Left Matrix
+            b:              Right Matrix
+            hw_target:      Hardware target, either "host" or "accelerator" depending on the current location of a
+            c:              Matrix that will be added to the result
+            alpha:          Scalar to be multiplied with a
+            beta:           Scalar to be multiplied with c
+            trans_a:        {'N','T','C'} or {'0','1','2'} respectively determines op(a)
+            trans_b:        {'N','T','C'} or {'0','1','2'} respectively determines op(b)
+            overwrite_c:    Bool determining wheter the result should overwrite Matrix c
+        
+        Returns:
+            out:            Resulting Matrix
+
+        Raises:
+            ModuelNotFoundError:    If the hw_target is not in {"host","accelerator"}
+            TypeError:              If the Matrix has an invalid dtype or another parameter cannot be recognized
+    """
     
 
     if hw_target == "host":
@@ -32,14 +57,9 @@ def gemm (a, b, hw_target, c=None, alpha=1.0, beta=0.0, trans_a ='N', trans_b ='
 
 
 def matmul_gemm_host(a, b, c=None, alpha=1.0, beta=0.0, trans_a=0, trans_b=0, overwrite_c=0, check_finite=False):
-    """Computes out = alpha * op(a) @ op(b) + beta * c
+    """Computes GEMM on the host
 
-    op(a) = a if transa is 'N', op(a) = a.T if transa is 'T',
-    op(a) = a.T.conj() if transa is 'C'.
-    op(b) = b if transb is 'N', op(b) = b.T if transb is 'T',
-    op(b) = b.T.conj() if transb is 'C'.
-    
-    overwrite_c determines if out will overwrite c
+    additional Argument check_finite that checks if a and b are finite
     """
 
     a1 = _asarray_validated(a, check_finite=check_finite)
@@ -147,17 +167,9 @@ def _get_scalar_ptr(a, dtype):
     return a, a_ptr
 # Util functions for cupy gemm end
 
-
+# TODO: warnings for copies, maybe...
 def matmul_gemm_accelerator(a, b, c=None, alpha=1.0, beta=0.0, transa=0, transb=0, overwrite_c=0):
-    """Computes out = alpha * op(a) @ op(b) + beta * c
-
-    op(a) = a if transa is 'N', op(a) = a.T if transa is 'T',
-    op(a) = a.T.conj() if transa is 'C'.
-    op(b) = b if transb is 'N', op(b) = b.T if transb is 'T',
-    op(b) = b.T.conj() if transb is 'C'.
-    
-    overwrite_c determines if out will overwrite c
-    """
+    """Computes GEMM on a cuda accelerator"""
     assert a.ndim == b.ndim == 2
     assert a.dtype == b.dtype
     dtype = a.dtype.char

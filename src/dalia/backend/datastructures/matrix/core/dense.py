@@ -61,9 +61,9 @@ class DenseMatrix(Matrix):
                 "sparse_matrix.toarray()."
             )
         
+        
         if isinstance(data, np.ndarray) and data.flags.c_contiguous and force_order:
             data = np.asfortranarray(data)
-
         
         if cupy_version is not None:
             if cu_sp.issparse(data):
@@ -75,8 +75,13 @@ class DenseMatrix(Matrix):
             
             if isinstance(data, cp.ndarray) and data.flags.c_contiguous and force_order:
                 data = cp.asfortranarray(data)
-            
-        
+        # TODO: allow for accelerator arrays that are not cp.ndarray    
+        if not isinstance(data, np.ndarray):
+            if cupy_version is not None:
+                if not isinstance(data, cp.ndarray):
+                    data = np.asarray(data, order='F')
+            else:
+                data = np.asarray(data, order='F')
 
         # Initialize parent with dense array
         super().__init__(data, hw_target)

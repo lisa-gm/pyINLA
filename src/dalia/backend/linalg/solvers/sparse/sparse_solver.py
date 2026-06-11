@@ -4,13 +4,14 @@
 
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import spsolve, splu
+from scipy.sparse.linalg import splu as h_splu
 
 from dalia.backend.linalg.solvers.linear_solver import LinearSolver
-from dalia.backend.config import cupy_version
+from dalia.backend.config import cupy_version, target_list
 
 if cupy_version is not None:
     import cupy as cp
+    from cupyx.scipy.sparse.linalg import splu as a_splu
 
 class SparseSolver(LinearSolver):
     ...
@@ -42,15 +43,21 @@ class SparseSolver(LinearSolver):
         """
         # TODO: maybe just say that there is no cholesky decomposition
         # pylint: disable=protected-access
-        if self._target == "accelerator":
-            raise NotImplementedError("SparseSolver does not support accelerators. Use CuDSS instead.")
-        factors = splu(
-            self._matrix._data.tocsc()
-        )
+        if self._target == "host":
+            factors = h_splu(
+                self._matrix._data.tocsc()
+            )
+        elif self._target == "accelerator" and cupy_version is not None:
+            factors = a_splu(
+                self._matrix._data.tocsc()
+            )
+        else:
+            raise ValueError(f"Invalid hardware target type '{self._target}'. Supported target types are {target_list}.")
+        
         return factors
     
     def _solve_system(self, b: np.ndarray):
-        """Solve Ax = b using Cholesky factors.
+        """Solve Ax = b using LU factors.
 
         Solves A * x = b.
 
@@ -64,20 +71,30 @@ class SparseSolver(LinearSolver):
         x : numpy.ndarray
             Solution vector or matrix.
         """
-        if self._target == "accelerator":
-            raise NotImplementedError("SparseSolver does not support accelerators. Use CuDSS instead.")
-        # Forward solve L y = b
-
-        # Backward solve L^T x = y
-        x = self._factors.solve(b
-        )
+        # Solve A * x = b
+        x = self._factors.solve(b)
 
         return x
     
-    def _compute_selected_inverse(self):
-
-        raise NotImplementedError("Selected inversion not implemented for sparse solver yet.")
-    
     def _compute_logdet(self):
+        """Compute log-determinant from LU factors.
+
+        For LU decomposition:
+            det(A) = det(L) * det(U)
+            Since L has 1s on diagonal: det(L) = 1
+            Therfore det(A) = det(U)
+        Returns
+        -------
+        float
+            Log-determinant of the matrix.
+        """
+        if self._target == "host":
+            return np.sum(np.log(np.abs(self._factors.U.diagonal())))
+        elif self._target == "accelerator" and cupy_version is not None:
+            return cp.sum(cp.log(cp.abs(self._factors.U.diagonal())))
+        else:
+            raise ValueError(f"Invalid hardware target type '{self._target}'. Supported target types are {target_list}.")
+        
+    def _compute_selected_inverse(self):
 
         raise NotImplementedError("Log determinant not implemented for sparse solver yet.")

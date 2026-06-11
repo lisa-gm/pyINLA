@@ -31,9 +31,11 @@ INTERNAL_DEVICE_TYPES.append(pytest.param("accelerator", marks=pytest.mark.skipi
                 cupy_version is None,
                 reason="CuPy is not installed",
             ),))
+# TODO: implement auto memory regime more
+"""future test for auto memory regime
 MEMORY_REGIMES.append(pytest.param("auto", marks=pytest.mark.skipif(
                 True,
                 reason="No reason to test",
             ),))
 
-
+"""
