@@ -1,7 +1,7 @@
 # src/dalia/backend/datastructures/matrix/dispatch/matmul.py
+from dalia.backend.BLAS import gemm
 
-
-def dispatch_matmul(left, right, left_type, right_type):
+def dispatch_matmul(left, right, left_type, right_type, hw_target):
     """Dispatch matrix multiplication to optimized backends"""
     if left_type == "sparse" and right_type == "dense":
         return left @ right
@@ -13,6 +13,6 @@ def dispatch_matmul(left, right, left_type, right_type):
         return left @ right
 
     if left_type == "dense" and right_type == "dense":
-        return left @ right
+        return gemm(left, right, hw_target)
 
     raise TypeError(f"Cannot multiply {left_type} @ {right_type}")

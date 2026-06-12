@@ -4,6 +4,7 @@
 
 # from dalia.inla.configs.configs import Config
 
+from dalia.statistical_modeling_toolbox import StatisticalModel
 
 class Config:
     # Checkpointing for restart durign the optimization

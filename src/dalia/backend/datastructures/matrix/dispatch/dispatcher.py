@@ -2,6 +2,17 @@
 import numpy as np
 import scipy.sparse as sp
 
+
+from dalia.backend.config import cupy_version, memory_regime, memory_threshold, regime_list, gputil_version
+
+if cupy_version is not None:
+    import cupy as cp
+    import cupyx.scipy.sparse as cu_sp
+    
+if gputil_version is not None:
+    import GPUtil
+
+
 from .add import dispatch_add
 from .matmul import dispatch_matmul
 from .operations import Operation
@@ -17,18 +28,89 @@ _OPERATION_MAP = {
 
 def blas_dispatch(operation: Operation, left, right):
     # Type checking
-    left_type = _get_matrix_type(left)
-    right_type = _get_matrix_type(right)
+    left_type, left_hw_target = _get_matrix_type(left)
+    right_type, right_hw_target = _get_matrix_type(right)
+    if left_hw_target != right_hw_target:
+        # Handle hw_target mismatch
+        # TODO: Make this work for different aproaches
+        target = None
+        if memory_regime == "auto":
+            target = _target_decider(left, right, left_hw_target, right_hw_target, left_type, right_type)
+
+            if left_hw_target != target:
+                left = _hw_target_handler(left, target, left_type)
+                left_hw_target = target
+            if right_hw_target != target:
+                right = _hw_target_handler(right, target, right_type)
+                right_hw_target = target
+        elif memory_regime == "manual":
+            try:
+                target = left_hw_target
+                right = _hw_target_handler(right, target, right_type)
+                right_hw_target = target
+            except:
+                raise ValueError(f"Out of memory, try using automatic memory management.")
+        else:
+            raise ValueError(f"Invalid memory regime '{memory_regime}'. Supported regimes are {regime_list}.")
+            # This should never happen here
 
     # Dispatch based on operation
     dispatch_func = _OPERATION_MAP[operation]
-    return dispatch_func(left, right, left_type, right_type)
+    return dispatch_func(left, right, left_type, right_type, left_hw_target)
 
+def _hw_target_handler(data, hw_target, matrix_type):
+    # Moves data to hw_target
+    if hw_target == "accelerator":
+        if matrix_type == "sparse":
+            return cu_sp.csr_matrix(data)
+        if matrix_type == "dense":
+            return cp.asarray(data)
+    if hw_target == "host":
+        if matrix_type == "sparse":
+            return data.get()
+        if matrix_type == "dense":
+            return data.get()
+    raise TypeError(f"Unknown hw_target type: {hw_target}")
 
 def _get_matrix_type(data):
     """Determine the type of matrix data"""
     if sp.issparse(data):
-        return "sparse"
+        return "sparse", "host"
     if isinstance(data, np.ndarray):
-        return "dense"
+        return "dense", "host"
+    if cupy_version is not None:
+         if cu_sp.issparse(data):
+            return "sparse", "accelerator"
+         if isinstance(data, cp.ndarray):
+            return "dense", "accelerator"
     raise TypeError(f"Unknown matrix type: {type(data)}")
+
+def _target_decider(left_data, right_data, left_hw_target, right_hw_target, left_type, right_type):
+    """Decide the hardware target for 'auto' memory regime based on available memory and data size"""
+    gpus = GPUtil.getGPUs()
+
+    used_memory = gpus[0].memoryUsed * 1024 * 1024  # Convert from MB to bytes
+    total_memory = gpus[0].memoryTotal * 1024 * 1024  # Convert from MB to bytes
+    available_memory = total_memory * memory_threshold - used_memory
+
+    if left_hw_target == "host":
+        if left_type == "sparse":
+            if left_data.format == "coo":
+                memory_needed = left_data.data.nbytes + left_data.row.nbytes + left_data.col.nbytes
+            else:
+                memory_needed = left_data.data.nbytes + left_data.indptr.nbytes + left_data.indices.nbytes
+        else:
+            memory_needed = left_data.nbytes
+
+    if right_hw_target == "host":
+        if right_type == "sparse":
+            if right_data.format == "coo":
+                memory_needed = right_data.data.nbytes + right_data.row.nbytes + right_data.col.nbytes
+            else:
+                memory_needed = right_data.data.nbytes + right_data.indptr.nbytes + right_data.indices.nbytes
+        else:
+            memory_needed = right_data.nbytes
+
+    if memory_needed > available_memory:
+        return "host"
+    return "accelerator"

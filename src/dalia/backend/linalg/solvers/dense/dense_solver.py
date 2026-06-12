@@ -1,10 +1,18 @@
 # src/dalia/backend/linalg/solvers/dense/dense_linear_solver.py
 
+from dalia.backend.config import cupy_version
+
 import numpy as np
-from scipy.linalg import cholesky, get_lapack_funcs, solve_triangular
+import scipy.linalg as sp_la
+# from scipy.linalg import cholesky, get_lapack_funcs, solve_triangular
+
+
+if cupy_version is not None:
+    import cupy as cp
+    import cupy.linalg as cp_la
 
 from dalia.backend.linalg.solvers.linear_solver import LinearSolver
-
+from dalia.backend.BLAS import trsm
 
 class DenseSolver(LinearSolver):
     """Base Dense linear solver class.
@@ -38,10 +46,18 @@ class DenseSolver(LinearSolver):
         L : numpy.ndarray
             Lower triangular Cholesky factor.
         """
+        # TODO: maybe use pbstf instead
+        if self._target == "host":
+            factors = sp_la.cholesky(
+                self._matrix._data, lower=True, overwrite_a=overwrite, check_finite=False
+            )
+        elif self._target == "accelerator":
+            factors = cp_la.cholesky(
+                self._matrix._data
+            )
+        else:
+            raise ValueError(f"Unsupported hardware target: {self._target}")
         # pylint: disable=protected-access
-        factors: np.ndarray = cholesky(
-            self._matrix._data, lower=True, overwrite_a=overwrite, check_finite=False
-        )
         return factors
 
     def _solve_system(self, b: np.ndarray) -> np.ndarray:
@@ -59,20 +75,25 @@ class DenseSolver(LinearSolver):
         x : numpy.ndarray
             Solution vector or matrix.
         """
+        if self._target == "accelerator":
+            b = cp.asarray(b)
         # Forward solve L y = b
-        y: np.ndarray = solve_triangular(
+        y = trsm(
             self._factors,
             b,
+            hw_target=self._target,
             lower=True,
             overwrite_b=False,
             check_finite=False,
         )
 
-        # Backward solve L^T x = y
-        x: np.ndarray = solve_triangular(
+        # Backward solve L^T x = y using the transpose of the lower-triangular factor
+        x = trsm(
             self._factors,
             y,
-            lower=False,
+            hw_target=self._target,
+            trans="T",
+            lower=True,
             overwrite_b=False,
             check_finite=False,
         )
@@ -135,7 +156,8 @@ class DenseSolver(LinearSolver):
             #   - This uses LAPACK POTRI to directly inverse the L factor, after
             #   the call, self._factors contains the inverse in its lower triangle.
             #   - As POTRI only fills the lower triangle, we symmetrize afterward.
-            (potri,) = get_lapack_funcs(("potri",), (self._factors,))
+            xp_la = self._set_library(self._target)
+            (potri,) = xp_la.get_lapack_funcs(("potri",), (self._factors,))
 
             inv_array, info = potri(self._factors, lower=True, overwrite_c=True)
 
@@ -150,7 +172,7 @@ class DenseSolver(LinearSolver):
             # This allocates 2xn² additional memory at peak
 
             # Compute L^{-1} by solving L X = I
-            L_inv = solve_triangular(
+            L_inv = xp_la.solve_triangular(
                 self._factors, np.eye(n), lower=True, check_finite=False
             )
 
@@ -158,3 +180,4 @@ class DenseSolver(LinearSolver):
             inv_array = L_inv.T @ L_inv
 
         return DenseMatrix(inv_array)
+    

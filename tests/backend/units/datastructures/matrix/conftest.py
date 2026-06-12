@@ -1,40 +1,41 @@
 # tests/backend/units/datastructures/matrix/conftest.py
 
-import numpy as np
 import pytest
-import scipy.sparse as sp
 
-from dalia.backend.datastructures import DenseMatrix, SparseMatrix
+from dalia.backend.config import cupy_version
 
 # Type groups - reusable across all tests
 EXTERNAL_SPARSE_TYPES = ["scipy_csr", "scipy_csc", "scipy_coo"]
 EXTERNAL_DENSE_TYPES = ["numpy"]
+INTERNAL_DEVICE_TYPES = ["host"]
+MEMORY_REGIMES = ["manual"]
 
 
-@pytest.fixture
-def matrix_factory():
-    """Factory to create test matrices of different types"""
+EXTERNAL_DENSE_TYPES.append(pytest.param("cupy", marks=pytest.mark.skipif(
+                cupy_version is None,
+                reason="CuPy is not installed",
+            ),))
+EXTERNAL_SPARSE_TYPES.append(pytest.param("cupy_csr", marks=pytest.mark.skipif(
+                cupy_version is None,
+                reason="CuPy is not installed",
+            ),))
+EXTERNAL_SPARSE_TYPES.append(pytest.param("cupy_csc", marks=pytest.mark.skipif(
+                cupy_version is None,
+                reason="CuPy is not installed",
+            ),))
+EXTERNAL_SPARSE_TYPES.append(pytest.param("cupy_coo", marks=pytest.mark.skipif(
+                cupy_version is None,
+                reason="CuPy is not installed",
+            ),))
+INTERNAL_DEVICE_TYPES.append(pytest.param("accelerator", marks=pytest.mark.skipif(
+                cupy_version is None,
+                reason="CuPy is not installed",
+            ),))
+# TODO: implement auto memory regime more
+"""future test for auto memory regime
+MEMORY_REGIMES.append(pytest.param("auto", marks=pytest.mark.skipif(
+                True,
+                reason="No reason to test",
+            ),))
 
-    def _make_matrix(matrix_type, shape=(3, 3), data=None):
-        if data is None:
-            data = np.arange(1, shape[0] * shape[1] + 1).reshape(shape)
-
-        # Handle Internal types
-        if matrix_type == "SparseMatrix":
-            return SparseMatrix(sp.csr_matrix(data))
-        if matrix_type == "DenseMatrix":
-            return DenseMatrix(data)
-
-        # Handle External types
-        if matrix_type == "scipy_csr":
-            return sp.csr_array(data)
-        if matrix_type == "scipy_csc":
-            return sp.csc_array(data)
-        if matrix_type == "scipy_coo":
-            return sp.coo_array(data)
-        if matrix_type == "numpy":
-            return data
-
-        raise ValueError(f"Unknown matrix_type: {matrix_type}")
-
-    return _make_matrix
+"""

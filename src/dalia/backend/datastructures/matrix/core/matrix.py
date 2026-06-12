@@ -2,8 +2,9 @@
 from abc import ABC
 
 from dalia.backend.datastructures.matrix.dispatch import Operation, blas_dispatch
+from dalia.backend.config import default_hw_target
 
-from .utils import toarray, wrap_result
+from .utils import toarray, wrap_result, tohost, toaccelerator, settarget
 
 
 class Matrix(ABC):
@@ -112,7 +113,15 @@ class Matrix(ABC):
     __array_ufunc__ = None  # Disable numpy ufuncs to avoid conflicts
 
     # 2. Initialization
-    def __init__(self, data):
+    def __init__(self, data, hw_target=default_hw_target):
+
+        
+        if data.dtype.char not in 'fdFD':
+            raise TypeError(f"Unsupported data type '{data.dtype}'. Only float32 and float64 are supported.")
+
+        data, hw_target = settarget(data, hw_target)
+        
+        self._hw_target = hw_target
         self._data = data
 
     # 3. Special representation methods
@@ -127,6 +136,21 @@ class Matrix(ABC):
         """
         # pylint: disable=invalid-name
         return wrap_result(self._data.T)
+    
+    @property
+    def hw_target(self):
+        """Hardware where the matrix data is stored ('host' or 'accelerator')"""
+        return self._hw_target
+    
+    @hw_target.setter
+    def hw_target(self, hw_target):
+        """Set hardware target for the matrix data
+
+        Args:
+            hw_target (str): 'host' or if supported by the system: 'accelerator'.
+        """
+        if self._hw_target != hw_target:
+            self._data, self._hw_target = settarget(self._data, hw_target)
 
     # 5. Comparison operators (if needed)
 
@@ -209,6 +233,9 @@ class Matrix(ABC):
         """Set matrix elements"""
         self._data[key] = value
 
+    def __repr__(self):
+        return self._data
+
     # 10. Public methods
     def copy(self):
         """Create a deep copy of the matrix.
@@ -281,4 +308,4 @@ class Matrix(ABC):
     # 11. Private/protected methods (start with _)
     def _wrap_result(self, data):
         """Wrap the result data in the appropriate Matrix subclass"""
-        return wrap_result(data)
+        return wrap_result(data, hw_target=self._hw_target)

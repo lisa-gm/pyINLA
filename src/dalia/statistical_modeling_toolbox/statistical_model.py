@@ -9,7 +9,7 @@ class StatisticalModel(ABC):
     """Class for statistical models."""
 
     latent_structures: list[LatentStructure] = []
-    latent_assembly_operator: = None
+    latent_assembly_operator = None
 
     hyperparameters: dict[Hyperparameter] = {}
     are_hyperparameters_true: bool = False

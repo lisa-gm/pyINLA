@@ -1,6 +1,11 @@
 # src/dalia/backend/datastructures/matrix/core/sparse.py
 import numpy as np
 import scipy.sparse as sp
+from dalia.backend.config import cupy_version
+
+if cupy_version is not None:
+    import cupy as cp
+    import cupyx.scipy.sparse as cu_sp
 
 from .matrix import Matrix
 
@@ -43,7 +48,7 @@ class SparseMatrix(Matrix):
     # 1. Class attributes (if any)
 
     # 2. Initialization
-    def __init__(self, data):
+    def __init__(self, data, hw_target=None):
         # Reject Matrix objects - use .copy() method instead
         if isinstance(data, Matrix):
             raise TypeError(
@@ -58,16 +63,36 @@ class SparseMatrix(Matrix):
                 "Use DenseMatrix instead, or convert to sparse format first with "
                 "scipy.sparse.csr_matrix(array)."
             )
+        
+        if cupy_version is not None:
+            if isinstance(data, cp.ndarray):
+                raise TypeError(
+                    "Cannot create SparseMatrix from dense cupy array. "
+                    "Use DenseMatrix instead, or convert to sparse format first with "
+                    "cupyx.scipy.sparse.csr_matrix(array)."
+                )
 
         # Validate input is sparse
-        if not sp.issparse(data):
-            raise TypeError(
-                f"SparseMatrix requires scipy.sparse matrix, got {type(data).__name__}"
-            )
+        if not (sp.issparse(data)):
+            
+            if cupy_version is not None:
+                if not cu_sp.issparse(data):
+                    raise TypeError(
+                        f"SparseMatrix requires either scipy.sparse or cupyx.scipy.sparse matrix, got {type(data).__name__}"
+                    )
+            else:
+                raise TypeError(
+                    f"SparseMatrix requires scipy.sparse matrix, got {type(data).__name__}"
+                )
 
         # Convert to canonical CSR format if needed
         if not isinstance(data, sp.csr_matrix):
-            data = sp.csr_matrix(data)
+            
+            if cupy_version is not None:
+                if not isinstance(data, cu_sp.csr_matrix):
+                    data = data.tocsr()
+            else:
+                data = data.tocsr()
 
         # Ensure canonical format for optimal performance
         # This sorts indices and removes duplicates if needed
@@ -76,7 +101,7 @@ class SparseMatrix(Matrix):
             data.sort_indices()
 
         # Initialize parent with CSR matrix
-        super().__init__(data)
+        super().__init__(data, hw_target)
 
     # 3. Special representation methods
     # 4. Properties (grouped together)

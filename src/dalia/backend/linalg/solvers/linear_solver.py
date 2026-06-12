@@ -38,6 +38,7 @@ class LinearSolver(ABC):
         self._overwrite_matrix: bool = overwrite_matrix
         self._is_factorized: bool = False
         self._factors: Matrix = None
+        self._target = self._choose_target()
 
     # 3. Special representation methods
     # 4. Properties (grouped together)
@@ -64,6 +65,7 @@ class LinearSolver(ABC):
 
         self._matrix: Matrix = new_matrix
         self._is_factorized: bool = False  # Invalidate factorization
+        self._target = self._choose_target()  # Update target if needed
 
     def factorize(self, matrix: Matrix = None, overwrite: bool = None):
         """Factorize system matrix.
@@ -233,3 +235,7 @@ class LinearSolver(ABC):
         overwrite_factors : bool
             If True, destroys stored factorization to save memory.
         """
+
+    def _choose_target(self):
+        """Choose hardware target based on matrix type."""
+        return self._matrix.hw_target
