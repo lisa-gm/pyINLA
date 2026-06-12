@@ -41,6 +41,8 @@ class Matrix(ABC):
       (e.g., precision matrices from SPDE models, design matrices with many zeros)
     - Use **DenseMatrix** for small or fully populated matrices
       (e.g., covariance matrices, small design matrices)
+    - Use **BStructMatrix** for block-structured matrices.
+      (e.g. precision matrices that results of the assembly of several sub-models)
 
     Common Operations
     -----------------
@@ -57,12 +59,13 @@ class Matrix(ABC):
     --------
     >>> import numpy as np
     >>> import scipy.sparse as sp
-    >>> from backend.datastructures import DenseMatrix, SparseMatrix
+    >>> from backend.datastructures import DenseMatrix, SparseMatrix, BStructMatrix
 
     Create matrices:
 
     >>> dense = DenseMatrix(np.array([[1, 2], [3, 4]]))
     >>> sparse = SparseMatrix(sp.csr_matrix([[1, 0], [0, 2]]))
+    >>> bstruct = BStructMatrix([[dense, sparse], [sparse, dense]])
 
     Operations return Matrix types:
 
@@ -99,10 +102,11 @@ class Matrix(ABC):
     --------
     DenseMatrix : Concrete class for dense matrices
     SparseMatrix : Concrete class for sparse matrices (CSR format)
+    BStructMatrix : Block-structured matrix class for hierarchical models
 
     Notes
     -----
-    Matrix blocks the numpy array protocol (`__array__`, `__array_interface__`,
+    - Matrix blocks the numpy array protocol (`__array__`, `__array_interface__`,
     `__array_struct__`) to prevent implicit conversion. This ensures that
     operations like `scipy.sparse @ Matrix` properly return Matrix types
     rather than unwrapped numpy arrays. This design follows pandas/PyTorch
@@ -115,12 +119,13 @@ class Matrix(ABC):
     # 2. Initialization
     def __init__(self, data, hw_target=default_hw_target):
 
-        
-        if data.dtype.char not in 'fdFD':
-            raise TypeError(f"Unsupported data type '{data.dtype}'. Only float32 and float64 are supported.")
+        if data.dtype.char not in "fdFD":
+            raise TypeError(
+                f"Unsupported data type '{data.dtype}'. Only float32 and float64 are supported."
+            )
 
         data, hw_target = settarget(data, hw_target)
-        
+
         self._hw_target = hw_target
         self._data = data
 
@@ -136,12 +141,12 @@ class Matrix(ABC):
         """
         # pylint: disable=invalid-name
         return wrap_result(self._data.T)
-    
+
     @property
     def hw_target(self):
         """Hardware where the matrix data is stored ('host' or 'accelerator')"""
         return self._hw_target
-    
+
     @hw_target.setter
     def hw_target(self, hw_target):
         """Set hardware target for the matrix data

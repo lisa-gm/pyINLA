@@ -63,7 +63,7 @@ class SparseMatrix(Matrix):
                 "Use DenseMatrix instead, or convert to sparse format first with "
                 "scipy.sparse.csr_matrix(array)."
             )
-        
+
         if cupy_version is not None:
             if isinstance(data, cp.ndarray):
                 raise TypeError(
@@ -74,7 +74,7 @@ class SparseMatrix(Matrix):
 
         # Validate input is sparse
         if not (sp.issparse(data)):
-            
+
             if cupy_version is not None:
                 if not cu_sp.issparse(data):
                     raise TypeError(
@@ -87,7 +87,7 @@ class SparseMatrix(Matrix):
 
         # Convert to canonical CSR format if needed
         if not isinstance(data, sp.csr_matrix):
-            
+
             if cupy_version is not None:
                 if not isinstance(data, cu_sp.csr_matrix):
                     data = data.tocsr()

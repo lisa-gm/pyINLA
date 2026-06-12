@@ -5,6 +5,7 @@ from .matrix import Matrix
 from dalia.backend.config import default_hw_target, cupy_version
 
 import numpy as np
+
 if cupy_version is not None:
     import cupy as cp
     import cupyx.scipy.sparse as cu_sp
@@ -60,11 +61,10 @@ class DenseMatrix(Matrix):
                 "Use SparseMatrix instead, or convert to dense format first with "
                 "sparse_matrix.toarray()."
             )
-        
-        
+
         if isinstance(data, np.ndarray) and data.flags.c_contiguous and force_order:
             data = np.asfortranarray(data)
-        
+
         if cupy_version is not None:
             if cu_sp.issparse(data):
                 raise TypeError(
@@ -72,16 +72,16 @@ class DenseMatrix(Matrix):
                     "Use SparseMatrix instead, or convert to dense format first with "
                     "sparse_matrix.toarray()."
                 )
-            
+
             if isinstance(data, cp.ndarray) and data.flags.c_contiguous and force_order:
                 data = cp.asfortranarray(data)
-        # TODO: allow for accelerator arrays that are not cp.ndarray    
+        # TODO: allow for accelerator arrays that are not cp.ndarray
         if not isinstance(data, np.ndarray):
             if cupy_version is not None:
                 if not isinstance(data, cp.ndarray):
-                    data = np.asarray(data, order='F')
+                    data = np.asarray(data, order="F")
             else:
-                data = np.asarray(data, order='F')
+                data = np.asarray(data, order="F")
 
         # Initialize parent with dense array
         super().__init__(data, hw_target)
