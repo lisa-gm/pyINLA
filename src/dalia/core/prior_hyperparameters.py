@@ -39,6 +39,16 @@ class PriorHyperparameters(ABC):
             raise ValueError(f"Invalid direction: {direction}")
 
     @abstractmethod
+    def evaluate_prior(self, theta: float) -> float:
+        """Evaluate the prior hyperparameters."""
+        pass
+
+    @abstractmethod
     def evaluate_log_prior(self, theta: float) -> float:
         """Evaluate the log prior hyperparameters."""
+        pass
+
+    @abstractmethod
+    def evaluate_internal_log_prior(self, theta: float) -> float:
+        """Evaluate the transformedlog prior hyperparameters in internal representation."""
         pass

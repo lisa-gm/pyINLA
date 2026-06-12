@@ -1,6 +1,4 @@
 # Copyright 2024-2026 DALIA authors. All rights reserved.
-from dalia import NDArray
-from scipy.sparse import spmatrix
 from dalia import xp
 
 import numpy as np
@@ -22,11 +20,8 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
     where sigma is a positive scale parameter, typically the standard deviation.
 
     We use the internal parameterization:
-
     theta = log(1 / sigma^2) = -2 * log(sigma)
-
     and evaluate the prior in internal space through change of variables:
-
     log p(theta) = log p(sigma(theta)) + log(|d sigma / d theta|)
 
     Parameters
@@ -38,8 +33,8 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
     ----------
     scale : float. scale > 0. Default is 25.0.
         Scale parameter of the Half-Cauchy distribution.
-    normalizing_constant : float
-        Precomputed constant term for log probability evaluation in internal theta-space.
+    log_normalizing_constant : float
+        Precomputed log of the normalizing constant for log probability evaluation.
     """
 
     def __init__(
@@ -66,7 +61,7 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
         if self.scale <= 0:
             raise ValueError(f"Scale must be positive, got {self.scale}")
 
-        self.normalizing_constant: float = (
+        self.log_normalizing_constant: float = (
             xp.log(2.0) - xp.log(np.pi) - xp.log(self.scale)
         )
 
@@ -74,11 +69,10 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
         """
         Transform between external and internal parameter representations.
 
-        The Half-Cauchy prior is defined on sigma > 0 and the internal variable is
-        chosen as log precision:
-
-        theta = log(1 / sigma^2) = -2 * log(sigma),
-        sigma = exp(-0.5 * theta).
+        The Half-Cauchy distribution is defined on sigma > 0, but optimization often
+        works better in unconstrained space. This method transforms between sigma
+        (external, positive) and log precision theta = log(1/sigma^2) = -2*log(sigma)
+        (internal, unconstrained).
 
         Parameters
         ----------
@@ -86,8 +80,11 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
             Parameter value(s) to transform.
         direction : str
             Transformation direction:
-            - "forward": from external sigma to internal theta
-            - "backward": from internal theta to external sigma
+            - "forward": sigma -> log(1/sigma^2) (external to internal)
+            - "backward": log(1/sigma^2) -> sigma (internal to external)
+            - "forward_jacobian": Jacobian of forward transformation
+            - "backward_log_jacobian": Log-Jacobian of backward transformation
+
         Returns
         -------
         float or NDArray
@@ -98,62 +95,150 @@ class HalfCauchyPriorHyperparameters(PriorHyperparameters):
         ValueError
             If direction is not recognized.
         """
-        if direction == "forward":
+        if direction == "forward":  # input is sigma (external)
             theta_scaled = -2.0 * xp.log(theta)
-        elif direction == "backward":
+        elif direction == "backward":  # input is theta (internal)
             theta_scaled = xp.exp(-0.5 * theta)
-        elif direction == "forward_jacobian":
-            theta_scaled = -2.0 / theta
         elif (
-            direction == "backward_log_jacobian"
-        ):  ## expects theta to be in internal scale
+            direction == "forward_jacobian"
+        ):  # input is sigma (external), should be positive anyway
+            theta_scaled = 2.0 / xp.abs(theta)
+        elif direction == "backward_log_jacobian":  # input is theta (internal)
             theta_scaled = -xp.log(2.0) - 0.5 * theta
+            # log |d(exp(-0.5*theta))/d(theta)| = log|-0.5*exp(-0.5*theta)| = -log(2) - 0.5*theta
         else:
             raise ValueError(f"Unknown direction: {direction}")
 
         return theta_scaled
 
-    def evaluate_log_prior(self, theta: float, **kwargs) -> float:
+    def evaluate_prior(self, theta: float, **kwargs) -> float:
         """
-        Evaluate the log prior probability density.
+        Evaluate the prior probability density.
 
-        Computes the log probability density in external space where
-        theta = sigma.
+        Computes the probability density of the Half-Cauchy distribution
+        at the given sigma value in its external/user representation.
+
+        Is mainly used for plotting to understand the shape of the prior.
 
         Parameters
         ----------
         theta : float
-            External value theta = sigma
+            Parameter value at which to evaluate the prior.
+            Must be positive (external/user representation, sigma).
         **kwargs
             Additional keyword arguments (unused).
 
         Returns
         -------
         float
-            Log prior probability density at internal theta.
+            Prior probability density at sigma.
+
+        Notes
+        -----
+        The computation follows:
+            p(σ) = 2 / (π * scale * (1 + (σ / scale)²))
         """
+        if theta <= 0:
+            raise ValueError(f"Half-Cauchy sigma must be positive. Got theta={theta}")
 
-        theta_internal = self.rescale_hyperparameters_to_internal(theta, "forward")
+        prior = 2.0 / (np.pi * self.scale * (1.0 + (theta / self.scale) ** 2))
 
-        log_prior = (
-            self.normalizing_constant
-            - xp.log(1 + (theta / self.scale) ** 2)
-            + self.rescale_hyperparameters_to_internal(
-                theta_internal, direction="backward_log_jacobian"
-            )
+        return prior
+
+    def evaluate_log_prior(self, theta: float, **kwargs) -> float:
+        """
+        Computes the log probability density of the Half-Cauchy distribution
+        at the given sigma value in its external/user representation.
+
+        Parameters
+        ----------
+        theta : float
+            Parameter value at which to evaluate the log prior.
+            Must be positive (external/user representation, sigma).
+        **kwargs
+            Additional keyword arguments (unused).
+
+        Returns
+        -------
+        float
+            Log prior probability density at sigma.
+
+        Notes
+        -----
+        The computation follows:
+            log p(σ) = log(2) - log(π) - log(scale) - log(1 + (σ / scale)²)
+        """
+        if xp.min(theta) <= 0:
+            raise ValueError(f"Half-Cauchy sigma must be positive. Got theta={theta}")
+
+        log_prior = self.log_normalizing_constant - xp.log(
+            1.0 + (theta / self.scale) ** 2
         )
 
         return log_prior
 
+    def evaluate_internal_log_prior(self, theta: float, **kwargs) -> float:
+        """
+        Evaluate the log prior probability density transformed to internal space.
+
+        Computes the log prior in unconstrained (internal/log-precision) space by
+        applying a log-Jacobian correction for the change of variables from
+        constrained external space (σ > 0) to unconstrained internal space
+        (θ_internal ∈ ℝ, where θ_internal = -2*log(σ)).
+
+        Parameters
+        ----------
+        theta : float
+            Parameter value in external representation (must be positive, sigma).
+        **kwargs
+            Additional keyword arguments (unused).
+
+        Returns
+        -------
+        float
+            Log prior probability density in internal space:
+            log p(θ_internal) = log p_external(exp(-0.5*θ_internal)) + log|dσ/dθ_internal|
+
+        Notes
+        -----
+        The transformation uses the change of variables formula:
+            log p(θ_internal) = log p(σ) + log|dσ/dθ_internal|
+        where dσ/dθ_internal = -0.5*exp(-0.5*θ_internal), so
+        log|dσ/dθ_internal| = -log(2) - 0.5*θ_internal
+
+        This ensures the log prior is correctly normalized in internal space.
+        """
+        if xp.min(theta) <= 0:
+            raise ValueError(f"Half-Cauchy sigma must be positive. Got theta={theta}")
+
+        theta_internal = self.rescale_hyperparameters_to_internal(theta, "forward")
+
+        transformed_log_prior = self.evaluate_log_prior(
+            theta
+        ) + self.rescale_hyperparameters_to_internal(
+            theta_internal, "backward_log_jacobian"
+        )
+
+        return transformed_log_prior
+
 
 if __name__ == "__main__":
     """
-    Basic checks for Half-Cauchy prior implementation in internal theta-space.
+    Test Half-Cauchy prior hyperparameters with scipy validation.
+
+    Validates:
+    1. Prior evaluation against scipy.stats.halfcauchy
+    2. Log-prior evaluation against scipy.stats.halfcauchy.logpdf
+    3. Internal log-prior (transformed to log-precision space) via empirical sampling
     """
 
-    import matplotlib.pyplot as plt
+    print("=" * 80)
+    print("Testing Half-Cauchy Prior Hyperparameters")
+    print("=" * 80)
+
     from scipy.stats import halfcauchy
 
+    # Test configurations
     scale_values = [0.5, 1.0, 2.0]
 
     for scale in scale_values:
@@ -161,78 +246,167 @@ if __name__ == "__main__":
         config = HalfCauchyPriorHyperparametersConfig(scale=scale)
         half_cauchy_prior = HalfCauchyPriorHyperparameters(config=config)
 
+        # Test values: sigma must be positive
         test_values = [0.1, 0.5, 1.0, 2.0, 5.0]
-        print(
-            "Comparing log prior evaluations in internal theta-space with scipy.stats.halfcauchy + Jacobian:"
-        )
-        for sigma in test_values:
-            theta_internal = half_cauchy_prior.rescale_hyperparameters_to_internal(
-                sigma, "forward"
-            )
-            log_jac = -xp.log(2.0) + xp.log(sigma)
-            print(
-                " Testing sigma = {:.1f} (theta_internal = {:.3f}), log_jac = {:.6f}:".format(
-                    sigma, theta_internal, log_jac
-                )
-            )
 
-            logp_dalia = half_cauchy_prior.evaluate_log_prior(sigma)
-            logp_scipy = halfcauchy.logpdf(sigma, loc=0.0, scale=scale) + log_jac
+        print("Comparing prior evaluations with scipy.stats.halfcauchy:")
+        for val in test_values:
+            p_dalia = half_cauchy_prior.evaluate_prior(val)
+            p_scipy = halfcauchy.pdf(val, loc=0, scale=scale)
             print(
-                f"  sigma = {sigma:4.1f}: DALIA logp = {logp_dalia:.6f}, "
-                f"scipy logp = {logp_scipy:.6f}, diff = {abs(logp_dalia - logp_scipy):.6e}"
+                f"  σ = {val:4.1f}: DALIA p = {p_dalia:.6f}, "
+                f"scipy p = {p_scipy:.6f}, diff = {abs(p_dalia - p_scipy):.2e}"
             )
-            if abs(logp_dalia - logp_scipy) > 1e-6:
+            if abs(p_dalia - p_scipy) > 1e-6:
+                raise ValueError(
+                    "Prior evaluation does not match scipy implementation."
+                )
+
+        print("Comparing log prior evaluations with scipy.stats.halfcauchy:")
+        for val in test_values:
+            log_p_dalia = half_cauchy_prior.evaluate_log_prior(val)
+            log_p_scipy = halfcauchy.logpdf(val, loc=0, scale=scale)
+            print(
+                f"  σ = {val:4.1f}: DALIA log p = {log_p_dalia:.6f}, "
+                f"scipy log p = {log_p_scipy:.6f}, diff = {abs(log_p_dalia - log_p_scipy):.2e}"
+            )
+            if abs(log_p_dalia - log_p_scipy) > 1e-6:
                 raise ValueError(
                     "Log prior evaluation does not match scipy implementation."
                 )
 
-    print("\nAll Half-Cauchy checks passed!")
+        # Test internal log prior via sampling
+        N = 1000000
+        sigma_external_samples = halfcauchy.rvs(loc=0, scale=scale, size=N)
+        theta_internal_samples = half_cauchy_prior.rescale_hyperparameters_to_internal(
+            sigma_external_samples, "forward"
+        )
+        theta_min, theta_max = (
+            theta_internal_samples.min(),
+            theta_internal_samples.max(),
+        )
+        counts, bins = np.histogram(
+            theta_internal_samples, bins=500, range=(theta_min, theta_max), density=True
+        )
 
-    # Plot Half-Cauchy prior in external (sigma) and internal (theta) x-scales.
-    half_cauchy_plot = HalfCauchyPriorHyperparameters(
-        config=HalfCauchyPriorHyperparametersConfig(scale=25.0)
-    )
+        # Create grid over the observed internal space range (avoid extreme boundaries)
+        theta_grid = np.linspace(theta_min, theta_max, 1000)
+        bin_centers = (bins[:-1] + bins[1:]) / 2
 
-    sigma_grid = np.logspace(-5, 2, 500)
-    theta_grid = half_cauchy_plot.rescale_hyperparameters_to_internal(
-        sigma_grid, "forward"
-    )
-    order = np.argsort(theta_grid)
-    theta_sorted = theta_grid[order]
+        # Filter to core region (exclude low-count tail bins)
+        min_count = 0
+        valid_bins = counts > min_count
+        empirical_log_density = np.log(counts[valid_bins])
+        filtered_bin_centers = bin_centers[valid_bins]
 
-    # External-scale density p(sigma).
-    p_sigma_half_cauchy = 2.0 / (
-        np.pi
-        * half_cauchy_plot.scale
-        * (1.0 + (sigma_grid / half_cauchy_plot.scale) ** 2)
-    )
+        # Restrict theoretical evaluation to empirical range
+        empirical_theta_min = filtered_bin_centers.min()
+        empirical_theta_max = filtered_bin_centers.max()
 
-    # Internal-scale density p(theta) via change of variables.
-    log_jac = -np.log(2.0) + np.log(sigma_grid)
-    p_theta_half_cauchy = np.exp(
-        half_cauchy_plot.normalizing_constant
-        - np.log(1.0 + (sigma_grid / half_cauchy_plot.scale) ** 2)
-        + log_jac
-    )
+        # Convert back to external sigma and evaluate
+        sigma_grid = half_cauchy_prior.rescale_hyperparameters_to_internal(
+            theta_grid, "backward"
+        )
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+        theoretical_log_density = half_cauchy_prior.evaluate_internal_log_prior(
+            sigma_grid
+        )
 
-    axes[0].plot(sigma_grid, p_sigma_half_cauchy, label="Half-Cauchy")
-    axes[0].set_xscale("log")
-    axes[0].set_xlabel("External scale (sigma)")
-    axes[0].set_ylabel("Density")
-    axes[0].set_title("Half-Cauchy Density in External Scale")
-    axes[0].grid(alpha=0.3)
-    axes[0].legend()
+        from matplotlib import pyplot as plt
 
-    axes[1].plot(theta_sorted, p_theta_half_cauchy[order], label="Half-Cauchy")
-    axes[1].set_xlabel("Internal scale (theta = log(1/sigma^2))")
-    axes[1].set_ylabel("Density")
-    axes[1].set_title("Half-Cauchy Density in Internal Scale")
-    axes[1].grid(alpha=0.3)
-    axes[1].legend()
+        # Plot comparison
+        plt.figure(figsize=(9, 6))
+        plt.scatter(
+            filtered_bin_centers,
+            empirical_log_density,
+            color="royalblue",
+            s=15,
+            alpha=0.8,
+            label="Empirical Log-Densities (from samples)",
+        )
+        plt.plot(
+            theta_grid,
+            theoretical_log_density,
+            color="crimson",
+            lw=2.5,
+            label="Half-Cauchy Log-Density (internal space)",
+        )
+        plt.title(
+            f"Half-Cauchy Prior Internal Log-Space Validation (scale={scale})",
+            fontsize=14,
+        )
+        plt.xlabel("θ (log precision)", fontsize=12)
+        plt.ylabel("Log-Density", fontsize=12)
+        plt.grid(True, linestyle="--", alpha=0.5)
+        plt.legend(fontsize=11)
+        plt.show()
 
-    fig.suptitle("Half-Cauchy (scale=25)", fontsize=12)
-    fig.tight_layout()
-    plt.show()
+    ######### Check forward transformation
+    # Suppose I have now fitted a Gaussian in internal space and want to check that the
+    # forward transformation to external space gives the correct density shape.
+    # Do this by sampling from the Gaussian in internal space, transforming to external space using the half-Cauchy prior's rescaling function,
+    # and comparing the empirical density of the transformed samples to the theoretical density computed using the half-Cauchy prior's evaluate_prior() method.
+
+    # Create a inverse gamma prior configuration
+    mean_values = [-1.0, 3.0, 5.0]
+    sd_values = [0.5, 1.0, 2.0]
+
+    for mean, sd in zip(mean_values, sd_values):
+        N = 1000000
+        internal_samples = np.random.normal(loc=mean, scale=sd, size=N)
+        external_samples = half_cauchy_prior.rescale_hyperparameters_to_internal(
+            internal_samples, "backward"
+        )
+
+        xmin, xmax = external_samples.min(), external_samples.max()
+        counts, bins = np.histogram(
+            external_samples, bins=500, range=(xmin, xmax), density=True
+        )
+        bin_centers = (bins[:-1] + bins[1:]) / 2
+
+        valid_bins = counts > 0
+        empirical_log_density = np.log(counts[valid_bins])
+        filtered_bin_centers = bin_centers[valid_bins]
+
+        external_grid = np.linspace(xmin, xmax, 1000)
+
+        from scipy.stats import norm
+
+        theoretical_density = norm.pdf(
+            half_cauchy_prior.rescale_hyperparameters_to_internal(
+                external_grid, "forward"
+            ),
+            loc=mean,
+            scale=sd,
+        ) * np.abs(
+            half_cauchy_prior.rescale_hyperparameters_to_internal(
+                external_grid, "forward_jacobian"
+            )
+        )
+
+        plt.figure(figsize=(9, 6))
+        plt.scatter(
+            bin_centers,
+            counts,
+            color="royalblue",
+            s=15,
+            alpha=0.8,
+            label="Empirical Densities (from samples)",
+        )
+        plt.plot(
+            external_grid,
+            theoretical_density,
+            color="crimson",
+            lw=2.5,
+            label="Theoretical Density with Jacobian Correction",
+        )
+        plt.title(
+            "Validation of Forward Projection with Jacobian Correction", fontsize=14
+        )
+        plt.xlabel("x (External Space)", fontsize=12)
+        plt.ylabel("Density", fontsize=12)
+        plt.grid(True, linestyle="--", alpha=0.5)
+        plt.legend(fontsize=11)
+        plt.show()
+
+    print("\nAll value direct value comparisons passed. Check sampling plots.")

@@ -25,7 +25,7 @@ def scaled_logit(x: NDArray, direction: str) -> NDArray:
         return 1 / (1 + xp.exp(-k * x))
     elif direction == "forward_jacobian":
         return 1.0 / (k * x * (1.0 - x))
-    elif direction == "backward_jacobian":  ### should be 1 / forward_jacobian ...
-        return k * x * (1.0 - x)
+    elif direction == "backward_log_jacobian":
+        return xp.log(k) - 2 * xp.log1p(xp.exp(-k * x)) - k * x
     else:
         raise ValueError(f"Unknown direction: {direction}")
