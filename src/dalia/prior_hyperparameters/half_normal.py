@@ -111,21 +111,21 @@ class HalfNormalPriorHyperparameters(PriorHyperparameters):
 
         return theta_scaled
 
-    def evaluate_prior(self, sigma: float, **kwargs) -> float:
+    def evaluate_prior(self, theta: float, **kwargs) -> float:
         """
         Evaluate the prior probability density.
 
         Computes the probability density of the Half-Normal distribution
-        at the given sigma value in its external/user representation.
+        at the given theta value in its external/user representation.
         Typically representing a standard deviation.
 
         Is mainly used for plotting to understand the shape of the prior.
 
         Parameters
         ----------
-        sigma : float
+        theta : float
             Parameter value at which to evaluate the prior.
-            Must be positive (external/user representation, sigma).
+            Must be positive (external/user representation, typically standard deviation).
         **kwargs
             Additional keyword arguments (unused).
 
@@ -139,42 +139,42 @@ class HalfNormalPriorHyperparameters(PriorHyperparameters):
         The computation follows:
             p(σ) = sqrt(2 * precision / π) * exp(-0.5 * precision * σ²)
         """
-        if sigma <= 0:
-            raise ValueError(f"Half-Normal sigma must be positive. Got sigma={sigma}")
+        if xp.min(theta) <= 0:
+            raise ValueError(f"Half-Normal theta must be positive. Got theta={theta}")
 
         prior = np.sqrt(2.0 * self.precision / np.pi) * np.exp(
-            -0.5 * self.precision * sigma * sigma
+            -0.5 * self.precision * theta * theta
         )
 
         return prior
 
-    def evaluate_log_prior(self, sigma: float, **kwargs) -> float:
+    def evaluate_log_prior(self, theta: float, **kwargs) -> float:
         """
         Computes the log probability density of the Half-Normal distribution
-        at the given sigma value in its external/user representation.
+        at the given theta value in its external/user representation.
 
         Parameters
         ----------
-        sigma : float
+        theta : float
             Parameter value at which to evaluate the log prior.
-            Must be positive (external/user representation, sigma).
+            Must be positive (external/user representation, typically sd).
         **kwargs
             Additional keyword arguments (unused).
 
         Returns
         -------
         float
-            Log prior probability density at sigma.
+            Log prior probability density at theta.
 
         Notes
         -----
         The computation follows:
             log p(σ) = 0.5*log(2) + 0.5*log(precision) - 0.5*log(π) - 0.5*precision*σ²
         """
-        if xp.min(sigma) <= 0:
-            raise ValueError(f"Half-Normal sigma must be positive. Got sigma={sigma}")
+        if xp.min(theta) <= 0:
+            raise ValueError(f"Half-Normal theta must be positive. Got theta={theta}")
 
-        log_prior = self.log_normalizing_constant - 0.5 * self.precision * sigma * sigma
+        log_prior = self.log_normalizing_constant - 0.5 * self.precision * theta * theta
 
         return log_prior
 
@@ -210,7 +210,7 @@ class HalfNormalPriorHyperparameters(PriorHyperparameters):
         This ensures the log prior is correctly normalized in internal space.
         """
         if xp.min(theta) <= 0:
-            raise ValueError(f"Half-Normal: sigma must be positive. Got theta={theta}")
+            raise ValueError(f"Half-Normal: theta must be positive. Got theta={theta}")
 
         theta_internal = self.rescale_hyperparameters_to_internal(theta, "forward")
 

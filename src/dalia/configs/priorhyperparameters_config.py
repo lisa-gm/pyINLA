@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PositiveFloat
 from scipy.sparse import spmatrix
 from typing_extensions import Annotated
 
@@ -39,35 +39,26 @@ class PenalizedComplexityPriorHyperparametersConfig(PriorHyperparametersConfig):
     alpha: float = None
     u: float = None
 
-    # Generalized formula:
-    # lambda = - log(alpha) * pow(u, c_l)
-    #
-    # log_prior = a + b + c
-    # a = log(lambda)
-    # b = -lambda * exp(c_b * r)
-    # c = c_c * r
-
-
 class BetaPriorHyperparametersConfig(PriorHyperparametersConfig):
-    alpha: float = None
-    beta: float = None
+    alpha: PositiveFloat = None
+    beta: PositiveFloat = None
 
 
 class GammaPriorHyperparametersConfig(PriorHyperparametersConfig):
-    alpha: float = None
-    beta: float = None
+    alpha: PositiveFloat = None
+    beta: PositiveFloat = None
 
 class InverseGammaPriorHyperparametersConfig(PriorHyperparametersConfig):
-    alpha: float = None
-    beta: float = None
+    alpha: PositiveFloat = None
+    beta: PositiveFloat = None
 
 
 class HalfCauchyPriorHyperparametersConfig(PriorHyperparametersConfig):
-    scale: float = 25.0
+    scale: PositiveFloat = 25.0
 
 
 class HalfNormalPriorHyperparametersConfig(PriorHyperparametersConfig):
-    precision: float = 0.001
+    precision: PositiveFloat = 0.001
 
 
 def parse_config(config: dict) -> PriorHyperparametersConfig:

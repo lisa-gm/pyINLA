@@ -15,6 +15,7 @@ from dalia.configs.priorhyperparameters_config import (
     GaussianPriorHyperparametersConfig,
     PenalizedComplexityPriorHyperparametersConfig,
     GammaPriorHyperparametersConfig,
+    InverseGammaPriorHyperparametersConfig,
     HalfCauchyPriorHyperparametersConfig,
     HalfNormalPriorHyperparametersConfig,
 )
@@ -28,6 +29,7 @@ from dalia.prior_hyperparameters import (
     GaussianPriorHyperparameters,
     PenalizedComplexityPriorHyperparameters,
     GammaPriorHyperparameters,
+    InverseGammaPriorHyperparameters,
     HalfCauchyPriorHyperparameters,
     HalfNormalPriorHyperparameters,
 )
@@ -400,6 +402,15 @@ class Model(ABC):
                 )
             elif isinstance(
                 likelihood_config.prior_hyperparameters,
+                InverseGammaPriorHyperparametersConfig,
+            ):
+                self.prior_hyperparameters.append(
+                    InverseGammaPriorHyperparameters(
+                        config=likelihood_config.prior_hyperparameters,
+                    )
+                )
+            elif isinstance(
+                likelihood_config.prior_hyperparameters,
                 HalfCauchyPriorHyperparametersConfig,
             ):
                 self.prior_hyperparameters.append(
@@ -707,11 +718,11 @@ class Model(ABC):
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
             if isinstance(prior_hyperparameter, GaussianMVNPriorHyperparameters):
                 # for MVN prior hyperparameters, we need to pass the full vector
-                log_prior += prior_hyperparameter.evaluate_log_prior(
+                log_prior += prior_hyperparameter.evaluate_internal_log_prior(
                     self.theta_external[i : i + prior_hyperparameter.mean.shape[0]]
                 )
             else:
-                log_prior += prior_hyperparameter.evaluate_log_prior(
+                log_prior += prior_hyperparameter.evaluate_internal_log_prior(
                     self.theta_external[i]
                 )
 
