@@ -1407,7 +1407,11 @@ class DALIA:
                     "Computing marginal variances for currently stored latent parameters. "
                 )
                 x_star = self.model.x
-                theta_external = self.model.theta_external
+                theta_internal = self.theta_star_internal
+
+            elif theta_external is not None and x_star is not None:
+                self.model.theta_external = xp.atleast_1d(theta_external)
+                theta_internal = self.model.theta_internal
 
             if theta_external is None or x_star is None:
                 raise ValueError(
@@ -1415,7 +1419,7 @@ class DALIA:
                 )
 
                 # check order x_star ... -> potentially need to reorder marginal variances
-            self._compute_covariance_latent_parameters(theta_external, x_star)
+            self._compute_covariance_latent_parameters(theta_internal, x_star)
 
             # now only extract diagonal elements corresponding to marginal variances of the latent parameters
             variances_latent = self.solver._structured_to_spmatrix(

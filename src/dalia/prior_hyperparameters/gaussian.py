@@ -156,7 +156,7 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
         Parameters
         ----------
         theta : float
-            Parameter value in external representation.
+            Parameter value in INTERNAL representation.
         **kwargs
             Additional keyword arguments (unused).
 
@@ -172,14 +172,13 @@ class GaussianPriorHyperparameters(PriorHyperparameters):
                               = log p(θ_external) + 0
                               = log p(θ_external)
         """
+
         # Since the transformation is identity, the Jacobian correction is 0
-        theta_internal = self.rescale_hyperparameters_to_internal(theta, "forward")
+        theta_external = self.rescale_hyperparameters_to_internal(theta, "backward")
 
         transformed_log_prior = self.evaluate_log_prior(
-            theta
-        ) + self.rescale_hyperparameters_to_internal(
-            theta_internal, "backward_log_jacobian"
-        )
+            theta_external
+        ) + self.rescale_hyperparameters_to_internal(theta, "backward_log_jacobian")
 
         return transformed_log_prior
 
@@ -270,10 +269,7 @@ if __name__ == "__main__":
         filtered_bin_centers = bin_centers[valid_bins]
 
         # Compute theoretical log-density in internal space
-        theta_grid = gaussian_prior.rescale_hyperparameters_to_internal(
-            y_grid, "backward"
-        )
-        theoretical_log_density = gaussian_prior.evaluate_internal_log_prior(theta_grid)
+        theoretical_log_density = gaussian_prior.evaluate_internal_log_prior(y_grid)
 
         from matplotlib import pyplot as plt
 

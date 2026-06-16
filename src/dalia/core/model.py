@@ -719,11 +719,11 @@ class Model(ABC):
             if isinstance(prior_hyperparameter, GaussianMVNPriorHyperparameters):
                 # for MVN prior hyperparameters, we need to pass the full vector
                 log_prior += prior_hyperparameter.evaluate_internal_log_prior(
-                    self.theta_external[i : i + prior_hyperparameter.mean.shape[0]]
+                    self.theta_internal[i : i + prior_hyperparameter.mean.shape[0]]
                 )
             else:
                 log_prior += prior_hyperparameter.evaluate_internal_log_prior(
-                    self.theta_external[i]
+                    self.theta_internal[i]
                 )
 
         return log_prior

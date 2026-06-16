@@ -178,7 +178,7 @@ class GaussianMVNPriorHyperparameters(PriorHyperparameters):
         Parameters
         ----------
         theta : NDArray
-            Parameter values in external representation.
+            Parameter values in INTERNAL representation.
         **kwargs
             Additional keyword arguments (unused).
 
@@ -194,14 +194,13 @@ class GaussianMVNPriorHyperparameters(PriorHyperparameters):
                               = log p(θ_external) + 0
                               = log p(θ_external)
         """
+
         # Since transformation is identity, Jacobian correction is 0
-        theta_internal = self.rescale_hyperparameters_to_internal(theta, "forward")
+        theta_external = self.rescale_hyperparameters_to_internal(theta, "backward")
 
         transformed_log_prior = self.evaluate_log_prior(
-            theta
-        ) + self.rescale_hyperparameters_to_internal(
-            theta_internal, "backward_log_jacobian"
-        )
+            theta_external
+        ) + self.rescale_hyperparameters_to_internal(theta, "backward_log_jacobian")
 
         return transformed_log_prior
 

@@ -202,7 +202,7 @@ class InverseGammaPriorHyperparameters(PriorHyperparameters):
         Parameters
         ----------
         theta : float
-            Parameter value in external representation (must be positive).
+            Parameter value in INTERNAL representation (must be positive).
         **kwargs
             Additional keyword arguments (unused).
 
@@ -212,16 +212,12 @@ class InverseGammaPriorHyperparameters(PriorHyperparameters):
             Log prior probability density in internal space:
 
         """
-        if xp.min(theta) <= 0:
-            raise ValueError(f"Inverse Gamma theta must be positive. Got theta={theta}")
 
-        theta_internal = self.rescale_hyperparameters_to_internal(theta, "forward")
+        theta_external = self.rescale_hyperparameters_to_internal(theta, "backward")
 
         transformed_log_prior = self.evaluate_log_prior(
-            theta
-        ) + self.rescale_hyperparameters_to_internal(
-            theta_internal, "backward_log_jacobian"
-        )
+            theta_external
+        ) + self.rescale_hyperparameters_to_internal(theta, "backward_log_jacobian")
 
         return transformed_log_prior
 
@@ -308,7 +304,7 @@ if __name__ == "__main__":
 
         # Compute theoretical log-density in internal space
         theoretical_log_density = inverse_gamma_prior.evaluate_internal_log_prior(
-            inverse_gamma_prior.rescale_hyperparameters_to_internal(y_grid, "backward"),
+            y_grid
         )
 
         from matplotlib import pyplot as plt

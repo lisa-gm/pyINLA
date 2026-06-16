@@ -205,7 +205,7 @@ class BetaPriorHyperparameters(PriorHyperparameters):
         Parameters
         ----------
         theta : float
-            Parameter value in external representation (must be in (0, 1)).
+            Parameter value in internal representation (R).
         **kwargs
             Additional keyword arguments (unused).
 
@@ -227,13 +227,11 @@ class BetaPriorHyperparameters(PriorHyperparameters):
             If theta is not in (0, 1).
         """
 
-        theta_internal = self.rescale_hyperparameters_to_internal(theta, "forward")
+        theta_external = self.rescale_hyperparameters_to_internal(theta, "backward")
 
         transformed_log_prior = self.evaluate_log_prior(
-            theta
-        ) + self.rescale_hyperparameters_to_internal(
-            theta_internal, "backward_log_jacobian"
-        )
+            theta_external
+        ) + self.rescale_hyperparameters_to_internal(theta, "backward_log_jacobian")
 
         return transformed_log_prior
 
@@ -313,8 +311,7 @@ if __name__ == "__main__":
         filtered_bin_centers = bin_centers[valid_bins]
 
         # Compute theoretical log-density
-        theta_grid = beta_prior.rescale_hyperparameters_to_internal(y_grid, "backward")
-        theoretical_log_density = beta_prior.evaluate_internal_log_prior(theta_grid)
+        theoretical_log_density = beta_prior.evaluate_internal_log_prior(y_grid)
 
         from matplotlib import pyplot as plt
 

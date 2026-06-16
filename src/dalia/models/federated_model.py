@@ -297,10 +297,13 @@ class FederatedModel(Model):
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0
 
-        theta_interpret = self.theta_external
+        # TODO: do I need this local re-assignment?
+        theta_internal = self.theta_internal
 
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-            log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
+            log_prior += prior_hyperparameter.evaluate_internal_log_prior(
+                theta_internal[i]
+            )
 
         return log_prior
 

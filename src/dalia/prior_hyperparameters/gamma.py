@@ -194,7 +194,7 @@ class GammaPriorHyperparameters(PriorHyperparameters):
         Parameters
         ----------
         theta : float
-            Parameter value in external representation (must be positive).
+            Parameter value in INTERNAL representation (R).
         **kwargs
             Additional keyword arguments (unused).
 
@@ -211,13 +211,11 @@ class GammaPriorHyperparameters(PriorHyperparameters):
         direction to account for the Jacobian of the transformation.
         """
 
-        theta_internal = self.rescale_hyperparameters_to_internal(theta, "forward")
+        theta_external = self.rescale_hyperparameters_to_internal(theta, "backward")
 
         transformed_log_prior = self.evaluate_log_prior(
-            theta
-        ) + self.rescale_hyperparameters_to_internal(
-            theta_internal, "backward_log_jacobian"
-        )
+            theta_external
+        ) + self.rescale_hyperparameters_to_internal(theta, "backward_log_jacobian")
 
         return transformed_log_prior
 
@@ -306,9 +304,7 @@ if __name__ == "__main__":
         filtered_bin_centers = bin_centers[valid_bins]
 
         # 4. Compute Theoretical Log-Density Curve
-        theoretical_log_density = gamma_prior.evaluate_internal_log_prior(
-            np.exp(y_grid)
-        )
+        theoretical_log_density = gamma_prior.evaluate_internal_log_prior(y_grid)
 
         from matplotlib import pyplot as plt
 
