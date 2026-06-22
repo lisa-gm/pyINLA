@@ -8,7 +8,7 @@ from dalia.configs import dalia_config, likelihood_config, submodels_config
 from dalia.core.dalia import DALIA
 from dalia.core.model import Model
 from dalia.submodels import RegressionSubModel
-from dalia.utils import extract_diagonal, get_host, print_msg, plot_marginal_distributions_hp, plot_prior_hp
+from dalia.utils import extract_diagonal, print_msg, plot_marginal_distributions_hp, plot_prior_hp
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
@@ -37,9 +37,9 @@ if __name__ == "__main__":
     likelihood_dict = {
         "type": "gaussian",
         "prec_o": 1.0,
-        # "prior_hyperparameters": {"type": "half_cauchy", "scale": 25},
-        "prior_hyperparameters": {"type": "half_normal", "precision": 0.01},
-        # "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+        # "prior_hyperparameters": {"type": "half_cauchy", "scale": 5},
+        # "prior_hyperparameters": {"type": "half_normal", "precision": 0.1},
+        "prior_hyperparameters": {"type": "inverse_gamma", "alpha": 0.1, "beta": 0.5},
         # "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
     }
     # Creation of the first model by combining the Regression submodel and the likelihood
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     print_msg(model)
 
     ## Plot prior of hyperparameter -- identification by [0], [1], ... not amazing but works for now
-    theta_interval = [-5, 7]
+    theta_interval = [0.01, 8]
     print(model.prior_hyperparameters)
     prior_hp = model.prior_hyperparameters[0]
 
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
     # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
-    Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
+    Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ results["x"])
     Qinv_ref = xp.linalg.inv(Qconditional.toarray())
     print_msg(
         "Norm (marg var latent - ref):    ",
@@ -117,7 +117,7 @@ if __name__ == "__main__":
 
     # Compare marginal variances of observations
     var_obs = dalia.get_marginal_variances_observations(
-        theta_external=theta_ref, x_star=x_ref
+        theta_external=results["theta"], x_star=results["x"]
     )
 
     var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)

@@ -17,17 +17,11 @@ if __name__ == "__main__":
 
     # load reference output
     theta_original = np.load(BASE_DIR / "reference_outputs" / "theta_original.npy")
-    print(
-        "theta original: ",
-        theta_original,
-    )
 
     theta_initial = theta_original #[0.6, 1.0, 3.0]
     print("theta initial: ", theta_initial)
 
     x_original = np.load(BASE_DIR / "reference_outputs" / "x_original.npy")
-    print("x original: ", x_original[:10])
-    print("dim(x original): ", x_original.shape)
 
     ar1_dict = {
         "type": "ar1",
@@ -35,11 +29,11 @@ if __name__ == "__main__":
         "phi": 0.5,  # has to be between 0 and 1
         "ph_phi": {"type": "beta", "alpha": 5.0, "beta": 1.0},
         # initial guess on the precision
-        "tau": 3, # has to be positive
-        "ph_tau": {"type": "gamma", "alpha": 2.0, "beta": 1.0},
+        "tau": 3,  # has to be positive
+        "ph_tau": {"type": "gamma", "alpha": 1.0, "beta": 0.9},
         # initial guess on the variance
         # "sigma2": 0.33, # has to be positive
-        # "ph_sigma2": {"type": "invgamma", "alpha": 2.0, "beta": 1.0}, 
+        # "ph_sigma2": {"type": "invgamma", "alpha": 2.0, "beta": 1.0},
     }
     ar1 = AR1SubModel(
         config=submodels_config.parse_config(ar1_dict),
@@ -64,7 +58,10 @@ if __name__ == "__main__":
         #     "alpha": 0.01,
         #     "u": 5,
         # },
-        "prior_hyperparameters": {"type": "gaussian", "mean": theta_original[2], "precision": 0.05},
+        "prior_hyperparameters": {
+            "type": "half_normal",
+            "precision": 1e-4,
+        },
     }
 
     model = Model(
@@ -73,36 +70,228 @@ if __name__ == "__main__":
     )
     print_msg(model)
     
-    # plot phi
-    # theta_interval = [0, 1]
-    # prior_hp = model.prior_hyperparameters[0]
-    # fig, ax = plot_prior_hp("phi", theta_interval, prior_hp)
-
-    # plot tau
-    theta_interval = [0, 5]
-    prior_hp = model.prior_hyperparameters[1]
-    fig, ax = plot_prior_hp("tau", theta_interval, prior_hp)
-
     import matplotlib.pyplot as plt
+
+    # Plot all three priors
+    fig, axes = plt.subplots(3, 3, figsize=(18, 12))
+
+    # Plot 1: phi (Beta prior)
+    phi_interval = np.linspace(1e-6, 1 - 1e-6, 200)
+    phi_internal_interval = model.prior_hyperparameters[
+        0
+    ].rescale_hyperparameters_to_internal(phi_interval, "forward")
+    log_prior_phi = model.prior_hyperparameters[0].evaluate_log_prior(phi_interval)
+    prior_phi = model.prior_hyperparameters[0].evaluate_prior(phi_interval)
+    theta_original_internal = model.prior_hyperparameters[
+        0
+    ].rescale_hyperparameters_to_internal(theta_original[0], "forward")
+    tranformed_prior_phi = model.prior_hyperparameters[0].evaluate_internal_log_prior(
+        phi_internal_interval
+    )
+
+    # Plot 1a: phi evaluate_prior (Column 0)
+    axes[0, 0].plot(phi_interval, prior_phi, "b-", linewidth=2, label="Prior PDF")
+    axes[0, 0].axvline(
+        theta_original[0],
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label=f"Reference: {theta_original[0]:.4f}",
+    )
+    axes[0, 0].set_xlabel("φ (external)")
+    axes[0, 0].set_ylabel("Density")
+    axes[0, 0].set_title("φ Beta Prior PDF (External Space)")
+    axes[0, 0].legend()
+    axes[0, 0].grid(alpha=0.3)
+
+    # Plot 1b: phi log prior (Column 1)
+    axes[0, 1].plot(phi_interval, log_prior_phi, "b-", linewidth=2, label="Log Prior")
+    axes[0, 1].axvline(
+        theta_original[0],
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label=f"Reference: {theta_original[0]:.4f}",
+    )
+    axes[0, 1].set_xlabel("φ (external)")
+    axes[0, 1].set_ylabel("Log Density")
+    axes[0, 1].set_title("φ Log Prior (External Space)")
+    axes[0, 1].legend()
+    axes[0, 1].grid(alpha=0.3)
+
+    # Plot 1c: phi internal log prior (Column 2)
+    axes[0, 2].plot(
+        phi_internal_interval,
+        tranformed_prior_phi,
+        "orange",
+        linewidth=2,
+        label="Internal Log Prior",
+    )
+    axes[0, 2].axvline(
+        theta_original_internal,
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label=f"Reference (internal): {theta_original_internal:.4f}",
+    )
+    axes[0, 2].set_xlabel("φ (internal)")
+    axes[0, 2].set_ylabel("Log Density")
+    axes[0, 2].set_title("φ Log Prior (Internal Space)")
+    axes[0, 2].legend()
+    axes[0, 2].grid(alpha=0.3)
+
+    # Plot 2: tau (Gamma prior)
+    tau_interval = np.linspace(0.01, 10, 200)
+    tau_internal_interval = model.prior_hyperparameters[
+        1
+    ].rescale_hyperparameters_to_internal(tau_interval, "forward")
+    log_prior_tau = model.prior_hyperparameters[1].evaluate_log_prior(tau_interval)
+    prior_tau = model.prior_hyperparameters[1].evaluate_prior(tau_interval)
+    tranformed_prior_tau = model.prior_hyperparameters[1].evaluate_internal_log_prior(
+        tau_internal_interval
+    )
+    theta_original_internal_tau = model.prior_hyperparameters[
+        1
+    ].rescale_hyperparameters_to_internal(theta_original[1], "forward")
+
+    # Plot 2a: tau evaluate_prior (Column 0)
+    axes[1, 0].plot(tau_interval, prior_tau, "g-", linewidth=2, label="Prior PDF")
+    axes[1, 0].axvline(
+        theta_original[1],
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label=f"Reference: {theta_original[1]:.4f}",
+    )
+    axes[1, 0].set_xlabel("τ (external)")
+    axes[1, 0].set_ylabel("Density")
+    axes[1, 0].set_title("τ GAmma Prior PDF (External Space)")
+    axes[1, 0].legend()
+    axes[1, 0].grid(alpha=0.3)
+
+    # Plot 2b: tau log prior (Column 1)
+    axes[1, 1].plot(tau_interval, log_prior_tau, "g-", linewidth=2, label="Log Prior")
+    axes[1, 1].axvline(
+        theta_original[1],
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label=f"Reference: {theta_original[1]:.4f}",
+    )
+    axes[1, 1].set_xlabel("τ (external)")
+    axes[1, 1].set_ylabel("Log Density")
+    axes[1, 1].set_title("τ Log Prior (External Space)")
+    axes[1, 1].legend()
+    axes[1, 1].grid(alpha=0.3)
+
+    # Plot 2c: tau internal log prior (Column 2)
+    axes[1, 2].plot(
+        tau_internal_interval,
+        tranformed_prior_tau,
+        "orange",
+        linewidth=2,
+        label="Internal Log Prior",
+    )
+    axes[1, 2].axvline(
+        theta_original_internal_tau,
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label=f"Reference (internal): {theta_original_internal_tau:.4f}",
+    )
+    axes[1, 2].set_xlabel("τ (internal)")
+    axes[1, 2].set_ylabel("Log Density")
+    axes[1, 2].set_title("τ Log Prior (Internal Space)")
+    axes[1, 2].legend()
+    axes[1, 2].grid(alpha=0.3)
+
+    # Plot 3: prec_o (Half-normal prior)
+    # Plot 3: prec_o (Half-normal prior)
+    prec_o_interval = np.linspace(0.01, 100, 200)
+    prec_o_internal_interval = model.prior_hyperparameters[
+        2
+    ].rescale_hyperparameters_to_internal(prec_o_interval, "forward")
+    log_prior_prec_o = model.prior_hyperparameters[2].evaluate_log_prior(
+        prec_o_interval
+    )
+    prior_prec_o = model.prior_hyperparameters[2].evaluate_prior(prec_o_interval)
+    transformed_prior_prec_o = model.prior_hyperparameters[
+        2
+    ].evaluate_internal_log_prior(prec_o_internal_interval)
+    theta_original_internal_prec_o = model.prior_hyperparameters[
+        2
+    ].rescale_hyperparameters_to_internal(theta_original[2], "forward")
+
+    # Plot 3a: prec_o evaluate_prior (Column 0)
+    axes[2, 0].plot(prec_o_interval, prior_prec_o, "m-", linewidth=2, label="Prior PDF")
+    axes[2, 0].axvline(
+        theta_original[2],
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label=f"Initial: {theta_original[2]:.4f}",
+    )
+    axes[2, 0].set_xlabel("variance (external)")
+    axes[2, 0].set_ylabel("Density")
+    axes[2, 0].set_title("prec_o Half Normal Prior PDF (External Space)")
+    axes[2, 0].legend()
+    axes[2, 0].grid(alpha=0.3)
+
+    # Plot 3b: prec_o log prior (Column 1)
+    axes[2, 1].plot(
+        prec_o_interval, log_prior_prec_o, "m-", linewidth=2, label="Log Prior"
+    )
+    axes[2, 1].axvline(
+        theta_original[2],
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label=f"Initial: {theta_original[2]:.4f}",
+    )
+    axes[2, 1].set_xlabel("variance (external)")
+    axes[2, 1].set_ylabel("Log Density")
+    axes[2, 1].set_title("prec_o Log Prior (External Space)")
+    axes[2, 1].legend()
+    axes[2, 1].grid(alpha=0.3)
+
+    # Plot 3c: prec_o internal log prior (Column 2)
+    axes[2, 2].plot(
+        prec_o_internal_interval,
+        transformed_prior_prec_o,
+        "cyan",
+        linewidth=2,
+        label="Internal Log Prior",
+    )
+    axes[2, 2].axvline(
+        theta_original_internal_prec_o,
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label=f"Reference (internal): {theta_original_internal_prec_o:.4f}",
+    )
+    axes[2, 2].set_xlabel("variance (internal)")
+    axes[2, 2].set_ylabel("Log Density")
+    axes[2, 2].set_title("prec_o Log Prior (Internal Space)")
+    axes[2, 2].legend()
+    axes[2, 2].grid(alpha=0.3)
+
+    plt.tight_layout()
     plt.show()
 
+    exit()
+
     Qprior = model.construct_Q_prior()
-    print("Qprior: \n", Qprior.toarray()[:6, :6])
     Qinv = xp.linalg.inv(Qprior.toarray())
-    geom_mean = xp.exp(xp.mean(xp.log(Qinv.diagonal())))
-    print("Geometric mean of Qinv diagonal: ", geom_mean)
 
     # in gaussian case x = 0, thus eta = 0
     x_i = xp.zeros(model.n_latent_parameters)
     eta = model.a @ x_i
     Qcond = model.construct_Q_conditional(eta=eta)
-    print("Qcond: \n", Qcond.toarray()[:6, :6])
 
     b = model.construct_information_vector(eta=eta, x_i=x_i)
-    print("b: ", b[:10])
 
     x_est = xp.linalg.solve(Qcond.toarray(), b)
-    #print("x est: ", x_est)
+    # print("x est: ", x_est)
     print("norm(x_original - x_est): ", xp.linalg.norm(xp.asarray(x_original) - x_est))
 
     # Configurations of DALIA
@@ -163,19 +352,19 @@ if __name__ == "__main__":
         "Norm (marg var latent - ref):    ",
         f"{xp.linalg.norm(var_latent_params - xp.diag(Qinv_ref)):.4e}",
     )
-    
+
     print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp() 
 
     fig, axes = plot_marginal_distributions_hp(marginals_hp)
     import matplotlib.pyplot as plt
     plt.show()
-    
-    phi = marginals_hp['hyperparameters']['phi']
+
+    phi = marginals_hp["hyperparameters"]["prec_o"]
     quantile_pairs = phi['quantiles']['external']['pairs']
 
     print("Quantile pairs of phi:")
     for p, q in quantile_pairs:
         print(f"   {p:.3f} quantile: {q:.4f}")
-    
+
     print_msg("\n--- Finished ---")

@@ -22,7 +22,7 @@ class GaussianLikelihood(Likelihood):
         y: NDArray,
         **kwargs,
     ) -> float:
-        """Evaluate a Gaussian likelihood.
+        """Evaluate a Gaussian log likelihood.
 
         Notes
         -----
