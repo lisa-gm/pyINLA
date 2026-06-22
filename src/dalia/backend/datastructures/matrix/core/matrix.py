@@ -160,6 +160,13 @@ class Matrix(ABC):
     # 5. Comparison operators (if needed)
 
     # 6. Arithmetic operators (standard order)
+    def __mul__(self, other):
+        other_data = other._data if isinstance(other, Matrix) else other
+        result_data = blas_dispatch(Operation.MUL, self._data, other_data)
+        return self._wrap_result(
+            result_data
+        )
+
     def __matmul__(self, other):
         other_data = other._data if isinstance(other, Matrix) else other
         result_data = blas_dispatch(Operation.MATMUL, self._data, other_data)
@@ -239,7 +246,7 @@ class Matrix(ABC):
         self._data[key] = value
 
     def __repr__(self):
-        return self._data
+        return self._data.__repr__()
 
     # 10. Public methods
     def copy(self):

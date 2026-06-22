@@ -14,12 +14,14 @@ if gputil_version is not None:
 
 
 from .add import dispatch_add
+from .mat import dispatch_mul
 from .matmul import dispatch_matmul
 from .operations import Operation
 from .sub import dispatch_sub
 
 # At module level
 _OPERATION_MAP = {
+    Operation.MUL: dispatch_mul,
     Operation.MATMUL: dispatch_matmul,
     Operation.ADD: dispatch_add,
     Operation.SUB: dispatch_sub,

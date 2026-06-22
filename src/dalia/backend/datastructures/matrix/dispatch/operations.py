@@ -3,6 +3,7 @@ from enum import Enum
 
 
 class Operation(Enum):
+    MUL = "mul"
     MATMUL = "matmul"
     ADD = "add"
     SUB = "sub"
