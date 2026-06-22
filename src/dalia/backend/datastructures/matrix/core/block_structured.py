@@ -33,6 +33,13 @@ class BStructMatrix(Matrix):
     that every block row and block column contains at least one non-zero block. This is
     necessary to define the dimensions of the matrix and to avoid ambiguity in shape and size.
 
+    Raises
+    ------
+    TypeError
+        If `blocks` is not a list or numpy array, or if any block is not a Matrix object or None.
+    ValueError
+        If `blocks` is not 1D or 2D, if any block row or block column is entirely zero blocks, or if blocks in the same block row (resp. column) do not have the same number of rows (resp. columns).
+    
     Examples
     --------
     Create a 2x2 block-structured matrix using a 2D list of blocks:
@@ -55,14 +62,14 @@ class BStructMatrix(Matrix):
         # Validate input is 1D or 2D list/array of Matrix objects or None
         if not isinstance(blocks, (list, np.ndarray)):
             raise TypeError(
-                f"Blocks must be a list or numpy array, got {type(blocks).__name__}"
+                f"`blocks` must be a list or numpy array, got {type(blocks).__name__}"
             )
 
         # Convert list to numpy array and check dimensions
         if isinstance(blocks, list):
             blocks = np.array(blocks, dtype=Matrix)
         if blocks.ndim not in (1, 2):
-            raise ValueError(f"Blocks must be a 1D or 2D array, got {blocks.ndim}D")
+            raise ValueError(f"`blocks` must be a 1D or 2D array, got {blocks.ndim}D")
         n_brows, n_bcols = blocks.shape if blocks.ndim == 2 else (blocks.size, 1)
 
         # Validate that each block is a Matrix object or None
@@ -71,7 +78,7 @@ class BStructMatrix(Matrix):
                 block = blocks[i, j]
                 if block is not None and not isinstance(block, Matrix):
                     raise TypeError(
-                        f"Each block must be a Matrix object or None, got {type(block).__name__} at position ({i}, {j})"
+                        f"Each `block` must be a Matrix object or None, got {type(block).__name__} at position ({i}, {j})"
                     )
 
         # Temporary storage for row/col sizes (to be filled during validation)
@@ -109,12 +116,26 @@ class BStructMatrix(Matrix):
                 0
             ]  # Store the common column size for this block column
 
+        # If all diagonal blocks are square, then this Matrix is block-diagonally aligned.
+        # . this property is important as only block-diagonally aligned matrices are potential candidate for direct linear solvers.
+        is_bdiag_aligned = True
+        if n_brows != n_bcols:
+            # If the matrix is not square, it cannot be block-diagonally aligned
+            is_bdiag_aligned = False
+        else:
+            # If it is square we check further if all diagonal blocks are square
+            for i in range(n_brows):
+                if row_sizes[i] != col_sizes[i]:
+                    is_bdiag_aligned = False
+                    break
+
         # block-structure related attributes
         self._n_brows = n_brows
         self._n_bcols = n_bcols
         self._bshape = blocks.shape
 
         self._blocks = blocks
+        self._is_bdiag_aligned = is_bdiag_aligned
 
         # overall (value-wise) matrix attributes
         self._row_sizes = row_sizes
@@ -139,10 +160,25 @@ class BStructMatrix(Matrix):
 
     @property
     def dtype(self):
-        """..."""
-        raise NotImplementedError(
-            "dtype property not implemented yet for BStructMatrix as it is considered for now as an undefined behavior."
-        )
+        """ Undefined behavior
+
+        The dtype of a block-structured matrix is not uniquely defined as it 
+        can contain heterogeneous blocks with different dtypes. To get the dtype
+        of the underlying blocks, use the `bdtype` property instead.
+        """
+
+    @property
+    def bdtype(self):
+        """ This function hence return an array of the same shape as the block 
+        structure, where each entry corresponds to the dtype of the respective 
+        block. For zero blocks (None), the dtype is considered as None.
+        """
+        bdtype_array = np.empty(self._bshape, dtype=object)
+        for i in range(self._n_brows):
+            for j in range(self._n_bcols):
+                block = self._blocks[i, j]
+                bdtype_array[i, j] = block.dtype if block is not None else None
+        return bdtype_array
 
     @property
     def T(self):
@@ -234,9 +270,13 @@ class BStructMatrix(Matrix):
                         blk_sp = blk._data
                     elif isinstance(blk, DenseMatrix):
                         blk_sp = sp.csr_matrix(blk.toarray())
-                    else:
+                    elif isinstance(blk, BStructMatrix):
                         # Recursively convert nested BStructMatrix
-                        blk_sp = blk.to_sparse()._data
+                        blk_sp = blk.to_sparse()
+                    else:
+                        raise TypeError(
+                            f"Unsupported block type {type(blk).__name__} at position ({i}, {j})"
+                        )
                     blk_coo = blk_sp.tocoo()
                     rows.extend(blk_coo.row + row_offset)
                     cols.extend(blk_coo.col + col_offset)
