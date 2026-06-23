@@ -213,14 +213,85 @@ class HyperparameterManager:
             return None
         return deepcopy(self._history[-1])
     
-    def get_history_values(self) -> np.ndarray:
+    def get_historical_array(self, iteration: int) -> np.ndarray:
         """
-        Convenience method: get only the value arrays from history.
+        Get the full array of hyperparameters at a specific iteration.
+        
+        Args:
+            iteration: Iteration number (0-indexed)
+            
+        Returns:
+            1D numpy array of hyperparameter values at that iteration
+        """
+        if not self._track_history:
+            raise ValueError("History tracking is disabled")
+        if iteration < 0 or iteration >= len(self._history):
+            raise IndexError(f"Iteration {iteration} out of range (0 to {len(self._history)-1})")
+        
+        # Return from history array if available, otherwise reconstruct
+        if self._history_array is not None and iteration < len(self._history_array):
+            return self._history_array[iteration].copy()
+        else:
+            # Fallback: reconstruct from values dict
+            return np.array([self._history[iteration]['values'][name] 
+                           for name in self._param_names])
+    
+    def get_historical_dict(self, iteration: int) -> Dict[str, float]:
+        """
+        Get all hyperparameter values at a specific iteration as a dict.
+        
+        Args:
+            iteration: Iteration number (0-indexed)
+            
+        Returns:
+            Dictionary mapping hyperparameter names to values at that iteration
+        """
+        if not self._track_history:
+            raise ValueError("History tracking is disabled")
+        if iteration < 0 or iteration >= len(self._history):
+            raise IndexError(f"Iteration {iteration} out of range (0 to {len(self._history)-1})")
+        
+        return deepcopy(self._history[iteration]['values'])
+    
+    def get_historical_by_name(self, name: str) -> np.ndarray:
+        """
+        Get the entire history of a specific hyperparameter as an array.
+        
+        Args:
+            name: Name of the hyperparameter
+            
+        Returns:
+            1D numpy array of values across all iterations
+        """
+        if name not in self._values:
+            raise KeyError(f"Hyperparameter '{name}' not found")
+        if not self._track_history:
+            raise ValueError("History tracking is disabled")
+        
+        # Get the index of this parameter
+        param_idx = self._param_names.index(name)
+        
+        # Extract from history array
+        if self._history_array is not None and len(self._history_array) > 0:
+            return self._history_array[:, param_idx].copy()
+        else:
+            # Fallback: extract from history dicts
+            return np.array([entry['values'][name] for entry in self._history])
+    
+    def get_history_dataframe(self):
+        """
+        Get history as a pandas DataFrame (if pandas is available).
         
         Returns:
-            2D array of values only (no metadata)
+            pandas DataFrame with hyperparameters as columns and iterations as rows
         """
-        return self.get_history_array()
+        try:
+            import pandas as pd
+            df = pd.DataFrame(self._history_array, columns=self._param_names)
+            df.index.name = 'iteration'
+            return df
+        except ImportError:
+            raise ImportError("pandas is not installed. Install it with: pip install pandas")
     
     # ========== UTILITY METHODS ==========
     

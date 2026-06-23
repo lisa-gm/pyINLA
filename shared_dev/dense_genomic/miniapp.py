@@ -27,33 +27,40 @@ def assemble_prior_precision_matrix(
 def assemble_iid_prior_precision_matrix(
     PATH : Path,
     ):
+    # Initialize the iid precision matrix of given dimension
     iid_dim : int = np.load(PATH / "iid_dim.npy")    
     return DiagonalMatrix(diag = np.ones(iid_dim))
 
 def assemble_queen_prior_precision_matrix(
     PATH : Path,
     ):
+    # Directly load the precision matrix given by the dataset
     Q_queen : np.ndarray = np.load(PATH / "Q_queen.npy")
     return DenseMatrix(Q_queen)
 
 def assemble_regression_prior_precision_matrix(
     PATH : Path,
     ):
-    return DiagonalMatrix(diag = np.ones(1))
+    precision_regression : float = np.load(PATH / "prec_regression.npy")
+    regression_dim : int = np.load(PATH / "regression_dim.npy")
+    return DiagonalMatrix(diag = precision_regression * np.ones(regression_dim))
 
 def update_model_precision_matrix(
     Qp_model : BlockMatrix,
-    hp : "Hyperparameters"
+    hp : HyperparameterManager
     ) -> BlockMatrix:
     # Update the block precision matrix with the new hyperparameters.
-    hp_i = hp.to_dict(iter = -1)
-    hp_im1 = hp.to_dict(iter = -2)
+    # the scaling factors are computed as the ratio of the new hyperparameter value to the previous one.
+    iid_scaling = hp.get_hyperparameter_value("tau_iid") / hp.get_previous_hyperparameter_value("tau_iid")
     Qp_model.blocks[0][0] *= (hp_i["tau_iid"] / hp_im1["tau_iid"])
     Qp_model.blocks[1][1] *= (hp_i["tau_queen"] / hp_im1["tau_queen"])
     Qp_model.blocks[2][2] *= (hp_i["prec_regression"] / hp_im1["prec_regression"])
     return Qp_model
 
 
+
+def objective():
+    ...
 
 
 
@@ -81,20 +88,12 @@ if __name__ == "__main__":
                   [None, None, Q_prior_regression]]
     )
 
-    # Define the hyperparameters for the model.
-    #theta : Hyperparameters = Hyperparameters(
-    #    tau_iid = np.load(dataset_path / "tau_iid.npy"),
-    #    tau_queen = np.load(dataset_path / "tau_queen.npy"),
-    #    prec_regression = np.load(dataset_path / "prec_regression.npy")
-    #)
-
-    hp : Hyperparameters = Hyperparameters(
-        hyperparameters_dict = {
-            "tau_iid" : np.load(dataset_path / "tau_iid.npy"),
-            "tau_queen" : np.load(dataset_path / "tau_queen.npy"),
-            "prec_regression" : np.load(dataset_path / "prec_regression.npy")
-        }
-    )
+    # Initialize the hyperparameter manager with the hyperparameter configurations.
+    configs = [
+        HyperparameterConfig("tau_iid", (float)np.load(dataset_path / "tau_iid.npy")),
+        HyperparameterConfig("tau_queen", (float)np.load(dataset_path / "tau_queen.npy")),
+    ]
+    hp = HyperparameterManager(configs, track_history=True)
 
     # Update the model precision matrix with the hyperparameters.
     Qp_model = update_model_precision_matrix(Qp_model, hp)
