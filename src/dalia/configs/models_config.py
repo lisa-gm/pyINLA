@@ -26,6 +26,27 @@ class ModelConfig(BaseModel, ABC):
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
 
 
+class ReplicateModelConfig(ModelConfig):
+    type: Literal["replicate"] = "replicate"
+    n_replicates: PositiveInt = None
+
+    theta: list[float] = None  # Hyperparameters
+    theta_keys: list[str] = None  # Hyperparameter keys
+
+    @model_validator(mode="after")
+    def check_theta_and_theta_keys(self):
+        if len(self.theta) != len(self.theta_keys):
+            raise ValueError(
+                "Length of theta and theta_keys must be the same in ReplicateModelConfig."
+            )
+        return self
+
+    def read_hyperparameters(self):
+        theta = xp.array(self.theta)
+        theta_keys = self.theta_keys
+        return theta, theta_keys
+
+
 class CoregionalModelConfig(ModelConfig):
     n_models: PositiveInt = None
 
