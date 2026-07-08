@@ -38,12 +38,33 @@ class FederatedModelConfig(ModelConfig):
             raise ValueError("FederatedModelConfig requires both theta and theta_keys.")
         if len(self.theta) != len(self.theta_keys):
             raise ValueError(
-                f"Length of theta ({len(self.theta)}) does not match length of theta_keys ({len(self.theta_keys)})."
+                f"Length of theta ({len(self.theta)}) does not match length of theta_keys ({len(self.theta_keys)}).")
+    
+        return self
+    
+    def read_hyperparameters(self):
+        return xp.array(self.theta), self.theta_keys
+
+class ReplicateModelConfig(ModelConfig):
+    type: Literal["replicate"] = "replicate"
+    n_replicates: PositiveInt = None
+
+    theta: list[float] = None  # Hyperparameters
+    theta_keys: list[str] = None  # Hyperparameter keys
+
+    @model_validator(mode="after")
+    def check_theta_and_theta_keys(self):
+        if len(self.theta) != len(self.theta_keys):
+            raise ValueError(
+                "Length of theta and theta_keys must be the same in ReplicateModelConfig."
             )
         return self
 
     def read_hyperparameters(self):
-        return xp.array(self.theta), self.theta_keys
+        theta = xp.array(self.theta)
+        theta_keys = self.theta_keys
+        
+        return theta, theta_keys
 
 
 class CoregionalModelConfig(ModelConfig):
