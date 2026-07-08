@@ -18,6 +18,7 @@ from dalia.configs.priorhyperparameters_config import (
     InverseGammaPriorHyperparametersConfig,
     HalfCauchyPriorHyperparametersConfig,
     HalfNormalPriorHyperparametersConfig,
+    LKJCorrPriorHyperparametersConfig,
 )
 from dalia.core.likelihood import Likelihood
 from dalia.core.prior_hyperparameters import PriorHyperparameters
@@ -32,6 +33,7 @@ from dalia.prior_hyperparameters import (
     InverseGammaPriorHyperparameters,
     HalfCauchyPriorHyperparameters,
     HalfNormalPriorHyperparameters,
+    LKJCorrPriorHyperparameters,
 )
 from dalia.submodels import (
     BrainiacSubModel,
@@ -40,8 +42,9 @@ from dalia.submodels import (
     SpatioTemporalSubModel,
     AR1SubModel,
     GenericSubModel,
+    LKJSubModel,
 )
-from dalia.utils import add_str_header, boxify, scaled_logit
+from dalia.utils import add_str_header, boxify
 from dalia.utils.scalar_ndarray import ensure_scalar
 
 
@@ -213,7 +216,7 @@ class Model(ABC):
                             config=submodel.config.ph_tau,
                         )
                     )
-                if isinstance(
+                elif isinstance(
                     submodel.config.ph_tau,
                     PenalizedComplexityPriorHyperparametersConfig,
                 ):
@@ -223,16 +226,75 @@ class Model(ABC):
                             hyperparameter_type="tau",
                         )
                     )
-
                 # doesn't really make sense to allow Gaussian prior on precision
                 # implement proper check to raise error later
-                if isinstance(
+                elif isinstance(
                     submodel.config.ph_tau, GaussianPriorHyperparametersConfig
                 ):
                     self.prior_hyperparameters.append(
                         GaussianPriorHyperparameters(
                             config=submodel.config.ph_tau,
                         )
+                    )
+                else:
+                    raise ValueError(
+                        "Unsupported prior hyperparameter type for tau in GenericSubModel."
+                    )
+
+            elif isinstance(submodel, LKJSubModel):
+                if isinstance(
+                    submodel.config.ph_sigma1, HalfNormalPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        HalfNormalPriorHyperparameters(
+                            config=submodel.config.ph_sigma1,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_sigma1, HalfCauchyPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        HalfCauchyPriorHyperparameters(
+                            config=submodel.config.ph_sigma1,
+                        )
+                    )
+                else:
+                    raise ValueError(
+                        "Unsupported prior hyperparameter type for sigma1 in LKJSubModel."
+                    )
+
+                if isinstance(
+                    submodel.config.ph_sigma2, HalfNormalPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        HalfNormalPriorHyperparameters(
+                            config=submodel.config.ph_sigma2,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_sigma2, HalfCauchyPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        HalfCauchyPriorHyperparameters(
+                            config=submodel.config.ph_sigma2,
+                        )
+                    )
+                else:
+                    raise ValueError(
+                        "Unsupported prior hyperparameter type for sigma2 in LKJSubModel."
+                    )
+
+                if isinstance(
+                    submodel.config.ph_rho, LKJCorrPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        LKJCorrPriorHyperparameters(
+                            config=submodel.config.ph_rho,
+                        )
+                    )
+                else:
+                    raise ValueError(
+                        "Unsupported prior hyperparameter type for rho in LKJSubModel."
                     )
 
             elif isinstance(submodel, BrainiacSubModel):
@@ -547,6 +609,14 @@ class Model(ABC):
                             self.theta_external[hp_idx]
                         )
 
+                elif isinstance(submodel, LKJSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(
+                            self.theta_external[hp_idx]
+                        )
+
                 elif isinstance(submodel, RegressionSubModel):
                     ...
 
@@ -608,6 +678,14 @@ class Model(ABC):
                         )
                         # kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
                 elif isinstance(submodel, GenericSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(
+                            self.theta_external[hp_idx]
+                        )
+
+                elif isinstance(submodel, LKJSubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):

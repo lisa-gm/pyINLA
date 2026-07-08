@@ -22,6 +22,7 @@ class PriorHyperparametersConfig(BaseModel):
         "inverse_gamma",
         "half_cauchy",
         "half_normal",
+        "lkj_2d",
     ] = None
 
 
@@ -39,6 +40,7 @@ class PenalizedComplexityPriorHyperparametersConfig(PriorHyperparametersConfig):
     alpha: float = None
     u: float = None
 
+
 class BetaPriorHyperparametersConfig(PriorHyperparametersConfig):
     alpha: PositiveFloat = None
     beta: PositiveFloat = None
@@ -47,6 +49,7 @@ class BetaPriorHyperparametersConfig(PriorHyperparametersConfig):
 class GammaPriorHyperparametersConfig(PriorHyperparametersConfig):
     alpha: PositiveFloat = None
     beta: PositiveFloat = None
+
 
 class InverseGammaPriorHyperparametersConfig(PriorHyperparametersConfig):
     alpha: PositiveFloat = None
@@ -59,6 +62,10 @@ class HalfCauchyPriorHyperparametersConfig(PriorHyperparametersConfig):
 
 class HalfNormalPriorHyperparametersConfig(PriorHyperparametersConfig):
     precision: PositiveFloat = 0.001
+
+
+class LKJCorrPriorHyperparametersConfig(PriorHyperparametersConfig):
+    eta: PositiveFloat = 1.0
 
 
 def parse_config(config: dict) -> PriorHyperparametersConfig:
@@ -79,4 +86,6 @@ def parse_config(config: dict) -> PriorHyperparametersConfig:
         return HalfCauchyPriorHyperparametersConfig(**config)
     if prior_type == "half_normal":
         return HalfNormalPriorHyperparametersConfig(**config)
+    if prior_type == "lkj_2d":
+        return LKJCorrPriorHyperparametersConfig(**config)
     raise ValueError(f"Unknown prior hyperparameters config type: {prior_type}")

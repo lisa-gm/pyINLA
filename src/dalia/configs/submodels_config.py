@@ -12,6 +12,7 @@ from dalia.configs.priorhyperparameters_config import (
     BetaPriorHyperparametersConfig,
     GaussianMVNPriorHyperparametersConfig,
     PriorHyperparametersConfig,
+    LKJCorrPriorHyperparametersConfig,
 )
 from dalia.configs.priorhyperparameters_config import (
     parse_config as parse_priorhyperparameters_config,
@@ -24,7 +25,7 @@ class SubModelConfig(BaseModel, ABC):
     # Input folder for this specific submodel
     input_dir: str = None
     type: Literal[
-        "spatio_temporal", "spatial", "regression", "brainiac", "ar1", "generic"
+        "spatio_temporal", "spatial", "regression", "brainiac", "ar1", "generic", "lkj"
     ] = None
 
     @abstractmethod
@@ -136,6 +137,25 @@ class BrainiacSubModelConfig(SubModelConfig):
         return theta, theta_keys
 
 
+class LKJSubModelConfig(SubModelConfig):
+    sigma1: PositiveFloat = None
+    sigma2: PositiveFloat = None
+    rho: float = None
+
+    ph_sigma1: PriorHyperparametersConfig = (
+        None  # This is more flexible, in general we assume prior on standard deviations
+    )
+    ph_sigma2: PriorHyperparametersConfig = (
+        None  # This is more flexible, in general we assume prior on standard deviations
+    )
+    ph_rho: LKJCorrPriorHyperparametersConfig = None  # Enforce LKJ prior on rho
+
+    def read_hyperparameters(self):
+        theta = xp.array([self.sigma1, self.sigma2, self.rho])
+        theta_keys = ["sigma1", "sigma2", "rho"]
+        return theta, theta_keys
+
+
 def parse_config(config: dict | str) -> SubModelConfig:
     if isinstance(config, str):
         with open(config, "rb") as f:
@@ -160,6 +180,11 @@ def parse_config(config: dict | str) -> SubModelConfig:
         config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
         config["ph_phi"] = parse_priorhyperparameters_config(config["ph_phi"])
         return AR1SubModelConfig(**config)
+    if model_type == "lkj":
+        config["ph_sigma1"] = parse_priorhyperparameters_config(config["ph_sigma1"])
+        config["ph_sigma2"] = parse_priorhyperparameters_config(config["ph_sigma2"])
+        config["ph_rho"] = parse_priorhyperparameters_config(config["ph_rho"])
+        return LKJSubModelConfig(**config)
     elif model_type == "generic":
         config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
         return GenericSubModelConfig(**config)

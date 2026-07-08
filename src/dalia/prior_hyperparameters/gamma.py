@@ -341,10 +341,11 @@ if __name__ == "__main__":
     ######### Check forward transformation
     # Suppose I have now fitted a Gaussian in internal space and want to check that the
     # forward transformation to external space gives the correct density shape.
-    # Do this by sampling from the Gaussian in internal space, transforming to external space using the gamma prior's rescaling function,
-    # and comparing the empirical density of the transformed samples to the theoretical density computed using the gamma prior's evaluate_prior() method.
+    # Do this by sampling from the Gaussian in internal space, transforming to external space using the gamma
+    # prior's rescaling function,
+    # and comparing the empirical density of the transformed distribution to the empirical density of the
 
-    # Create a inverse gamma prior configuration
+    # Create gamma prior configuration
     mean_values = [-1.0, 3.0, 5.0]
     sd_values = [0.5, 1.0, 2.0]
 
