@@ -18,6 +18,7 @@ from dalia.utils import (
     extract_diagonal,
     print_msg,
     plot_marginal_distributions_hp,
+    save_to_json,
 )
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -29,6 +30,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if __name__ == "__main__":
     print_msg("--- Example: Gaussian Regression with multiple replicates ---")
 
+    save_dalia_results = False  # Set to True to save results to JSON
     # Check for parsed parameters
     args = parse_args()
 
@@ -162,23 +164,10 @@ if __name__ == "__main__":
         print(f"   {p:.3f} quantile: {q:.4f}")
 
     # save estimates to reference outputs folder
-    import json
-
-    dalia_estimates = {
-        "theta_internal": results["theta_internal"].tolist(),
-        "theta_external_map": results["theta"].tolist(),
-        "theta_external_mean": prec_obs["mean_external"],
-        "x": results["x"].tolist(),
-        "cov_theta_internal_diagonal": xp.diag(results["cov_theta_internal"]).tolist(),
-        "cov_theta_internal_full": results["cov_theta_internal"].tolist(),
-        "marginal_variance_external_prec_o": prec_obs["variance_external"],
-        "quantile_pairs": quantile_pairs,
-        "pdf_pairs": list(zip(pdf_pairs_x.tolist(), pdf_pairs_y.tolist())),
-    }
-    
-    reference_outputs_dir = f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs"
-    os.makedirs(reference_outputs_dir, exist_ok=True)
-    with open(f"{reference_outputs_dir}/dalia_estimates.json", "w") as f:
-        json.dump(dalia_estimates, f, indent=2)
+    if save_dalia_results:
+        save_to_json(
+            results=results,
+            filename=f"{BASE_DIR}/reference_outputs/dalia_estimates.json",
+        )
 
     print_msg("\n--- Finished ---")
