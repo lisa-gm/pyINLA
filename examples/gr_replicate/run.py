@@ -38,7 +38,9 @@ if __name__ == "__main__":
     models = []
     for i in range(n_replicates):
         # Configurations of the regression submodel
-        path_dir = f"{BASE_DIR}/inputs/replicate_{i+1}/inputs_regression"
+        path_dir = (
+            f"{BASE_DIR}/../gr/inputs"  # inputs/replicate_{i+1}/inputs_regression"
+        )
         regression_dict = {
             "type": "regression",
             "input_dir": path_dir,
@@ -71,31 +73,29 @@ if __name__ == "__main__":
         replicate_model_config=models_config.parse_config(replicate_dict),
     )
 
-    Qprior = replicate_model.construct_Q_prior()
-    print(f"Q_prior:\n{Qprior.toarray()}")
+    # Qprior = replicate_model.construct_Q_prior()
+    # print(f"Q_prior:\n{Qprior.toarray()}")
 
-    Qconditional = replicate_model.construct_Q_conditional(
-        eta=replicate_model.a @ replicate_model.x
-    )
-    print(f"Q_conditional:\n{Qconditional.toarray()}")
+    # Qconditional = replicate_model.construct_Q_conditional(
+    #     eta=replicate_model.a @ replicate_model.x
+    # )
+    # print(f"Q_conditional:\n{Qconditional.toarray()}")
 
-    exit()
+    # import matplotlib.pyplot as plt
+
+    # plt.matshow(Qprior.toarray())
+    # plt.show()
+
+    # plt.matshow(Qconditional.toarray())
+    # plt.show()
 
     # Configurations of DALIA
     dalia_dict = {
         "solver": {"type": "dense"},
-        "minimize": {
-            "max_iter": args.max_iter,
-            "gtol": 1e-3,
-            "disp": True,
-        },
-        "inner_iteration_max_iter": 50,
-        "eps_inner_iteration": 1e-3,
-        "eps_gradient_f": 1e-3,
         "simulation_dir": ".",
     }
     dalia = DALIA(
-        model=model,
+        model=replicate_model,
         config=dalia_config.parse_config(dalia_dict),
     )
 
@@ -108,10 +108,6 @@ if __name__ == "__main__":
     print_msg("Theta values external:\n", results["theta"])
     print_msg("Theta values internal:\n", results["theta_internal"])
     print_msg("Internal Covariance of theta:\n", results["cov_theta_internal"])
-    print_msg(
-        "Mean of the fixed effects:\n",
-        results["x"][-model.submodels[-1].n_fixed_effects :],
-    )
 
     print_msg("\n--- Comparisons ---")
     # Compare hyperparameters
@@ -126,12 +122,14 @@ if __name__ == "__main__":
     x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
     print_msg(
         "Norm (x - x_ref):                ",
-        f"{xp.linalg.norm(results['x'] - x_ref):.4e}",
+        f"{xp.sqrt(xp.sum((results['x'] - x_ref) ** 2)):.4e}",
     )
 
     # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
-    Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
+    Qconditional = dalia.model.construct_Q_conditional(
+        eta=replicate_model.a @ replicate_model.x
+    )
     Qinv_ref = xp.linalg.inv(Qconditional.toarray())
     print_msg(
         "Norm (marg var latent - ref):    ",
@@ -139,11 +137,9 @@ if __name__ == "__main__":
     )
 
     # Compare marginal variances of observations
-    var_obs = dalia.get_marginal_variances_observations(
-        theta_external=theta_ref, x_star=x_ref
-    )
+    var_obs = dalia.get_marginal_variances_observations()
 
-    var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
+    var_obs_ref = extract_diagonal(replicate_model.a @ Qinv_ref @ replicate_model.a.T)
     print_msg(
         "Norm (var_obs - var_obs_ref):    ",
         f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",

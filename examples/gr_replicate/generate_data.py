@@ -19,7 +19,7 @@ path = os.path.dirname(__file__)
 if __name__ == "__main__":
     n_observations = 20
     n_latent_parameters = 6
-    n_replicates = 3  # number of replicates
+    n_replicates = 5  # number of replicates
 
     prior_precision = 1e-3
     Sigma_prior = 1 / prior_precision * np.eye(n_latent_parameters)
