@@ -510,7 +510,7 @@ class DALIA:
                         "maxcor": self.config.minimize.maxcor,
                         "maxls": self.config.minimize.maxls,
                         "gtol": self.config.minimize.gtol,
-                        "disp": self.config.minimize.disp,
+                       # "disp": self.config.minimize.disp,
                         "ftol": 1e-22,
                     },
                     callback=callback,
@@ -707,6 +707,8 @@ class DALIA:
                 toc = time.perf_counter()
                 self.t_construction_qconditional += toc - tic
 
+                print(f"model.theta_external: {self.model.theta_external}")
+                print(f"model.theta_internal: {self.model.theta_internal}")
                 self.solver.factorize(A=Q_conditional, sparsity="bta")
 
                 rhs: NDArray = self.model.construct_information_vector(
@@ -1337,26 +1339,26 @@ class DALIA:
                 "Computing marginal variances for currently stored latent parameters. "
             )
             x_star = self.model.x
-            theta = self.model.theta_internal
+            theta_internal = self.model.theta_internal
         elif theta_external is not None and x_star is not None:
             ## assume theta to be in "external" scale
             self.model.theta_external = xp.atleast_1d(theta_external)
-            theta = self.model.theta_internal
+            theta_internal = self.model.theta_internal
 
-        elif theta is None or x_star is None:
+        elif theta_external is None or x_star is None:
             raise ValueError(
                 "BOTH or NEITHER theta and x_star must be provided to compute the marginal variances."
             )
 
         check_vector_consistency(
-            theta, comm=self.comm_world, flag="theta", verbose="Full"
+            theta_internal, comm=self.comm_world, flag="theta_internal", verbose="Full"
         )
         check_vector_consistency(
             x_star, comm=self.comm_world, flag="x_star", verbose="Minimal"
         )
 
         # check order x_star ... -> potentially need to reorder marginal variances
-        self._compute_covariance_latent_parameters(theta, x_star)
+        self._compute_covariance_latent_parameters(theta_internal, x_star)
 
         # now only extract diagonal elements corresponding to marginal variances of the latent parameters
         marginal_variances_sp = self.solver._structured_to_spmatrix(
@@ -1393,13 +1395,6 @@ class DALIA:
         """
 
         # TODO: implement this for non-Gaussian likelihoods
-        check_vector_consistency(
-            theta_external, comm=self.comm_world, flag="theta_external", verbose="Full"
-        )
-        check_vector_consistency(
-            x_star, comm=self.comm_world, flag="x_star", verbose="Minimal"
-        )
-
         if self.model.is_likelihood_gaussian():
             # TODO: this should be only called by rank 0?
             if theta_external is None and x_star is None:
@@ -1407,18 +1402,28 @@ class DALIA:
                     "Computing marginal variances for currently stored latent parameters. "
                 )
                 x_star = self.model.x
-                theta_internal = self.theta_star_internal
-
+                theta_internal = self.model.theta_internal
             elif theta_external is not None and x_star is not None:
+                
                 self.model.theta_external = xp.atleast_1d(theta_external)
                 theta_internal = self.model.theta_internal
 
-            if theta_external is None or x_star is None:
+            elif theta_external is None or x_star is None:
                 raise ValueError(
                     "BOTH or NEITHER theta and x_star must be provided to compute the marginal variances."
                 )
 
-                # check order x_star ... -> potentially need to reorder marginal variances
+            check_vector_consistency(
+                theta_internal,
+                comm=self.comm_world,
+                flag="theta_internal",
+                verbose="Full",
+            )
+            check_vector_consistency(
+                x_star, comm=self.comm_world, flag="x_star", verbose="Minimal"
+            )
+
+            # check order x_star ... -> potentially need to reorder marginal variances
             self._compute_covariance_latent_parameters(theta_internal, x_star)
 
             # now only extract diagonal elements corresponding to marginal variances of the latent parameters
@@ -1426,7 +1431,7 @@ class DALIA:
                 self.model.Q_conditional,
                 sparsity="bta",
             )
-
+            
             # compute diag(A Q_selected_inv A^T)
             # TODO: sparsify this. can be improved A LOT
             marginal_variances_observations = (

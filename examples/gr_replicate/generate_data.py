@@ -61,7 +61,8 @@ if __name__ == "__main__":
         # save the synthetic data
         np.save(f"{input_dir}/y.npy", y)
         # save a as .npz
-        sparse.save_npz(f"{input_dir}/a.npz", a)
+        os.makedirs(f"{input_dir}/inputs_regression", exist_ok=True)
+        sparse.save_npz(f"{input_dir}/inputs_regression/a.npz", a)
 
         # accumulate reference x
         x_ref[i * n_latent_parameters : (i + 1) * n_latent_parameters] = x

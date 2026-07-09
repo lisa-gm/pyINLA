@@ -138,6 +138,8 @@ def parse_config(config: dict | str) -> ModelConfig:
         return CoregionalModelConfig(**config)
     elif type == "federated":
         return FederatedModelConfig(**config)
+    if type == "replicate":
+        return ReplicateModelConfig(**config)
     # Add more elif branches for other model types
     else:
         raise ValueError(f"Invalid model type: {type}")

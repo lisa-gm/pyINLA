@@ -175,6 +175,9 @@ class GammaPriorHyperparameters(PriorHyperparameters):
         and β is the rate parameter.
         """
 
+        if theta <= 0:
+            raise ValueError(f"Theta must be positive for Gamma prior, got {theta}")
+
         log_prior = (
             self.log_normalizing_constant
             + (self.alpha - 1) * xp.log(theta)
