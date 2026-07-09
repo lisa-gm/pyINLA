@@ -699,8 +699,6 @@ class Model(ABC):
 
         return ensure_scalar(likelihood)
 
-        
-
     def __str__(self) -> str:
         """String representation of the model."""
         str_representation = ""

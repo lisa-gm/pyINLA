@@ -116,6 +116,8 @@ def parse_config(config: dict | str) -> ModelConfig:
                 config["ph_lambdas"][i]
             )
         return CoregionalModelConfig(**config)
+    if type == "replicate":
+        return ReplicateModelConfig(**config)
     # Add more elif branches for other model types
     else:
         raise ValueError(f"Invalid submodel type: {type}")

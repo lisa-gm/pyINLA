@@ -32,15 +32,15 @@ class ReplicateModel(Model):
         """Initializes the model."""
         self.models: list[Model] = models
 
-        self.n_models: int = replicate_model_config.n_models
-        assert self.n_models == len(
+        self.n_replicates: int = replicate_model_config.n_replicates
+        assert self.n_replicates == len(
             self.models
-        ), "Number of models does not match the number of models in the ReplicateModelConfig"
+        ), "Number of models does not match the number of replicates in the ReplicateModelConfig"
 
         # simply set theta according to first model
         first_model = self.models[0]
 
-        self.n_latent_effects = self.n_models * first_model.n_latent_effects
+        self.n_latent_parameters = self.n_replicates * first_model.n_latent_parameters
         ref_n_submodels = len(first_model.submodels)
         ref_submodel_types = [type(submodel) for submodel in first_model.submodels]
 
@@ -63,6 +63,12 @@ class ReplicateModel(Model):
         self.n_hyperparameters = self.theta_external.size
         self.theta_keys = theta_keys_replicate_config
         self.hyperparameters_idx: ArrayLike = first_model.hyperparameters_idx
+
+        print("Replicate model initialized with the following configuration:")
+        print(f"Number of replicates: {self.n_replicates}")
+        print(f"Number of hyperparameters: {self.n_hyperparameters}")
+        print(f"theta keys: {self.theta_keys}")
+        print(f"theta external: {self.theta_external}")
 
         self.n_observations: int = 0
         self.n_observations_idx: list[int] = [0]
@@ -134,7 +140,13 @@ class ReplicateModel(Model):
         self.y: NDArray = xp.zeros(self.n_observations)
 
         ### construct the observation matrix A as a block diagonal matrix of all local models
-        self.a = sp.sparse.block_diag([model.a for model in self.models], format="csc")
+        # if a of local model is sparse then use sparse block diagonal, otherwise use dense block diagonal
+        if sp.sparse.issparse(first_model.a):
+            self.a = sp.sparse.block_diag(
+                [model.a for model in self.models], format="csc"
+            )
+        else:
+            self.a = sp.block_diag([model.a for model in self.models])
 
         # now check that col(a) == n_latent_parameters, row(a) == n_observations
         if self.a.shape[0] != self.n_observations:
@@ -146,8 +158,21 @@ class ReplicateModel(Model):
                 f"Observation matrix A has {self.a.shape[1]} columns, but expected {self.n_latent_parameters} (total number of latent parameters across all models)."
             )
 
-        self.Q_conditional = None
+        # Not precomputing this as it takes unncessary memory
+        self.aTa = None
+
+        # assume for now that Q_prior is always sparse
         self.Q_prior: sp.sparse.spmatrix = None
+
+        # decide matrix type for Q_conditional based on the type of A
+        if sp.sparse.issparse(self.a):
+            self.Q_conditional: sp.sparse.spmatrix = sp.sparse.csc_matrix(
+                (self.n_latent_parameters, self.n_latent_parameters)
+            )
+        else:
+            self.Q_conditional: NDArray = xp.zeros(
+                (self.n_latent_parameters, self.n_latent_parameters)
+            )
 
         self.construct_Q_prior()
 
@@ -161,9 +186,13 @@ class ReplicateModel(Model):
 
         # create block diagonal matrix of Q_prior from each model
         # can use the first model to construct them all
-        self.models[0].theta_external = self.theta_external
+        # not solved yet for dense case -- but im on a branch where this is not yet handled
+        # update all models with the same theta_external
+        for model in self.models:
+            model.theta_external = self.theta_external
+
         self.Q_prior = sp.sparse.block_diag(
-            [self.models[0].construct_Q_prior() for _ in self.models], format="csc"
+            [model.construct_Q_prior() for model in self.models], format="csc"
         )
 
         return self.Q_prior
@@ -180,14 +209,20 @@ class ReplicateModel(Model):
         Input of the hessian of the likelihood is a diagonal matrix.
         The negative hessian is required, therefore the minus in front.
 
-        Iteratively add the contributions of each model. Something along the lines of
-        Q_conditional = Q_prior + A_1^T D_1 A_1 + A_2^T D_2 A_2 + ... + A_n^T D_n A_n
+        Q_conditional maintains a block diagonal structure, because both Qprior and A
+        are block diagonal. There we can assemble Q_conditional using independent blocks from each model.
 
         """
 
-        self.Q_conditional = self.Q_prior.copy()
-        self.Q_conditional -= self.construct_ATDA(eta=eta)
+        # iterate through each replicate to construct the block diagonal Q_conditional
+        Q_blocks = []
+        for i, model in enumerate(self.models):
+            model.theta_external = self.theta_external
+            eta_local = eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]]
+            Q_local = model.construct_Q_conditional(eta=eta_local)
+            Q_blocks.append(Q_local)
 
+        self.Q_conditional = sp.sparse.block_diag(Q_blocks, format="csc")
         return self.Q_conditional
 
     def construct_information_vector(
@@ -199,23 +234,19 @@ class ReplicateModel(Model):
 
         Note
         ----
-        Compute information vector for each model and then sum them.
+        Compute information vector for each model and insert into the correct chunk of the information vector for the replicate model.
         """
 
         information_vector = -1 * self.Q_prior @ x_i
-        print(f"n_observations_idx: {self.n_observations_idx}")
-        exit()
 
         for i, model in enumerate(self.models):
-            # TODO:move this inside the model and pass only x
-            eta = model.a @ x_i
-            information_vector += (
-                model.a.T
-                @ model.likelihood.evaluate_gradient_likelihood(
-                    eta=eta,
-                    y=model.y,
-                    theta=self.theta_external[self.hyperparameters_idx[-1] :],
-                )
+            eta_local = eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]]
+            information_vector[
+                i * model.n_latent_parameters : (i + 1) * model.n_latent_parameters
+            ] += model.a.T @ model.likelihood.evaluate_gradient_likelihood(
+                eta=eta_local,
+                y=model.y,
+                theta=self.theta_external[self.hyperparameters_idx[-1] :],
             )
 
         return information_vector
@@ -259,11 +290,11 @@ class ReplicateModel(Model):
         """
 
         likelihood: float = 0.0
-        for _, model in enumerate(self.models):
+        for i, model in enumerate(self.models):
             # local eta
-            eta = model.a @ model.x
+            eta_local = eta[self.n_observations_idx[i] : self.n_observations_idx[i + 1]]
             likelihood += model.likelihood.evaluate_likelihood(
-                eta=eta,
+                eta=eta_local,
                 y=model.y,
                 theta=self.theta_external[self.hyperparameters_idx[-1] :],
             )
@@ -293,20 +324,23 @@ class ReplicateModel(Model):
         log_prior = 0.0
 
         # TODO: do I need this local re-assignment?
-        theta_internal = self.theta_internal
+        theta_external = self.theta_external
 
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-            log_prior += prior_hyperparameter.evaluate_internal_log_prior(
-                theta_internal[i]
-            )
+            log_prior += prior_hyperparameter.evaluate_log_prior(theta_external[i])
 
         return log_prior
+
+    def total_number_fixed_effects(self) -> int:
+        """Get the number of fixed effects. Doesn't really make sense here because this is meant to determine the size of the
+        arrowhead. But here the ordering is different. So the whole concept should be rethought. For now, return number of fixed effects
+        multiplied by the number of replicates. This is the current best placeholder."""
+        return self.models[0].n_fixed_effects * self.n_replicates
 
     def __str__(self) -> str:
         """String representation of the model."""
 
         headers = [
-            "Federated Type",
             "Number of Replicates",
             "Number of Hyperparameters",
             "Total number of Latent Parameters",
@@ -314,20 +348,19 @@ class ReplicateModel(Model):
             "Total number of Observations",
         ]
         values = [
-            self.federated_type,
-            self.n_models,
+            self.n_replicates,
             self.n_hyperparameters,
             self.n_latent_parameters,
             self.n_fixed_effects,
             self.n_observations,
         ]
 
-        federated_table = tabulate(
+        replicate_table = tabulate(
             [headers, values],
             tablefmt="fancy_grid",
             colalign=("center", "center", "center", "center", "center", "center"),
         )
-        federated_table = add_str_header("Federated Model", federated_table)
+        replicate_table = add_str_header("Replicate Model", replicate_table)
 
         models_str_representation = []
         for model in self.models:
@@ -340,4 +373,4 @@ class ReplicateModel(Model):
             "Local Models", model_jointed_representation
         )
 
-        return federated_table + "\n" + boxify(model_jointed_representation)
+        return replicate_table + "\n" + boxify(model_jointed_representation)

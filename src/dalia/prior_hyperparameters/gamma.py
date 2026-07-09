@@ -141,6 +141,9 @@ class GammaPriorHyperparameters(PriorHyperparameters):
             If theta is not positive (implicitly through log computation).
         """
 
+        if theta <= 0:
+            raise ValueError(f"Theta must be positive for Gamma prior, got {theta}")
+
         log_prior = (
             self.normalizing_constant
             + (self.alpha - 1) * xp.log(theta)
@@ -344,4 +347,3 @@ if __name__ == "__main__":
     print("the moments of log-normal distributions obtained through gamma")  
     print("prior rescaling transformations.")
     print("=" * 80)
-

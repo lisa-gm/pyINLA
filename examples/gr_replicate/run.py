@@ -38,7 +38,7 @@ if __name__ == "__main__":
     models = []
     for i in range(n_replicates):
         # Configurations of the regression submodel
-        path_dir = f"{BASE_DIR}/inputs/replicate_{i+1}"
+        path_dir = f"{BASE_DIR}/inputs/replicate_{i+1}/inputs_regression"
         regression_dict = {
             "type": "regression",
             "input_dir": path_dir,
@@ -51,7 +51,6 @@ if __name__ == "__main__":
             "type": "gaussian",
             "prec_o": 1.0,
             "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
-            "input_dir": path_dir,
         }
         local_model = Model(
             submodels=[regression],
@@ -74,6 +73,11 @@ if __name__ == "__main__":
 
     Qprior = replicate_model.construct_Q_prior()
     print(f"Q_prior:\n{Qprior.toarray()}")
+
+    Qconditional = replicate_model.construct_Q_conditional(
+        eta=replicate_model.a @ replicate_model.x
+    )
+    print(f"Q_conditional:\n{Qconditional.toarray()}")
 
     exit()
 
