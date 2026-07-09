@@ -712,8 +712,6 @@ class DALIA:
                 toc = time.perf_counter()
                 self.t_construction_qconditional += toc - tic
 
-                print(f"model.theta_external: {self.model.theta_external}")
-                print(f"model.theta_internal: {self.model.theta_internal}")
                 self.solver.factorize(A=Q_conditional, sparsity="bta")
 
                 rhs: NDArray = self.model.construct_information_vector(
@@ -1336,7 +1334,7 @@ class DALIA:
                 self.model.Q_conditional,
                 sparsity="bta",
             )
-            
+
             # compute diag(A Q_selected_inv A^T)
             # TODO: sparsify this. can be improved A LOT
             marginal_variances_observations = (
