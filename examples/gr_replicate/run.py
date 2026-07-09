@@ -54,21 +54,6 @@ if __name__ == "__main__":
     )
     print_msg(model)
 
-    # print(f"Q_prior:\n{Qprior.toarray()}")
-
-    # Qconditional = replicate_model.construct_Q_conditional(
-    #     eta=replicate_model.a @ replicate_model.x
-    # )
-    # print(f"Q_conditional:\n{Qconditional.toarray()}")
-
-    # import matplotlib.pyplot as plt
-
-    # plt.matshow(Qprior.toarray())
-    # plt.show()
-
-    # plt.matshow(Qconditional.toarray())
-    # plt.show()
-
     # Configurations of DALIA
     dalia_dict = {
         "solver": {"type": "dense"},

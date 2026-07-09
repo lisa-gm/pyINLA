@@ -64,6 +64,12 @@ class ReplicateModel(Model):
         self.theta_keys = theta_keys_replicate_config
         self.hyperparameters_idx: ArrayLike = first_model.hyperparameters_idx
 
+        print("Replicate model initialized with the following configuration:")
+        print(f"Number of replicates: {self.n_replicates}")
+        print(f"Number of hyperparameters: {self.n_hyperparameters}")
+        print(f"theta keys: {self.theta_keys}")
+        print(f"theta external: {self.theta_external}")
+
         self.n_observations: int = 0
         self.n_observations_idx: list[int] = [0]
         y_list: list[NDArray] = []
