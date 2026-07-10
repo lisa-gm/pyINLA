@@ -24,7 +24,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if __name__ == "__main__":
     print_msg("--- Example: AR1 with Regression and multiple replicates ---")
 
-    save_dalia_results = True  # Set to True to save results to JSON
+    save_dalia_results = False  # Set to True to save results to JSON
     
     # Check for parsed parameters
     args = parse_args()
