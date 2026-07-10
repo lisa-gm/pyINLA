@@ -37,9 +37,7 @@ if __name__ == "__main__":
     likelihood_dict = {
         "type": "gaussian",
         "prec_o": 1.0,
-        # "prior_hyperparameters": {"type": "half_cauchy", "scale": 5},
-        # "prior_hyperparameters": {"type": "half_normal", "precision": 0.1},
-        "prior_hyperparameters": {"type": "inverse_gamma", "alpha": 0.1, "beta": 0.5},
+        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
         # "prior_hyperparameters": {"type": "gaussian", "mean": 1.0, "precision": 0.5},
     }
     # Creation of the first model by combining the Regression submodel and the likelihood
@@ -50,22 +48,17 @@ if __name__ == "__main__":
     print_msg(model)
 
     ## Plot prior of hyperparameter -- identification by [0], [1], ... not amazing but works for now
-    theta_interval = [0.01, 8]
-    print(model.prior_hyperparameters)
-    prior_hp = model.prior_hyperparameters[0]
+    # theta_interval = [1e-3, 7]
+    # prior_hp = model.prior_hyperparameters[0]
 
-    fig, ax = plot_prior_hp("prec_o", theta_interval, prior_hp)
-    import matplotlib.pyplot as plt
-    plt.show()
+    # fig, ax = plot_prior_hp("prec_o", theta_interval, prior_hp)
+    # import matplotlib.pyplot as plt
+
+    # plt.show()
 
     # Configurations of DALIA
     dalia_dict = {
         "solver": {"type": "dense"},
-        "minimize": {
-            "max_iter": args.max_iter,
-            "gtol": 1e-3,
-            "disp": True,
-        },
         "inner_iteration_max_iter": 50,
         "eps_inner_iteration": 1e-3,
         "eps_gradient_f": 1e-3,
@@ -116,9 +109,7 @@ if __name__ == "__main__":
     )
 
     # Compare marginal variances of observations
-    var_obs = dalia.get_marginal_variances_observations(
-        theta_external=results["theta"], x_star=results["x"]
-    )
+    var_obs = dalia.get_marginal_variances_observations()
 
     var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
     print_msg(

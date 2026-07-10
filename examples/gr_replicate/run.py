@@ -32,15 +32,13 @@ if __name__ == "__main__":
     # Check for parsed parameters
     args = parse_args()
 
-    n_replicates = 5  # number of replicates
+    n_replicates = 8  # number of replicates
 
     # setup 1 model for each replicate
     models = []
     for i in range(n_replicates):
         # Configurations of the regression submodel
-        path_dir = (
-            f"{BASE_DIR}/../gr/inputs"  # inputs/replicate_{i+1}/inputs_regression"
-        )
+        path_dir = f"{BASE_DIR}/inputs/replicate_{i+1}/inputs_regression"
         regression_dict = {
             "type": "regression",
             "input_dir": path_dir,
@@ -125,12 +123,6 @@ if __name__ == "__main__":
         f"{xp.sqrt(xp.sum((results['x'] - x_ref) ** 2)):.4e}",
     )
 
-    print_msg("x_ref[:10]:\n", x_ref[:10])
-    print_msg("x_est[:10]:\n", results["x"][:10])
-
-    print_msg("x_ref[-10:]:\n", x_ref[-10:])
-    print_msg("x_est[-10:]:\n", results["x"][-10:])
-
     # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
     Qconditional = dalia.model.construct_Q_conditional(
@@ -150,6 +142,8 @@ if __name__ == "__main__":
         "Norm (var_obs - var_obs_ref):    ",
         f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
     )
+
+    print_msg("replicate_model.y[:10]: ", replicate_model.y[:10])
 
     print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp()
