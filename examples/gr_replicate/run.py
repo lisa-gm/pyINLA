@@ -125,6 +125,12 @@ if __name__ == "__main__":
         f"{xp.sqrt(xp.sum((results['x'] - x_ref) ** 2)):.4e}",
     )
 
+    print_msg("x_ref[:10]:\n", x_ref[:10])
+    print_msg("x_est[:10]:\n", results["x"][:10])
+
+    print_msg("x_ref[-10:]:\n", x_ref[-10:])
+    print_msg("x_est[-10:]:\n", results["x"][-10:])
+
     # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
     Qconditional = dalia.model.construct_Q_conditional(

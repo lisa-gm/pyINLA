@@ -64,14 +64,9 @@ class ReplicateModel(Model):
         self.theta_keys = theta_keys_replicate_config
         self.hyperparameters_idx: ArrayLike = first_model.hyperparameters_idx
 
-        print("Replicate model initialized with the following configuration:")
-        print(f"Number of replicates: {self.n_replicates}")
-        print(f"Number of hyperparameters: {self.n_hyperparameters}")
-        print(f"theta keys: {self.theta_keys}")
-        print(f"theta external: {self.theta_external}")
-
         self.n_observations: int = 0
         self.n_observations_idx: list[int] = [0]
+        y_list: list[NDArray] = []
 
         ## ensure all local models have the same structure
         for i, model in enumerate(self.models):
@@ -133,11 +128,12 @@ class ReplicateModel(Model):
             # each instance can have a different number of observations
             self.n_observations += model.n_observations
             self.n_observations_idx.append(self.n_observations)
+            y_list.append(model.y)
 
         # this is now the total number of latent parameters (i.e. contains multiple instances of the same latent parameter)
         self.x: NDArray = xp.zeros(self.n_latent_parameters)
         # total number of observations across all replicates
-        self.y: NDArray = xp.zeros(self.n_observations)
+        self.y: NDArray = xp.concatenate(y_list)
 
         ### construct the observation matrix A as a block diagonal matrix of all local models
         # if a of local model is sparse then use sparse block diagonal, otherwise use dense block diagonal
