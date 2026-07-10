@@ -1,7 +1,17 @@
 
+from math import inf
+
+from scipy.optimize import Bounds
 
 class Hyperparameter:
-    ...
+    key : str
+    value : float
+
+    # Wether or not this hyperparameter is fixed or can be optimized
+    is_fixed : bool = False
+
+    # Hyperparameter bounds for optimization
+    bounds : Bounds = Bounds(lb=-inf, ub=inf)
 
 class HyperparameterManagerConfig:
     ...
