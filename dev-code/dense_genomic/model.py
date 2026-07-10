@@ -2,11 +2,16 @@ from abc import ABC, abstractmethod
 
 from pathlib import Path
 
+import numpy as np
+
 from .hyperparameter import Hyperparameter
-from dalia.backend.datastructure import Matrix
+from .cache_utils import restore_from_cache, store_in_cache
+from dalia.backend.datastructure import Matrix, DenseMatrix
 
 class StatisticalModelConfig:
     dataset_path: Path
+
+    n_observations: int
 
 
 class StatisticalModel(ABC):
@@ -16,45 +21,232 @@ class StatisticalModel(ABC):
         self.config = config
 
         # Load the model hyperparameters and their initial values
-        self.hyperparameters : list[Hyperparameter] = ...
+        self.hyperparameters : dict[str, Hyperparameter] = ...
 
-        # Load and construct the initial prior precision matrix
-        # -> This should be called someting like "model components"
-        # -> prior_precision_matrix_components
-        self.q_prior : Matrix = ...
+        # Specific statistical model overload these methods depending on the
+        # components of the model (e.g. iid, regression, spatial, temporal, etc.)
+        self.prior_components : dict = self._load_prior_components()
+        self.design_components : dict = self._load_design_components()
 
-        # Load and construct the design matrix
-        # -> Same here, design_matrix_components
-        self.design_matrix : Matrix = ...
+    # --- Public API ---
 
-    def assemble_prior_precision_matrix(self, hyperparameters: list[Hyperparameter]) -> Matrix:
-        if self.q_prior.is_cached():
-            # load it back from cache
-            self.q_prior.restore()
+    def assemble_prior_precision_matrix(self, hyperparameters: dict[str, Hyperparameter]) -> Matrix:
+        restore_from_cache(elements = self.prior_components)
 
-        # Apply some transofmration to self.q_prior
-        q_prior_at_hp : Matrix = f(hp, self.q_prior)
+        # Assemble the prior precision matrix from its components
+        # given the current hyperparameter values
+        q_prior = self._assemble_prior_precision_matrix(
+            prior_components = self.prior_components, 
+            hyperparameters = hyperparameters,
+        )
 
-        # Cache the bare precision matrix
-        self.q_prior.cache()
+        store_in_cache(elements = self.prior_components)
 
-        return q_prior_at_hp
+        return q_prior
     
     def assemble_design_matrix(self) -> Matrix:
-        # ...
-        restore_from_cache(design_matrix_components)
+        restore_from_cache(elements = self.design_components)
 
         # Assemble the design matrix from its components
-        design_matrix = self._assemble_design_matrix(design_matrix_components)
+        design_matrix = self._assemble_design_matrix(design_components = self.design_components)
 
-        cache(design_matrix_components)
+        store_in_cache(elements = self.design_components)
 
         return design_matrix
-    
+
+    # --- Abstract methods ---
+
     @abstractmethod
-    def _assemble_design_matrix(self) -> Matrix:
+    def _load_prior_components(self) -> dict:
+        """Abstract method whom specification will load the specific
+        components of the model needed to assemble the prior precision matrix.
+
+        Returns
+        -------
+        dict
+            A dictionary containing the components needed to assemble the prior precision matrix of the specific model.
+        """
         ...
 
+    @abstractmethod
+    def _load_design_components(self) -> dict:
+        """Abstract method whom specification will load the specific
+        components of the model needed to assemble the design matrix.
+        """
+        ...
+
+    @abstractmethod
+    def _assemble_prior_precision_matrix(self, prior_components: dict, hyperparameters: dict[str, Hyperparameter]) -> Matrix:
+        """Abstract method whom specification will assemble the prior precision matrix
+        from its components given the current hyperparameter values.
+
+        Parameters
+        ----------
+        prior_components : dict
+            The components of the prior precision matrix.
+        hyperparameters : dict[str, Hyperparameter]
+            The current hyperparameter values.
+
+        Returns
+        -------
+        Matrix
+            The assembled prior precision matrix.
+        """
+        ...
+
+    @abstractmethod
+    def _assemble_design_matrix(self, design_components: dict) -> Matrix:
+        """Abstract method whom specification will assemble the design matrix
+        from its components.
+        """
+        ...
+
+class GenomicModelConfig(StatisticalModelConfig):
+    # Component: iid 
+    iid_prior_n: int
+    iid_design_name: str # Name of the file containing the design matrix for the iid component
+
+    # Component: queen
+    queen_prior_name: str # Name of the file containing the Queen contiguity matrix
+    queen_design_name: str # Name of the file containing the design matrix for the queen component
+
+    # Component: regression
+    regression_prior_n: int
+    regression_design_name: str # Name of the file containing the design matrix for the regression component
+
+
 class GenomicModel(StatisticalModel):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, config: StatisticalModelConfig):
+        super().__init__(config)
+
+    def _load_prior_components(self) -> dict:
+        """Load the different components of the GenomicModel.
+
+        Returns
+        -------
+        dict
+            A dictionary containing the components needed to assemble the prior precision matrix of the GenomicModel.
+
+        Components
+        ----------
+        - iid: Independent and identically distributed prior component
+        - queen: Spatial prior component based on the Queen contiguity matrix
+        - regression: Regression prior component
+        """
+        # Load or assemble each components of the statistical model
+        # . This will be modified using the appropriate Matrix specifications, 
+        # in particular DiagonalMatrix for the iid and regression components.
+        iid_prior_matrix = DenseMatrix(data=np.eye(self.config.iid_prior_n))
+        queen_prior_matrix = DenseMatrix(data=np.load(self.config.dataset_path / self.config.queen_prior_name))
+        regression_prior_matrix = DenseMatrix(data=np.eye(self.config.regression_prior_n))
+
+        return {
+            "iid": iid_prior_matrix,
+            "queen": queen_prior_matrix,
+            "regression": regression_prior_matrix
+        }
+
+    def _load_design_components(self) -> dict:
+        """Load the different design components of the GenomicModel.
+
+        Returns
+        -------
+        dict
+            A dictionary containing the components needed to assemble the design matrix of the GenomicModel.
+        """
+        iid_design_matrix = DenseMatrix(data=np.load(self.config.dataset_path / self.config.iid_design_name))
+        queen_design_matrix = DenseMatrix(data=np.load(self.config.dataset_path / self.config.queen_design_name))
+        regression_design_matrix = DenseMatrix(data=np.load(self.config.dataset_path / self.config.regression_design_name))
+
+        return {
+            "iid": iid_design_matrix,
+            "queen": queen_design_matrix,
+            "regression": regression_design_matrix
+        }
+
+    def _assemble_prior_precision_matrix(self, prior_components: dict, hyperparameters: dict[str, Hyperparameter]) -> Matrix:
+        """Assemble the prior precision matrix of the Genomic model from its components 
+        given the current hyperparameter values.
+
+        Parameters
+        ----------
+        prior_components : dict
+            The components of the prior precision matrix.
+        hyperparameters : dict[str, Hyperparameter]
+            The current hyperparameter values.
+
+        Returns
+        -------
+        Matrix
+            The assembled prior precision matrix.
+
+        Components
+        ----------
+        - iid: Independent and identically distributed prior component
+        - queen: Spatial prior component based on the Queen contiguity matrix
+        - regression: Regression prior component
+        """ 
+        # Extract the required components
+        iid_component = prior_components["iid"]
+        queen_component = prior_components["queen"]
+        regression_component = prior_components["regression"]
+
+        # Initialize the prior precision matrix with the appropriate shape
+        prior_shape = iid_component.shape + queen_component.shape + regression_component.shape
+        q_prior = DenseMatrix(data=np.zeros(prior_shape, dtype=np.float64))
+
+        # Assemble the prior precision matrix from its components at the current hyperparameter values
+        # . This block is gonna become way easier with the block-matrix. Then no need to 
+        # maintain knowledge about the different shapes of each component.
+        # . This also currently assumes that each component of this specific model 
+        # is a square matrix.
+        iid_prior_n : int = iid_component.shape[0]
+        n_queen : int = queen_component.shape[0]
+
+        block_offsets : list = [0, iid_prior_n, iid_prior_n + n_queen]
+        q_prior[:block_offsets[1], :iid_prior_n] = iid_component * hyperparameters["tau_iid"].value
+        q_prior[block_offsets[1]:block_offsets[2], block_offsets[1]:block_offsets[2]] = queen_component * hyperparameters["tau_queen"].value
+        q_prior[block_offsets[2]:, block_offsets[2]:] = regression_component * hyperparameters["prec_regression"].value
+
+        return q_prior
+
+    def _assemble_design_matrix(self, design_components: dict) -> Matrix:
+        """Assemble the design matrix of the Genomic model from its components.
+
+        Parameters
+        ----------
+        design_components : dict
+            The components of the design matrix.
+
+        Returns
+        -------
+        Matrix
+            The assembled design matrix.
+
+        Components
+        ----------
+        - iid: Independent and identically distributed design component
+        - queen: Spatial design component based on the Queen contiguity matrix
+        - regression: Regression design component
+        """
+        # Extract the required components
+        iid_design_matrix = design_components["iid"]
+        queen_design_matrix = design_components["queen"]
+        regression_design_matrix = design_components["regression"]
+
+        # Initialize the design matrix with the appropriate shape
+        n_observations : int = self.config.n_observations
+        n_iid : int = iid_design_matrix.shape[1]
+        n_queen : int = queen_design_matrix.shape[1]
+        n_regression : int = regression_design_matrix.shape[1]
+
+        design_shape : tuple = (n_observations, n_iid + n_queen + n_regression)
+        design_matrix : DenseMatrix = DenseMatrix(data=np.zeros(design_shape, dtype=np.float64))
+
+        # Assemble the design matrix from its components
+        block_offsets : list = [0, n_iid, n_iid + n_queen]
+        design_matrix[:, block_offsets[0]:block_offsets[1]] = iid_design_matrix
+        design_matrix[:, block_offsets[1]:block_offsets[2]] = queen_design_matrix
+        design_matrix[:, block_offsets[2]:] = regression_design_matrix
+
+        return design_matrix

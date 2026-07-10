@@ -5,28 +5,7 @@ from scipy.optimize import minimize, OptimizeResult
 from pathlib import Path
 
 from hyperparameter import Hyperparameter, HyperparameterManagerConfig, HyperparameterManager
-
-
-
-
-def update_prior_precision_matrix(
-    Q_prior : np.ndarray,
-    n_iid : int,
-    n_queen : int,
-    n_regression : int,
-    hp_manager : HyperparameterManager
-    ) -> np.ndarray:
-    # Update the prior precision matrix with the new hyperparameters.
-    # the scaling factors are computed as the ratio of the new hyperparameter value to the previous one.
-    tau_iid_scaling = hp_manager.get_hyperparameter_value("tau_iid") / hp_manager.get_previous_hyperparameter_value("tau_iid")
-    tau_queen_scaling = hp_manager.get_hyperparameter_value("tau_queen") / hp_manager.get_previous_hyperparameter_value("tau_queen")
-    prec_regression_scaling = hp_manager.get_hyperparameter_value("prec_regression") / hp_manager.get_previous_hyperparameter_value("prec_regression")
-
-    Q_prior[:n_iid, :n_iid] *= tau_iid_scaling
-    Q_prior[n_iid:n_iid+n_queen, n_iid:n_iid+n_queen] *= tau_queen_scaling
-    Q_prior[n_iid+n_queen:, n_iid+n_queen:] *= prec_regression_scaling
-
-    return Q_prior
+from .model import GenomicModel, GenomicModelConfig
 
 
 def objective():
@@ -79,27 +58,22 @@ def optimize(
     return result
 
 if __name__ == "__main__":
-    # Set-up of the problem
-    dataset_path : Path = ...
-
-    n_iid : int = ...
-    n_queen : int = ...
-    n_regression : int = ...
-    n_total : int = n_iid + n_queen + n_regression
-
-    Q_prior : np.ndarray = np.zeros((n_total, n_total), dtype=np.float64)
-
-    # Assemble the sub-components of the prior precision matrix
-    # . prior_iid
-    tau_iid : Hyperparameter = ...
-    Q_prior[:n_iid, :n_iid] = np.eye(n_iid) * tau_iid
-    # . prior_queen
-    tau_queen : Hyperparameter = ...
-    Q_prior[n_iid:n_iid+n_queen, n_iid:n_iid+n_queen] = tau_queen * np.load(dataset_path / "Q_queen.npy")
-    # . prior_regression
-    prec_regression : Hyperparameter = ...
-    Q_prior[n_iid+n_queen:, n_iid+n_queen:] = np.eye(n_regression) * prec_regression
-
+    # Configure and initialize the Genomic Model
+    config : GenomicModelConfig = GenomicModelConfig(
+        dataset_path=Path("path/to/dataset"),
+        n_observations=100,
+        # Component: iid
+        iid_prior_n=100,
+        iid_design_name="iid_design_matrix.npy",
+        # Component: queen
+        queen_prior_name="queen_matrix.npy",
+        queen_design_name="queen_design_matrix.npy",
+        # Component: regression
+        regression_prior_n=10,
+        regression_design_name="regression_design_matrix.npy"
+    )
+    model : GenomicModel = GenomicModel(config=config)
+    
     # Initialize the hyperparameter manager with the hyperparameters and their initial values
     hp_manager_config : HyperparameterManagerConfig = ...
     hp_manager : HyperparameterManager = HyperparameterManager(
@@ -113,7 +87,3 @@ if __name__ == "__main__":
         jacobian_function=jacobian,
         hyperparameter_manager=hp_manager
     )
-
-    # Problems:
-    # - how do I interface the precision matrices construction to the objective function
-    # - need a Model() class again?
