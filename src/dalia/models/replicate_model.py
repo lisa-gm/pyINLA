@@ -340,14 +340,12 @@ class ReplicateModel(Model):
             "Number of Replicates",
             "Number of Hyperparameters",
             "Total number of Latent Parameters",
-            "Total numberof Fixed Effects",
             "Total number of Observations",
         ]
         values = [
             self.n_replicates,
             self.n_hyperparameters,
             self.n_latent_parameters,
-            self.n_fixed_effects,
             self.n_observations,
         ]
 
