@@ -1,5 +1,4 @@
-
-
+"""..."""
 
 
 def restore_from_cache(elements: list | dict):
@@ -17,9 +16,10 @@ def restore_from_cache(elements: list | dict):
     """
     if isinstance(elements, dict):
         elements = list(elements.values())
-    
+
     for element in elements:
         element.restore_from_cache()
+
 
 def store_in_cache(elements: list | dict):
     """
@@ -36,6 +36,6 @@ def store_in_cache(elements: list | dict):
     """
     if isinstance(elements, dict):
         elements = list(elements.values())
-    
+
     for element in elements:
         element.store_in_cache()

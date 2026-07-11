@@ -1,51 +1,38 @@
-import numpy as np
-
-from scipy.optimize import minimize, OptimizeResult
-
 from pathlib import Path
 
-from hyperparameter import Hyperparameter, HyperparameterManagerConfig, HyperparameterManager
-from .model import GenomicModel, GenomicModelConfig
+import numpy as np
+from hyperparameter import (
+    Hyperparameter,
+    HyperparameterManager,
+    HyperparameterManagerConfig,
+)
+from scipy.optimize import OptimizeResult, minimize
 
-
-def objective():
-    # Define the objective function for the INLA optimization.
-    # . need to caracterize the architectural difference differences between getting forward difference gradient (and objective function at current hp) and auto-differentiation.
-    # . . in particulat objective(), jacobian(), and how they are plugged intot he optimize()
-    
-    # Conditional of the latent field
-    # . In the Gaussian case:
-    # . . Q_cond = Q_prior - theta_likelihood * a.T @ a
-    
-    conditional_latent_parameters : float = ...
-
-    prior_latent_parameters : float = ...
-    likelihood : float = ...
-    prior_hyperparameters : float = ...
-
-    f = (
-        conditional_latent_parameters
-        - prior_latent_parameters
-        - likelihood
-        - prior_hyperparameters
-    )
-    
-    return f
-
-def jacobian():
-    ...
-    # return grad separatly? Need to check scipy.minimize documentation for this.
+from . import inla
+from .model import GenomicModel, GenomicModelConfig, StatisticalModel
 
 
 def optimize(
+    model : StatisticalModel,
     objective_function : callable,
     jacobian_function : callable,
-    hyperparameter_manager : HyperparameterManager
     ) -> OptimizeResult:
+    # Maybe the hyperparameter manager should be part of the optimization itself?
+    # . This woudl imply that after optimizing a Model() its hyperparameters get updated and
+    # these hyperparameters are then the one that are gonna be used for the "post-processing"
+    # related computations.
+
+    # Initialize the hyperparameter manager with the hyperparameters and their initial values
+    hp_manager_config : HyperparameterManagerConfig = ...
+    hp_manager : HyperparameterManager = HyperparameterManager(
+        hyperparameters : List[Hyperparameter] = [tau_iid, tau_queen, prec_regression],
+        config=hp_manager_config
+    )
+
     # Perform the optimization of the hyperparameters using the objective function and jacobian.
     # . could be interesting to have a checkpointing function (save the current state of the optimization to disk) to allow for resuming the optimization in case of interruptions.
-    initial_hyperparameters : np.ndarray = hyperparameter_manager.get_initial_hyperparameter_values()
-    bounds : List[Tuple[float, float]] = hyperparameter_manager.get_hyperparameter_bounds()
+    initial_hyperparameters : np.ndarray = hp_manager.get_initial_hyperparameter_values()
+    bounds : List[Tuple[float, float]] = hp_manager.get_hyperparameter_bounds()
 
     result : OptimizeResult = minimize(
         fun=objective_function,
@@ -72,18 +59,12 @@ if __name__ == "__main__":
         regression_prior_n=10,
         regression_design_name="regression_design_matrix.npy"
     )
+
     model : GenomicModel = GenomicModel(config=config)
     
-    # Initialize the hyperparameter manager with the hyperparameters and their initial values
-    hp_manager_config : HyperparameterManagerConfig = ...
-    hp_manager : HyperparameterManager = HyperparameterManager(
-        hyperparameters : List[Hyperparameter] = [tau_iid, tau_queen, prec_regression],
-        config=hp_manager_config
-    )
-
-    # Perform the hyperparameter optimization using the objective function and jacobian
+    # Optimize the model's hyperparameters using the defined objective function and jacobian.
     result : OptimizeResult = optimize(
-        objective_function=objective,
-        jacobian_function=jacobian,
-        hyperparameter_manager=hp_manager
+        model=model,
+        objective_function=inla.objective,
+        jacobian_function=inla.jacobian,
     )
