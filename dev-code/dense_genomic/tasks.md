@@ -1,3 +1,11 @@
+# State of the project
+
+
+
+
+
+
+
 # Tasks
 1. Monolithic pipeline using DenseMatrix data-structure
 	a. Finite Diff Dense

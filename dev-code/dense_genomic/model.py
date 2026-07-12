@@ -69,17 +69,20 @@ class StatisticalModel(ABC):
         -------
         Matrix
             The assembled prior precision matrix.
-        """
-        restore_from_cache(elements=self.prior_components)
 
+        Notes
+        -----
+        - For now the caching idea is defered to later optimization of the
+        implementation. With signatures:
+        - restore_from_cache(elements=self.prior_components)
+        - store_in_cache(elements=self.prior_components)
+        """
         # Assemble the prior precision matrix from its components
         # given the current hyperparameter values
         q_prior = self._assemble_prior_precision_matrix(
             prior_components=self.prior_components,
             hyperparameters=hyperparameters,
         )
-
-        store_in_cache(elements=self.prior_components)
 
         return q_prior
 
@@ -171,7 +174,7 @@ class GenomicModelConfig(StatisticalModelConfig):
 
 
 class GenomicModel(StatisticalModel):
-    def __init__(self, config: StatisticalModelConfig):
+    def __init__(self, config: GenomicModelConfig):
         super().__init__(config)
 
     def _load_prior_components(self) -> dict:

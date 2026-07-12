@@ -25,5 +25,5 @@ class HyperparameterManagerConfig: ...
 
 class HyperparameterManager:
     def __init__(
-        self, config: HyperparameterManagerConfig, hyperparameters: List[Hyperparameter]
+        self, config: HyperparameterManagerConfig, hyperparameters: list[Hyperparameter]
     ): ...
