@@ -17,9 +17,9 @@ np.random.seed(41)
 path = os.path.dirname(__file__)
 
 if __name__ == "__main__":
-    n_observations = 20
+    n_observations = 50
     n_latent_parameters = 6
-    n_replicates = 5  # number of replicates
+    n_replicates = 20  # number of replicates
 
     prior_precision = 1e-3
     Sigma_prior = 1 / prior_precision * np.eye(n_latent_parameters)
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         print("A: \n", a[:10, :n_latent_parameters].toarray())
         print("y: ", y[:10])
 
-        input_dir = f"{path}/inputs/replicate_{i+1}"
+        input_dir = f"{path}/inputs_nrep{n_replicates}/replicate_{i+1}"
         os.makedirs(input_dir, exist_ok=True)
 
         # save the synthetic data
@@ -68,6 +68,9 @@ if __name__ == "__main__":
         x_ref[i * n_latent_parameters : (i + 1) * n_latent_parameters] = x
 
     # save original hyperparameter theta
-    os.makedirs(f"{path}/reference_outputs", exist_ok=True)
-    np.save(f"{path}/reference_outputs/theta_ref.npy", theta_observations)
-    np.save(f"{path}/reference_outputs/x_ref.npy", x_ref)
+    os.makedirs(f"{path}/inputs_nrep{n_replicates}/reference_outputs", exist_ok=True)
+    np.save(
+        f"{path}/inputs_nrep{n_replicates}/reference_outputs/theta_ref.npy",
+        theta_observations,
+    )
+    np.save(f"{path}/inputs_nrep{n_replicates}/reference_outputs/x_ref.npy", x_ref)
