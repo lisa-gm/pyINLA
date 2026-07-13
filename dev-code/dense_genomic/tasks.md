@@ -1,7 +1,11 @@
 # State of the project
 
 
-
+Next:
+- Check on point 1-5 with lightweight LLM
+- Try to instanciate the Model and play with it trivially
+- Dive into Optimizer/ObjectiveFunction/FD/GradientStrategy
+	- It seems liek this buffer and commit_buffer with the HPM has some more design weirdness to handle. Maybe the explicit array interface is need when trying tentative points. The buffer should likely always only contain current tentative (but un-perturbed by the FD) points.
 
 
 
