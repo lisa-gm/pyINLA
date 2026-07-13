@@ -2,30 +2,6 @@
 
 ## Architecture Decisions
 
-### 1. Hyperparameter Ownership: Manager Owns HP State
-
-**Decision:** The `HyperparameterManager` owns all optimization state. The `StatisticalModel` does not track whether its hyperparameters have been optimized.
-
-**Rationale:**
-- Separation of concerns: optimization is not a statistical property of a model
-- `StatisticalModel` remains a pure abstraction — it knows nothing about INLA, optimizers, or solvers
-- Adding alternative inference methods (MCMC, variational) doesn't touch `StatisticalModel`
-- The optimizer orchestrator reads from the model, updates it, and owns the lifecycle
-
-**Interface:**
-```
-Model.hyperparameters: dict[str, Hyperparameter]
-    ↓ (metadata: names, initial values, bounds)
-HyperparameterManager
-    ↓ (array interface for scipy)
-np.ndarray of HP values + Bounds
-    ↓ (scipy.optimize writes back)
-HyperparameterManager.set_values()
-    ↓ (post-optimization)
-Model.hyperparameters updated by optimizer
-```
-
-**Mapping:** The manager handles `np.ndarray ↔ dict[str, Hyperparameter]` conversion. The optimizer never sees HP names — only arrays.
 
 ### 2. Optimization is External to StatisticalModel
 

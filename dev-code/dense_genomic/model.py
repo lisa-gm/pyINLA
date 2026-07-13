@@ -21,6 +21,8 @@ HP-value through the public API (no self get updated!).
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from dataclasses import dataclass
+
 import numpy as np
 
 from dalia.backend.datastructure import DenseMatrix, Matrix
@@ -28,11 +30,19 @@ from dalia.backend.datastructure import DenseMatrix, Matrix
 from .cache_utils import restore_from_cache, store_in_cache
 from .hyperparameter import Hyperparameter
 
-
+@dataclass
 class StatisticalModelConfig:
-    dataset_path: Path
+    # Dataset and Model Paths
+    path_to_model_components: Path
+    path_to_observations: Path
 
-    n_observations: int
+    # Model Hyperparameters
+    hyperparameters: dict[str, Hyperparameter]
+
+    def __post_init__(self):
+        # Validate: all names match dict keys
+        for key, hp in self.config.hyperparameters.items():
+            assert hp.name == key, f"Hyperparameter.name '{hp.name}' must match dict key '{key}'"
 
 
 class StatisticalModel(ABC):
@@ -45,7 +55,7 @@ class StatisticalModel(ABC):
         self.config = config
 
         # Load the model hyperparameters and their initial values
-        self.hyperparameters: dict[str, Hyperparameter] = ...
+        self._hyperparameters: dict[str, Hyperparameter] = self.config.hyperparameters
 
         # Specific statistical model overload these methods depending on the
         # components of the model (e.g. iid, regression, spatial, temporal, etc.)
@@ -93,17 +103,45 @@ class StatisticalModel(ABC):
         -------
         Matrix
             The assembled design matrix.
-        """
-        restore_from_cache(elements=self.design_components)
 
+        Notes
+        -----
+        - For now the caching idea is defered to later optimization of the
+        implementation. With signatures:
+        - restore_from_cache(elements=self.design_components)
+        - store_in_cache(elements=self.design_components)
+        """
         # Assemble the design matrix from its components
         design_matrix = self._assemble_design_matrix(
             design_components=self.design_components
         )
 
-        store_in_cache(elements=self.design_components)
-
         return design_matrix
+
+    def get_hyperparameters(self) -> dict[str, Hyperparameter]:
+        """Get the model's hyperparameters.
+
+        Returns
+        -------
+        dict[str, Hyperparameter]
+            A copy of the model's hyperparameters.
+        """
+        return self._hyperparameters.copy()
+
+    def set_hyperparameter(self, key, hyperparameter: Hyperparameter):
+        """Set a hyperparameter.
+
+        Parameters
+        ----------
+        key : str
+            The key/name (unique identifier) of the hyperparameter to set.
+        hyperparameter : Hyperparameter
+            The hyperparameter object to set.
+        """
+        if key not in self._hyperparameters:
+            raise KeyError(f"Hyperparameter '{key}' does not exist in the model. Adding new hyperparameter after instantiation is not allowed.")
+        
+        self._hyperparameters[key] = hyperparameter
 
     # --- Abstract methods ---
 
@@ -192,7 +230,7 @@ class GenomicModel(StatisticalModel):
         - regression: Regression prior component
         """
         # Load or assemble each components of the statistical model
-        # . This will be modified using the appropriate Matrix specifications,
+        # . This will be modified (later) using the appropriate Matrix specifications,
         # in particular DiagonalMatrix for the iid and regression components.
         iid_prior_matrix = DenseMatrix(data=np.eye(N=self.config.iid_prior_n, dtype=np.float64))
         queen_prior_matrix = DenseMatrix(
