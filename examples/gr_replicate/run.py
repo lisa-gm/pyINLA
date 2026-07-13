@@ -131,8 +131,6 @@ if __name__ == "__main__":
         f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
     )
 
-    print_msg("replicate_model.y[:10]: ", replicate_model.y[:10])
-
     print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp()
 
