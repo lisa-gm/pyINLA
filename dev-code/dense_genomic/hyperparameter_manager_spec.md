@@ -1,5 +1,13 @@
 ## Hyperparameter Architecture: Model ↔ Optimizer Interface
 
+> **Status note (2026-07-13):** `Hyperparameter` and `HyperparameterManager` now exist in
+> `hyperparameter.py` and already implement the fixed/optimized split described below.
+> This document is kept as a **forward-looking spec**: it assumes the existing classes,
+> flags what still needs fixing in them, and focuses on how they get puzzled together
+> with the model, the objective, the gradient strategy, and the optimizer — the parts
+> of the pipeline that don't exist yet. It intentionally does not re-explain what is
+> already legible in the code.
+
 You've identified the core tension correctly. Let me break down the **three distinct spaces** that need to be coordinated:
 
 ### The Three Spaces
@@ -41,555 +49,174 @@ The **HyperparameterManager** is the **bilingual bridge** between these spaces:
 
 ---
 
-## Detailed Workflow: Accepted vs Rejected Iterations
+## Blocking Fixes (do these before writing new code on top)
 
-Let me sketch the complete workflow with state transitions:
+These aren't design questions — they will raise exceptions or silently corrupt
+state the first time the pipeline actually runs. Fix in this order, since later
+items depend on earlier ones being correct.
 
-### Initial Setup
+1. **De-indent the `HyperparameterManager` methods out of `__init__`.**
+   `array_to_dict`, `dict_to_array`, `get_array`, `get_bounds`, `buffer_update`,
+   `commit_buffer`, `get_history`, `get_last_iteration`, `update_model`,
+   `load_checkpoint`, `_checkpoint` are currently local closures inside
+   `__init__` — none of them are callable as `manager.method(...)`.
 
-```python
-# Step 1: Model defines hyperparameters with names
-model = GenomicModel(config)
-# model.hyperparameters = {
-#     "tau_iid": Hyperparameter(name="tau_iid", value=1.0, bounds=(1e-6, 1e6)),
-#     "tau_queen": Hyperparameter(name="tau_queen", value=1.0, bounds=(1e-6, 1e6)),
-#     "prec_regression": Hyperparameter(name="prec_regression", value=1.0, bounds=(1e-6, 1e6))
-# }
+2. **Make `Hyperparameter` an actual dataclass (or give it `__init__`).**
+   Right now it only has class-level annotations, so `Hyperparameter(name=...,
+   value=..., bounds=...)` fails, and any default (like `bounds`) would be a
+   single shared mutable object across all instances. Decide the scalar bound
+   representation here too — `scipy.optimize.Bounds` wraps a whole vector, not
+   one hyperparameter; a plain `tuple[float, float]` (or `(lb, ub)` pair) per
+   `Hyperparameter` composed into a single `Bounds`/list by
+   `HyperparameterManager.get_bounds()` is simpler and matches what `minimize`
+   expects.
 
-# Step 2: Manager creates ordered mapping
-hp_manager = HyperparameterManager(
-    hyperparameters=model.hyperparameters,
-    order=["tau_iid", "tau_queen", "prec_regression"]  # CRITICAL: defines array index → key mapping
-)
+3. **Fix the optimized/full index mismatch in `array_to_dict`/`dict_to_array`.**
+   `_array` only has `len(self._optimized_keys)` entries, but both methods loop
+   over `self._order` (fixed + optimized) and index with `self._key_to_index`
+   (built over the full order). Both should loop/index over `_optimized_keys` /
+   `_optimized_key_to_index` consistently.
 
-# Manager internal state:
-# hp_manager._key_to_index = {"tau_iid": 0, "tau_queen": 1, "prec_regression": 2}
-# hp_manager._index_to_key = {0: "tau_iid", 1: "tau_queen", 2: "prec_regression"}
-# hp_manager._array = np.array([1.0, 1.0, 1.0])  # current accepted values
-# hp_manager._history = []  # list of accepted iterations
-# hp_manager._buffer = None  # buffered perturbed values (not yet accepted)
-```
+4. **Give the model a way to see the *full* hyperparameter dict (fixed + optimized merged).**
+   `GenomicModel._assemble_prior_precision_matrix` needs every key
+   (`tau_iid`, `tau_queen`, `prec_regression`), not just the ones being
+   optimized. `_fixed_values` is stored but never merged back in anywhere.
+   Suggest adding `HyperparameterManager.get_full_dict(array=None) -> dict[str, float]`
+   that merges `_fixed_values` with `array_to_dict(array)` — this becomes the
+   thing that actually gets passed to `model.assemble_prior_precision_matrix`.
 
-### Optimization Loop with Rejected Iterations
+5. **Decide whether the Manager owns copies or references of the Model's `Hyperparameter` objects.**
+   `model.get_hyperparameters()` returns a shallow dict copy — same
+   `Hyperparameter` instances. `commit_buffer()` mutates
+   `self._hyperparameters[key].value` in place, which means it mutates the
+   model's own objects immediately, before `update_model()` is ever called.
+   This contradicts the stated goal ("model does not track optimization
+   state"). Either deep-copy `Hyperparameter` objects at
+   `HyperparameterManager.__init__` (so `update_model()` becomes the real,
+   deliberate sync point back to the model), or explicitly drop that isolation
+   guarantee from the docstring and design around shared references instead.
 
-Here's what happens during optimization:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Iteration 0: Initial point                                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ scipy calls: wrapped_objective(x=[1.0, 1.0, 1.0])                          │
-│   ↓                                                                          │
-│   1. Manager buffers this as current "tentative" point                     │
-│      hp_manager._buffer = np.array([1.0, 1.0, 1.0])                       │
-│   ↓                                                                          │
-│   2. objective_fn converts buffer → dict for model:                        │
-│      hp_dict = {"tau_iid": 1.0, "tau_queen": 1.0, "prec_regression": 1.0} │
-│   ↓                                                                          │
-│   3. Model assembles Q_prior with hp_dict                                  │
-│   ↓                                                                          │
-│   4. Compute INLA approximation f = -123.45                                │
-│   ↓                                                                          │
-│   5. Return f to scipy                                                     │
-│   ↓                                                                          │
-│   6. scipy accepts point (first iteration, always accepted)               │
-│   ↓                                                                          │
-│   7. callback(xk=[1.0, 1.0, 1.0]) triggers:                               │
-│      hp_manager._history.append((0, [1.0, 1.0, 1.0], f=-123.45))          │
-│      hp_manager._array = np.array([1.0, 1.0, 1.0])  # update accepted     │
-│      hp_manager._buffer = None  # clear buffer                            │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Iteration 1: Rejected perturbation                                          │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ scipy computes finite difference:                                           │
-│   x_perturbed = [1.0001, 1.0, 1.0]  (h=1e-4)                               │
-│   ↓                                                                          │
-│   1. Manager buffers this perturbation:                                    │
-│      hp_manager._buffer = np.array([1.0001, 1.0, 1.0])                    │
-│   ↓                                                                          │
-│   2. objective_fn converts buffer → dict:                                  │
-│      hp_dict = {"tau_iid": 1.0001, "tau_queen": 1.0, ...}                 │
-│   ↓                                                                          │
-│   3. Model assembles Q_prior with hp_dict                                  │
-│   ↓                                                                          │
-│   4. Compute f = -123.44 (slightly worse)                                  │
-│   ↓                                                                          │
-│   5. Return f to scipy                                                     │
-│   ↓                                                                          │
-│   6. scipy REJECTS point (line search or bound constraint)                │
-│   ↓                                                                          │
-│   7. NO callback called — buffer remains unchanged                         │
-│   ↓                                                                          │
-│   8. Next perturbation: x_perturbed = [0.9999, 1.0, 1.0]                   │
-│   ↓                                                                          │
-│   9. Manager updates buffer: hp_manager._buffer = [0.9999, 1.0, 1.0]     │
-│   ↓                                                                          │
-│   10. objective_fn uses buffer → dict                                      │
-│   ↓                                                                          │
-│   11. Compute f = -123.40 (better!)                                        │
-│   ↓                                                                          │
-│   12. Return f to scipy                                                    │
-│   ↓                                                                          │
-│   13. scipy ACCEPTS point                                                  │
-│   ↓                                                                          │
-│   14. callback(xk=[0.9999, 1.0, 1.0]) triggers:                           │
-│       hp_manager._history.append((1, [0.9999, 1.0, 1.0], f=-123.40))     │
-│       hp_manager._array = np.array([0.9999, 1.0, 1.0])  # update accepted │
-│       hp_manager._buffer = None  # clear buffer                            │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+6. **Decide what `commit_buffer` actually commits.** With finite-difference
+   gradients, `fun` is called several times per outer iteration (once at the
+   candidate point, then at `x ± h·eᵢ` for each dimension to build the
+   gradient) — each call overwrites `_buffer` via `buffer_update`. `scipy`'s
+   `callback(xk)` fires with the *accepted* `xk`, but `commit_buffer()` takes no
+   array argument and just uses whatever is currently in `_buffer`, which is
+   very likely a leftover finite-difference perturbation, not `xk`. Two fixes,
+   pick one: (a) have `commit_buffer(xk)` take `xk` explicitly and use that
+   instead of `_buffer`, or (b) have `wrapped_objective` re-buffer the *last
+   requested* full point right before returning `f`, and have the outer
+   optimizer loop re-buffer `xk` itself right before calling `commit_buffer()`.
+   (a) is simpler and removes the ambiguity entirely.
 
 ---
 
-## HyperparameterManager Interface Specification
+## Next Steps: Wiring the Rest of the Pipeline
 
-Here's the clean interface that resolves all your concerns:
+The manager and model classes are the *foundation*; the interesting remaining
+work is in how the objective, gradient strategy, and optimizer loop consume
+them. This section sketches that wiring — treat it as a proposal, not a
+finished spec, since `inla.py`/`main.py` are still drafts.
 
-```python
-class Hyperparameter:
-    """Represents a single hyperparameter with metadata."""
-    name: str              # Unique identifier (e.g., "sigma_st", "tau_iid")
-    value: float           # Current value
-    is_fixed: bool         # If True, not optimized
-    bounds: Bounds         # (lb, ub) for optimization
-    # NOTE: name is the key — enforced to match dict key in model.hyperparameters
+### 1. `objective()` must be a pure function of `(hp_values, model)`
 
-
-class HyperparameterManager:
-    """
-    Bridge between Model (dict-based) and Optimizer (array-based).
-    
-    Key design principles:
-    1. Manager owns the ordered array representation
-    2. Only ACCEPTED iterations update manager._array and _history
-    3. Buffer holds tentative/perturbed values (not yet accepted)
-    4. name field in Hyperparameter must match dict key in Model
-    """
-    
-    # ── Initialization ─────────────────────────────────────────────────────
-    def __init__(
-        self,
-        hyperparameters: dict[str, Hyperparameter],  # Model's dict
-        order: list[str] | None = None,              # Explicit ordering
-        track_history: bool = True,
-        checkpoint_frequency: int = 10
-    ):
-        """
-        Initialize manager from Model's hyperparameters.
-        
-        Parameters
-        ----------
-        hyperparameters : dict[str, Hyperparameter]
-            Model's hyperparameters dict. Keys are used as names.
-        order : list[str], optional
-            Explicit order of hyperparameters in array. If None,
-            uses dict insertion order (Python 3.7+).
-        track_history : bool, default True
-            If False, skip history tracking (for performance).
-        checkpoint_frequency : int, default 10
-            How often to checkpoint history to disk.
-        """
-        # Validate: all names match dict keys
-        for key, hp in hyperparameters.items():
-            assert hp.name == key, f"Hyperparameter.name '{hp.name}' must match dict key '{key}'"
-        
-        # Store metadata
-        self._hyperparameters = hyperparameters
-        self._order = order or list(hyperparameters.keys())
-        
-        # Create mapping (CRITICAL: index ↔ key)
-        self._key_to_index = {key: i for i, key in enumerate(self._order)}
-        self._index_to_key = {i: key for key, i in self._key_to_index.items()}
-        
-        # Initialize array from initial values
-        self._array = np.array([hyperparameters[key].value for key in self._order])
-        
-        # State management
-        self._buffer: np.ndarray | None = None  # Tentative values (not accepted)
-        self._iteration = 0
-        self._track_history = track_history
-        self._checkpoint_frequency = checkpoint_frequency
-        self._history: list[tuple[int, np.ndarray, float]] = []  # (iter, array, f)
-    
-    # ── Array ↔ Dict Conversion ────────────────────────────────────────────
-    def array_to_dict(self, array: np.ndarray | None = None) -> dict[str, float]:
-        """
-        Convert array to dict with model-compatible keys.
-        
-        Parameters
-        ----------
-        array : np.ndarray, optional
-            Array to convert. If None, uses current accepted values.
-        
-        Returns
-        -------
-        dict[str, float]
-            Dict with keys matching Model.hyperparameters.
-        
-        Example
-        -------
-        >>> manager.array_to_dict(np.array([1.0, 2.0]))
-        {"tau_iid": 1.0, "tau_queen": 2.0}
-        """
-        if array is None:
-            array = self._array  # Use accepted values
-        
-        return {key: array[self._key_to_index[key]] for key in self._order}
-    
-    def dict_to_array(self, d: dict[str, float]) -> np.ndarray:
-        """
-        Convert dict to array matching manager's ordering.
-        
-        Parameters
-        ----------
-        d : dict[str, float]
-            Dict with keys matching Model.hyperparameters.
-        
-        Returns
-        -------
-        np.ndarray
-            Array in manager's order.
-        
-        Example
-        -------
-        >>> manager.dict_to_array({"tau_queen": 2.0, "tau_iid": 1.0})
-        np.array([1.0, 2.0])  # Order follows manager._order
-        """
-        return np.array([d[key] for key in self._order])
-    
-    # ── Getters for Optimizer ──────────────────────────────────────────────
-    def get_array(self) -> np.ndarray:
-        """Get current accepted values as array (for scipy x0)."""
-        return self._array.copy()
-    
-    def get_bounds(self) -> list[tuple[float, float]]:
-        """
-        Get bounds as list of (lb, ub) tuples matching array order.
-        
-        Returns
-        -------
-        list[tuple[float, float]]
-            Bounds in same order as get_array().
-        
-        Example
-        -------
-        >>> manager.get_bounds()
-        [(1e-6, 1e6), (1e-6, 1e6), (1e-6, 1e6)]
-        """
-        return [self._hyperparameters[key].bounds for key in self._order]
-    
-    # ── State Management (Buffered) ────────────────────────────────────────
-    def buffer_update(self, array: np.ndarray) -> None:
-        """
-        Buffer a perturbed array (tentative, not yet accepted).
-        
-        Called by optimizer BEFORE each objective evaluation.
-        The buffer is only committed on accepted iterations.
-        """
-        self._buffer = array.copy()
-    
-    def commit_buffer(self, f: float | None = None) -> None:
-        """
-        Commit buffered values as accepted iteration.
-        
-        Called by callback AFTER scipy accepts a point.
-        Updates _array, increments iteration, optionally records history.
-        """
-        if self._buffer is None:
-            raise ValueError("No buffered values to commit")
-        
-        # Update accepted values
-        self._array = self._buffer.copy()
-        
-        # Record history if enabled
-        if self._track_history:
-            if len(self._history) % self._checkpoint_frequency == 0:
-                self._checkpoint_history()
-            
-            self._history.append((self._iteration, self._array.copy(), f or -np.inf))
-        
-        # Cleanup
-        self._buffer = None
-        self._iteration += 1
-    
-    def reject_buffer(self) -> None:
-        """
-        Discard buffered values (scipy rejected the perturbation).
-        
-        No state change — buffer remains for next perturbation.
-        """
-        self._buffer = None  # Clear buffer, wait for next perturbation
-    
-    # ── History Access ─────────────────────────────────────────────────────
-    def get_history(self) -> list[tuple[int, np.ndarray, float]]:
-        """Get full history of accepted iterations."""
-        return self._history.copy()
-    
-    def get_last_iteration(self) -> int:
-        """Get last accepted iteration number."""
-        return self._iteration - 1 if self._history else 0
-    
-    # ── Model Integration ──────────────────────────────────────────────────
-    def update_model(self, model: StatisticalModel) -> None:
-        """
-        Update model's hyperparameters with manager's current values.
-        
-        Called after optimization completes.
-        """
-        hp_dict = self.array_to_dict()
-        
-        for key, value in hp_dict.items():
-            model.hyperparameters[key].value = value
-    
-    # ── Checkpointing ──────────────────────────────────────────────────────
-    def _checkpoint_history(self) -> None:
-        """Save history to disk (implementation-specific)."""
-        # Save self._history to disk (e.g., np.save, pickle, etc.)
-        pass
-    
-    def checkpoint(self, path: Path) -> None:
-        """Save entire manager state to disk."""
-        state = {
-            "array": self._array,
-            "iteration": self._iteration,
-            "history": self._history,
-            "order": self._order
-        }
-        np.save(path, state, allow_pickle=True)
-    
-    @classmethod
-    def load_checkpoint(cls, path: Path, hyperparameters: dict[str, Hyperparameter]) -> "HyperparameterManager":
-        """Restore manager from checkpoint."""
-        state = np.load(path, allow_pickle=True).item()
-        
-        manager = cls(hyperparameters=hyperparameters, order=state["order"])
-        manager._array = state["array"]
-        manager._iteration = state["iteration"]
-        manager._history = state["history"]
-        
-        return manager
-```
-
----
-
-## Optimizer Integration Pattern
-
-Here's how the optimizer wraps everything:
+`inla.objective` currently calls `manager.get_named_values()` — an undefined
+name, and (more importantly) the wrong idea: an objective used for finite
+differences must recompute `f` from the exact perturbed point it's given, not
+from whatever the manager currently has committed. The fix is mechanical but
+important to get right:
 
 ```python
-def optimize(
-    model: StatisticalModel,
-    hp_manager: HyperparameterManager,
-    objective_fn: callable,
-    gradient_strategy: GradientStrategy,
-    callback: callable | None = None
-) -> OptimizeResult:
-    """
-    Optimize hyperparameters using INLA objective function.
-    
-    Parameters
-    ----------
-    model : StatisticalModel
-        The statistical model to optimize.
-    hp_manager : HyperparameterManager
-        Bridge between model (dict) and optimizer (array).
-    objective_fn : callable
-        INLA objective function f(hp_values, model) → float.
-    gradient_strategy : GradientStrategy
-        Strategy for computing gradients (finite diff, AD, etc.).
-    callback : callable, optional
-        User-defined callback after each accepted iteration.
-    
-    Returns
-    -------
-    OptimizeResult
-        scipy.optimize.OptimizeResult.
-    """
-    # ── Setup ──────────────────────────────────────────────────────────────
-    x0 = hp_manager.get_array()
-    bounds = hp_manager.get_bounds()
-    
-    # ── Wrapped Objective (pure function) ──────────────────────────────────
-    def wrapped_objective(x: np.ndarray) -> float:
-        """
-        Pure objective function — no state mutation.
-        
-        Uses buffered values (not committed to manager yet).
-        """
-        # Buffer the perturbation (tentative, not accepted)
-        hp_manager.buffer_update(x)
-        
-        # Convert to dict for model
-        hp_dict = hp_manager.array_to_dict(array=x)
-        
-        # Compute objective (model uses hp_dict)
-        return objective_fn(hp_dict, model)
-    
-    # ── Wrapped Jacobian (if needed) ───────────────────────────────────────
-    def wrapped_jacobian(x: np.ndarray) -> np.ndarray:
-        """Compute gradient using gradient strategy."""
-        hp_manager.buffer_update(x)
-        return gradient_strategy.compute(objective_fn, x, model)
-    
-    # ── Scipy Callback (accepted iterations only) ──────────────────────────
-    def scipy_callback(xk: np.ndarray):
-        """
-        Called by scipy AFTER each accepted iteration.
-        
-        Commits buffered values to manager state.
-        """
-        # Commit the accepted point
-        hp_manager.commit_buffer()
-        
-        # User callback for logging
-        if callback is not None:
-            callback(xk, hp_manager.array_to_dict())
-    
-    # ── Run Optimization ───────────────────────────────────────────────────
-    result = minimize(
-        fun=wrapped_objective,
-        x0=x0,
-        jac=wrapped_jacobian if gradient_strategy.supports_autodiff else None,
-        bounds=bounds,
-        method='L-BFGS-B',
-        callback=scipy_callback
-    )
-    
-    # ── Final Update ───────────────────────────────────────────────────────
-    # Commit final point
-    hp_manager.buffer_update(result.x)
-    hp_manager.commit_buffer()
-    
-    # Update model with optimized hyperparameters
-    hp_manager.update_model(model)
-    
-    return result
+def objective(hp_full_dict: dict[str, float], model: StatisticalModel) -> float:
+    Q_prior = model.assemble_prior_precision_matrix(hp_full_dict)
+    ...
 ```
 
----
+The caller (the optimizer wrapper, not `objective` itself) is responsible for
+turning the raw `x: np.ndarray` scipy hands it into `hp_full_dict` via
+`manager.get_full_dict(array=x)` (see fix #4 above). This keeps `objective`
+trivially testable in isolation, independent of `HyperparameterManager`.
 
-## Key Design Principles Resolving Your Concerns
+### 2. Where does `Q_cond = Q_prior - θ·AᵀA` (or similar) belong?
 
-### 1. **Name/Key Enforcement**
-```python
-# In __init__:
-for key, hp in hyperparameters.items():
-    assert hp.name == key, f"Hyperparameter.name '{hp.name}' must match dict key '{key}'"
-```
-- Model defines `hyperparameters = {"sigma_st": Hyperparameter(name="sigma_st", ...)}`
-- Manager validates that `hp.name == key`
-- Array index `i` → key `self._order[i]` → `Hyperparameter.name`
+`inla.py` currently stubs this out with `...`. This is a modeling decision, not
+a hyperparameter-management one, but it affects the interface: does
+`StatisticalModel` gain a `assemble_conditional_precision_matrix(hp_full_dict)`
+method (keeping the "given the likelihood, know how to combine Q_prior and A"
+logic inside the model, consistent with your existing `assemble_*` pattern), or
+does `objective()` compute it inline using only `Q_prior`/`A` as building
+blocks? Given your note in `model.py` that "the conditional precision matrix
+... depends on the type of prior ... hence should not be part of it" — worth
+deciding now whether that logic instead belongs on the *likelihood* object
+(see `saved_taxonomy/likelihoods/`) rather than duplicated inside `inla.py`.
 
-### 2. **Only Accepted Iterations Update State**
-```python
-# Optimizer flow:
-wrapped_objective(x_perturbed)  # buffers, computes f, returns f
-# ↓
-scipy REJECTS → no callback → buffer discarded
-# OR
-scipy ACCEPTS → callback(xk) → commit_buffer() → state updated
-```
-- Rejected perturbations never touch `_array` or `_history`
-- Buffer is cleared on rejection
+### 3. `GradientStrategy` doesn't exist yet as a class — only as a bare function
 
-### 3. **Model Gets Dict, Optimizer Gets Array**
-```python
-# Model interface:
-model.assemble_prior_precision_matrix(hp_dict)  # {"sigma_st": 1.0, ...}
+`design_decisions.md` describes an abstract `GradientStrategy` with
+`finite_difference`/`backward_difference`/`autodiff` variants, and
+`mode_finding_and_ad.md` explains why AD breaks for non-Gaussian likelihoods
+(data-dependent Newton iteration count, non-differentiable convergence check).
+Concretely, before the pipeline can run end-to-end you need:
 
-# Optimizer interface:
-minimize(wrapped_objective, x0=array)  # [1.0, 2.0, ...]
+- An actual `GradientStrategy` ABC (or a `Protocol`) with a single
+  `compute(objective_fn, x, model) -> np.ndarray` method, so `optimize()` can
+  stay agnostic to which strategy is active.
+- A decision on whether `finite_difference_gradient` in `inla.py` becomes a
+  method on a `FiniteDifferenceStrategy` class, or stays a free function that
+  a thin `GradientStrategy` wraps. Given `L-BFGS-B` already supports numeric
+  differentiation out of the box (`jac=None` + `bounds`), also worth asking:
+  do you need your *own* finite-difference implementation at all for the
+  Gaussian-likelihood path, or only once AD/implicit-differentiation is
+  introduced for non-Gaussian likelihoods?
 
-# Manager bridges both:
-hp_dict = manager.array_to_dict(array)  # Convert for model
-array = manager.dict_to_array(hp_dict)  # Convert for optimizer
-```
+### 4. The optimizer wrapper (in `main.py`) is the piece that ties everything together
 
-### 4. **Order Preservation**
-```python
-# Manager stores explicit order:
-self._order = ["tau_iid", "tau_queen", "prec_regression"]
-self._key_to_index = {"tau_iid": 0, "tau_queen": 1, "prec_regression": 2}
+None of this exists yet beyond a signature stub. Concretely it needs to:
 
-# Array index 0 always → "tau_iid", index 1 → "tau_queen", etc.
-# This order is fixed at initialization
-```
+- Pull `x0 = hp_manager.get_array()` and `bounds = hp_manager.get_bounds()`
+  (optimized-only, per fix #3).
+- Wrap `objective` so scipy's `x` gets converted via
+  `hp_manager.get_full_dict(array=x)` before being passed to `objective`.
+- Wrap `jac` similarly if/when a `GradientStrategy` other than scipy's built-in
+  numerical differencing is used.
+- Register a `callback(xk)` that commits `xk` (per fix #6) and, only then, asks
+  the `HyperparameterManagerConfig` checkpointing logic whether to flush to
+  disk.
+- After `minimize()` returns, call something like
+  `hp_manager.commit_buffer(result.x)` followed by `hp_manager.update_model(model)`
+  as the single deliberate sync point from optimizer state back into the model
+  — consistent with fix #5.
+- `main.py`'s current call to `HyperparameterManager(hyperparameters=[...],
+  config=...)` also needs to be reconciled with the real constructor, which
+  takes `model` (not a raw list of `Hyperparameter`) and derives
+  `model.get_hyperparameters()` from it — decide whether `main.py` should
+  build `Hyperparameter`s and attach them to `GenomicModelConfig.hyperparameters`
+  instead of constructing them ad hoc for the manager.
 
-### 5. **Buffered Updates**
-```python
-# Tentative perturbations:
-hp_manager.buffer_update(x_perturbed)  # Store in _buffer
-objective_fn(...)  # Use _buffer for conversion
+### 5. Config plumbing between `main.py`, `GenomicModelConfig`, and `StatisticalModelConfig` needs to be reconciled
 
-# Accepted:
-hp_manager.commit_buffer()  # _array = _buffer, clear _buffer
+Not a `HyperparameterManager` concern per se, but it blocks running anything:
+`GenomicModelConfig` isn't itself a `@dataclass` (so its extra fields like
+`iid_prior_n` aren't real dataclass fields), `StatisticalModelConfig.__post_init__`
+references `self.config.hyperparameters` where it should reference
+`self.hyperparameters`, and `main.py` passes keyword arguments
+(`dataset_path`, `n_observations`) that don't exist on either config while
+omitting the ones that do (`path_to_model_components`, `path_to_observations`,
+`hyperparameters`). Worth resolving before wiring the optimizer, since
+`optimize()` needs a working `model` instance to run against.
 
-# Rejected:
-hp_manager.reject_buffer()  # Clear _buffer, wait for next
-```
+### 6. Checkpointing/resume path is unexercised
 
----
-
-## Summary: The Complete Flow
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 1. INITIALIZATION                                                           │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ Model.hyperparameters = {"tau_iid": HP(name="tau_iid", value=1.0), ...}    │
-│                                                                              │
-│ Manager = HyperparameterManager(                                            │
-│     hyperparameters=model.hyperparameters,                                  │
-│     order=["tau_iid", "tau_queen", "prec_regression"]                       │
-│ )                                                                            │
-│                                                                              │
-│ Manager._key_to_index = {"tau_iid": 0, "tau_queen": 1, "prec_regression": 2}│
-│ Manager._array = [1.0, 1.0, 1.0]  # accepted values                        │
-│ Manager._buffer = None  # tentative values (not yet accepted)              │
-└─────────────────────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 2. OPTIMIZATION LOOP                                                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ scipy calls wrapped_objective(x=[1.0001, 1.0, 1.0])                        │
-│   ├─> Manager.buffer_update([1.0001, 1.0, 1.0])  # Store in _buffer       │
-│   ├─> hp_dict = Manager.array_to_dict([1.0001, 1.0, 1.0])                 │
-│   │     → {"tau_iid": 1.0001, "tau_queen": 1.0, "prec_regression": 1.0}   │
-│   ├─> Model.assemble_prior_precision_matrix(hp_dict)  # Use dict          │
-│   ├─> Compute f = -123.44                                                   │
-│   └─> Return f to scipy                                                     │
-│                                                                              │
-│ scipy REJECTS point (worse objective)                                       │
-│   └─> NO callback → Manager._buffer discarded, _array unchanged            │
-│                                                                              │
-│ scipy calls wrapped_objective(x=[0.9999, 1.0, 1.0])                        │
-│   ├─> Manager.buffer_update([0.9999, 1.0, 1.0])                           │
-│   ├─> hp_dict = {"tau_iid": 0.9999, "tau_queen": 1.0, ...}                │
-│   ├─> Model.assemble_prior_precision_matrix(hp_dict)                       │
-│   ├─> Compute f = -123.40 (better!)                                         │
-│   └─> Return f to scipy                                                     │
-│                                                                              │
-│ scipy ACCEPTS point                                                         │
-│   └─> callback(xk=[0.9999, 1.0, 1.0]) → Manager.commit_buffer()           │
-│         ├─> Manager._array = [0.9999, 1.0, 1.0]  # Update accepted         │
-│         ├─> Manager._history.append((iter, [0.9999, 1.0, 1.0], f))        │
-│         └─> Manager._buffer = None  # Clear buffer                         │
-└─────────────────────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 3. OPTIMIZATION COMPLETE                                                    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ result = minimize(...)                                                      │
-│                                                                              │
-│ hp_manager.commit_buffer()  # Final point                                  │
-│ hp_manager.update_model(model)  # Write optimized HPs to model              │
-│                                                                              │
-│ Model.hyperparameters now has optimized values:                             │
-│ {"tau_iid": 0.9999, "tau_queen": 1.0, "prec_regression": 1.0}              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+`HyperparameterManagerConfig` has the knobs (`checkpoint_hpm`,
+`checkpoint_hpm_every`, ...) and `_checkpoint()`/`load_checkpoint()` exist, but
+nothing calls `load_checkpoint()` from `main.py`, and `_checkpoint()` pickles
+`self._hyperparameters` (live `Hyperparameter` objects, possibly containing
+non-trivial `Bounds` objects) via `np.save(..., allow_pickle=True)` — confirm
+this round-trips correctly once `Hyperparameter` is a real dataclass (fix #2),
+and decide whether resume should reconstruct a fresh `HyperparameterManager`
+from `model.get_hyperparameters()` and then overwrite `_array`/`_iteration`/
+`_history` from the checkpoint (current approach), or reconstruct everything
+from the checkpoint alone without touching the model at all.
 
 This architecture cleanly separates concerns:
 - **Model**: Works with dict `{"sigma_st": 1.0, ...}`

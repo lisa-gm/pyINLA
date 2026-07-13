@@ -19,6 +19,7 @@ HP-value through the public API (no self get updated!).
 """
 
 from abc import ABC, abstractmethod
+import copy
 from pathlib import Path
 
 from dataclasses import dataclass
@@ -124,9 +125,15 @@ class StatisticalModel(ABC):
         Returns
         -------
         dict[str, Hyperparameter]
-            A copy of the model's hyperparameters.
+            The model's hyperparameters. 
+            
+        Notes
+        -----
+        - The hyperparameters are returned by reference, hence any 
+        modification to the returned dictionary will affect the 
+        model's hyperparameters.
         """
-        return self._hyperparameters.copy()
+        return self._hyperparameters
 
     def set_hyperparameter(self, key, hyperparameter: Hyperparameter):
         """Set a hyperparameter.
@@ -137,11 +144,18 @@ class StatisticalModel(ABC):
             The key/name (unique identifier) of the hyperparameter to set.
         hyperparameter : Hyperparameter
             The hyperparameter object to set.
+
+        Notes
+        -----
+        - The given hyperparameter will replace the existing hyperparameter 
+        in the model through a deep copy, ensuring that the model's internal 
+        state is not affected by external modifications to the provided 
+        hyperparameter object.
         """
         if key not in self._hyperparameters:
             raise KeyError(f"Hyperparameter '{key}' does not exist in the model. Adding new hyperparameter after instantiation is not allowed.")
         
-        self._hyperparameters[key] = hyperparameter
+        self._hyperparameters[key] = copy.deepcopy(hyperparameter)
 
     # --- Abstract methods ---
 
@@ -192,7 +206,7 @@ class StatisticalModel(ABC):
         """
         ...
 
-
+@dataclass
 class GenomicModelConfig(StatisticalModelConfig):
     # Component: iid
     iid_prior_n: int
