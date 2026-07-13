@@ -32,13 +32,15 @@ if __name__ == "__main__":
     # Check for parsed parameters
     args = parse_args()
 
-    n_replicates = 8  # number of replicates
+    n_replicates = 1  # number of replicates
 
     # setup 1 model for each replicate
     models = []
     for i in range(n_replicates):
         # Configurations of the regression submodel
-        path_dir = f"{BASE_DIR}/inputs/replicate_{i+1}/inputs_regression"
+        path_dir = (
+            f"{BASE_DIR}/inputs_nrep{n_replicates}/replicate_{i+1}/inputs_regression"
+        )
         regression_dict = {
             "type": "regression",
             "input_dir": path_dir,
@@ -97,8 +99,10 @@ if __name__ == "__main__":
         config=dalia_config.parse_config(dalia_dict),
     )
 
-    theta_ref = xp.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
-    x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
+    theta_ref = xp.load(
+        f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs/theta_ref.npy"
+    )
+    x_ref = xp.load(f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs/x_ref.npy")
 
     results = dalia.run()
 
@@ -109,7 +113,6 @@ if __name__ == "__main__":
 
     print_msg("\n--- Comparisons ---")
     # Compare hyperparameters
-    theta_ref = xp.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
     print_msg("Reference theta:", theta_ref)
     print_msg(
         "Norm (theta - theta_ref):        ",
@@ -117,10 +120,9 @@ if __name__ == "__main__":
     )
 
     # Compare latent parameters
-    x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
     print_msg(
-        "Norm (x - x_ref):                ",
-        f"{xp.sqrt(xp.sum((results['x'] - x_ref) ** 2)):.4e}",
+        "Norm (x - x_ref) / ||x_ref||:                ",
+        f"{xp.sqrt(xp.sum((results['x'] - x_ref) ** 2)) / xp.sqrt(xp.sum(x_ref ** 2)):.4e}",
     )
 
     # Compare marginal variances of latent parameters
@@ -142,8 +144,6 @@ if __name__ == "__main__":
         "Norm (var_obs - var_obs_ref):    ",
         f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
     )
-
-    print_msg("replicate_model.y[:10]: ", replicate_model.y[:10])
 
     print_msg("\n--- Marginal distributions of the hyperparameters ---")
     marginals_hp = dalia.marginal_distributions_hp()
