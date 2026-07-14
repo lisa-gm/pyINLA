@@ -18,6 +18,7 @@ def exit_as_expected():
     print("Program completed successfully.")
     exit(0)
 
+
 def fit_model(
     model: StatisticalModel,
     options: dict = None,
@@ -76,15 +77,15 @@ if __name__ == "__main__":
     # . Configure the hyperparameters
     tau_iid: Hyperparameter = Hyperparameter(
         name="tau_iid",
-        value=2.3, # Synthetic True = 3.0
+        value=2.3,  # Synthetic True = 3.0
     )
     tau_queen: Hyperparameter = Hyperparameter(
         name="tau_queen",
-        value=15.6, # Synthetic True = 10.0
+        value=15.6,  # Synthetic True = 10.0
     )
     prec_regression: Hyperparameter = Hyperparameter(
         name="prec_regression",
-        value=50.0, # Synthetic True = 50.0
+        value=50.0,  # Synthetic True = 50.0
         is_fixed=True,  # This hyperparameter is fixed and will not be optimized
     )
     genomic_hps: dict[str, Hyperparameter] = assemble_hyperparameter_dict(
@@ -93,8 +94,12 @@ if __name__ == "__main__":
 
     # . Configure the Genomic Model
     config: GenomicModelConfig = GenomicModelConfig(
-        path_to_model_components=Path("/home/vmaillou/Repos/DALIA/dev-code/genomic_dataset"),
-        path_to_observations=Path("/home/vmaillou/Repos/DALIA/dev-code/genomic_dataset"),
+        path_to_model_components=Path(
+            "/home/vmaillou/Repos/DALIA/dev-code/genomic_dataset"
+        ),
+        path_to_observations=Path(
+            "/home/vmaillou/Repos/DALIA/dev-code/genomic_dataset"
+        ),
         hyperparameters=genomic_hps,
         # Component: iid
         iid_prior_n=40,

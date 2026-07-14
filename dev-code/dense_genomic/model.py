@@ -73,7 +73,9 @@ class StatisticalModel(ABC):
         # Load the observations
         # . for now hard-coded the name to be "observations.npy"
         # . this could be part of the config or we might need to accomodate for Pandas DataFrame
-        self.observations: np.ndarray = np.load(self.config.path_to_observations + "/observations.npy")
+        self.observations: np.ndarray = np.load(
+            self.config.path_to_observations + "/observations.npy"
+        )
 
         # Specific statistical model overload these methods depending on the
         # components of the model (e.g. iid, regression, spatial, temporal, etc.)
