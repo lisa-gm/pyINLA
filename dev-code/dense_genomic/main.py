@@ -35,7 +35,7 @@ def fit_model(
     )
     hpm: HyperparameterManager = HyperparameterManager(model=model, config=hpm_config)
 
-    def minimize_callback(xk: np.ndarray):
+    def minimize_callback(intermediate_result: OptimizeResult):
         """Callback function for the optimization process.
 
         After each successful iteration of the optimization algorithm,
@@ -44,10 +44,10 @@ def fit_model(
 
         Parameters
         ----------
-        xk : np.ndarray
-            The current hyperparameter values at the current iteration.
+        intermediate_result : OptimizeResult
+            The result of the intermediate optimization step.
         """
-        hpm.commit_buffer()
+        hpm.commit_buffer(f=intermediate_result.fun)
 
     # Fit the model's hyperparameters to the observations using the INLA objective function.
     model_fitting_result: OptimizeResult = minimize(
