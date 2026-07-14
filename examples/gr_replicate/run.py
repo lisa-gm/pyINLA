@@ -52,7 +52,7 @@ if __name__ == "__main__":
         likelihood_dict = {
             "type": "gaussian",
             "prec_o": 1.0,
-            "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 2.0},
+            "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 1e-1},
         }
         local_model = Model(
             submodels=[regression],
@@ -155,9 +155,29 @@ if __name__ == "__main__":
 
     prec_obs = marginals_hp["hyperparameters"]["prec_o"]
     quantile_pairs = prec_obs["quantiles"]["external"]["pairs"]
+    pdf_pairs_x, pdf_pairs_y = prec_obs["pdf_data"]
 
     print("Quantile pairs of prec_o:")
     for p, q in quantile_pairs:
         print(f"   {p:.3f} quantile: {q:.4f}")
+
+    # save estimates to reference outputs folder
+    import json
+
+    dalia_estimates = {
+        "theta_external_map": results["theta"].tolist(),
+        "theta_external_mean": prec_obs["mean_external"],
+        "x": results["x"].tolist(),
+        "cov_theta_internal_diagonal": xp.diag(results["cov_theta_internal"]).tolist(),
+        "cov_theta_internal_full": results["cov_theta_internal"].tolist(),
+        "marginal_variance_external_prec_o": prec_obs["variance_external"],
+        "quantile_pairs": quantile_pairs,
+        "pdf_pairs": list(zip(pdf_pairs_x.tolist(), pdf_pairs_y.tolist())),
+    }
+    
+    reference_outputs_dir = f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs"
+    os.makedirs(reference_outputs_dir, exist_ok=True)
+    with open(f"{reference_outputs_dir}/dalia_estimates.json", "w") as f:
+        json.dump(dalia_estimates, f, indent=2)
 
     print_msg("\n--- Finished ---")
