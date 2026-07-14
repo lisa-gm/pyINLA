@@ -69,6 +69,7 @@ or to track the history without checkpointing the HPM. Or to do
 both, or to do neither.
 """
 
+import copy
 from dataclasses import dataclass
 from math import inf
 from pathlib import Path
@@ -206,7 +207,7 @@ class HyperparameterManager:
         # at the initialization of the HPM, but not stored. Beyond this point
         # the HPM manages its own state and the Model is only updated at the
         # end of the optimization.
-        hyperparameters = model.get_hyperparameters()
+        hyperparameters = copy.deepcopy(model.get_hyperparameters())
 
         # . Store the keys to verify in case of a checkpoint load that the
         # model has the same hyperparameters
@@ -294,7 +295,8 @@ class HyperparameterManager:
 
         Example
         -------
-        >>> manager.convert_array_to_dict(np.array([1.0, 2.0]))
+        >>> # Assuming the manager has 2 optimized hyperparameters "tau_iid" and "tau_queen"
+        >>> manager.convert_array_to_dict(np.array([1.0, 2.0]), include_fixed=True)
         {"tau_iid": 1.0, "tau_queen": 2.0, "prec_regression": 0.1}
         >>> manager.convert_array_to_dict(np.array([1.0, 2.0]), include_fixed=False)
         {"tau_iid": 1.0, "tau_queen": 2.0}

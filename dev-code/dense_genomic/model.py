@@ -81,14 +81,14 @@ class StatisticalModel(ABC):
     # --- Public API ---
 
     def assemble_prior_precision_matrix(
-        self, hyperparameters: dict[str, Hyperparameter]
+        self, hyperparameters_values: dict[str, float]
     ) -> Matrix:
         """Assemble the prior precision matrix from its components
         given (at) the current hyperparameter values.
 
         Parameters
         ----------
-        hyperparameters : dict[str, Hyperparameter]
+        hyperparameters_values : dict[str, float]
             The current hyperparameter values.
 
         Returns
@@ -107,7 +107,7 @@ class StatisticalModel(ABC):
         # given the current hyperparameter values
         q_prior = self._assemble_prior_precision_matrix(
             prior_components=self.prior_components,
-            hyperparameters=hyperparameters,
+            hyperparameters_values=hyperparameters_values,
         )
 
         return q_prior
@@ -190,7 +190,7 @@ class StatisticalModel(ABC):
 
     @abstractmethod
     def _assemble_prior_precision_matrix(
-        self, prior_components: dict, hyperparameters: dict[str, Hyperparameter]
+        self, prior_components: dict, hyperparameters_values: dict[str, float]
     ) -> Matrix:
         """Abstract method whom specification will assemble the prior precision matrix
         from its components given the current hyperparameter values.
@@ -199,7 +199,7 @@ class StatisticalModel(ABC):
         ----------
         prior_components : dict
             The components of the prior precision matrix.
-        hyperparameters : dict[str, Hyperparameter]
+        hyperparameters_values : dict[str, float]
             The current hyperparameter values.
 
         Returns
@@ -298,7 +298,7 @@ class GenomicModel(StatisticalModel):
         }
 
     def _assemble_prior_precision_matrix(
-        self, prior_components: dict, hyperparameters: dict[str, Hyperparameter]
+        self, prior_components: dict, hyperparameters_values: dict[str, float]
     ) -> Matrix:
         """Assemble the prior precision matrix of the Genomic model from its components
         given the current hyperparameter values.
@@ -307,7 +307,7 @@ class GenomicModel(StatisticalModel):
         ----------
         prior_components : dict
             The components of the prior precision matrix.
-        hyperparameters : dict[str, Hyperparameter]
+        hyperparameters_values : dict[str, float]
             The current hyperparameter values.
 
         Returns
@@ -342,13 +342,13 @@ class GenomicModel(StatisticalModel):
 
         block_offsets: list = [0, iid_prior_n, iid_prior_n + n_queen]
         q_prior[: block_offsets[1], :iid_prior_n] = (
-            iid_component * hyperparameters["tau_iid"].value
+            iid_component * hyperparameters_values["tau_iid"]
         )
         q_prior[
             block_offsets[1] : block_offsets[2], block_offsets[1] : block_offsets[2]
-        ] = (queen_component * hyperparameters["tau_queen"].value)
+        ] = (queen_component * hyperparameters_values["tau_queen"])
         q_prior[block_offsets[2] :, block_offsets[2] :] = (
-            regression_component * hyperparameters["prec_regression"].value
+            regression_component * hyperparameters_values["prec_regression"]
         )
 
         return q_prior

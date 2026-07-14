@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 from hyperparameter import (
     Hyperparameter,
     HyperparameterManager,
@@ -29,7 +30,7 @@ def fit_model(
     )
     hpm: HyperparameterManager = HyperparameterManager(model=model, config=hpm_config)
 
-    def minimize_callback(intermediate_result: OptimizeResult):
+    def minimize_callback(xk: np.ndarray):
         """Callback function for the optimization process.
 
         After each successful iteration of the optimization algorithm,
@@ -48,7 +49,7 @@ def fit_model(
         # We always restart with the latest accepted hyperparameters
         # (if new optimization: initial values, if restarded
         # optimization: latest accepted values)
-        x0=hpm.get_latest_hyperparameters(),
+        x0=hpm.get_latest_hyperparameters(format="array", include_fixed=False),
         fun=inla.objective,
         jac=True,  # Assumes inla.objective returns (fun, jac)
         args=(model, hpm),

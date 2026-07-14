@@ -7,7 +7,7 @@ from .model import StatisticalModel
 
 
 def marginal_log_likelihood_approximation(
-    hp_dict: dict,
+    hp_dict: dict[str, float],
     model: StatisticalModel,
 ) -> float:
     """
@@ -24,11 +24,23 @@ def marginal_log_likelihood_approximation(
     # Compute the 4 terms
     f_cond = compute_conditional_latent(Q_cond)
     f_prior = compute_prior_latent(Q_prior)
-    f_lik = compute_likelihood(y, A, Q_cond)
-    f_hp = compute_prior_hyperparameters(hp_named)
+    f_lik = compute_likelihood(model.observations, A, Q_cond)
+    f_hp = compute_prior_hyperparameters(hp_dict)
 
     f = f_cond - f_prior - f_lik - f_hp
     return f
+
+
+def compute_conditional_latent(Q_cond): ...
+
+
+def compute_prior_latent(Q_prior): ...
+
+
+def compute_likelihood(observations, A, Q_cond): ...
+
+
+def compute_prior_hyperparameters(hp_dict): ...
 
 
 def objective(
@@ -46,7 +58,7 @@ def objective(
     hpm.buffer_update(hp_values)
 
     # . compute the marginal log-likelihood approximation at current points
-    hp_dict: dict = hpm.convert_array_to_dict(
+    hp_dict: dict[str, float] = hpm.convert_array_to_dict(
         array=hp_values,
         include_fixed=True,
     )
@@ -89,14 +101,14 @@ def finite_difference_gradient(
             # . f(x+h)
             hp_plus = hp_values.copy()
             hp_plus[i] += h
-            hp_plus_dict: dict = hpm.convert_array_to_dict(
+            hp_plus_dict: dict[str, float] = hpm.convert_array_to_dict(
                 array=hp_plus,
                 include_fixed=True,
             )
             # . f(x-h)
             hp_minus = hp_values.copy()
             hp_minus[i] -= h
-            hp_minus_dict: dict = hpm.convert_array_to_dict(
+            hp_minus_dict: dict[str, float] = hpm.convert_array_to_dict(
                 array=hp_minus,
                 include_fixed=True,
             )

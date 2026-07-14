@@ -55,31 +55,6 @@ These aren't design questions — they will raise exceptions or silently corrupt
 state the first time the pipeline actually runs. Fix in this order, since later
 items depend on earlier ones being correct.
 
-3. **Fix the optimized/full index mismatch in `array_to_dict`/`dict_to_array`.**
-   `_array` only has `len(self._optimized_keys)` entries, but both methods loop
-   over `self._order` (fixed + optimized) and index with `self._key_to_index`
-   (built over the full order). Both should loop/index over `_optimized_keys` /
-   `_optimized_key_to_index` consistently.
-
-4. **Give the model a way to see the *full* hyperparameter dict (fixed + optimized merged).**
-   `GenomicModel._assemble_prior_precision_matrix` needs every key
-   (`tau_iid`, `tau_queen`, `prec_regression`), not just the ones being
-   optimized. `_fixed_values` is stored but never merged back in anywhere.
-   Suggest adding `HyperparameterManager.get_full_dict(array=None) -> dict[str, float]`
-   that merges `_fixed_values` with `array_to_dict(array)` — this becomes the
-   thing that actually gets passed to `model.assemble_prior_precision_matrix`.
-
-5. **Decide whether the Manager owns copies or references of the Model's `Hyperparameter` objects.**
-   `model.get_hyperparameters()` returns a shallow dict copy — same
-   `Hyperparameter` instances. `commit_buffer()` mutates
-   `self._hyperparameters[key].value` in place, which means it mutates the
-   model's own objects immediately, before `update_model()` is ever called.
-   This contradicts the stated goal ("model does not track optimization
-   state"). Either deep-copy `Hyperparameter` objects at
-   `HyperparameterManager.__init__` (so `update_model()` becomes the real,
-   deliberate sync point back to the model), or explicitly drop that isolation
-   guarantee from the docstring and design around shared references instead.
-
 ---
 
 ## Next Steps: Wiring the Rest of the Pipeline
