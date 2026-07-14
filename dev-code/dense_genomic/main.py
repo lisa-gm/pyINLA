@@ -13,6 +13,11 @@ from . import inla
 from .model import GenomicModel, GenomicModelConfig, StatisticalModel
 
 
+def exit_as_expected():
+    """Exit the program with a message indicating that the program has completed successfully."""
+    print("Program completed successfully.")
+    exit(0)
+
 def fit_model(
     model: StatisticalModel,
     options: dict = None,
@@ -71,15 +76,15 @@ if __name__ == "__main__":
     # . Configure the hyperparameters
     tau_iid: Hyperparameter = Hyperparameter(
         name="tau_iid",
-        value=1.0,
+        value=2.3, # Synthetic True = 3.0
     )
     tau_queen: Hyperparameter = Hyperparameter(
         name="tau_queen",
-        value=1.0,
+        value=15.6, # Synthetic True = 10.0
     )
     prec_regression: Hyperparameter = Hyperparameter(
         name="prec_regression",
-        value=0.1,
+        value=50.0, # Synthetic True = 50.0
         is_fixed=True,  # This hyperparameter is fixed and will not be optimized
     )
     genomic_hps: dict[str, Hyperparameter] = assemble_hyperparameter_dict(
@@ -88,22 +93,24 @@ if __name__ == "__main__":
 
     # . Configure the Genomic Model
     config: GenomicModelConfig = GenomicModelConfig(
-        path_to_model_components=Path("path/to/dataset"),
-        path_to_observations=Path("path/to/observations.npy"),
+        path_to_model_components=Path("/home/vmaillou/Repos/DALIA/dev-code/genomic_dataset"),
+        path_to_observations=Path("/home/vmaillou/Repos/DALIA/dev-code/genomic_dataset"),
         hyperparameters=genomic_hps,
         # Component: iid
-        iid_prior_n=100,
-        iid_design_name="iid_design_matrix.npy",
+        iid_prior_n=40,
+        iid_design_name="iid_design.npy",
         # Component: queen
-        queen_prior_name="queen_matrix.npy",
-        queen_design_name="queen_design_matrix.npy",
+        queen_prior_name="queen_prior.npy",
+        queen_design_name="queen_design.npy",
         # Component: regression
         regression_prior_n=10,
-        regression_design_name="regression_design_matrix.npy",
+        regression_design_name="regression_design.npy",
     )
 
     # Instanciate the Genomic Model
     model: GenomicModel = GenomicModel(config=config)
+
+    exit_as_expected()
 
     # Optimize the model's hyperparameters using the defined objective function and jacobian.
     # . minimization options

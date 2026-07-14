@@ -77,7 +77,7 @@ from typing import Literal
 
 import numpy as np
 
-from dalia.statistical_modeling_toolbox.statistical_model import StatisticalModel
+from model import StatisticalModel
 
 
 def assemble_hyperparameter_dict(
