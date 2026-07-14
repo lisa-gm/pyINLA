@@ -18,11 +18,10 @@ HP-value through the public API (no self get updated!).
 
 """
 
-from abc import ABC, abstractmethod
 import copy
-from pathlib import Path
-
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
@@ -30,6 +29,7 @@ from dalia.backend.datastructure import DenseMatrix, Matrix
 
 from .cache_utils import restore_from_cache, store_in_cache
 from .hyperparameter import Hyperparameter
+
 
 @dataclass
 class StatisticalModelConfig:
@@ -43,7 +43,19 @@ class StatisticalModelConfig:
     def __post_init__(self):
         # Validate: all names match dict keys
         for key, hp in self.config.hyperparameters.items():
-            assert hp.name == key, f"Hyperparameter.name '{hp.name}' must match dict key '{key}'"
+            assert (
+                hp.name == key
+            ), f"Hyperparameter.name '{hp.name}' must match dict key '{key}'"
+
+        # Validate paths
+        if not self.path_to_model_components.exists():
+            raise FileNotFoundError(
+                f"Path to model components '{self.path_to_model_components}' does not exist."
+            )
+        if not self.path_to_observations.exists():
+            raise FileNotFoundError(
+                f"Path to observations '{self.path_to_observations}' does not exist."
+            )
 
 
 class StatisticalModel(ABC):
@@ -58,6 +70,9 @@ class StatisticalModel(ABC):
         # Load the model hyperparameters and their initial values
         self._hyperparameters: dict[str, Hyperparameter] = self.config.hyperparameters
 
+        # Load the observations
+        self.observations: np.ndarray = np.load(self.config.path_to_observations)
+
         # Specific statistical model overload these methods depending on the
         # components of the model (e.g. iid, regression, spatial, temporal, etc.)
         self.prior_components: dict = self._load_prior_components()
@@ -68,7 +83,7 @@ class StatisticalModel(ABC):
     def assemble_prior_precision_matrix(
         self, hyperparameters: dict[str, Hyperparameter]
     ) -> Matrix:
-        """Assemble the prior precision matrix from its components 
+        """Assemble the prior precision matrix from its components
         given (at) the current hyperparameter values.
 
         Parameters
@@ -99,7 +114,7 @@ class StatisticalModel(ABC):
 
     def assemble_design_matrix(self) -> Matrix:
         """Assemble the design matrix from its components.
-        
+
         Returns
         -------
         Matrix
@@ -125,37 +140,32 @@ class StatisticalModel(ABC):
         Returns
         -------
         dict[str, Hyperparameter]
-            The model's hyperparameters. 
-            
+            The model's hyperparameters.
+
         Notes
         -----
-        - The hyperparameters are returned by reference, hence any 
-        modification to the returned dictionary will affect the 
+        - The hyperparameters are returned by reference, hence any
+        modification to the returned dictionary will affect the
         model's hyperparameters.
         """
         return self._hyperparameters
 
-    def set_hyperparameter(self, key, hyperparameter: Hyperparameter):
-        """Set a hyperparameter.
+    def set_hyperparameter_value(self, key: str, value: float) -> None:
+        """Set a hyperparameter value.
 
         Parameters
         ----------
         key : str
             The key/name (unique identifier) of the hyperparameter to set.
-        hyperparameter : Hyperparameter
-            The hyperparameter object to set.
-
-        Notes
-        -----
-        - The given hyperparameter will replace the existing hyperparameter 
-        in the model through a deep copy, ensuring that the model's internal 
-        state is not affected by external modifications to the provided 
-        hyperparameter object.
+        value : float
+            The new value for the hyperparameter.
         """
         if key not in self._hyperparameters:
-            raise KeyError(f"Hyperparameter '{key}' does not exist in the model. Adding new hyperparameter after instantiation is not allowed.")
-        
-        self._hyperparameters[key] = copy.deepcopy(hyperparameter)
+            raise KeyError(
+                f"Hyperparameter '{key}' does not exist in the model. Adding new hyperparameter after instantiation is not allowed."
+            )
+
+        self._hyperparameters[key].value = value
 
     # --- Abstract methods ---
 
@@ -206,6 +216,7 @@ class StatisticalModel(ABC):
         """
         ...
 
+
 @dataclass
 class GenomicModelConfig(StatisticalModelConfig):
     # Component: iid
@@ -246,7 +257,9 @@ class GenomicModel(StatisticalModel):
         # Load or assemble each components of the statistical model
         # . This will be modified (later) using the appropriate Matrix specifications,
         # in particular DiagonalMatrix for the iid and regression components.
-        iid_prior_matrix = DenseMatrix(data=np.eye(N=self.config.iid_prior_n, dtype=np.float64))
+        iid_prior_matrix = DenseMatrix(
+            data=np.eye(N=self.config.iid_prior_n, dtype=np.float64)
+        )
         queen_prior_matrix = DenseMatrix(
             data=np.load(self.config.dataset_path / self.config.queen_prior_name)
         )

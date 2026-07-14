@@ -1,10 +1,10 @@
 from pathlib import Path
 
-import numpy as np
 from hyperparameter import (
     Hyperparameter,
     HyperparameterManager,
     HyperparameterManagerConfig,
+    assemble_hyperparameter_dict,
 )
 from scipy.optimize import OptimizeResult, minimize
 
@@ -12,43 +12,84 @@ from . import inla
 from .model import GenomicModel, GenomicModelConfig, StatisticalModel
 
 
-def optimize(
-    model : StatisticalModel,
-    objective_function : callable,
-    jacobian_function : callable,
-    ) -> OptimizeResult:
-    # Maybe the hyperparameter manager should be part of the optimization itself?
-    # . This woudl imply that after optimizing a Model() its hyperparameters get updated and
-    # these hyperparameters are then the one that are gonna be used for the "post-processing"
-    # related computations.
+def fit_model(
+    model: StatisticalModel,
+    options: dict = None,
+) -> OptimizeResult:
+    # Initialize the hyperparameter manager HPM
+    hpm_config: HyperparameterManagerConfig = HyperparameterManagerConfig(
+        # HPM State Checkpointing
+        checkpoint_hpm=False,
+        checkpoint_hpm_every=10,
+        checkpoint_hpm_path=Path("hpm_checkpoint.pkl"),
+        # Hyperparameter Optimization History Checkpointing
+        track_history=False,
+        checkpoint_history_every=10,
+        checkpoint_history_path=Path("hpm_history_checkpoint.pkl"),
+    )
+    hpm: HyperparameterManager = HyperparameterManager(model=model, config=hpm_config)
 
-    # Initialize the hyperparameter manager with the hyperparameters and their initial values
-    hp_manager_config : HyperparameterManagerConfig = ...
-    hp_manager : HyperparameterManager = HyperparameterManager(
-        hyperparameters : List[Hyperparameter] = [tau_iid, tau_queen, prec_regression],
-        config=hp_manager_config
+    def minimize_callback(intermediate_result: OptimizeResult):
+        """Callback function for the optimization process.
+
+        After each successful iteration of the optimization algorithm,
+        this function will commit the buffer of tentative hyperparameter
+        values in the HyperparameterManager's and flush it.
+
+        Parameters
+        ----------
+        xk : np.ndarray
+            The current hyperparameter values at the current iteration.
+        """
+        hpm.commit_buffer()
+
+    # Fit the model's hyperparameters to the observations using the INLA objective function.
+    model_fitting_result: OptimizeResult = minimize(
+        # We always restart with the latest accepted hyperparameters
+        # (if new optimization: initial values, if restarded
+        # optimization: latest accepted values)
+        x0=hpm.get_latest_hyperparameters(),
+        fun=inla.objective,
+        jac=True,  # Assumes inla.objective returns (fun, jac)
+        args=(model, hpm),
+        bounds=hpm.get_bounds(),
+        method="L-BFGS-B",
+        callback=minimize_callback,
+        options=options,
     )
 
-    # Perform the optimization of the hyperparameters using the objective function and jacobian.
-    # . could be interesting to have a checkpointing function (save the current state of the optimization to disk) to allow for resuming the optimization in case of interruptions.
-    initial_hyperparameters : np.ndarray = hp_manager.get_initial_hyperparameter_values()
-    bounds : List[Tuple[float, float]] = hp_manager.get_hyperparameter_bounds()
+    # Overwrite the model's hyperparameters value with the one
+    # found by the optimization (latest accepted hyperparameters)
+    hpm.update_model(model=model)
 
-    result : OptimizeResult = minimize(
-        fun=objective_function,
-        x0=initial_hyperparameters,
-        jac=jacobian_function,
-        bounds=bounds,
-        method='L-BFGS-B'
-    )
+    return model_fitting_result
 
-    return result
 
 if __name__ == "__main__":
     # Configure and initialize the Genomic Model
-    config : GenomicModelConfig = GenomicModelConfig(
-        dataset_path=Path("path/to/dataset"),
-        n_observations=100,
+    # . Configure the hyperparameters
+    tau_iid: Hyperparameter = Hyperparameter(
+        name="tau_iid",
+        value=1.0,
+    )
+    tau_queen: Hyperparameter = Hyperparameter(
+        name="tau_queen",
+        value=1.0,
+    )
+    prec_regression: Hyperparameter = Hyperparameter(
+        name="prec_regression",
+        value=0.1,
+        is_fixed=True,  # This hyperparameter is fixed and will not be optimized
+    )
+    genomic_hps: dict[str, Hyperparameter] = assemble_hyperparameter_dict(
+        hyperparameters=[tau_iid, tau_queen, prec_regression]
+    )
+
+    # . Configure the Genomic Model
+    config: GenomicModelConfig = GenomicModelConfig(
+        path_to_model_components=Path("path/to/dataset"),
+        path_to_observations=Path("path/to/observations.npy"),
+        hyperparameters=genomic_hps,
         # Component: iid
         iid_prior_n=100,
         iid_design_name="iid_design_matrix.npy",
@@ -57,14 +98,24 @@ if __name__ == "__main__":
         queen_design_name="queen_design_matrix.npy",
         # Component: regression
         regression_prior_n=10,
-        regression_design_name="regression_design_matrix.npy"
+        regression_design_name="regression_design_matrix.npy",
     )
 
-    model : GenomicModel = GenomicModel(config=config)
-    
+    # Instanciate the Genomic Model
+    model: GenomicModel = GenomicModel(config=config)
+
     # Optimize the model's hyperparameters using the defined objective function and jacobian.
-    result : OptimizeResult = optimize(
+    # . minimization options
+    options = {
+        "maxiter": 100,
+        "maxcor": 10,
+        "maxls": 100,
+        "ftol": 1e-9,
+        "gtol": 1e-5,
+        "disp": False,
+    }
+    # . run model fitting
+    model_fitting_result: OptimizeResult = fit_model(
         model=model,
-        objective_function=inla.objective,
-        jacobian_function=inla.jacobian,
+        options=None,
     )
