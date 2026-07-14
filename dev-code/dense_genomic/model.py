@@ -25,10 +25,10 @@ from pathlib import Path
 
 import numpy as np
 
-from dalia.backend.datastructures import DenseMatrix, Matrix
+# from cache_utils import restore_from_cache, store_in_cache
+from hp_dataclass import Hyperparameter
 
-from .cache_utils import restore_from_cache, store_in_cache
-from .hyperparameter import Hyperparameter
+from dalia.backend.datastructures import DenseMatrix, Matrix
 
 
 @dataclass
@@ -42,7 +42,7 @@ class StatisticalModelConfig:
 
     def __post_init__(self):
         # Validate: all names match dict keys
-        for key, hp in self.config.hyperparameters.items():
+        for key, hp in self.hyperparameters.items():
             assert (
                 hp.name == key
             ), f"Hyperparameter.name '{hp.name}' must match dict key '{key}'"
@@ -74,7 +74,7 @@ class StatisticalModel(ABC):
         # . for now hard-coded the name to be "observations.npy"
         # . this could be part of the config or we might need to accomodate for Pandas DataFrame
         self.observations: np.ndarray = np.load(
-            self.config.path_to_observations + "/observations.npy"
+            self.config.path_to_observations / "observations.npy"
         )
 
         # Specific statistical model overload these methods depending on the
@@ -265,7 +265,9 @@ class GenomicModel(StatisticalModel):
             data=np.eye(N=self.config.iid_prior_n, dtype=np.float64)
         )
         queen_prior_matrix = DenseMatrix(
-            data=np.load(self.config.dataset_path / self.config.queen_prior_name)
+            data=np.load(
+                self.config.path_to_model_components / self.config.queen_prior_name
+            )
         )
         regression_prior_matrix = DenseMatrix(
             data=np.eye(N=self.config.regression_prior_n, dtype=np.float64)
@@ -286,13 +288,20 @@ class GenomicModel(StatisticalModel):
             A dictionary containing the components needed to assemble the design matrix of the GenomicModel.
         """
         iid_design_matrix = DenseMatrix(
-            data=np.load(self.config.dataset_path / self.config.iid_design_name)
+            data=np.load(
+                self.config.path_to_model_components / self.config.iid_design_name
+            )
         )
         queen_design_matrix = DenseMatrix(
-            data=np.load(self.config.dataset_path / self.config.queen_design_name)
+            data=np.load(
+                self.config.path_to_model_components / self.config.queen_design_name
+            )
         )
         regression_design_matrix = DenseMatrix(
-            data=np.load(self.config.dataset_path / self.config.regression_design_name)
+            data=np.load(
+                self.config.path_to_model_components
+                / self.config.regression_design_name
+            )
         )
 
         return {

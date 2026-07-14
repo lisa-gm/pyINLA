@@ -1,9 +1,8 @@
 """..."""
 
 import numpy as np
-from hyperparameter import HyperparameterManager
-
-from .model import StatisticalModel
+from hp_manager import HyperparameterManager
+from model import StatisticalModel
 
 
 def marginal_log_likelihood_approximation(

@@ -14,7 +14,7 @@ if gputil_version is not None:
 
 
 from .add import dispatch_add
-from .mat import dispatch_mul
+from .mul import dispatch_mul
 from .matmul import dispatch_matmul
 from .operations import Operation
 from .sub import dispatch_sub

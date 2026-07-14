@@ -1,16 +1,15 @@
 from pathlib import Path
 
 import numpy as np
-from hyperparameter import (
+from hp_dataclass import (
     Hyperparameter,
-    HyperparameterManager,
-    HyperparameterManagerConfig,
     assemble_hyperparameter_dict,
 )
+from hp_manager import HyperparameterManager, HyperparameterManagerConfig
+from model import GenomicModel, GenomicModelConfig, StatisticalModel
 from scipy.optimize import OptimizeResult, minimize
 
-from . import inla
-from .model import GenomicModel, GenomicModelConfig, StatisticalModel
+from inla import objective as inla_objective
 
 
 def exit_as_expected():
@@ -56,8 +55,8 @@ def fit_model(
         # (if new optimization: initial values, if restarded
         # optimization: latest accepted values)
         x0=hpm.get_latest_hyperparameters(format="array", include_fixed=False),
-        fun=inla.objective,
-        jac=True,  # Assumes inla.objective returns (fun, jac)
+        fun=inla_objective,
+        jac=True,  # Assumes inla_objective returns (fun, jac)
         args=(model, hpm),
         bounds=hpm.get_bounds(),
         method="L-BFGS-B",

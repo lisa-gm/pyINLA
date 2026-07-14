@@ -76,6 +76,7 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
+from hp_dataclass import Hyperparameter
 from model import StatisticalModel
 
 
@@ -142,25 +143,6 @@ class HyperparameterManagerConfig:
             raise ValueError("checkpoint_hpm_every must be a positive integer")
         if self.checkpoint_history_every <= 0:
             raise ValueError("checkpoint_history_every must be a positive integer")
-
-
-@dataclass
-class Hyperparameter:
-    """A single hyperparameter with its metadata."""
-
-    # Unique identifier, should be unique across all hyperparameters in the model.
-    name: str
-    # Value of the hyperparameter.
-    value: float
-
-    # Wether or not this hyperparameter is fixed or can be optimized.
-    # if True, not optimized
-    is_fixed: bool = False
-
-    # Hyperparameter bounds for optimization
-    bounds: tuple[float, float] | None = (
-        None  # Default no bounds for optimization (-inf, +inf)
-    )
 
 
 class HyperparameterManager:
