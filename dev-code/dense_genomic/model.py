@@ -335,33 +335,38 @@ class GenomicModel(StatisticalModel):
         - regression: Regression prior component
         """
         # Extract the required components
-        iid_component = prior_components["iid"]
-        queen_component = prior_components["queen"]
-        regression_component = prior_components["regression"]
+        iid_component: Matrix = prior_components["iid"]
+        queen_component: Matrix = prior_components["queen"]
+        regression_component: Matrix = prior_components["regression"]
+        # . and their dimmensions
+        n_iid: int = iid_component.shape[0]
+        n_queen: int = queen_component.shape[0]
+        n_regression: int = regression_component.shape[0]
 
         # Initialize the prior precision matrix with the appropriate shape
-        prior_shape = (
-            iid_component.shape + queen_component.shape + regression_component.shape
+        prior_shape: tuple = (
+            n_iid + n_queen + n_regression,
+            n_iid + n_queen + n_regression,
         )
-        q_prior = DenseMatrix(data=np.zeros(prior_shape, dtype=np.float64))
+        q_prior: Matrix = DenseMatrix(data=np.zeros(prior_shape, dtype=np.float64))
 
         # Assemble the prior precision matrix from its components at the current hyperparameter values
         # . This block is gonna become way easier with the block-matrix. Then no need to
         # maintain knowledge about the different shapes of each component.
         # . This also currently assumes that each component of this specific model
         # is a square matrix.
-        iid_prior_n: int = iid_component.shape[0]
-        n_queen: int = queen_component.shape[0]
-
-        block_offsets: list = [0, iid_prior_n, iid_prior_n + n_queen]
-        q_prior[: block_offsets[1], :iid_prior_n] = (
-            iid_component * hyperparameters_values["tau_iid"]
+        block_offsets: list = [0, n_iid, n_iid + n_queen]
+        # . assign iid contribution
+        q_prior[: block_offsets[1], : block_offsets[1]] = (
+            hyperparameters_values["tau_iid"] * iid_component
         )
+        # . assign queen contribution
         q_prior[
             block_offsets[1] : block_offsets[2], block_offsets[1] : block_offsets[2]
-        ] = (queen_component * hyperparameters_values["tau_queen"])
+        ] = (hyperparameters_values["tau_queen"] * queen_component)
+        # . assign regression contribution
         q_prior[block_offsets[2] :, block_offsets[2] :] = (
-            regression_component * hyperparameters_values["prec_regression"]
+            hyperparameters_values["prec_regression"] * regression_component
         )
 
         return q_prior
@@ -385,17 +390,20 @@ class GenomicModel(StatisticalModel):
         - queen: Spatial design component based on the Queen contiguity matrix
         - regression: Regression design component
         """
+        # . assumes 1D observations vector (n_observations, 1) and that
+        # the design matrix is (n_observations, n_features)
+        n_observations: int = self.observations.shape[0]
+
         # Extract the required components
         iid_design_matrix = design_components["iid"]
         queen_design_matrix = design_components["queen"]
         regression_design_matrix = design_components["regression"]
-
-        # Initialize the design matrix with the appropriate shape
-        n_observations: int = self.config.n_observations
+        # . and their dimmensions
         n_iid: int = iid_design_matrix.shape[1]
         n_queen: int = queen_design_matrix.shape[1]
         n_regression: int = regression_design_matrix.shape[1]
 
+        # Initialize the design matrix with the appropriate shape
         design_shape: tuple = (n_observations, n_iid + n_queen + n_regression)
         design_matrix: DenseMatrix = DenseMatrix(
             data=np.zeros(design_shape, dtype=np.float64)

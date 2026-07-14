@@ -185,6 +185,12 @@ class Matrix(ABC):
         return self._wrap_result(result_data)
 
     # 7. Right-hand operators (same order as above)
+    def __rmul__(self, other):
+        """Right-hand multiplication: other * self"""
+        other_data = other._data if isinstance(other, Matrix) else other
+        result_data = blas_dispatch(Operation.MUL, other_data, self._data)
+        return self._wrap_result(result_data)
+
     def __rmatmul__(self, other):
         """Right-hand matrix multiplication: other @ self"""
         # other is the left operand (likely numpy/scipy, not wrapped)
@@ -242,7 +248,36 @@ class Matrix(ABC):
         return self._data[key]
 
     def __setitem__(self, key, value):
-        """Set matrix elements"""
+        """Set matrix elements
+        
+        Supports assigning either scalar values or Matrix objects.
+        When assigning a Matrix, extracts the underlying data before assignment.
+        
+        Parameters
+        ----------
+        key : slice or tuple
+            Indexing key for the matrix elements to set.
+        value : scalar or Matrix
+            Value to assign. If a Matrix is provided, its underlying data is used.
+
+        Raises
+        ------
+        TypeError
+            If the value is not a scalar or a Matrix instance.
+        """
+        if not isinstance(value, (int, float, Matrix)):
+            raise TypeError(
+                f"Unsupported value type '{type(value)}'. "
+                f"Only scalar values or Matrix instances are supported."
+            )
+
+        if isinstance(value, Matrix):
+            # Ensure value is on same hardware target
+            if value._hw_target != self._hw_target:
+                value = tohost(value._data) if self._hw_target == "host" else toaccelerator(value._data)
+            else:
+                value = value._data
+
         self._data[key] = value
 
     def __repr__(self):

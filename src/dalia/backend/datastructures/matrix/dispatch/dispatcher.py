@@ -30,8 +30,8 @@ _OPERATION_MAP = {
 
 def blas_dispatch(operation: Operation, left, right):
     # Type checking
-    left_type, left_hw_target = _get_matrix_type(left)
-    right_type, right_hw_target = _get_matrix_type(right)
+    left_type, left_hw_target = _get_dispatch_metadata(data=left)
+    right_type, right_hw_target = _get_dispatch_metadata(data=right)
     if left_hw_target != right_hw_target:
         # Handle hw_target mismatch
         # TODO: Make this work for different aproaches
@@ -74,17 +74,38 @@ def _hw_target_handler(data, hw_target, matrix_type):
             return data.get()
     raise TypeError(f"Unknown hw_target type: {hw_target}")
 
-def _get_matrix_type(data):
-    """Determine the type of matrix data"""
+def _get_dispatch_metadata(data) -> tuple[str, str]:
+    """Determine metadata related to the data dispatch.
+    
+    Parameters
+    ----------
+    data : Union[np.ndarray, sp.spmatrix, cp.ndarray, cupyx.scipy.sparse.spmatrix]
+        The input data for which to determine the dispatch metadata.
+
+    Returns
+    -------
+    tuple[str, str]
+        A tuple containing:
+        - The type of the data ('sparse' or 'dense').
+        - The hardware target of the data ('host' or 'accelerator').
+    """
+    # Basic type checking for host (CPU) data
     if sp.issparse(data):
         return "sparse", "host"
     if isinstance(data, np.ndarray):
         return "dense", "host"
+    if isinstance(data, float):
+        return "dense", "host"
+    if isinstance(data, int):
+        return "dense", "host"
+
+    # Adding GPU types if cupy is available
     if cupy_version is not None:
          if cu_sp.issparse(data):
             return "sparse", "accelerator"
          if isinstance(data, cp.ndarray):
             return "dense", "accelerator"
+    
     raise TypeError(f"Unknown matrix type: {type(data)}")
 
 def _target_decider(left_data, right_data, left_hw_target, right_hw_target, left_type, right_type):

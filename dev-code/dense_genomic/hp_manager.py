@@ -434,15 +434,26 @@ class HyperparameterManager:
 
         Returns
         -------
-        list[tuple[float, float] | None]
+        list[tuple[float, float]] | None
             Bounds in same order as get_array().
 
         Example
         -------
+        >>> # If some hyperparameters are unbounded
         >>> manager.get_bounds()
-        [(1e-6, 1e6), (1e-6, 1e6), None]
+        [(1e-6, 1e6), (1e-6, 1e6), (-inf, inf)]
+        >>> # If all hyperparameters are unbounded
+        >>> manager.get_bounds()
+        None
         """
-        return [self._bounds[key] for key in self._optimized_keys]
+        bounds = [self._bounds[key] for key in self._optimized_keys]
+
+        # 1. Check if all bounds are None, then return None
+        if all(bound is None for bound in bounds):
+            return None
+
+        # 2. If some bounds are None, replace them with (-inf, +inf) for scipy compatibility
+        return [bound if bound is not None else (-np.inf, np.inf) for bound in bounds]
 
     # API for : State Management
     # . Public

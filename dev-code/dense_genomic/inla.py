@@ -1,8 +1,11 @@
 """..."""
 
+import matplotlib.pyplot as plt
 import numpy as np
 from hp_manager import HyperparameterManager
 from model import StatisticalModel
+
+from dalia.backend.datastructures import Matrix
 
 
 def marginal_log_likelihood_approximation(
@@ -14,8 +17,30 @@ def marginal_log_likelihood_approximation(
 
     Returns the scalar f = conditional - prior - likelihood - prior_hyperparameters
     """
-    Q_prior = model.assemble_prior_precision_matrix(hyperparameters=hp_dict)
+
+    print("hp_dict:", hp_dict)
+    print("model:", model)
+
+    q_prior: Matrix = model.assemble_prior_precision_matrix(
+        hyperparameters_values=hp_dict
+    )
+
+    print("q_prior:", q_prior)
+
     A = model.assemble_design_matrix()
+
+    print("A:", A)
+
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+    axs[0].matshow(q_prior.data, cmap="viridis")
+    axs[0].set_title("Prior Precision Matrix")
+    plt.colorbar(axs[0].matshow(q_prior.data, cmap="viridis"), ax=axs[0])
+    axs[1].matshow(A.data, cmap="viridis")
+    axs[1].set_title("Design Matrix")
+    plt.colorbar(axs[1].matshow(A.data, cmap="viridis"), ax=axs[1])
+    plt.show()
+
+    exit()
 
     # Conditional precision: Q_cond = Q_prior - θ * AᵀA
     Q_cond = ...  # depends on likelihood structure

@@ -114,8 +114,6 @@ if __name__ == "__main__":
     # Instanciate the Genomic Model
     model: GenomicModel = GenomicModel(config=config)
 
-    exit_as_expected()
-
     # Optimize the model's hyperparameters using the defined objective function and jacobian.
     # . minimization options
     options = {
