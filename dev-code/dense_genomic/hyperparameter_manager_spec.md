@@ -55,22 +55,6 @@ These aren't design questions — they will raise exceptions or silently corrupt
 state the first time the pipeline actually runs. Fix in this order, since later
 items depend on earlier ones being correct.
 
-1. **De-indent the `HyperparameterManager` methods out of `__init__`.**
-   `array_to_dict`, `dict_to_array`, `get_array`, `get_bounds`, `buffer_update`,
-   `commit_buffer`, `get_history`, `get_last_iteration`, `update_model`,
-   `load_checkpoint`, `_checkpoint` are currently local closures inside
-   `__init__` — none of them are callable as `manager.method(...)`.
-
-2. **Make `Hyperparameter` an actual dataclass (or give it `__init__`).**
-   Right now it only has class-level annotations, so `Hyperparameter(name=...,
-   value=..., bounds=...)` fails, and any default (like `bounds`) would be a
-   single shared mutable object across all instances. Decide the scalar bound
-   representation here too — `scipy.optimize.Bounds` wraps a whole vector, not
-   one hyperparameter; a plain `tuple[float, float]` (or `(lb, ub)` pair) per
-   `Hyperparameter` composed into a single `Bounds`/list by
-   `HyperparameterManager.get_bounds()` is simpler and matches what `minimize`
-   expects.
-
 3. **Fix the optimized/full index mismatch in `array_to_dict`/`dict_to_array`.**
    `_array` only has `len(self._optimized_keys)` entries, but both methods loop
    over `self._order` (fixed + optimized) and index with `self._key_to_index`
@@ -95,19 +79,6 @@ items depend on earlier ones being correct.
    `HyperparameterManager.__init__` (so `update_model()` becomes the real,
    deliberate sync point back to the model), or explicitly drop that isolation
    guarantee from the docstring and design around shared references instead.
-
-6. **Decide what `commit_buffer` actually commits.** With finite-difference
-   gradients, `fun` is called several times per outer iteration (once at the
-   candidate point, then at `x ± h·eᵢ` for each dimension to build the
-   gradient) — each call overwrites `_buffer` via `buffer_update`. `scipy`'s
-   `callback(xk)` fires with the *accepted* `xk`, but `commit_buffer()` takes no
-   array argument and just uses whatever is currently in `_buffer`, which is
-   very likely a leftover finite-difference perturbation, not `xk`. Two fixes,
-   pick one: (a) have `commit_buffer(xk)` take `xk` explicitly and use that
-   instead of `_buffer`, or (b) have `wrapped_objective` re-buffer the *last
-   requested* full point right before returning `f`, and have the outer
-   optimizer loop re-buffer `xk` itself right before calling `commit_buffer()`.
-   (a) is simpler and removes the ambiguity entirely.
 
 ---
 

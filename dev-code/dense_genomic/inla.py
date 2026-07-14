@@ -7,21 +7,15 @@ from .model import StatisticalModel
 
 
 def marginal_log_likelihood_approximation(
-    hp_values: np.ndarray,
+    hp_dict: dict,
     model: StatisticalModel,
-    hpm: HyperparameterManager,
 ) -> float:
     """
     Compute the INLA marginal log-likelihood approximation.
 
     Returns the scalar f = conditional - prior - likelihood - prior_hyperparameters
     """
-    Q_prior = model.assemble_prior_precision_matrix(
-        hyperparameters=hpm.convert_array_to_dict(
-            array=hp_values,
-            include_fixed=True,
-        )
-    )
+    Q_prior = model.assemble_prior_precision_matrix(hyperparameters=hp_dict)
     A = model.assemble_design_matrix()
 
     # Conditional precision: Q_cond = Q_prior - θ * AᵀA
@@ -51,11 +45,17 @@ def objective(
     """
     hpm.buffer_update(hp_values)
 
-    fun = marginal_log_likelihood_approximation(
-        hp_values=hp_values,
-        model=model,
-        hpm=hpm,
+    # . compute the marginal log-likelihood approximation at current points
+    hp_dict: dict = hpm.convert_array_to_dict(
+        array=hp_values,
+        include_fixed=True,
     )
+    fun = marginal_log_likelihood_approximation(
+        hp_dict=hp_dict,
+        model=model,
+    )
+
+    # . compute Jacobian
     jac = finite_difference_gradient(
         objective_fn=marginal_log_likelihood_approximation,
         hp_values=hp_values,
@@ -86,12 +86,23 @@ def finite_difference_gradient(
     for i in range(n):
         if stencil == 3:
             # Central difference: (f(x+h) - f(x-h)) / (2h)
+            # . f(x+h)
             hp_plus = hp_values.copy()
             hp_plus[i] += h
+            hp_plus_dict: dict = hpm.convert_array_to_dict(
+                array=hp_plus,
+                include_fixed=True,
+            )
+            # . f(x-h)
             hp_minus = hp_values.copy()
             hp_minus[i] -= h
+            hp_minus_dict: dict = hpm.convert_array_to_dict(
+                array=hp_minus,
+                include_fixed=True,
+            )
+            # . compute gradient
             grad[i] = (
-                objective_fn(hp_plus, model, hpm) - objective_fn(hp_minus, model, hpm)
+                objective_fn(hp_plus_dict, model) - objective_fn(hp_minus_dict, model)
             ) / (2 * h)
         elif stencil == 5:
             # Higher-order central: (-f(x+2h) + 8*f(x+h) - 8*f(x-h) + f(x-2h)) / (12h)
