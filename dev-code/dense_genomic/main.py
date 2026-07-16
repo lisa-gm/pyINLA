@@ -11,11 +11,7 @@ from scipy.optimize import OptimizeResult, minimize
 
 from inla import objective as inla_objective
 
-
-def exit_as_expected():
-    """Exit the program with a message indicating that the program has completed successfully."""
-    print("Program completed successfully.")
-    exit(0)
+from dev_utils import exit_as_expected
 
 
 def fit_model(
@@ -47,7 +43,12 @@ def fit_model(
         intermediate_result : OptimizeResult
             The result of the intermediate optimization step.
         """
-        hpm.commit_buffer(f=intermediate_result.fun)
+        hpm.commit_iteration(
+            array=intermediate_result.x,
+            fun=intermediate_result.fun
+        )
+
+        
 
     # Fit the model's hyperparameters to the observations using the INLA objective function.
     model_fitting_result: OptimizeResult = minimize(

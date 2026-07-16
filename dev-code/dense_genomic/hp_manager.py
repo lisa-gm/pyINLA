@@ -234,7 +234,6 @@ class HyperparameterManager:
         }
 
         # State management
-        self._buffer: np.ndarray | None = None  # Tentative values (not accepted)
         self._iteration: int = 0
         self._history: list[tuple[int, np.ndarray, float]] = []  # (iter, array, f)
 
@@ -457,52 +456,40 @@ class HyperparameterManager:
 
     # API for : State Management
     # . Public
-    def buffer_update(self, array: np.ndarray) -> None:
+    def commit_iteration(
+            self,
+            array: np.ndarray,
+            fun: float | None = None,
+        ) -> None:
         """
-        Buffer a perturbed array (tentative, not yet accepted).
+        Commit given array values from accepted iteration.
 
-        Called by optimizer BEFORE each objective evaluation.
-        The buffer is only committed on accepted iterations.
-
+        Called by callback AFTER scipy accepts a point.
+        Updates _optimized_array, increments iteration, optionally records history.
+        
         Parameters
         ----------
         array : np.ndarray
-            Tentative hyperparameter values to buffer.
+            Array of hyperparameter values in the order specified by self._optimized_keys.
+        fun : float, optional
+            Objective function value at the accepted point. If provided, it will be recorded in the history
 
         Raises
         ------
         ValueError
-            If array length does not match the number of optimized hyperparameters.
-
-        Notes
-        -----
-        The buffer will hold a deep copy of the provided array, so modifying the
-        original array after calling this method will not affect the buffer.
+            If the length of the array does not match the number of optimized hyperparameters.  
         """
         if len(array) != len(self._optimized_keys):
             raise ValueError(
                 "Provided buffered array length does not match the number of optimized hyperparameters"
             )
 
-        # .copy() of np.ndarray is a deep copy
-        self._buffer = array.copy()
-
-    def commit_buffer(self, f: float | None = None) -> None:
-        """
-        Commit buffered values as accepted iteration.
-
-        Called by callback AFTER scipy accepts a point.
-        Updates _optimized_array, increments iteration, optionally records history.
-        """
-        if self._buffer is None:
-            raise ValueError("No buffered values to commit")
-
         # Update accepted values
-        self._optimized_array = self._buffer.copy()
+        self._optimized_array = array.copy()
 
         # History Tracking and Checkpointing
         if self._config.track_history:
-            self._history.append((self._iteration, self._optimized_array.copy(), f))
+            self._history.append((self._iteration, self._optimized_array.copy(), fun))
 
             # Checkpoint history if needed
             if (self._iteration + 1) % self._config.checkpoint_history_every == 0:
@@ -520,7 +507,6 @@ class HyperparameterManager:
             self._checkpoint()
 
         # Cleanup
-        self._buffer = None
         self._iteration += 1
 
     # API for : History Access

@@ -83,6 +83,8 @@ will raise or silently misbehave the moment `inla.py` calls past the `exit()` st
    immediately before `commit_buffer()`, making acceptance explicit rather than
    order-dependent.
 
+    - [x] Solution: I decided to remove the `hpm.buffer_update(hp_values)` as it was seamingly useless (given that to pass hp to the model we already have the `convert_array_to_dict` interface) and that it was adding a boilerplate and potentially confusing code. Instead I modified the `hpm.commit_buffer(f=...)` and transformed it into `commit_iteration(array, fun)` that now makes explicit which hyperparameter array is beiing commited into the `_optimized_array`.
+
 ---
 
 ## Next Steps: Wiring the Rest of the Pipeline

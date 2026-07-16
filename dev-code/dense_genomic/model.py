@@ -116,13 +116,17 @@ class StatisticalModel(ABC):
 
         return q_prior
 
-    def assemble_design_matrix(self) -> Matrix:
-        """Assemble the design matrix from its components.
+    def design_matrix(self) -> Matrix:
+        """Return the design matrix associated with the Model.
 
+        The design matrix is considered to be a static model geometry, it is latily
+        assembled at first call but then simply looked up as a property of the model.
+        
         Returns
         -------
         Matrix
-            The assembled design matrix.
+            The design matrix (per reference, not a copy, hence any modification 
+            to the returned matrix will affect the model's design matrix).
 
         Notes
         -----
@@ -130,13 +134,19 @@ class StatisticalModel(ABC):
         implementation. With signatures:
         - restore_from_cache(elements=self.design_components)
         - store_in_cache(elements=self.design_components)
+        These caching ideas above are not realy relevant to the components 
+        anymore as once the design matrix has been assembled they can be 
+        destroyed. However the caching is still very relevant for the design 
+        matrix itself.
         """
-        # Assemble the design matrix from its components
-        design_matrix = self._assemble_design_matrix(
-            design_components=self.design_components
-        )
+        # If the design matrix is not already assembled, assemble it from its
+        # components and store it as a property of the model for future calls.
+        if not hasattr(self, "_design_matrix"):
+            self._design_matrix = self._assemble_design_matrix(
+                design_components=self.design_components
+            )
 
-        return design_matrix
+        return self._design_matrix
 
     def get_hyperparameters(self) -> dict[str, Hyperparameter]:
         """Get the model's hyperparameters.
