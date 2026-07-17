@@ -121,7 +121,7 @@ if __name__ == "__main__":
 
     # Compare latent parameters
     print_msg(
-        "Norm (x - x_ref) / ||x_ref||:                ",
+        "Norm (x - x_ref) / ||x_ref||:    ",
         f"{xp.sqrt(xp.sum((results['x'] - x_ref) ** 2)) / xp.sqrt(xp.sum(x_ref ** 2)):.4e}",
     )
 
@@ -160,25 +160,5 @@ if __name__ == "__main__":
     print("Quantile pairs of prec_o:")
     for p, q in quantile_pairs:
         print(f"   {p:.3f} quantile: {q:.4f}")
-
-    # save estimates to reference outputs folder
-    import json
-
-    dalia_estimates = {
-        "theta_internal": results["theta_internal"].tolist(),
-        "theta_external_map": results["theta"].tolist(),
-        "theta_external_mean": prec_obs["mean_external"],
-        "x": results["x"].tolist(),
-        "cov_theta_internal_diagonal": xp.diag(results["cov_theta_internal"]).tolist(),
-        "cov_theta_internal_full": results["cov_theta_internal"].tolist(),
-        "marginal_variance_external_prec_o": prec_obs["variance_external"],
-        "quantile_pairs": quantile_pairs,
-        "pdf_pairs": list(zip(pdf_pairs_x.tolist(), pdf_pairs_y.tolist())),
-    }
-    
-    reference_outputs_dir = f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs"
-    os.makedirs(reference_outputs_dir, exist_ok=True)
-    with open(f"{reference_outputs_dir}/dalia_estimates.json", "w") as f:
-        json.dump(dalia_estimates, f, indent=2)
 
     print_msg("\n--- Finished ---")
