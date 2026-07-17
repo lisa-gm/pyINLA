@@ -1,9 +1,15 @@
 # src/dalia/backend/datastructures/matrix/dispatch/dispatcher.py
+from enum import Enum
+
 import numpy as np
 import scipy.sparse as sp
 
 
 from dalia.backend.config import cupy_version, memory_regime, memory_threshold, regime_list, gputil_version
+from dalia.backend.datastructures.matrix.operators.mul import dispatch_mul
+from dalia.backend.datastructures.matrix.operators.matmul import dispatch_matmul
+from dalia.backend.datastructures.matrix.operators.add import dispatch_add
+from dalia.backend.datastructures.matrix.operators.sub import dispatch_sub
 
 if cupy_version is not None:
     import cupy as cp
@@ -12,14 +18,12 @@ if cupy_version is not None:
 if gputil_version is not None:
     import GPUtil
 
+class Operation(Enum):
+    MUL = "mul"
+    MATMUL = "matmul"
+    ADD = "add"
+    SUB = "sub"
 
-from .add import dispatch_add
-from .mul import dispatch_mul
-from .matmul import dispatch_matmul
-from .operations import Operation
-from .sub import dispatch_sub
-
-# At module level
 _OPERATION_MAP = {
     Operation.MUL: dispatch_mul,
     Operation.MATMUL: dispatch_matmul,
@@ -27,8 +31,7 @@ _OPERATION_MAP = {
     Operation.SUB: dispatch_sub,
 }
 
-
-def blas_dispatch(operation: Operation, left, right):
+def dispatch(operation: Operation, left, right):
     # Type checking
     left_type, left_hw_target = _get_dispatch_metadata(data=left)
     right_type, right_hw_target = _get_dispatch_metadata(data=right)
@@ -58,7 +61,7 @@ def blas_dispatch(operation: Operation, left, right):
 
     # Dispatch based on operation
     dispatch_func = _OPERATION_MAP[operation]
-    return dispatch_func(left, right, left_type, right_type, left_hw_target)
+    return dispatch_func(left, right, left_type, right_type)
 
 def _hw_target_handler(data, hw_target, matrix_type):
     # Moves data to hw_target

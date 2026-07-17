@@ -1,7 +1,7 @@
 # src/dalia/backend/datastructures/matrix/core/matrix.py
 from abc import ABC
 
-from dalia.backend.datastructures.matrix.dispatch import Operation, blas_dispatch
+from dalia.backend.datastructures.matrix import operators
 from dalia.backend.config import default_hw_target
 
 from .utils import toarray, wrap_result, tohost, toaccelerator, settarget
@@ -162,33 +162,33 @@ class Matrix(ABC):
     # 6. Arithmetic operators (standard order)
     def __mul__(self, other):
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = blas_dispatch(Operation.MUL, self._data, other_data)
+        result_data = operators.dispatch(operators.Operation.MUL, self._data, other_data)
         return self._wrap_result(
             result_data
         )
 
     def __matmul__(self, other):
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = blas_dispatch(Operation.MATMUL, self._data, other_data)
+        result_data = operators.dispatch(operators.Operation.MATMUL, self._data, other_data)
         return self._wrap_result(
             result_data
         )  # Wrapping to correct Matrix() happens here
 
     def __add__(self, other):
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = blas_dispatch(Operation.ADD, self._data, other_data)
+        result_data = operators.dispatch(operators.Operation.ADD, self._data, other_data)
         return self._wrap_result(result_data)
 
     def __sub__(self, other):
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = blas_dispatch(Operation.SUB, self._data, other_data)
+        result_data = operators.dispatch(operators.Operation.SUB, self._data, other_data)
         return self._wrap_result(result_data)
 
     # 7. Right-hand operators (same order as above)
     def __rmul__(self, other):
         """Right-hand multiplication: other * self"""
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = blas_dispatch(Operation.MUL, other_data, self._data)
+        result_data = operators.dispatch(operators.Operation.MUL, other_data, self._data)
         return self._wrap_result(result_data)
 
     def __rmatmul__(self, other):
@@ -196,19 +196,19 @@ class Matrix(ABC):
         # other is the left operand (likely numpy/scipy, not wrapped)
         # self is the right operand (our Matrix)
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = blas_dispatch(Operation.MATMUL, other_data, self._data)
+        result_data = operators.dispatch(operators.Operation.MATMUL, other_data, self._data)
         return self._wrap_result(result_data)
 
     def __radd__(self, other):
         """Right-hand addition: other + self"""
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = blas_dispatch(Operation.ADD, other_data, self._data)
+        result_data = operators.dispatch(operators.Operation.ADD, other_data, self._data)
         return self._wrap_result(result_data)
 
     def __rsub__(self, other):
         """Right-hand subtraction: other - self"""
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = blas_dispatch(Operation.SUB, other_data, self._data)
+        result_data = operators.dispatch(operators.Operation.SUB, other_data, self._data)
         return self._wrap_result(result_data)
 
     # 8. In-place operators (if supported)
