@@ -110,15 +110,15 @@ def assemble_conditional_precision(q_prior: Matrix, a: Matrix, q_lik: Matrix = N
     # . q_lik = identity because of Gaussian Likelihood, it can be ignored for now
     # . use xxrk (syrk) routine
     # . perform computation in-place on q_cond
-    xxrk(
-        uplo="l",
-        trans_a='t',
-        alpha=1.0,
-        a=a,
-        beta=1.0,
-        c=q_cond,
-        hw_target="default",
-    )
+    # xxrk(
+    #     uplo="l",
+    #     trans_a='t',
+    #     alpha=1.0,
+    #     a=a,
+    #     beta=1.0,
+    #     c=q_cond,
+    #     hw_target="default",
+    # )
 
     return q_cond
 

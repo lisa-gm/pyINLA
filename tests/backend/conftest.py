@@ -27,6 +27,7 @@ def matrix_factory():
             return DenseMatrix(data, hw_target=hw_target)
 
         # Handle External types
+        # . numpy/scipy
         if matrix_type == "scipy_csr":
             return sp.csr_array(data, dtype=np.float64)
         if matrix_type == "scipy_csc":
@@ -35,7 +36,8 @@ def matrix_factory():
             return sp.coo_array(data, dtype=np.float64)
         if matrix_type == "numpy":
             return data
-        # Cupy types
+        
+        # . cupy/cupy-sparse
         if matrix_type == "cupy_csr":
             data = sp.csr_matrix(data)
             return cu_sp.csr_matrix(data, dtype = cp.float64)
