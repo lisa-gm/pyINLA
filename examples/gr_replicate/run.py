@@ -17,8 +17,7 @@ from dalia.submodels import RegressionSubModel
 from dalia.utils import (
     extract_diagonal,
     print_msg,
-    plot_marginal_distributions_hp,
-)
+    save_to_json,)
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
@@ -29,10 +28,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if __name__ == "__main__":
     print_msg("--- Example: Gaussian Regression with multiple replicates ---")
 
+    save_dalia_results = True  # Set to True to save results to JSON
     # Check for parsed parameters
     args = parse_args()
 
-    n_replicates = 20  # number of replicates
+    n_replicates = 1  # number of replicates
 
     # setup 1 model for each replicate
     models = []
@@ -144,21 +144,12 @@ if __name__ == "__main__":
         "Norm (var_obs - var_obs_ref):    ",
         f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
     )
-
-    print_msg("\n--- Marginal distributions of the hyperparameters ---")
-    marginals_hp = dalia.marginal_distributions_hp()
-
-    fig, axes = plot_marginal_distributions_hp(marginals_hp)
-    import matplotlib.pyplot as plt
-
-    plt.savefig(f"gr_marginal_distributions_hp.png")
-
-    prec_obs = marginals_hp["hyperparameters"]["prec_o"]
-    quantile_pairs = prec_obs["quantiles"]["external"]["pairs"]
-    pdf_pairs_x, pdf_pairs_y = prec_obs["pdf_data"]
-
-    print("Quantile pairs of prec_o:")
-    for p, q in quantile_pairs:
-        print(f"   {p:.3f} quantile: {q:.4f}")
+        
+    # save estimates to reference outputs folder
+    if save_dalia_results:
+        save_to_json(
+            results=results,
+            filename=f"{BASE_DIR}/reference_outputs/dalia_estimates.json",
+        )
 
     print_msg("\n--- Finished ---")
