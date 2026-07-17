@@ -18,7 +18,12 @@ from .conftest import DATA_TYPES, INTERNAL_DEVICE_TYPES
 @pytest.mark.parametrize("alpha", [-1.5, 0.0, 1.5])
 @pytest.mark.parametrize("beta", [-1.5, 0.0, 1.5])
 def test_xxrk(matrix_factory, device_type, data_type, uplo, trans_a, alpha, beta):
-    """Test the symmetric/hermitian rank-k update (SYHERK) operation."""
+    """Test the symmetric/hermitian rank-k update (SYHERK) operation.
+    
+    Notes:
+    - This is not testign the complex part (herk) at all
+    - the hw_device is hard coded to "host"
+    """
     if (
         nvmath_version is None
         and data_type in ["complex64", "complex128"]
@@ -65,4 +70,5 @@ def test_xxrk(matrix_factory, device_type, data_type, uplo, trans_a, alpha, beta
     if device_type == "accelerator":
         C = C.get()
         expected = expected.get()
+        
     assert np.allclose(C._data, expected)
