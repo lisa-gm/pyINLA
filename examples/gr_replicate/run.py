@@ -32,7 +32,7 @@ if __name__ == "__main__":
     # Check for parsed parameters
     args = parse_args()
 
-    n_replicates = 1  # number of replicates
+    n_replicates = 20  # number of replicates
 
     # setup 1 model for each replicate
     models = []
@@ -165,6 +165,7 @@ if __name__ == "__main__":
     import json
 
     dalia_estimates = {
+        "theta_internal": results["theta_internal"].tolist(),
         "theta_external_map": results["theta"].tolist(),
         "theta_external_mean": prec_obs["mean_external"],
         "x": results["x"].tolist(),
