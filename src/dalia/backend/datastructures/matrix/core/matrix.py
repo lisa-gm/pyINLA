@@ -162,33 +162,53 @@ class Matrix(ABC):
     # 6. Arithmetic operators (standard order)
     def __mul__(self, other):
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = operators.dispatch(operators.Operation.MUL, self._data, other_data)
+        result_data = operators.dispatch(
+            left_operand=self._data,
+            right_operand=other_data,
+            operation=operators.Operation.MUL
+        )
         return self._wrap_result(
             result_data
         )
 
     def __matmul__(self, other):
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = operators.dispatch(operators.Operation.MATMUL, self._data, other_data)
+        result_data = operators.dispatch(
+            left_operand=self._data,
+            right_operand=other_data,
+            operation=operators.Operation.MATMUL
+        )
         return self._wrap_result(
             result_data
         )  # Wrapping to correct Matrix() happens here
 
     def __add__(self, other):
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = operators.dispatch(operators.Operation.ADD, self._data, other_data)
+        result_data = operators.dispatch(
+            left_operand=self._data,
+            right_operand=other_data,
+            operation=operators.Operation.ADD
+        )
         return self._wrap_result(result_data)
 
     def __sub__(self, other):
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = operators.dispatch(operators.Operation.SUB, self._data, other_data)
+        result_data = operators.dispatch(
+            left_operand=self._data,
+            right_operand=other_data,
+            operation=operators.Operation.SUB
+        )
         return self._wrap_result(result_data)
 
     # 7. Right-hand operators (same order as above)
     def __rmul__(self, other):
         """Right-hand multiplication: other * self"""
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = operators.dispatch(operators.Operation.MUL, other_data, self._data)
+        result_data = operators.dispatch(
+            left_operand=other_data,
+            right_operand=self._data,
+            operation=operators.Operation.MUL
+        )
         return self._wrap_result(result_data)
 
     def __rmatmul__(self, other):
@@ -196,19 +216,31 @@ class Matrix(ABC):
         # other is the left operand (likely numpy/scipy, not wrapped)
         # self is the right operand (our Matrix)
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = operators.dispatch(operators.Operation.MATMUL, other_data, self._data)
+        result_data = operators.dispatch(
+            left_operand=other_data,
+            right_operand=self._data,
+            operation=operators.Operation.MATMUL
+        )
         return self._wrap_result(result_data)
 
     def __radd__(self, other):
         """Right-hand addition: other + self"""
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = operators.dispatch(operators.Operation.ADD, other_data, self._data)
+        result_data = operators.dispatch(
+            left_operand=other_data,
+            right_operand=self._data,
+            operation=operators.Operation.ADD
+        )
         return self._wrap_result(result_data)
 
     def __rsub__(self, other):
         """Right-hand subtraction: other - self"""
         other_data = other._data if isinstance(other, Matrix) else other
-        result_data = operators.dispatch(operators.Operation.SUB, other_data, self._data)
+        result_data = operators.dispatch(
+            left_operand=other_data,
+            right_operand=self._data,
+            operation=operators.Operation.SUB
+        )
         return self._wrap_result(result_data)
 
     # 8. In-place operators (if supported)

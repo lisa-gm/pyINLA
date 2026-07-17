@@ -8,9 +8,15 @@ from dalia.backend.datastructures import DenseMatrix, SparseMatrix
 if cupy_version is not None:
     import cupy as cp
     import cupyx.scipy.sparse as cu_sp
+
 from tests.backend import ATOLS, RTOLS
 
-from .conftest import EXTERNAL_DENSE_TYPES, EXTERNAL_SPARSE_TYPES, INTERNAL_DEVICE_TYPES, MEMORY_REGIMES
+from .conftest import (
+    EXTERNAL_DENSE_TYPES,
+    EXTERNAL_SPARSE_TYPES,
+    INTERNAL_DEVICE_TYPES,
+    MEMORY_REGIMES,
+)
 
 # Test-specific: Expected results for matmul
 MATMUL_EXPECTED = {
@@ -28,7 +34,9 @@ class TestMatmulReturnTypes:
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_sparse_matmul_sparse(self, hw_target, right_type, memory_regime, matrix_factory):
+    def test_sparse_matmul_sparse(
+        self, hw_target, right_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", hw_target=hw_target)
         right = matrix_factory(right_type)
@@ -38,7 +46,9 @@ class TestMatmulReturnTypes:
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_sparse_matmul_dense(self, hw_target, right_type, memory_regime, matrix_factory):
+    def test_sparse_matmul_dense(
+        self, hw_target, right_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", hw_target=hw_target)
         right = matrix_factory(right_type)
@@ -48,7 +58,9 @@ class TestMatmulReturnTypes:
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_dense_matmul_dense(self, hw_target, right_type, memory_regime, matrix_factory):
+    def test_dense_matmul_dense(
+        self, hw_target, right_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", hw_target=hw_target)
         right = matrix_factory(right_type)
@@ -58,7 +70,9 @@ class TestMatmulReturnTypes:
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_dense_matmul_sparse(self, hw_target, right_type, memory_regime, matrix_factory):
+    def test_dense_matmul_sparse(
+        self, hw_target, right_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", hw_target=hw_target)
         right = matrix_factory(right_type)
@@ -69,7 +83,9 @@ class TestMatmulReturnTypes:
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_sparse_rmatmul_sparse(self, hw_target, left_type, memory_regime, matrix_factory):
+    def test_sparse_rmatmul_sparse(
+        self, hw_target, left_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", hw_target=hw_target)
@@ -79,7 +95,9 @@ class TestMatmulReturnTypes:
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_sparse_rmatmul_dense(self, hw_target, left_type, memory_regime, matrix_factory):
+    def test_sparse_rmatmul_dense(
+        self, hw_target, left_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", hw_target=hw_target)
@@ -89,7 +107,9 @@ class TestMatmulReturnTypes:
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_dense_rmatmul_dense(self, hw_target, left_type, memory_regime, matrix_factory):
+    def test_dense_rmatmul_dense(
+        self, hw_target, left_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", hw_target=hw_target)
@@ -99,7 +119,9 @@ class TestMatmulReturnTypes:
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_dense_rmatmul_sparse(self, hw_target, left_type, memory_regime, matrix_factory):
+    def test_dense_rmatmul_sparse(
+        self, hw_target, left_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", hw_target=hw_target)
@@ -114,12 +136,18 @@ class TestMatmulResults:
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_sparse_matmul_sparse(self, hw_target, right_type, memory_regime, matrix_factory):
+    def test_sparse_matmul_sparse(
+        self, hw_target, right_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", hw_target=hw_target)
         right = matrix_factory(right_type)
         result = left @ right
-        if right_type == "cupy_csr" or right_type == "cupy_csc" or right_type == "cupy_coo":
+        if (
+            right_type == "cupy_csr"
+            or right_type == "cupy_csc"
+            or right_type == "cupy_coo"
+        ):
             reference = left.toarray() @ cp.asnumpy(right.toarray())
         else:
             reference = left.toarray() @ right.toarray()
@@ -130,7 +158,9 @@ class TestMatmulResults:
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_sparse_matmul_dense(self, hw_target, right_type, memory_regime, matrix_factory):
+    def test_sparse_matmul_dense(
+        self, hw_target, right_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory("SparseMatrix", hw_target=hw_target)
         right = matrix_factory(right_type)
@@ -149,7 +179,9 @@ class TestMatmulResults:
     @pytest.mark.parametrize("right_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_dense_matmul_dense(self, hw_target, right_type, memory_regime, matrix_factory):
+    def test_dense_matmul_dense(
+        self, hw_target, right_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", hw_target=hw_target)
         right = matrix_factory(right_type)
@@ -168,12 +200,18 @@ class TestMatmulResults:
     @pytest.mark.parametrize("right_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_dense_matmul_sparse(self, hw_target, right_type, memory_regime, matrix_factory):
+    def test_dense_matmul_sparse(
+        self, hw_target, right_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory("DenseMatrix", hw_target=hw_target)
         right = matrix_factory(right_type)
         result = left @ right
-        if right_type == "cupy_csr" or right_type == "cupy_csc" or right_type == "cupy_coo":
+        if (
+            right_type == "cupy_csr"
+            or right_type == "cupy_csc"
+            or right_type == "cupy_coo"
+        ):
             reference = left.toarray() @ cp.asnumpy(right.toarray())
         else:
             reference = left.toarray() @ right.toarray()
@@ -185,12 +223,18 @@ class TestMatmulResults:
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_sparse_rmatmul_sparse(self, left_type, hw_target, memory_regime, matrix_factory):
+    def test_sparse_rmatmul_sparse(
+        self, left_type, hw_target, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", hw_target=hw_target)
         result = left @ right
-        if left_type == "cupy_csr" or left_type == "cupy_csc" or left_type == "cupy_coo":
+        if (
+            left_type == "cupy_csr"
+            or left_type == "cupy_csc"
+            or left_type == "cupy_coo"
+        ):
             reference = cp.asnumpy(left.toarray()) @ right.toarray()
         else:
             reference = left.toarray() @ right.toarray()
@@ -201,12 +245,18 @@ class TestMatmulResults:
     @pytest.mark.parametrize("left_type", ["SparseMatrix"] + EXTERNAL_SPARSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_sparse_rmatmul_dense(self, left_type, hw_target, memory_regime, matrix_factory):
+    def test_sparse_rmatmul_dense(
+        self, left_type, hw_target, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", hw_target=hw_target)
         result = left @ right
-        if left_type == "cupy_csr" or left_type == "cupy_csc" or left_type == "cupy_coo":
+        if (
+            left_type == "cupy_csr"
+            or left_type == "cupy_csc"
+            or left_type == "cupy_coo"
+        ):
             reference = cp.asnumpy(left.toarray()) @ right.toarray()
         else:
             reference = left.toarray() @ right.toarray()
@@ -217,7 +267,9 @@ class TestMatmulResults:
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_dense_rmatmul_dense(self, hw_target, left_type, memory_regime, matrix_factory):
+    def test_dense_rmatmul_dense(
+        self, hw_target, left_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("DenseMatrix", hw_target=hw_target)
@@ -236,7 +288,9 @@ class TestMatmulResults:
     @pytest.mark.parametrize("left_type", ["DenseMatrix"] + EXTERNAL_DENSE_TYPES)
     @pytest.mark.parametrize("hw_target", INTERNAL_DEVICE_TYPES)
     @pytest.mark.parametrize("memory_regime", MEMORY_REGIMES)
-    def test_dense_rmatmul_sparse(self, hw_target, left_type, memory_regime, matrix_factory):
+    def test_dense_rmatmul_sparse(
+        self, hw_target, left_type, memory_regime, matrix_factory
+    ):
         set_memory_regime(memory_regime)
         left = matrix_factory(left_type)
         right = matrix_factory("SparseMatrix", hw_target=hw_target)
