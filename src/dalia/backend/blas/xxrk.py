@@ -9,12 +9,12 @@ Credits:
 
 from typing import Literal
 
-from dalia.backend.datastructures.matrix.core.dense import DenseMatrix
 import numpy as np
 from scipy.linalg.blas import get_blas_funcs
 
 from dalia.backend.config import cupy_version, nvmath_version
 from dalia.backend.datastructures import Matrix
+from dalia.backend.datastructures.matrix.core.dense import DenseMatrix
 
 from .gemm import matmul_gemm_accelerator
 
@@ -111,10 +111,28 @@ def xxrk(
     trans_a = trans_a.upper()
 
     if hw_target == "host":
-        return _xxrk_host(a=a_data, c=c_data, alpha=alpha, beta=beta, trans=trans_a, lower=lower, overwrite_c=overwrite_c)
+        return _xxrk_host(
+            a=a_data,
+            c=c_data,
+            alpha=alpha,
+            beta=beta,
+            trans=trans_a,
+            lower=lower,
+            overwrite_c=overwrite_c,
+        )
     elif hw_target == "accelerator":
-        raise NotImplementedError("Accelerator support for xxrk is not implemented yet. Please use the host target.")
-        return _xxrk_accelerator(a=a_data, c=c_data, alpha=alpha, beta=beta, trans=trans_a, lower=lower, overwrite_c=overwrite_c)
+        raise NotImplementedError(
+            "Accelerator support for xxrk is not implemented yet. Please use the host target."
+        )
+        return _xxrk_accelerator(
+            a=a_data,
+            c=c_data,
+            alpha=alpha,
+            beta=beta,
+            trans=trans_a,
+            lower=lower,
+            overwrite_c=overwrite_c,
+        )
     else:
         raise ModuleNotFoundError("Unknown Module")
 
@@ -141,10 +159,6 @@ def _xxrk_host(
         xxrk = get_blas_funcs(("syrk"), (a, a))
 
     return xxrk(alpha, a, beta, c, trans, lower, overwrite_c)
-
-
-
-    
 
 
 # Nvidia Accelerator-side Kernels

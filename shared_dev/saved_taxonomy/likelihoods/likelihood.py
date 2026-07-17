@@ -333,10 +333,11 @@ Status
 
 """
 
-# Standard library imports
-from typing import Dict, Any, Optional, Union, Tuple, Literal
 from dataclasses import dataclass
 from enum import Enum
+
+# Standard library imports
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 # Third-party imports
 import numpy as np

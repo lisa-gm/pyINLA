@@ -18,7 +18,6 @@ class StatisticalModel(ABC):
 
     likelihood: smthg[Likelihood] = ...
 
-
     # 1. Class attributes (if any)
     # 2. Initialization
     def __init__(self):

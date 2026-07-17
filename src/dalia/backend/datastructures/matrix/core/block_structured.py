@@ -1,10 +1,11 @@
 import numpy as np
 import scipy.sparse as sp
 
-from .matrix import Matrix
-from .dense import DenseMatrix
-from .sparse import SparseMatrix
 from dalia.backend.config import default_hw_target
+
+from .dense import DenseMatrix
+from .matrix import Matrix
+from .sparse import SparseMatrix
 
 
 class BStructMatrix(Matrix):
@@ -39,7 +40,7 @@ class BStructMatrix(Matrix):
         If `blocks` is not a list or numpy array, or if any block is not a Matrix object or None.
     ValueError
         If `blocks` is not 1D or 2D, if any block row or block column is entirely zero blocks, or if blocks in the same block row (resp. column) do not have the same number of rows (resp. columns).
-    
+
     Examples
     --------
     Create a 2x2 block-structured matrix using a 2D list of blocks:
@@ -160,17 +161,17 @@ class BStructMatrix(Matrix):
 
     @property
     def dtype(self):
-        """ Undefined behavior
+        """Undefined behavior
 
-        The dtype of a block-structured matrix is not uniquely defined as it 
+        The dtype of a block-structured matrix is not uniquely defined as it
         can contain heterogeneous blocks with different dtypes. To get the dtype
         of the underlying blocks, use the `bdtype` property instead.
         """
 
     @property
     def bdtype(self):
-        """ This function hence return an array of the same shape as the block 
-        structure, where each entry corresponds to the dtype of the respective 
+        """This function hence return an array of the same shape as the block
+        structure, where each entry corresponds to the dtype of the respective
         block. For zero blocks (None), the dtype is considered as None.
         """
         bdtype_array = np.empty(self._bshape, dtype=object)

@@ -1,9 +1,10 @@
 # src/dalia/backend/linalg/solvers/dense/dense_linear_solver.py
 
-from dalia.backend.config import cupy_version
-
 import numpy as np
 import scipy.linalg as sp_la
+
+from dalia.backend.config import cupy_version
+
 # from scipy.linalg import cholesky, get_lapack_funcs, solve_triangular
 
 
@@ -11,8 +12,9 @@ if cupy_version is not None:
     import cupy as cp
     import cupy.linalg as cp_la
 
-from dalia.backend.linalg.solvers.linear_solver import LinearSolver
 from dalia.backend.blas import trsm
+from dalia.backend.linalg.solvers.linear_solver import LinearSolver
+
 
 class DenseSolver(LinearSolver):
     """Base Dense linear solver class.
@@ -49,12 +51,13 @@ class DenseSolver(LinearSolver):
         # TODO: maybe use pbstf instead
         if self._target == "host":
             factors = sp_la.cholesky(
-                self._matrix._data, lower=True, overwrite_a=overwrite, check_finite=False
+                self._matrix._data,
+                lower=True,
+                overwrite_a=overwrite,
+                check_finite=False,
             )
         elif self._target == "accelerator":
-            factors = cp_la.cholesky(
-                self._matrix._data
-            )
+            factors = cp_la.cholesky(self._matrix._data)
         else:
             raise ValueError(f"Unsupported hardware target: {self._target}")
         # pylint: disable=protected-access
@@ -180,4 +183,3 @@ class DenseSolver(LinearSolver):
             inv_array = L_inv.T @ L_inv
 
         return DenseMatrix(inv_array)
-    

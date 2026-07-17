@@ -6,11 +6,12 @@ def exit_as_expected():
     print("Program completed successfully.")
     exit(0)
 
+
 def matshow_matrices(
-        matrices: list, 
-        titles: list = None,
-        plot_type: Literal["matshow", "spy"] = "matshow",
-    ) -> None:
+    matrices: list,
+    titles: list = None,
+    plot_type: Literal["matshow", "spy"] = "matshow",
+) -> None:
     """Display a list of matrices using matplotlib's matshow."""
     import matplotlib.pyplot as plt
 

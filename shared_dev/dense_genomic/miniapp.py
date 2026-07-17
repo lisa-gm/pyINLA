@@ -1,14 +1,12 @@
 
+from dataclasses import dataclass
+from pathlib import Path
+
 import numpy as np
 
-from pathlib import Path
-from dataclasses import dataclass
+from dalia.backend.datastructure import BlockMatrix, DenseMatrix, DiagonalMatrix
 
-from dalia.backend.datastructure import DiagonalMatrix, DenseMatrix, BlockMatrix
 from .hyperparameter import HyperparameterConfig, HyperparameterManager
-
-
-
 
 
 def assemble_prior_precision_matrix(

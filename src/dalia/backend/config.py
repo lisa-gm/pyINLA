@@ -1,4 +1,3 @@
-
 default_hw_target = "host"
 memory_regime = "manual"
 memory_threshold = 0.95
@@ -8,17 +7,18 @@ gputil_version = None
 target_list = ["host"]
 regime_list = ["manual"]
 
+
 def check_cupy_availability():
     """Check if CuPy is available.
-    
+
     Returns:
         str or None: The version of CuPy if available, otherwise None.
     """
     global cupy_version
     try:
         import cupy
-         
-        cupy_version= cupy.__version__
+
+        cupy_version = cupy.__version__
 
         global target_list
         if "accelerator" not in target_list:
@@ -27,29 +27,33 @@ def check_cupy_availability():
         pass
     return cupy_version
 
+
 def check_nvmath_availability():
     """Check if NVIDIA Math Libraries are available.
-    
+
     Returns:
         str or None: The version of NVIDIA Math Libraries if available, otherwise None.
     """
     global nvmath_version
     try:
         import nvmath
+
         nvmath_version = nvmath.__version__
     except ImportError:
         pass
     return nvmath_version
 
+
 def check_gputil_availability():
     """Check if NVIDIA Math Libraries are available.
-    
+
     Returns:
         str or None: The version of NVIDIA Math Libraries if available, otherwise None.
     """
     global gputil_version
     try:
         import gputil
+
         gputil_version = gputil.__version__
 
         global regime_list
@@ -59,12 +63,13 @@ def check_gputil_availability():
         pass
     return gputil_version
 
+
 def set_default_hw_target(hw_target):
     """Set the default hardware target.
 
-    'host' will use the CPU and 'accelerator' will use an accelerator like a GPU if available. 
+    'host' will use the CPU and 'accelerator' will use an accelerator like a GPU if available.
     If 'accelerator' is selected but not available, it will raise an error.
-    
+
     Args:
         hw_target (str): 'host' or if supported by the system: 'accelerator'.
 
@@ -76,11 +81,14 @@ def set_default_hw_target(hw_target):
     """
     global default_hw_target
     global target_list
-    
+
     if hw_target not in target_list:
-        raise ValueError(f"Invalid hardware target type '{hw_target}'. Supported target types are {target_list}.")
+        raise ValueError(
+            f"Invalid hardware target type '{hw_target}'. Supported target types are {target_list}."
+        )
     default_hw_target = hw_target
     return default_hw_target
+
 
 def set_memory_regime(regime):
     """Set the memory regime for the backend.
@@ -89,7 +97,7 @@ def set_memory_regime(regime):
     as long as there is enough memory available. If ther isn't enough memory, it will fall back to the host.
 
     Manual memorry management ('manual') will determine the calcualtion location based on the left operand.
-    
+
     Args:
         regime (str): 'auto' for automatic memory management, 'manual' for user-controlled memory management.
 
@@ -100,11 +108,12 @@ def set_memory_regime(regime):
         ValueError: If an invalid memory regime is provided.
     """
     global regime_list
-    if regime not in regime_list: 
+    if regime not in regime_list:
         raise ValueError(f"Invalid memory regime. Supported regimes are {regime_list}.")
-    global memory_regime 
+    global memory_regime
     memory_regime = regime
     return memory_regime
+
 
 def set_memory_threshold(threshold):
     """Set memory threshold for automatic memory management.
@@ -123,6 +132,7 @@ def set_memory_threshold(threshold):
         raise ValueError("Memory threshold must be a value between 0 and 1.")
     memory_threshold = threshold
     return memory_threshold
+
 
 __all__ = [
     "default_hw_target",

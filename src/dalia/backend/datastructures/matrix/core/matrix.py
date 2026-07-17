@@ -1,10 +1,10 @@
 # src/dalia/backend/datastructures/matrix/core/matrix.py
 from abc import ABC
 
-from dalia.backend.datastructures.matrix import operators
 from dalia.backend.config import default_hw_target
+from dalia.backend.datastructures.matrix import operators
 
-from .utils import toarray, wrap_result, tohost, toaccelerator, settarget
+from .utils import settarget, toaccelerator, toarray, tohost, wrap_result
 
 
 class Matrix(ABC):
@@ -165,18 +165,16 @@ class Matrix(ABC):
         result_data = operators.dispatch(
             left_operand=self._data,
             right_operand=other_data,
-            operation=operators.Operation.MUL
+            operation=operators.Operation.MUL,
         )
-        return self._wrap_result(
-            result_data
-        )
+        return self._wrap_result(result_data)
 
     def __matmul__(self, other):
         other_data = other._data if isinstance(other, Matrix) else other
         result_data = operators.dispatch(
             left_operand=self._data,
             right_operand=other_data,
-            operation=operators.Operation.MATMUL
+            operation=operators.Operation.MATMUL,
         )
         return self._wrap_result(
             result_data
@@ -187,7 +185,7 @@ class Matrix(ABC):
         result_data = operators.dispatch(
             left_operand=self._data,
             right_operand=other_data,
-            operation=operators.Operation.ADD
+            operation=operators.Operation.ADD,
         )
         return self._wrap_result(result_data)
 
@@ -196,7 +194,7 @@ class Matrix(ABC):
         result_data = operators.dispatch(
             left_operand=self._data,
             right_operand=other_data,
-            operation=operators.Operation.SUB
+            operation=operators.Operation.SUB,
         )
         return self._wrap_result(result_data)
 
@@ -207,7 +205,7 @@ class Matrix(ABC):
         result_data = operators.dispatch(
             left_operand=other_data,
             right_operand=self._data,
-            operation=operators.Operation.MUL
+            operation=operators.Operation.MUL,
         )
         return self._wrap_result(result_data)
 
@@ -219,7 +217,7 @@ class Matrix(ABC):
         result_data = operators.dispatch(
             left_operand=other_data,
             right_operand=self._data,
-            operation=operators.Operation.MATMUL
+            operation=operators.Operation.MATMUL,
         )
         return self._wrap_result(result_data)
 
@@ -229,7 +227,7 @@ class Matrix(ABC):
         result_data = operators.dispatch(
             left_operand=other_data,
             right_operand=self._data,
-            operation=operators.Operation.ADD
+            operation=operators.Operation.ADD,
         )
         return self._wrap_result(result_data)
 
@@ -239,7 +237,7 @@ class Matrix(ABC):
         result_data = operators.dispatch(
             left_operand=other_data,
             right_operand=self._data,
-            operation=operators.Operation.SUB
+            operation=operators.Operation.SUB,
         )
         return self._wrap_result(result_data)
 
@@ -281,10 +279,10 @@ class Matrix(ABC):
 
     def __setitem__(self, key, value):
         """Set matrix elements
-        
+
         Supports assigning either scalar values or Matrix objects.
         When assigning a Matrix, extracts the underlying data before assignment.
-        
+
         Parameters
         ----------
         key : slice or tuple
@@ -306,7 +304,11 @@ class Matrix(ABC):
         if isinstance(value, Matrix):
             # Ensure value is on same hardware target
             if value._hw_target != self._hw_target:
-                value = tohost(value._data) if self._hw_target == "host" else toaccelerator(value._data)
+                value = (
+                    tohost(value._data)
+                    if self._hw_target == "host"
+                    else toaccelerator(value._data)
+                )
             else:
                 value = value._data
 

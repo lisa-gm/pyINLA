@@ -3,24 +3,32 @@
 # and scipy.linal.solve_triangular: https://github.com/scipy/scipy/blob/v1.15.3/scipy/linalg/_basic.py#L411
 
 import numpy as np
-
-from scipy.linalg.blas import get_blas_funcs
-from scipy.linalg._misc import _datacopied
 from scipy.linalg._decomp import _asarray_validated
-
+from scipy.linalg._misc import _datacopied
+from scipy.linalg.blas import get_blas_funcs
 
 from dalia.backend.config import cupy_version
 
 if cupy_version is not None:
     import cupy as cp
-    from cupy_backends.cuda.libs import cublas
     from cupy import _core
     from cupy.cuda import device
+    from cupy_backends.cuda.libs import cublas
 
 
-def gemm (a, b, hw_target, c=None, alpha=1.0, beta=0.0, trans_a ='N', trans_b ='N', overwrite_c = 0):
+def gemm(
+    a,
+    b,
+    hw_target,
+    c=None,
+    alpha=1.0,
+    beta=0.0,
+    trans_a="N",
+    trans_b="N",
+    overwrite_c=0,
+):
     """Wrapper to call GEMM for host or device
-    
+
     Computes out = alpha * op(a) @ op(b) + beta * c
 
     op(a) = a if transa is 'N', op(a) = a.T if transa is 'T',
@@ -38,7 +46,7 @@ def gemm (a, b, hw_target, c=None, alpha=1.0, beta=0.0, trans_a ='N', trans_b ='
             trans_a:        {'N','T','C'} or {'0','1','2'} respectively determines op(a)
             trans_b:        {'N','T','C'} or {'0','1','2'} respectively determines op(b)
             overwrite_c:    Bool determining wheter the result should overwrite Matrix c
-        
+
         Returns:
             out:            Resulting Matrix
 
@@ -46,17 +54,28 @@ def gemm (a, b, hw_target, c=None, alpha=1.0, beta=0.0, trans_a ='N', trans_b ='
             ModuelNotFoundError:    If the hw_target is not in {"host","accelerator"}
             TypeError:              If the Matrix has an invalid dtype or another parameter cannot be recognized
     """
-    
 
     if hw_target == "host":
         return matmul_gemm_host(a, b, c, alpha, beta, trans_a, trans_b, overwrite_c)
     elif hw_target == "accelerator":
-        return matmul_gemm_accelerator(a, b, c, alpha, beta, trans_a, trans_b, overwrite_c)
+        return matmul_gemm_accelerator(
+            a, b, c, alpha, beta, trans_a, trans_b, overwrite_c
+        )
     else:
         ModuleNotFoundError("Unknown Module")
 
 
-def matmul_gemm_host(a, b, c=None, alpha=1.0, beta=0.0, trans_a=0, trans_b=0, overwrite_c=0, check_finite=False):
+def matmul_gemm_host(
+    a,
+    b,
+    c=None,
+    alpha=1.0,
+    beta=0.0,
+    trans_a=0,
+    trans_b=0,
+    overwrite_c=0,
+    check_finite=False,
+):
     """Computes GEMM on the host
 
     additional Argument check_finite that checks if a and b are finite
@@ -71,29 +90,37 @@ def matmul_gemm_host(a, b, c=None, alpha=1.0, beta=0.0, trans_a=0, trans_b=0, ov
 
     transa = True
     transb = True
-    if trans_a == 'N':
+    if trans_a == "N":
         transa = False
-    if trans_b == 'N':
+    if trans_b == "N":
         transb = False
 
     if not transa and not transb:
         if a1.shape[1] != b1.shape[0]:
-            raise ValueError(f'shapes of a {a1.shape} and b {b1.shape} are incompatible (1,0)')
-        
+            raise ValueError(
+                f"shapes of a {a1.shape} and b {b1.shape} are incompatible (1,0)"
+            )
+
     elif transa and not transb:
         if a1.shape[0] != b1.shape[0]:
-            raise ValueError(f'shapes of a {a1.shape} and b {b1.shape} are incompatible (0,0)')
-        
+            raise ValueError(
+                f"shapes of a {a1.shape} and b {b1.shape} are incompatible (0,0)"
+            )
+
     elif not transa and transb:
         if a1.shape[1] != b1.shape[1]:
-            raise ValueError(f'shapes of a {a1.shape} and b {b1.shape} are incompatible (1,1)')
-        
+            raise ValueError(
+                f"shapes of a {a1.shape} and b {b1.shape} are incompatible (1,1)"
+            )
+
     else:
         if a1.shape[0] != b1.shape[1]:
-            raise ValueError(f'shapes of a {a1.shape} and b {b1.shape} are incompatible (0,1)')
-    
+            raise ValueError(
+                f"shapes of a {a1.shape} and b {b1.shape} are incompatible (0,1)"
+            )
+
     if beta != 0 and c1 is None:
-        raise ValueError('expected C matrix')
+        raise ValueError("expected C matrix")
 
     # accommodate empty arrays
     if b1.size == 0:
@@ -101,41 +128,51 @@ def matmul_gemm_host(a, b, c=None, alpha=1.0, beta=0.0, trans_a=0, trans_b=0, ov
             np.eye(2, dtype=a1.dtype), np.ones(2, dtype=b1.dtype)
         ).dtype
         return np.empty_like(b1, dtype=dt_nonempty)
-    
+
     if c1 is not None:
         overwrite_c = overwrite_c or _datacopied(c1, c)
-    
+
     x = _matmul_gemm(a1, b1, alpha, beta, c1, trans_a, trans_b, overwrite_c)
     return x
 
 
 # gemm without the input validation
-def _matmul_gemm(a1, b1, alpha=1.0, beta=0.0, c1=None, trans_a=0, trans_b=0, overwrite_c=0):
+def _matmul_gemm(
+    a1, b1, alpha=1.0, beta=0.0, c1=None, trans_a=0, trans_b=0, overwrite_c=0
+):
 
-    trans_a = {'N': 0, 'T': 1, 'C': 2}.get(trans_a, trans_a)
-    trans_b = {'N': 0, 'T': 1, 'C': 2}.get(trans_b, trans_b)
-    gemm, = get_blas_funcs(('gemm',), (a1, b1))
+    trans_a = {"N": 0, "T": 1, "C": 2}.get(trans_a, trans_a)
+    trans_b = {"N": 0, "T": 1, "C": 2}.get(trans_b, trans_b)
+    (gemm,) = get_blas_funcs(("gemm",), (a1, b1))
 
     if beta == 0:
-        out = gemm(alpha, a1, b1, beta=beta, trans_a=trans_a, trans_b=trans_b, overwrite_c=overwrite_c)
+        out = gemm(
+            alpha,
+            a1,
+            b1,
+            beta=beta,
+            trans_a=trans_a,
+            trans_b=trans_b,
+            overwrite_c=overwrite_c,
+        )
     else:
         out = gemm(alpha, a1, b1, beta, c1, trans_a, trans_b, overwrite_c)
-    
 
     return out
 
 
 # Util functions for cupy gemm
 def _trans_to_cublas_op(trans):
-    if trans == 'N' or trans == cublas.CUBLAS_OP_N:
+    if trans == "N" or trans == cublas.CUBLAS_OP_N:
         trans = cublas.CUBLAS_OP_N
-    elif trans == 'T' or trans == cublas.CUBLAS_OP_T:
+    elif trans == "T" or trans == cublas.CUBLAS_OP_T:
         trans = cublas.CUBLAS_OP_T
-    elif trans == 'C' or trans == cublas.CUBLAS_OP_C:
+    elif trans == "C" or trans == cublas.CUBLAS_OP_C:
         trans = cublas.CUBLAS_OP_C
     else:
-        raise TypeError('invalid trans (actual: {})'.format(trans))
+        raise TypeError("invalid trans (actual: {})".format(trans))
     return trans
+
 
 def _decide_ld_and_trans(a, trans):
     ld = None
@@ -152,8 +189,9 @@ def _change_order_if_necessary(a, lda):
     if lda is None:
         lda = a.shape[0]
         if not a._f_contiguous:
-            a = a.copy(order='F')
+            a = a.copy(order="F")
     return a, lda
+
 
 def _get_scalar_ptr(a, dtype):
     if isinstance(a, cp.ndarray):
@@ -165,25 +203,29 @@ def _get_scalar_ptr(a, dtype):
             a = np.array(a, dtype=dtype)
         a_ptr = a.ctypes.data
     return a, a_ptr
+
+
 # Util functions for cupy gemm end
 
+
 # TODO: warnings for copies, maybe...
-def matmul_gemm_accelerator(a, b, c=None, alpha=1.0, beta=0.0, transa=0, transb=0, overwrite_c=0):
+def matmul_gemm_accelerator(
+    a, b, c=None, alpha=1.0, beta=0.0, transa=0, transb=0, overwrite_c=0
+):
     """Computes GEMM on a cuda accelerator"""
     assert a.ndim == b.ndim == 2
     assert a.dtype == b.dtype
     dtype = a.dtype.char
-    if dtype == 'f':
+    if dtype == "f":
         func = cublas.sgemm
-    elif dtype == 'd':
+    elif dtype == "d":
         func = cublas.dgemm
-    elif dtype == 'F':
+    elif dtype == "F":
         func = cublas.cgemm
-    elif dtype == 'D':
+    elif dtype == "D":
         func = cublas.zgemm
     else:
-        raise TypeError('invalid dtype')
-    
+        raise TypeError("invalid dtype")
 
     transa = _trans_to_cublas_op(transa)
     transb = _trans_to_cublas_op(transb)
@@ -200,13 +242,13 @@ def matmul_gemm_accelerator(a, b, c=None, alpha=1.0, beta=0.0, transa=0, transb=
 
     out = None
     if c is None:
-        out = cp.empty((m, n), dtype=dtype, order='F')
+        out = cp.empty((m, n), dtype=dtype, order="F")
         beta = 0.0
     else:
         if overwrite_c:
             out = c
         else:
-            out = c.copy(order='F')
+            out = c.copy(order="F")
         assert out.ndim == 2
         assert out.shape == (m, n)
         assert out.dtype == dtype
@@ -231,18 +273,44 @@ def matmul_gemm_accelerator(a, b, c=None, alpha=1.0, beta=0.0, transa=0, transb=
     if not (lda is None or ldb is None):
         if out._f_contiguous:
             try:
-                func(handle, transa, transb, m, n, k, alpha_ptr,
-                     a.data.ptr, lda, b.data.ptr, ldb, beta_ptr, out.data.ptr,
-                     m)
+                func(
+                    handle,
+                    transa,
+                    transb,
+                    m,
+                    n,
+                    k,
+                    alpha_ptr,
+                    a.data.ptr,
+                    lda,
+                    b.data.ptr,
+                    ldb,
+                    beta_ptr,
+                    out.data.ptr,
+                    m,
+                )
             finally:
                 cublas.setPointerMode(handle, orig_mode)
             return out
         elif out._c_contiguous:
             # Computes out.T = alpha * b.T @ a.T + beta * out.T
             try:
-                func(handle, 1 - transb, 1 - transa, n, m, k, alpha_ptr,
-                     b.data.ptr, ldb, a.data.ptr, lda, beta_ptr, out.data.ptr,
-                     n)
+                func(
+                    handle,
+                    1 - transb,
+                    1 - transa,
+                    n,
+                    m,
+                    k,
+                    alpha_ptr,
+                    b.data.ptr,
+                    ldb,
+                    a.data.ptr,
+                    lda,
+                    beta_ptr,
+                    out.data.ptr,
+                    n,
+                )
             finally:
                 cublas.setPointerMode(handle, orig_mode)
             return out
@@ -251,10 +319,24 @@ def matmul_gemm_accelerator(a, b, c=None, alpha=1.0, beta=0.0, transa=0, transb=
     b, ldb = _change_order_if_necessary(b, ldb)
     c = out
     if not out._f_contiguous:
-        c = out.copy(order='F')
+        c = out.copy(order="F")
     try:
-        func(handle, transa, transb, m, n, k, alpha_ptr, a.data.ptr, lda,
-             b.data.ptr, ldb, beta_ptr, c.data.ptr, m)
+        func(
+            handle,
+            transa,
+            transb,
+            m,
+            n,
+            k,
+            alpha_ptr,
+            a.data.ptr,
+            lda,
+            b.data.ptr,
+            ldb,
+            beta_ptr,
+            c.data.ptr,
+            m,
+        )
     finally:
         cublas.setPointerMode(handle, orig_mode)
     if not out._f_contiguous:

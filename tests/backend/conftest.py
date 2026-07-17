@@ -1,15 +1,14 @@
-
-
 import numpy as np
 import pytest
 import scipy.sparse as sp
 
-from dalia.backend.datastructures import DenseMatrix, SparseMatrix
 from dalia.backend.config import cupy_version
+from dalia.backend.datastructures import DenseMatrix, SparseMatrix
 
 if cupy_version is not None:
     import cupy as cp
     import cupyx.scipy.sparse as cu_sp
+
 
 @pytest.fixture
 def matrix_factory():
@@ -22,7 +21,9 @@ def matrix_factory():
 
         # Handle Internal types
         if matrix_type == "SparseMatrix":
-            return SparseMatrix(sp.csr_matrix(data, dtype=np.float64), hw_target=hw_target)
+            return SparseMatrix(
+                sp.csr_matrix(data, dtype=np.float64), hw_target=hw_target
+            )
         if matrix_type == "DenseMatrix":
             return DenseMatrix(data, hw_target=hw_target)
 
@@ -36,17 +37,17 @@ def matrix_factory():
             return sp.coo_array(data, dtype=np.float64)
         if matrix_type == "numpy":
             return data
-        
+
         # . cupy/cupy-sparse
         if matrix_type == "cupy_csr":
             data = sp.csr_matrix(data)
-            return cu_sp.csr_matrix(data, dtype = cp.float64)
+            return cu_sp.csr_matrix(data, dtype=cp.float64)
         if matrix_type == "cupy_csc":
             data = sp.csc_matrix(data)
-            return cu_sp.csc_matrix(data, dtype = cp.float64)
+            return cu_sp.csc_matrix(data, dtype=cp.float64)
         if matrix_type == "cupy_coo":
             data = sp.coo_matrix(data)
-            return cu_sp.coo_matrix(data, dtype = cp.float64)
+            return cu_sp.coo_matrix(data, dtype=cp.float64)
         if matrix_type == "cupy":
             return cp.asarray(data, dtype=cp.float64)
 

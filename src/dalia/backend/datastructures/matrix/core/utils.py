@@ -1,8 +1,8 @@
 # src/dalia/backend/datastructures/matrix/core/utils.py
 import numpy as np
 import scipy.sparse as sp
-from dalia.backend.config import cupy_version, target_list
 
+from dalia.backend.config import cupy_version, target_list
 
 if cupy_version is not None:
     import cupy as cp
@@ -16,12 +16,16 @@ def wrap_result(data, hw_target=None):
     from .sparse import SparseMatrix
 
     if isinstance(data, np.ndarray):
-        return DenseMatrix(data, hw_target=hw_target, force_order=False)  # Preserve original order
+        return DenseMatrix(
+            data, hw_target=hw_target, force_order=False
+        )  # Preserve original order
     if sp.issparse(data):
         return SparseMatrix(data)
     if cupy_version is not None:
         if isinstance(data, cp.ndarray):
-            return DenseMatrix(data, hw_target=hw_target, force_order=False)  # Preserve original order
+            return DenseMatrix(
+                data, hw_target=hw_target, force_order=False
+            )  # Preserve original order
         if cu_sp.issparse(data):
             return SparseMatrix(data)
     raise TypeError(f"Unknown matrix type: {type(data)}")
@@ -51,20 +55,22 @@ def toaccelerator(data):
     return cp.asarray(data)
 
 
-def settarget (data, hw_target):
+def settarget(data, hw_target):
     """Set the hardware target for the data, transferring it if necessary"""
     if hw_target is not None and hw_target not in target_list:
-        raise ValueError(f"Invalid hardware target type '{hw_target}'. Supported target types are {target_list}.")
+        raise ValueError(
+            f"Invalid hardware target type '{hw_target}'. Supported target types are {target_list}."
+        )
     if hw_target is not None:
-        if hw_target == 'accelerator' and 'cupy' not in str(type(data)):
+        if hw_target == "accelerator" and "cupy" not in str(type(data)):
             data = toaccelerator(data)
-        elif hw_target == 'host' and 'cupy' in str(type(data)):
+        elif hw_target == "host" and "cupy" in str(type(data)):
             data = tohost(data)
     else:
         # Infer hardware target from data type
-        if 'cupy' in str(type(data)):
-            hw_target = 'accelerator'
+        if "cupy" in str(type(data)):
+            hw_target = "accelerator"
         else:
-            hw_target = 'host'
+            hw_target = "host"
 
     return data, hw_target

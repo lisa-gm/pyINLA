@@ -1,10 +1,10 @@
 # src/dalia/backend/datastructures/matrix/core/dense.py
+import numpy as np
 import scipy.sparse as sp
 
-from .matrix import Matrix
-from dalia.backend.config import default_hw_target, cupy_version
+from dalia.backend.config import cupy_version, default_hw_target
 
-import numpy as np
+from .matrix import Matrix
 
 if cupy_version is not None:
     import cupy as cp

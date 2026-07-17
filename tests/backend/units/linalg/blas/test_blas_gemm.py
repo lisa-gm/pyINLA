@@ -1,5 +1,6 @@
-import pytest
 import numpy as np
+import pytest
+
 from dalia.backend.config import cupy_version, nvmath_version
 
 if cupy_version is not None:
@@ -7,7 +8,8 @@ if cupy_version is not None:
 
 from dalia.backend.blas import gemm
 
-from .conftest import INTERNAL_DEVICE_TYPES, DATA_TYPES
+from .conftest import DATA_TYPES, INTERNAL_DEVICE_TYPES
+
 
 @pytest.mark.parametrize("data_type", DATA_TYPES)
 @pytest.mark.parametrize("device_type", INTERNAL_DEVICE_TYPES)

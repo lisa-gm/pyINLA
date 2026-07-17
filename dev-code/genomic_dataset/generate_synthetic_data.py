@@ -4,7 +4,6 @@ from pathlib import Path
 import numpy as np
 from scipy import sparse
 
-
 BASE_DIR = Path(__file__).resolve().parent
 
 
@@ -53,7 +52,9 @@ def main() -> None:
     u_iid = rng.normal(loc=0.0, scale=np.sqrt(1.0 / tau_iid_true), size=n_iid)
 
     # 2) Dense generic component: random design and SPD precision matrix.
-    queen_design = rng.normal(loc=0.0, scale=1.0 / np.sqrt(n_dense), size=(n_obs, n_dense))
+    queen_design = rng.normal(
+        loc=0.0, scale=1.0 / np.sqrt(n_dense), size=(n_obs, n_dense)
+    )
 
     m = rng.normal(loc=0.0, scale=0.2, size=(n_dense, n_dense))
     queen_prior_np = m.T @ m + np.eye(n_dense)
@@ -76,7 +77,9 @@ def main() -> None:
     beta_true[nonzero_idx] = rng.normal(loc=0.0, scale=0.2, size=n_nonzero)
 
     eta = iid_design @ u_iid + queen_design @ u_dense + regression_design @ beta_true
-    observations = eta + rng.normal(loc=0.0, scale=np.sqrt(1.0 / prec_o_true), size=n_obs)
+    observations = eta + rng.normal(
+        loc=0.0, scale=np.sqrt(1.0 / prec_o_true), size=n_obs
+    )
 
     # Save run.py inputs
     np.save(BASE_DIR / "observations.npy", observations)
@@ -108,7 +111,12 @@ def main() -> None:
     )
 
     a_full = sparse.hstack(
-        [iid_design, sparse.csc_matrix(queen_design), sparse.csc_matrix(regression_design)], format="csc"
+        [
+            iid_design,
+            sparse.csc_matrix(queen_design),
+            sparse.csc_matrix(regression_design),
+        ],
+        format="csc",
     )
     q_cond = q_prior + prec_o_true * (a_full.T @ a_full)
 

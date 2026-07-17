@@ -1,7 +1,6 @@
 # src/dalia/backend/datastructures/matrix/core/dense.py
 import scipy.sparse as sp
 
-
 from .dense import DenseMatrix
 
 

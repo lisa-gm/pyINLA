@@ -84,6 +84,7 @@ objective(theta)
 
 """
 
+from copy import deepcopy
 from gc import collect
 
 import numpy as np
@@ -91,9 +92,9 @@ from dev_utils import exit_as_expected, matshow_matrices
 from hp_manager import HyperparameterManager
 from model import StatisticalModel
 
-from dalia.backend.datastructures import Matrix, Vector
 from dalia.backend.blas import xxrk
-from copy import deepcopy
+from dalia.backend.datastructures import Matrix, Vector
+
 
 def assemble_conditional_precision(q_prior: Matrix, a: Matrix, q_lik: Matrix = None):
     """
@@ -112,7 +113,7 @@ def assemble_conditional_precision(q_prior: Matrix, a: Matrix, q_lik: Matrix = N
     # . perform computation in-place on q_cond
     xxrk(
         uplo="l",
-        trans_a='t',
+        trans_a="t",
         alpha=1.0,
         a=a,
         beta=1.0,
@@ -121,7 +122,6 @@ def assemble_conditional_precision(q_prior: Matrix, a: Matrix, q_lik: Matrix = N
     )
 
     return q_cond
-
 
 
 def assemble_information_vector(
@@ -211,7 +211,7 @@ def negative_log_marginal_posterior(
     matshow_matrices(
         matrices=[q_prior.toarray(), q_cond.toarray()],
         titles=["q_prior", "q_cond"],
-        plot_type="spy"
+        plot_type="spy",
     )
 
     # Stop here for now, not implemented after...
