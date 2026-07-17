@@ -119,9 +119,6 @@ if __name__ == "__main__":
         "Norm (x - x_ref)/ norm(x_ref):   ",
         f"{xp.sqrt(xp.sum((results['x'] - x_ref) ** 2)) / xp.sqrt(xp.sum(x_ref ** 2)):.4e}",
     )
-    
-    hess_internal = dalia.hess_theta_internal
-    print_msg("Hessian of theta internal:\n", hess_internal)
 
     # Compare marginal variances of latent parameters
     # var_latent_params = results["marginal_variances_latent"]
