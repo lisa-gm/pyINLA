@@ -121,11 +121,11 @@ class StatisticalModel(ABC):
 
         The design matrix is considered to be a static model geometry, it is latily
         assembled at first call but then simply looked up as a property of the model.
-        
+
         Returns
         -------
         Matrix
-            The design matrix (per reference, not a copy, hence any modification 
+            The design matrix (per reference, not a copy, hence any modification
             to the returned matrix will affect the model's design matrix).
 
         Notes
@@ -134,9 +134,9 @@ class StatisticalModel(ABC):
         implementation. With signatures:
         - restore_from_cache(elements=self.design_components)
         - store_in_cache(elements=self.design_components)
-        These caching ideas above are not realy relevant to the components 
-        anymore as once the design matrix has been assembled they can be 
-        destroyed. However the caching is still very relevant for the design 
+        These caching ideas above are not realy relevant to the components
+        anymore as once the design matrix has been assembled they can be
+        destroyed. However the caching is still very relevant for the design
         matrix itself.
         """
         # If the design matrix is not already assembled, assemble it from its

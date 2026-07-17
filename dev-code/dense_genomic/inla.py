@@ -20,10 +20,10 @@ f_cond = compute_laplace_correction(
 ```
 
 We suggest new names:
-- conditional_latent_parameters -> log_conditional_gaussian()
-- prior_latent_parameters -> log_latent_prior()
-- likelihood -> log_likelihood()
-- log_prior_hyperparameters -> log_hyper_prior()
+- conditional_latent_parameters(Q_cond) -> laplace_correction()
+- prior_latent_parameters(Q_prior) -> log_latent_prior()
+- likelihood(observations, A, Q_cond) -> log_likelihood()
+- log_prior_hyperparameters(hp_dict) -> log_hyper_prior()
 
 Separation of concerns:
 Model knows:
@@ -46,7 +46,10 @@ Model
 -----
 assemble_prior_precision()
 assemble_information_vector()
-assemble_design_matrix()
+# The design matrix is a property of the model and
+# its assembly is independent of the hyperparameters
+# or optimization related things
+assemble_design_matrix() -> design_matrix()
 
 
 ```struct
@@ -54,7 +57,7 @@ objective(theta)
 │
 ├── assemble_prior_precision(theta)
 │
-├── assemble_likelihood(theta)
+├── assemble_information_vector(a, observations)
 │
 ├── find_conditional_mode(...)
 │      │
@@ -81,67 +84,88 @@ objective(theta)
 
 """
 
+from gc import collect
+
 import matplotlib.pyplot as plt
 import numpy as np
+from dev_utils import exit_as_expected
 from hp_manager import HyperparameterManager
 from model import StatisticalModel
 
-from gc import collect
-
 from dalia.backend.datastructures import Matrix, Vector
 
-from dev_utils import exit_as_expected
 
-# print("A:", A)
-# fig, axs = plt.subplots(1, 2, figsize=(12, 6))
-# axs[0].matshow(q_prior.data, cmap="viridis")
-# axs[0].set_title("Prior Precision Matrix")
-# plt.colorbar(axs[0].matshow(q_prior.data, cmap="viridis"), ax=axs[0])
-# axs[1].matshow(A.data, cmap="viridis")
-# axs[1].set_title("Design Matrix")
-# plt.colorbar(axs[1].matshow(A.data, cmap="viridis"), ax=axs[1])
-# plt.show()
-
-def find_conditional_mode(
-        q_cond: Matrix, 
-        information_vector: Vector,
-    ):
+def assemble_conditional_precision(q_prior: Matrix, a: Matrix, q_lik: Matrix = None):
     """
-    
-    For Gaussian:
-        1. assemble Q_cond = Q_prior + AᵀQ_likA
-        2. factorize Q_cond
-        3. solve Q_cond * x_mode = AᵀQ_lik y
+    Conditional precision matrix seems to be refere-able to as
+    "likelihood precision matrix"?
 
-    For Non-Gaussian:
-        1. assemble Q_cond = Q_prior + AᵀQ_likA
-        2. factorize Q_cond
-        3. Newton iterations to find mode:
-            x_mode^(k+1) = x_mode^(k) - H⁻¹ * g
-            where H = Hessian of log-likelihood at x_mode^(k)
-        4. return x_mode^(k+1) when convergence is reached
-    """
-    ...
-
-def assemble_conditional_precision(
-        q_prior: Matrix,
-        a: Matrix,
-        q_lik: Matrix = None
-    ):
-    """
     Q_cond = Q_prior + Aᵀ Q_lik A
     """
     ...
 
+
 def assemble_information_vector(
-        a: Matrix,
-        q_lik: Matrix = None,
-        observations: Vector = None,
-    ):
-    """
+    a: Matrix,
+    q_lik: Matrix = None,
+    observations: Vector = None,
+):
+    """Assemble the information vector for the conditional latent parameters.
+
+    Parameters
+    ----------
+    a : Matrix
+        The design matrix.
+    q_lik : Matrix, optional
+        The likelihood precision matrix, by default None.
+    observations : Vector, optional
+        The observed data, by default None.
+
+    Maybe this should be part of the model, since it depends
+    on the observations and the design matrix?
+    -> Which are both properties of the model.
+    -> This would depends on where Q_lik comes from, if it is part of the model or not.
+
     b = Aᵀ Q_lik y
     """
     ...
+
+
+def find_conditional_mode(
+    q_cond: Matrix,
+    information_vector: Vector,
+):
+    """
+
+    For Gaussian:
+        0. Get Q_cond = Q_prior + AᵀQ_likA
+        1. factorize Q_cond
+        2. solve Q_cond * x_mode = AᵀQ_lik y
+
+    For Non-Gaussian:
+        0. Get Q_cond = Q_prior + AᵀQ_likA
+        1. factorize Q_cond
+        2. Newton iterations to find mode:
+            x_mode^(k+1) = x_mode^(k) - H⁻¹ * g
+            where H = Hessian of log-likelihood at x_mode^(k)
+        3. return x_mode^(k+1) when convergence is reached
+    """
+    ...
+    # backend.factorize(q_cond)
+    # return backend.solve(information_vector)
+
+
+def log_likelihood(mode): ...
+
+
+def log_latent_prior(mode): ...
+
+
+def log_hyper_prior(hp_dict): ...
+
+
+def laplace_correction(l_cond, mode): ...
+
 
 def negative_log_marginal_posterior(
     hp_dict: dict[str, float],
@@ -176,52 +200,22 @@ def negative_log_marginal_posterior(
         observations=model.observations,
     )
 
-    # . assemble_likelihood(theta)
-    ...
-
     # . find_conditional_mode(q_prior, model, hp_dict)
     mode = find_conditional_mode(
         q_cond=q_cond,
         information_vector=information_vector,
     )
 
+    # . compute the components of the INLA objective function
+    f_likelihood = log_likelihood(mode=mode)
+    f_log_latent_prior = log_latent_prior(mode=mode)
+    f_log_hyper_prior = log_hyper_prior(hp_dict=hp_dict)
+    f_laplace_correction = laplace_correction(l_cond=l_cond, mode=mode)
 
+    # . assemble the final objective function value
+    f = f_laplace_correction - f_log_latent_prior - f_likelihood - f_log_hyper_prior
 
-    # f_cond = compute_laplace_correction(
-    #     mode,
-    # )
-
-    # Compute the 4 terms
-    f_cond = compute_conditional_latent(Q_cond)
-    f_prior = compute_prior_latent(Q_prior)
-    f_lik = compute_likelihood(model.observations, A, Q_cond)
-    f_hp = compute_prior_hyperparameters(hp_dict)
-
-    f = f_cond - f_prior - f_lik - f_hp
     return f
-
-# def laplace_log_marginal_posterior()
-# def inla_log_posterior()
-# def negative_log_marginal_posterior(theta, data):
-#     x_mode = latent_mode(theta, data)  # mode of the latent field
-#     log_lik = log_likelihood(x_mode, theta, data)
-#     log_latent = log_latent_prior(x_mode, theta)
-#     log_hyper = log_hyper_prior(theta)
-#     log_corr = laplace_correction(x_mode, theta, data)
-#     return log_lik + log_latent + log_hyper - log_corr
-
-
-
-def compute_conditional_latent(Q_cond): ...
-
-
-def compute_prior_latent(Q_prior): ...
-
-
-def compute_likelihood(observations, A, Q_cond): ...
-
-
-def compute_prior_hyperparameters(hp_dict): ...
 
 
 def objective(
@@ -255,7 +249,7 @@ def objective(
     )
 
     # Cleanup
-    # . Maybe it is a good idea to force garbage collection 
+    # . Maybe it is a good idea to force garbage collection
     # between calls to the objective function?
     collect()
 

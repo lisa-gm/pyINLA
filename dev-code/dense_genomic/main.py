@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+from dev_utils import exit_as_expected
 from hp_dataclass import (
     Hyperparameter,
     assemble_hyperparameter_dict,
@@ -10,8 +11,6 @@ from model import GenomicModel, GenomicModelConfig, StatisticalModel
 from scipy.optimize import OptimizeResult, minimize
 
 from inla import objective as inla_objective
-
-from dev_utils import exit_as_expected
 
 
 def fit_model(
@@ -43,12 +42,7 @@ def fit_model(
         intermediate_result : OptimizeResult
             The result of the intermediate optimization step.
         """
-        hpm.commit_iteration(
-            array=intermediate_result.x,
-            fun=intermediate_result.fun
-        )
-
-        
+        hpm.commit_iteration(array=intermediate_result.x, fun=intermediate_result.fun)
 
     # Fit the model's hyperparameters to the observations using the INLA objective function.
     model_fitting_result: OptimizeResult = minimize(

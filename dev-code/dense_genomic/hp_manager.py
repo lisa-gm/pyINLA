@@ -457,16 +457,16 @@ class HyperparameterManager:
     # API for : State Management
     # . Public
     def commit_iteration(
-            self,
-            array: np.ndarray,
-            fun: float | None = None,
-        ) -> None:
+        self,
+        array: np.ndarray,
+        fun: float | None = None,
+    ) -> None:
         """
         Commit given array values from accepted iteration.
 
         Called by callback AFTER scipy accepts a point.
         Updates _optimized_array, increments iteration, optionally records history.
-        
+
         Parameters
         ----------
         array : np.ndarray
@@ -477,7 +477,7 @@ class HyperparameterManager:
         Raises
         ------
         ValueError
-            If the length of the array does not match the number of optimized hyperparameters.  
+            If the length of the array does not match the number of optimized hyperparameters.
         """
         if len(array) != len(self._optimized_keys):
             raise ValueError(
