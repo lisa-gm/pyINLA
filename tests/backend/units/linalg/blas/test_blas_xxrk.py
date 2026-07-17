@@ -6,7 +6,7 @@ from dalia.backend.config import cupy_version, nvmath_version
 if cupy_version is not None:
     import cupy as cp
 
-from dalia.backend.blas import xxrk
+from dalia.backend.blas.l3 import xxrk
 
 from .conftest import DATA_TYPES, INTERNAL_DEVICE_TYPES
 
@@ -19,7 +19,7 @@ from .conftest import DATA_TYPES, INTERNAL_DEVICE_TYPES
 @pytest.mark.parametrize("beta", [-1.5, 0.0, 1.5])
 def test_xxrk(matrix_factory, device_type, data_type, uplo, trans_a, alpha, beta):
     """Test the symmetric/hermitian rank-k update (SYHERK) operation.
-    
+
     Notes:
     - This is not testign the complex part (herk) at all
     - the hw_device is hard coded to "host"
@@ -64,11 +64,19 @@ def test_xxrk(matrix_factory, device_type, data_type, uplo, trans_a, alpha, beta
         )
 
     # . only test in-place for now
-    xxrk(uplo=uplo, trans_a=trans_a, alpha=alpha, a=A, beta=beta, c=C, hw_target=device_type)
+    xxrk(
+        uplo=uplo,
+        trans_a=trans_a,
+        alpha=alpha,
+        a=A,
+        beta=beta,
+        c=C,
+        hw_target=device_type,
+    )
 
     # Verify the result is correct
     if device_type == "accelerator":
         C = C.get()
         expected = expected.get()
-        
+
     assert np.allclose(C._data, expected)

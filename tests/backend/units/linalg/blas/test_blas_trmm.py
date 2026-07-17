@@ -6,7 +6,7 @@ from dalia.backend.config import cupy_version, nvmath_version
 if cupy_version is not None:
     import cupy as cp
 
-from dalia.backend.blas import trmm
+from dalia.backend.blas.l3 import trmm
 
 from .conftest import DATA_TYPES, INTERNAL_DEVICE_TYPES
 

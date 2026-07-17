@@ -12,7 +12,7 @@ if cupy_version is not None:
     import cupy as cp
     import cupy.linalg as cp_la
 
-from dalia.backend.blas import trsm
+from dalia.backend.blas.l3 import trsm
 from dalia.backend.linalg.solvers.linear_solver import LinearSolver
 
 
