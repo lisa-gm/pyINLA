@@ -1,9 +1,16 @@
+from typing import Literal
+
+
 def exit_as_expected():
     """Exit the program with a message indicating that the program has completed successfully."""
     print("Program completed successfully.")
     exit(0)
 
-def matshow_matrices(matrices: list, titles: list = None):
+def matshow_matrices(
+        matrices: list, 
+        titles: list = None,
+        plot_type: Literal["matshow", "spy"] = "matshow",
+    ) -> None:
     """Display a list of matrices using matplotlib's matshow."""
     import matplotlib.pyplot as plt
 
@@ -14,7 +21,10 @@ def matshow_matrices(matrices: list, titles: list = None):
         titles = [f"Matrix {i+1}" for i in range(num_matrices)]
 
     for ax, matrix, title in zip(axes, matrices, titles):
-        cax = ax.matshow(matrix)
+        if plot_type == "matshow":
+            cax = ax.matshow(matrix)
+        elif plot_type == "spy":
+            cax = ax.spy(matrix)
         ax.set_title(title)
         fig.colorbar(cax, ax=ax)
 

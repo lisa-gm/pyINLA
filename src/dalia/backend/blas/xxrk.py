@@ -9,13 +9,12 @@ Credits:
 
 from typing import Literal
 
+from dalia.backend.datastructures.matrix.core.dense import DenseMatrix
 import numpy as np
-from scipy.linalg._decomp import _asarray_validated
-from scipy.linalg._misc import _datacopied
 from scipy.linalg.blas import get_blas_funcs
 
 from dalia.backend.config import cupy_version, nvmath_version
-# from dalia.backend.datastructures import Matrix
+from dalia.backend.datastructures import Matrix
 
 from .gemm import matmul_gemm_accelerator
 
@@ -29,136 +28,123 @@ if nvmath_version is not None:
     from nvmath.bindings import cublas as nvcublas
 
 
-# def xxrk(
-#     uplo: Literal["U", "u", "L", "l"],
-#     trans_a: Literal["N", "n", "T", "t", "C", "c"],
-#     alpha: float,
-#     a: Matrix,
-#     beta: float,
-#     c: Matrix = None,
-#     hw_target: Literal["default", "host", "accelerator"] = "default",
-# ) -> Matrix | None:
-#     """Wrapper for performing symmetric (syrk) and hermitian (herk) rank-k updates on
-#     Matrix datastructures.
+def xxrk(
+    uplo: Literal["U", "u", "L", "l"],
+    trans_a: Literal["N", "n", "T", "t", "C", "c"],
+    alpha: float,
+    a: Matrix,
+    beta: float,
+    c: Matrix = None,
+    hw_target: Literal["default", "host", "accelerator"] = "default",
+) -> Matrix | None:
+    """Wrapper for performing symmetric (syrk) and hermitian (herk) rank-k updates on
+    Matrix datastructures.
 
-#     This routine performs one of the following symmetric (hermitian) rank k operations:
-#         C = alpha * op(A) @ op(A)^T/H + beta * C
-#     or
-#         C = alpha * op(A)^T/H @ op(A) + beta * C
+    This routine performs one of the following symmetric (hermitian) rank k operations:
+        C = alpha * op(A) @ op(A)^T/H + beta * C
+    or
+        C = alpha * op(A)^T/H @ op(A) + beta * C
 
-#     Parameters
-#     ----------
-#     uplo : {'U', 'u', 'L', 'l'}
-#         Specifies whether the upper or lower triangular part of the result is
-#         to be referenced. 'U' or 'u' for upper, 'L' or 'l' for lower.
-#     trans_a : {'N', 'n', 'T', 't', 'C', 'c'}
-#         Specifies the operation to be performed on matrix `a`. 'N' or 'n' for
-#         no transpose, 'T' or 't' or 'C' or 'c' for transpose/conjugate transpose.
-#     alpha : float
-#         Scalar to be multiplied with matrix `a`.
-#     a : Matrix
-#         Matrix to be rank-updated.
-#     beta : float
-#         Scalar to be multiplied with matrix `c`.
-#     c : Matrix, optional
-#         Output matrix that will be added to the result. If None, a new matrix will
-#         be created, otherwise the matrix c will be overwritten with the result.
-#     hw_target : {'default', 'host', 'accelerator'}, default='default'
-#         Hardware target, either "host" or "accelerator" depending on the current
-#         location of matrix `a`. If set to "default", the function will automatically
-#         determine the hardware target based on the location of matrix `a`.
+    Parameters
+    ----------
+    uplo : {'U', 'u', 'L', 'l'}
+        Specifies whether the upper or lower triangular part of the result is
+        to be referenced. 'U' or 'u' for upper, 'L' or 'l' for lower.
+    trans_a : {'N', 'n', 'T', 't', 'C', 'c'}
+        Specifies the operation to be performed on matrix `a`. 'N' or 'n' for
+        no transpose, 'T' or 't' or 'C' or 'c' for transpose/conjugate transpose.
+    alpha : float
+        Scalar to be multiplied with matrix `a`.
+    a : Matrix
+        Matrix to be rank-updated.
+    beta : float
+        Scalar to be multiplied with matrix `c`.
+    c : Matrix, optional
+        Output matrix that will be added to the result. If None, a new matrix will
+        be created, otherwise the matrix c will be overwritten with the result.
+    hw_target : {'default', 'host', 'accelerator'}, default='default'
+        Hardware target, either "host" or "accelerator" depending on the current
+        location of matrix `a`. If set to "default", the function will automatically
+        determine the hardware target based on the location of matrix `a`.
 
-#     Returns
-#     -------
-#     Matrix or None
-#         Resulting matrix after the rank-k update if `c` is not provided. If `c`
-#         is provided, it will be overwritten in-place with the result, and the
-#         routine will return None.
-#     """
-
-#     if hw_target == "host":
-#         return _xxrk_host(a, c, alpha, beta, trans_a, lower, overwrite_c)
-#     elif hw_target == "accelerator":
-#         return _xxrk_accelerator(a, c, alpha, beta, trans_a, lower, overwrite_c)
-#     else:
-#         ModuleNotFoundError("Unknown Module")
-
-
-def xxrk(a, hw_target,c=None, alpha=1.0, beta=0.0, trans_a=0, lower=0, overwrite_c=0):
-    """Wrapper for the SYRK and HERK function to call depending on wheter the operation happens on the host or the device
-
-        Computes out = alpha * op(a) @ op(a)^T + beta * b
-
-        op(a) = a if trans is 'N', op(a) = a.T if trans is 'T',
-        op(a) = a.T.conj() if trans is 'C'.
-
-        Args:
-            a:              Matrix to be rank-updated
-            hw_target:      Hardware target, either "host" or "accelerator" depending on the current location of a
-            c:              Matrix that will be added to the result
-            alpha:          Scalar to be multiplied with a
-            beta:           Scalar to be multiplied with c
-            trans_a:          {'N','T','C'} or {'0','1','2'} respectively determines op(a)
-            lower:          Bool determining wheter the upper or lower result should be referenced
-            overwrite_c:    Bool determining wheter the result should overwrite Matrix c
-
-        Returns:
-            out:            Resulting Matrix
-
-        Raises:
-            ModuelNotFoundError:    If the hw_target is not in {"host","accelerator"}
-            TypeError:              If the Matrix has an invalid dtype or another parameter cannot be recognized
+    Returns
+    -------
+    Matrix or None
+        Resulting matrix after the rank-k update if `c` is not provided. If `c`
+        is provided, it will be overwritten in-place with the result, and the
+        routine will return None.
     """
+    # . assert operands types are valid
+    if not isinstance(a, Matrix):
+        raise TypeError(f"Invalid type for a, given: {type(a)}, expected: Matrix")
+    if c is not None and not isinstance(c, Matrix):
+        raise TypeError(f"Invalid type for c, given: {type(c)}, expected: Matrix")
 
-    if  hw_target == "host":
-        return _xxrk_host(a, c, alpha, beta, trans_a, lower, overwrite_c)
-    elif hw_target == "accelerator":
-        return _xxrk_accelerator(a, c, alpha, beta, trans_a, lower, overwrite_c)
+    # . extra check as for now only support DenseMatrix
+    if not isinstance(a, DenseMatrix):
+        raise NotImplementedError(
+            f"xxrk currently only supports DenseMatrix, given: {type(a)}"
+        )
+    if c is not None and not isinstance(c, DenseMatrix):
+        raise NotImplementedError(
+            f"xxrk currently only supports DenseMatrix for output, given: {type(c)}"
+        )
+
+    # . if c is given, perform in-place operation in c
+    if c is not None:
+        overwrite_c = True
     else:
-        ModuleNotFoundError("Unknown Module")
+        overwrite_c = False
+
+    # . map uplo to lower boolean
+    lower = uplo in ["L", "l"]
+
+    # . extract underlying data from Matrix datastructures
+    a_data = a._data
+    c_data = c._data if c is not None else None
+
+    # . sanitize hw_target (if default make it the same hw_target as a)
+    if hw_target == "default":
+        hw_target = a.hw_target
+
+    # . sanitize trans_a (make it uppercase)
+    trans_a = trans_a.upper()
+
+    if hw_target == "host":
+        return _xxrk_host(a=a_data, c=c_data, alpha=alpha, beta=beta, trans=trans_a, lower=lower, overwrite_c=overwrite_c)
+    elif hw_target == "accelerator":
+        raise NotImplementedError("Accelerator support for xxrk is not implemented yet. Please use the host target.")
+        return _xxrk_accelerator(a=a_data, c=c_data, alpha=alpha, beta=beta, trans=trans_a, lower=lower, overwrite_c=overwrite_c)
+    else:
+        raise ModuleNotFoundError("Unknown Module")
 
 
 # Host-side Kernels
 def _xxrk_host(
     a,
-    c=None,
-    alpha=1.0,
-    beta=1.0,
-    trans=0,
-    lower=False,
-    overwrite_c=False,
-    check_finite=True,
+    c,
+    alpha,
+    beta,
+    trans,
+    lower,
+    overwrite_c,
 ):
     """Computes SYRK and HERK on the host
 
     additional Argument check_finite that checks if a is finite
     """
-
-    a1 = _asarray_validated(a, check_finite=check_finite)
-    if c is None:
-        c1 = None
-    else:
-        c1 = _asarray_validated(c, check_finite=check_finite)
-
-    overwrite_c = overwrite_c or _datacopied(c1, c)
-
-    x = _xxrk(a1, c1, alpha, beta, trans, lower, overwrite_c)
-    return x
-
-
-def _xxrk(a1, c1=None, alpha=1.0, beta=0.0, trans=0, lower=False, overwrite_c=False):
-    """xxrk without the input validation"""
-
     trans = {"N": 0, "T": 1, "C": 2}.get(trans, trans)
 
-    if np.iscomplexobj(a1):
-        xxrk = get_blas_funcs(("herk"), (a1, a1))
+    if np.iscomplexobj(a):
+        xxrk = get_blas_funcs(("herk"), (a, a))
     else:
-        xxrk = get_blas_funcs(("syrk"), (a1, a1))
+        xxrk = get_blas_funcs(("syrk"), (a, a))
 
-    out = xxrk(alpha, a1, beta, c1, trans, lower, overwrite_c)
+    return xxrk(alpha, a, beta, c, trans, lower, overwrite_c)
 
-    return out
+
+
+    
 
 
 # Nvidia Accelerator-side Kernels

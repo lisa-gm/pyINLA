@@ -110,15 +110,15 @@ def assemble_conditional_precision(q_prior: Matrix, a: Matrix, q_lik: Matrix = N
     # . q_lik = identity because of Gaussian Likelihood, it can be ignored for now
     # . use xxrk (syrk) routine
     # . perform computation in-place on q_cond
-    # xxrk(
-    #     uplo="l",
-    #     trans_a='t',
-    #     alpha=1.0,
-    #     a=a,
-    #     beta=1.0,
-    #     c=q_cond,
-    #     hw_target="default",
-    # )
+    xxrk(
+        uplo="l",
+        trans_a='t',
+        alpha=1.0,
+        a=a,
+        beta=1.0,
+        c=q_cond,
+        hw_target="default",
+    )
 
     return q_cond
 
@@ -211,6 +211,7 @@ def negative_log_marginal_posterior(
     matshow_matrices(
         matrices=[q_prior.toarray(), q_cond.toarray()],
         titles=["q_prior", "q_cond"],
+        plot_type="spy"
     )
 
     # Stop here for now, not implemented after...
