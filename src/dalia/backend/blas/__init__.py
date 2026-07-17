@@ -1,4 +1,4 @@
-# src/dalia/backend/datastructures/matrix/dispatch/BLAS/__init__.py
+# src/dalia/backend/datastructures/matrix/dispatch/blas/__init__.py
 
 from .gemm import gemm
 from .syherk import syherk

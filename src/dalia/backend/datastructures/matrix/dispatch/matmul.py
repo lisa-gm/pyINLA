@@ -1,5 +1,5 @@
 # src/dalia/backend/datastructures/matrix/dispatch/matmul.py
-from dalia.backend.BLAS import gemm
+from dalia.backend.blas import gemm
 
 def dispatch_matmul(left, right, left_type, right_type, hw_target):
     """Dispatch matrix multiplication to optimized backends"""
