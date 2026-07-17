@@ -4,6 +4,7 @@ from dalia.backend.datastructures.matrix.core import (
     Matrix,
     SparseMatrix,
     BStructMatrix,
+    Vector,
 )
 
-__all__ = ["Matrix", "DenseMatrix", "SparseMatrix", "BStructMatrix"]
+__all__ = ["Matrix", "DenseMatrix", "SparseMatrix", "BStructMatrix", "Vector"]

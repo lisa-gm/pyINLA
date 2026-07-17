@@ -2,6 +2,7 @@
 from .dense import DenseMatrix
 from .matrix import Matrix
 from .sparse import SparseMatrix
+from .vector_dense import Vector
 from .block_structured import BStructMatrix
 
-__all__ = ["Matrix", "DenseMatrix", "SparseMatrix", "BStructMatrix"]
+__all__ = ["Matrix", "DenseMatrix", "SparseMatrix", "BStructMatrix", "Vector"]
