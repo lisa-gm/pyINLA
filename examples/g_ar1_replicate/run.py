@@ -119,9 +119,6 @@ if __name__ == "__main__":
         "Norm (x - x_ref)/ norm(x_ref):   ",
         f"{xp.sqrt(xp.sum((results['x'] - x_ref) ** 2)) / xp.sqrt(xp.sum(x_ref ** 2)):.4e}",
     )
-    
-    hess_internal = dalia.hess_theta_internal
-    print_msg("Hessian of theta internal:\n", hess_internal)
 
     # Compare marginal variances of latent parameters
     # var_latent_params = results["marginal_variances_latent"]
@@ -165,42 +162,6 @@ if __name__ == "__main__":
     prec_quantile_pairs = prec_o["quantiles"]["external"]["pairs"]
     for p, q in prec_quantile_pairs:
         print(f"   {p:.3f} quantile: {q:.4f}")
-
-    # save estimates to reference outputs folder
-    # import json
-
-    # dalia_estimates = {
-    #     "theta_internal": results["theta_internal"].tolist(),
-    #     "theta_external": results["theta"].tolist(),
-    #     "x": results["x"].tolist(),
-    #     "cov_theta_internal_diagonal": xp.diag(results["cov_theta_internal"]).tolist(),
-    #     "cov_theta_internal_full": results["cov_theta_internal"].tolist(),
-    #     "hyperparameters": {
-    #         "phi": {
-    #             "mean": phi["mean_external"],
-    #             "variance": phi["variance_external"],
-    #             "quantile_pairs": phi_quantile_pairs,
-    #             "pdf_pairs": list(zip(phi["pdf_data"][0].tolist(), phi["pdf_data"][1].tolist())),
-    #         },
-    #         "tau": {
-    #             "mean": tau["mean_external"],
-    #             "variance": tau["variance_external"],
-    #             "quantile_pairs": tau_quantile_pairs,
-    #             "pdf_pairs": list(zip(tau["pdf_data"][0].tolist(), tau["pdf_data"][1].tolist())),
-    #         },
-    #         "prec_o": {
-    #             "mean": prec_o["mean_external"],
-    #             "variance": prec_o["variance_external"],
-    #             "quantile_pairs": prec_quantile_pairs,
-    #             "pdf_pairs": list(zip(prec_o["pdf_data"][0].tolist(), prec_o["pdf_data"][1].tolist())),
-    #         },
-    #     },
-    # }
-
-    # reference_outputs_dir = f"{BASE_DIR}/reference_outputs"
-    # os.makedirs(reference_outputs_dir, exist_ok=True)
-    # with open(f"{reference_outputs_dir}/dalia_estimates.json", "w") as f:
-    #     json.dump(dalia_estimates, f, indent=2)
 
     # save estimates to reference outputs folder
     if save_dalia_results:
