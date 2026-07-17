@@ -86,14 +86,14 @@ objective(theta)
 
 from gc import collect
 
-import matplotlib.pyplot as plt
 import numpy as np
-from dev_utils import exit_as_expected
+from dev_utils import exit_as_expected, matshow_matrices
 from hp_manager import HyperparameterManager
 from model import StatisticalModel
 
 from dalia.backend.datastructures import Matrix, Vector
-
+from dalia.backend.blas import xxrk
+from copy import deepcopy
 
 def assemble_conditional_precision(q_prior: Matrix, a: Matrix, q_lik: Matrix = None):
     """
@@ -102,7 +102,26 @@ def assemble_conditional_precision(q_prior: Matrix, a: Matrix, q_lik: Matrix = N
 
     Q_cond = Q_prior + Aᵀ Q_lik A
     """
-    ...
+    # 1. q_cond = q_prior.copy()
+    # . Matrix.copy() perform a deepcopy of the underlying `._data array`.
+    q_cond: Matrix = q_prior.copy()
+
+    # 2. q_cond += a.T @ q_lik @ a
+    # . q_lik = identity because of Gaussian Likelihood, it can be ignored for now
+    # . use xxrk (syrk) routine
+    # . perform computation in-place on q_cond
+    xxrk(
+        uplo="l",
+        trans_a='t',
+        alpha=1.0,
+        a=a,
+        beta=1.0,
+        c=q_cond,
+        hw_target="default",
+    )
+
+    return q_cond
+
 
 
 def assemble_information_vector(
@@ -181,9 +200,6 @@ def negative_log_marginal_posterior(
         hyperparameters_values=hp_dict
     )
 
-    # Stop here for now, not implemented after...
-    exit_as_expected()
-
     # . assemble conditional precision matrix
     q_cond: Matrix = assemble_conditional_precision(
         q_prior=q_prior,
@@ -191,6 +207,14 @@ def negative_log_marginal_posterior(
         # For now we know the likelihood to be Gaussian
         # q_lik=model.assemble_likelihood_precision_matrix(),
     )
+
+    matshow_matrices(
+        matrices=[q_prior.toarray(), q_cond.toarray()],
+        titles=["q_prior", "q_cond"],
+    )
+
+    # Stop here for now, not implemented after...
+    exit_as_expected()
 
     # . assemble information vector
     information_vector: Vector = assemble_information_vector(
