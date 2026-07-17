@@ -1,13 +1,13 @@
 # src/dalia/backend/datastructures/matrix/dispatch/blas/__init__.py
 
 from .gemm import gemm
-from .syherk import syherk
+from .xxrk import xxrk
 from .trmm import trmm
 from .trsm import trsm
 
 __all__ = [
     "gemm",
-    "syherk",
+    "xxrk",
     "trmm",
     "trsm",
 ]

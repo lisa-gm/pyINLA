@@ -7,7 +7,7 @@ from dalia.backend.config import cupy_version, nvmath_version
 if cupy_version is not None:
     import cupy as cp
 
-from dalia.backend.blas import gemm, syherk, trmm
+from dalia.backend.blas import gemm, xxrk, trmm
 
 from .conftest import INTERNAL_DEVICE_TYPES, DATA_TYPES
 
@@ -52,7 +52,7 @@ class TestLapack:
         C_copy = C.copy()
         C_copy[xp.triu_indices_from(C)] *= beta
         expected = xp.triu(alpha * A @ A.conj().T) + C_copy
-        X = syherk(A, device_type, c=C, alpha=alpha, beta=beta)
+        X = xxrk(A, device_type, c=C, alpha=alpha, beta=beta)
         # Verify the result is correct
         if device_type == "accelerator":
             X = X.get()

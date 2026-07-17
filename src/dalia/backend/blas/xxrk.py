@@ -21,7 +21,7 @@ if cupy_version is not None:
 if nvmath_version is not None:
     from nvmath.bindings import cublas as nvcublas
 
-def syherk(a, hw_target,c=None, alpha=1.0, beta=0.0, trans_a=0, lower=0, overwrite_c=0):
+def xxrk(a, hw_target,c=None, alpha=1.0, beta=0.0, trans_a=0, lower=0, overwrite_c=0):
     """Wrapper for the SYRK and HERK function to call depending on wheter the operation happens on the host or the device
 
         Computes out = alpha * op(a) @ op(a)^T + beta * b
@@ -73,24 +73,24 @@ def matmul_syherk_host(a, c=None, alpha=1.0, beta=1.0, trans=0, lower=False,
     return x
 
 
-# syherk without the input validation
+# xxrk without the input validation
 def _syherk(a1, c1=None, alpha=1.0, beta=0.0, trans=0, lower=False,
                       overwrite_c=False):
 
     trans = {'N': 0, 'T': 1, 'C': 2}.get(trans, trans)
 
     if np.iscomplexobj(a1):
-        syherk = get_blas_funcs(('herk'), (a1, a1))
+        xxrk = get_blas_funcs(('herk'), (a1, a1))
     else:
-        syherk = get_blas_funcs(('syrk'), (a1, a1))
+        xxrk = get_blas_funcs(('syrk'), (a1, a1))
 
-    out = syherk(alpha, a1, beta, c1, trans, lower, overwrite_c)
+    out = xxrk(alpha, a1, beta, c1, trans, lower, overwrite_c)
 
     return out
 
 
 
-# Util functions for cuda syherk
+# Util functions for cuda xxrk
 def _trans_to_cublas_op(trans):
     if trans == 'N' or trans == cublas.CUBLAS_OP_N:
         trans = cublas.CUBLAS_OP_N
@@ -122,7 +122,7 @@ def _get_scalar_ptr(a, dtype):
             a = np.array(a, dtype=dtype)
         a_ptr = a.ctypes.data
     return a, a_ptr
-# Util functions for cuda syherk end
+# Util functions for cuda xxrk end
 
 def matmul_syherk_accelerator(a, c=None, alpha=1.0, beta=0.0, trans='N', lower=False, overwrite_c=0):
     """Computes SYRK and HERK on a cuda accelerator
