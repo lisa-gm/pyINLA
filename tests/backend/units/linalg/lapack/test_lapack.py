@@ -33,7 +33,7 @@ class TestLapack:
 
     @pytest.mark.parametrize("data_type", DATA_TYPES)
     @pytest.mark.parametrize("device_type", INTERNAL_DEVICE_TYPES)
-    def test_syherk(self, array_factory, device_type, data_type):
+    def test_xxrk(self, array_factory, device_type, data_type):
         """Test the symmetric/hermitian rank-k update (SYHERK) operation."""
         if (
             nvmath_version is None
