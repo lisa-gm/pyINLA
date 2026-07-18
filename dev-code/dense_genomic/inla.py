@@ -92,7 +92,7 @@ from dev_utils import exit_as_expected, matshow_matrices
 from hp_manager import HyperparameterManager
 from model import StatisticalModel
 
-from dalia.backend.blas.l2 import xxmv
+from dalia.backend.blas.l2 import gemv
 from dalia.backend.blas.l3 import xxrk
 from dalia.backend.datastructures import Matrix, Vector
 
@@ -122,8 +122,6 @@ def assemble_conditional_precision(q_prior: Matrix, a: Matrix, q_lik: Matrix = N
         hw_target="default",
     )
 
-    print(type(q_cond), q_cond.shape, q_cond.dtype, q_cond.hw_target)
-
     return q_cond
 
 
@@ -150,10 +148,11 @@ def assemble_information_vector(
 
     b = Aᵀ Q_lik y
     """
-    # . q_lik = identity because of Gaussian Likelihood, it can be ignored for now
-    # . use xxmv (symv) routine
-    information_vector: Vector = xxmv(
-        uplo="l",
+    # . q_lik = identity because of Gaussian Likelihood,
+    # it can be ignored for now
+    # . use gemv (gemv) routine
+    information_vector: Vector = gemv(
+        trans_a="t",
         alpha=1.0,
         a=a,
         x=observations,
@@ -168,15 +167,32 @@ def assemble_information_vector(
 def find_conditional_mode(
     q_cond: Matrix,
     information_vector: Vector,
-):
-    """
+) -> tuple[Vector, Matrix]:
+    """Find the mode of the conditional latent parameters given the hyperparameters.
 
-    For Gaussian:
+    Parameters
+    ----------
+    q_cond : Matrix
+        The conditional precision matrix.
+    information_vector : Vector
+        The information vector.
+
+    Returns
+    -------
+    mode : Vector
+        The mode of the conditional latent parameters.
+    l_cond : Matrix
+        The Cholesky factor of the conditional precision matrix.
+
+    Notes
+    -----
+
+    For Gaussian likelihood:
         0. Get Q_cond = Q_prior + AᵀQ_likA
-        1. factorize Q_cond
+        1. factorize Q_cond : Q_cond = L Lᵀ -> get L_cond
         2. solve Q_cond * x_mode = AᵀQ_lik y
 
-    For Non-Gaussian:
+    For Non-Gaussian likelihood:
         0. Get Q_cond = Q_prior + AᵀQ_likA
         1. factorize Q_cond
         2. Newton iterations to find mode:
@@ -205,10 +221,20 @@ def negative_log_marginal_posterior(
     hp_dict: dict[str, float],
     model: StatisticalModel,
 ) -> float:
-    """
-    Compute the INLA marginal log-likelihood approximation.
+    """Compute the negative of the INLA approximation of the log-marginal of the posterior.
 
-    Returns the scalar f = conditional - prior - likelihood - prior_hyperparameters
+    Parameters
+    ----------
+    hp_dict : dict[str, float]
+        A dictionary of hyperparameter values.
+    model : StatisticalModel
+        The statistical model.
+
+    Returns
+    -------
+    float
+        The negative of the INLA approximation of the log-marginal of the posterior `f`
+        defined as: f_laplace_correction - f_log_latent_prior - f_likelihood - f_log_hyper_prior
     """
     # . assemble prior precision matrix
     q_prior: Matrix = model.assemble_prior_precision_matrix(
@@ -223,15 +249,6 @@ def negative_log_marginal_posterior(
         # q_lik=model.assemble_likelihood_precision_matrix(),
     )
 
-    matshow_matrices(
-        matrices=[q_prior.toarray(), q_cond.toarray()],
-        titles=["q_prior", "q_cond"],
-        plot_type="spy",
-    )
-
-    # Stop here for now, not implemented after...
-    exit_as_expected()
-
     # . assemble information vector
     information_vector: Vector = assemble_information_vector(
         a=model.design_matrix(),
@@ -240,17 +257,17 @@ def negative_log_marginal_posterior(
         observations=model.observations,
     )
 
-    # matshow_matrices(
-    #     matrices=[q_prior.toarray(), q_cond.toarray(), information_vector.toarray()],
-    #     titles=["q_prior", "q_cond", "information_vector"],
-    #     plot_type="spy",
-    # )
+    matshow_matrices(
+        matrices=[q_prior.toarray(), q_cond.toarray(), information_vector.toarray()],
+        titles=["q_prior", "q_cond", "information_vector"],
+        plot_type="spy",
+    )
 
-    # # Stop here for now, not implemented after...
-    # exit_as_expected()
+    # Stop here for now, not implemented after...
+    exit_as_expected()
 
     # . find_conditional_mode(q_prior, model, hp_dict)
-    mode = find_conditional_mode(
+    mode, l_cond = find_conditional_mode(
         q_cond=q_cond,
         information_vector=information_vector,
     )

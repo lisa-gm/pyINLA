@@ -40,9 +40,9 @@ class Vector(DenseMatrix):
     # 1. Class attributes (if any)
 
     # 2. Initialization
-    def __init__(self, data, device=None):
+    def __init__(self, data, hw_target=None):
         # Initialize parent with dense array
-        super().__init__(data, device)
+        super().__init__(data, hw_target)
 
     # 3. Special representation methods
     # 4. Properties (grouped together)

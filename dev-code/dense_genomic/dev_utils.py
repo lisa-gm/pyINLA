@@ -22,10 +22,15 @@ def matshow_matrices(
         titles = [f"Matrix {i+1}" for i in range(num_matrices)]
 
     for ax, matrix, title in zip(axes, matrices, titles):
+        # . if array is 1D, reshape it for viz
+        if matrix.ndim == 1:
+            matrix = matrix.reshape(-1, 1)
+
         if plot_type == "matshow":
             cax = ax.matshow(matrix)
         elif plot_type == "spy":
             cax = ax.spy(matrix)
+
         ax.set_title(title)
         fig.colorbar(cax, ax=ax)
 

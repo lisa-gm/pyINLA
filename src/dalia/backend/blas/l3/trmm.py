@@ -7,19 +7,19 @@ from scipy.linalg._decomp import _asarray_validated
 from scipy.linalg._misc import _datacopied
 from scipy.linalg.blas import get_blas_funcs
 
-from dalia.backend.config import cupy_version, nvmath_version
+# from dalia.backend.config import cupy_version, nvmath_version
 
-from .gemm import matmul_gemm_accelerator
+# from .gemm import matmul_gemm_accelerator
 
-# TODO: Change this to use flags instead of try
-if cupy_version is not None:
-    import cupy as cp
-    from cupy import _core
-    from cupy.cuda import device
-    from cupy_backends.cuda.libs import cublas
+# # TODO: Change this to use flags instead of try
+# if cupy_version is not None:
+#     import cupy as cp
+#     from cupy import _core
+#     from cupy.cuda import device
+#     from cupy_backends.cuda.libs import cublas
 
-if nvmath_version is not None:
-    from nvmath.bindings import cublas as nvcublas
+# if nvmath_version is not None:
+#     from nvmath.bindings import cublas as nvcublas
 
 
 def trmm(
@@ -117,122 +117,122 @@ def _matmul_trmm(a1, b1, alpha=1.0, side=0, lower=0, trans_a=0, diag=0, overwrit
     return out
 
 
-# Util functions for cuda trmm
-def _trans_to_cublas_op(trans):
-    if trans == "N" or trans == cublas.CUBLAS_OP_N:
-        trans = cublas.CUBLAS_OP_N
-    elif trans == "T" or trans == cublas.CUBLAS_OP_T:
-        trans = cublas.CUBLAS_OP_T
-    elif trans == "C" or trans == cublas.CUBLAS_OP_C:
-        trans = cublas.CUBLAS_OP_C
-    else:
-        raise TypeError("invalid trans (actual: {})".format(trans))
-    return trans
+# # Util functions for cuda trmm
+# def _trans_to_cublas_op(trans):
+#     if trans == "N" or trans == cublas.CUBLAS_OP_N:
+#         trans = cublas.CUBLAS_OP_N
+#     elif trans == "T" or trans == cublas.CUBLAS_OP_T:
+#         trans = cublas.CUBLAS_OP_T
+#     elif trans == "C" or trans == cublas.CUBLAS_OP_C:
+#         trans = cublas.CUBLAS_OP_C
+#     else:
+#         raise TypeError("invalid trans (actual: {})".format(trans))
+#     return trans
 
 
-def _get_scalar_ptr(a, dtype):
-    if isinstance(a, cp.ndarray):
-        if a.dtype != dtype:
-            a = cp.array(a, dtype=dtype)
-        a_ptr = a.data.ptr
-    else:
-        if not (isinstance(a, np.ndarray) and a.dtype == dtype):
-            a = np.array(a, dtype=dtype)
-        a_ptr = a.ctypes.data
-    return a, a_ptr
+# def _get_scalar_ptr(a, dtype):
+#     if isinstance(a, cp.ndarray):
+#         if a.dtype != dtype:
+#             a = cp.array(a, dtype=dtype)
+#         a_ptr = a.data.ptr
+#     else:
+#         if not (isinstance(a, np.ndarray) and a.dtype == dtype):
+#             a = np.array(a, dtype=dtype)
+#         a_ptr = a.ctypes.data
+#     return a, a_ptr
 
 
-# Util functions for cuda trmm end
+# # Util functions for cuda trmm end
 
 
-def matmul_trmm_accelerator(
-    a, b, alpha=1.0, transa=0, side=0, lower=0, diag=0, overwrite_b=0
-):
-    """Computes TRMM on a cuda accelerator
+# def matmul_trmm_accelerator(
+#     a, b, alpha=1.0, transa=0, side=0, lower=0, diag=0, overwrite_b=0
+# ):
+#     """Computes TRMM on a cuda accelerator
 
-    if nvmath is not installed TRMM will call GEMM instead
-    """
-    if nvmath_version is not None:
-        matmul_gemm_accelerator(a, b, alpha=alpha, transa=transa, transb="N")
+#     if nvmath is not installed TRMM will call GEMM instead
+#     """
+#     if nvmath_version is not None:
+#         matmul_gemm_accelerator(a, b, alpha=alpha, transa=transa, transb="N")
 
-    assert a.ndim == b.ndim == 2
-    assert a.dtype == b.dtype
-    dtype = a.dtype.char
-    if dtype == "f":
-        func = nvcublas.strmm
-    elif dtype == "d":
-        func = nvcublas.dtrmm
-    elif dtype == "F":
-        func = nvcublas.ctrmm
-    elif dtype == "D":
-        func = nvcublas.ztrmm
-    else:
-        raise TypeError("invalid dtype")
+#     assert a.ndim == b.ndim == 2
+#     assert a.dtype == b.dtype
+#     dtype = a.dtype.char
+#     if dtype == "f":
+#         func = nvcublas.strmm
+#     elif dtype == "d":
+#         func = nvcublas.dtrmm
+#     elif dtype == "F":
+#         func = nvcublas.ctrmm
+#     elif dtype == "D":
+#         func = nvcublas.ztrmm
+#     else:
+#         raise TypeError("invalid dtype")
 
-    transa = _trans_to_cublas_op(transa)
-    assert a.shape[0] == a.shape[1]
-    lda = a.shape[0]
-    m, n = b.shape
-    ldb = m
-    out = None
-    if overwrite_b:
-        out = b
-        assert out.ndim == 2
-        assert out.shape == (m, n)
-        assert out.dtype == dtype
-    else:
-        out = cp.zeros((m, n), dtype=dtype, order="F")
-    if a._c_contiguous:
-        a = a.copy(order="F")
-    if b._c_contiguous:
-        b = b.copy(order="F")
-    if lower:
-        uplo = cublas.CUBLAS_FILL_MODE_LOWER
-    else:
-        uplo = cublas.CUBLAS_FILL_MODE_UPPER
+#     transa = _trans_to_cublas_op(transa)
+#     assert a.shape[0] == a.shape[1]
+#     lda = a.shape[0]
+#     m, n = b.shape
+#     ldb = m
+#     out = None
+#     if overwrite_b:
+#         out = b
+#         assert out.ndim == 2
+#         assert out.shape == (m, n)
+#         assert out.dtype == dtype
+#     else:
+#         out = cp.zeros((m, n), dtype=dtype, order="F")
+#     if a._c_contiguous:
+#         a = a.copy(order="F")
+#     if b._c_contiguous:
+#         b = b.copy(order="F")
+#     if lower:
+#         uplo = cublas.CUBLAS_FILL_MODE_LOWER
+#     else:
+#         uplo = cublas.CUBLAS_FILL_MODE_UPPER
 
-    if side:
-        side = cublas.CUBLAS_SIDE_RIGHT
-        assert lda == n
-    else:
-        side = cublas.CUBLAS_SIDE_LEFT
-        assert lda == m
+#     if side:
+#         side = cublas.CUBLAS_SIDE_RIGHT
+#         assert lda == n
+#     else:
+#         side = cublas.CUBLAS_SIDE_LEFT
+#         assert lda == m
 
-    if diag:
-        diag = cublas.CUBLAS_DIAG_UNIT
-    else:
-        diag = cublas.CUBLAS_DIAG_NON_UNIT
+#     if diag:
+#         diag = cublas.CUBLAS_DIAG_UNIT
+#     else:
+#         diag = cublas.CUBLAS_DIAG_NON_UNIT
 
-    alpha, alpha_ptr = _get_scalar_ptr(alpha, a.dtype)
-    handle = device.get_cublas_handle()
-    orig_mode = cublas.getPointerMode(handle)
-    if isinstance(alpha, cp.ndarray):
-        cublas.setPointerMode(handle, cublas.CUBLAS_POINTER_MODE_DEVICE)
-    else:
-        cublas.setPointerMode(handle, cublas.CUBLAS_POINTER_MODE_HOST)
+#     alpha, alpha_ptr = _get_scalar_ptr(alpha, a.dtype)
+#     handle = device.get_cublas_handle()
+#     orig_mode = cublas.getPointerMode(handle)
+#     if isinstance(alpha, cp.ndarray):
+#         cublas.setPointerMode(handle, cublas.CUBLAS_POINTER_MODE_DEVICE)
+#     else:
+#         cublas.setPointerMode(handle, cublas.CUBLAS_POINTER_MODE_HOST)
 
-    c = out
-    if not out._f_contiguous:
-        c = out.copy(order="F")
-    try:
-        func(
-            handle,
-            side,
-            uplo,
-            transa,
-            diag,
-            m,
-            n,
-            alpha_ptr,
-            a.data.ptr,
-            lda,
-            b.data.ptr,
-            ldb,
-            c.data.ptr,
-            m,
-        )
-    finally:
-        cublas.setPointerMode(handle, orig_mode)
-    if not out._f_contiguous:
-        _core.elementwise_copy(c, out)
-    return out
+#     c = out
+#     if not out._f_contiguous:
+#         c = out.copy(order="F")
+#     try:
+#         func(
+#             handle,
+#             side,
+#             uplo,
+#             transa,
+#             diag,
+#             m,
+#             n,
+#             alpha_ptr,
+#             a.data.ptr,
+#             lda,
+#             b.data.ptr,
+#             ldb,
+#             c.data.ptr,
+#             m,
+#         )
+#     finally:
+#         cublas.setPointerMode(handle, orig_mode)
+#     if not out._f_contiguous:
+#         _core.elementwise_copy(c, out)
+#     return out

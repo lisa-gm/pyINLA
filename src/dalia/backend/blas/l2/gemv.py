@@ -7,8 +7,8 @@ from dalia.backend.datastructures import Matrix, Vector
 from dalia.backend.datastructures.matrix.core.dense import DenseMatrix
 
 
-def xxmv(
-    uplo: Literal["U", "u", "L", "l"],
+def gemv(
+    trans_a: Literal["N", "n", "T", "t", "C", "c"],
     alpha: float,
     a: Matrix,
     x: Vector,
@@ -16,20 +16,21 @@ def xxmv(
     y: Vector = None,
     hw_target: Literal["default", "host", "accelerator"] = "default",
 ) -> Matrix | None:
-    """Wrapper for performing symmetric (symv) and hermitian (hemv) matrix vector
+    """Wrapper for performing general matrix vector
     products on Matrix/Vector datastructures.
 
-    This routine performs the following symmetric (hermitian) operation:
+    This routine performs one of the following general matrix-vector operations:
         y = alpha * A @ x + beta * y
-    were A is a symmetric (hermitian) matrix, x and y are vectors, and alpha and beta are scalars.
+    or
+        y = alpha * A.T @ x + beta * y
+    were A is a general matrix, x and y are vectors, and alpha and beta are scalars.
 
     API: Wrapper for Matrix datastructures.
 
     Parameters
     ----------
-    uplo : {'U', 'u', 'L', 'l'}
-        Specifies whether the upper or lower triangular part of the result is
-        to be referenced. 'U' or 'u' for upper, 'L' or 'l' for lower.
+    trans_a : {'N', 'n', 'T', 't', 'C', 'c'}
+        Specifies the operation to be performed on matrix `a`.
     alpha : float
         Scalar to be multiplied with matrix `a`.
     a : Matrix
@@ -55,8 +56,8 @@ def xxmv(
 
     Notes
     -----
-    - Need to sanitize the number of RHS (xxmv only support single RHS)
-    - If several RHS are given, fall-back to SYMM/HEMM (xxmv is a special case of SYMM/HEMM)
+    - Need to sanitize the number of RHS (gemv only support single RHS)
+    - If several RHS are given, fall-back to GEMM (gemv is a special case of GEMM)
     """
     # General assertion on input types
     if not isinstance(a, Matrix):
@@ -69,7 +70,7 @@ def xxmv(
     # . extra check as for now only support DenseMatrix
     if not isinstance(a, DenseMatrix):
         raise NotImplementedError(
-            f"xxmv currently only supports DenseMatrix, given: {type(a)}"
+            f"gemv currently only supports DenseMatrix, given: {type(a)}"
         )
 
     # Extract data-arrays
@@ -78,12 +79,17 @@ def xxmv(
     # . shape assertions
     if a_data.ndim != 2:
         raise ValueError(f"Matrix a must be 2D, given: {a_data.ndim}D")
-    if a_data.shape[0] != a_data.shape[1]:
-        raise ValueError(f"Matrix a must be square, given: {a_data.shape}")
-    if a_data.shape[1] != x_data.shape[0]:
-        raise ValueError(
-            f"Shapes of a {a_data.shape} and x {x_data.shape} are incompatible for matrix-vector multiplication"
-        )
+    # . adapt the shape assertions given the trans_a parameter
+    if trans_a in ["N", "n"]:
+        if a_data.shape[1] != x_data.shape[0]:
+            raise ValueError(
+                f"Shapes of a {a_data.shape} and x {x_data.shape} are incompatible for matrix-vector multiplication"
+            )
+    else:
+        if a_data.shape[0] != x_data.shape[0]:
+            raise ValueError(
+                f"Shapes of a {a_data.shape} and x {x_data.shape} are incompatible for matrix-vector multiplication"
+            )
     # . if y:Vector is not provided, allocate a new
     # data array (in F order) to store the result.
     y_data: np.ndarray = None
@@ -104,11 +110,8 @@ def xxmv(
                 f"Shapes of x {x_data.shape} and y {y_data.shape} are incompatible for vector-vector addition in the operation y = alpha * A @ x + beta * y"
             )
     else:
-        y_shape: tuple = (
-            (a_data.shape[0],)
-            if x_data.ndim == 1
-            else (a_data.shape[0], x_data.shape[1])
-        )
+        row_dim = a_data.shape[0] if trans_a in ["N", "n"] else a_data.shape[1]
+        y_shape: tuple = (row_dim,) if x_data.ndim == 1 else (row_dim, x_data.shape[1])
         y_data = np.zeros(y_shape, dtype=a_data.dtype, order="F")
 
     # Sanitize hw_target
@@ -118,8 +121,8 @@ def xxmv(
         hw_target = a.hw_target
 
     if hw_target == "host":
-        _xxmv_host(
-            uplo=uplo,
+        _gemv_host(
+            trans_a=trans_a,
             alpha=alpha,
             a=a_data,
             x=x_data,
@@ -134,15 +137,15 @@ def xxmv(
 
     elif hw_target == "accelerator":
         raise NotImplementedError(
-            "Accelerator support for xxmv is not implemented yet. Please use the host target."
+            "Accelerator support for gemv is not implemented yet. Please use the host target."
         )
     else:
         raise ModuleNotFoundError("Unknown Module")
 
 
 # Host-side Kernels
-def _xxmv_host(
-    uplo: Literal["U", "u", "L", "l"],
+def _gemv_host(
+    trans_a: Literal["N", "n", "T", "t", "C", "c"],
     alpha: float,
     a: np.ndarray,
     x: np.ndarray,
@@ -156,9 +159,8 @@ def _xxmv_host(
 
     Parameters
     ----------
-    uplo : {'U', 'u', 'L', 'l'}
-        Specifies whether the upper or lower triangular part of the result is
-        to be referenced. 'U' or 'u' for upper, 'L' or 'l' for lower.
+    trans_a : {'N', 'n', 'T', 't', 'C', 'c'}
+        Specifies the operation to be performed on matrix `a`.
     alpha : float
         Scalar to be multiplied with matrix `a`.
     a : np.ndarray
@@ -175,18 +177,9 @@ def _xxmv_host(
     None
         The result is stored in the `y` array, which is modified in-place.
     """
+    trans_a = trans_a.upper()
+    trans_a = {"N": 0, "T": 1, "C": 2}.get(trans_a, trans_a)
 
-    if np.iscomplexobj(a):
-        xxmv = get_blas_funcs(("hemv"), (a, x))
-    else:
-        xxmv = get_blas_funcs(("symv"), (a, x))
+    gemv = get_blas_funcs(("gemv"), (a, x))
 
-    xxmv(
-        alpha=alpha,
-        a=a,
-        x=x,
-        beta=beta,
-        y=y,
-        lower=uplo in ["L", "l"],
-        overwrite_y=True,
-    )
+    gemv(trans=trans_a, alpha=alpha, a=a, x=x, beta=beta, y=y, overwrite_y=True)

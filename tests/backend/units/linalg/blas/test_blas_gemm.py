@@ -11,20 +11,53 @@ from dalia.backend.blas.l3 import gemm
 from .conftest import DATA_TYPES, INTERNAL_DEVICE_TYPES
 
 
-@pytest.mark.parametrize("data_type", DATA_TYPES)
 @pytest.mark.parametrize("device_type", INTERNAL_DEVICE_TYPES)
-def test_gemm(array_factory, device_type, data_type):
+@pytest.mark.parametrize("trans_a", ["N", "T"])
+@pytest.mark.parametrize("trans_b", ["N", "T"])
+@pytest.mark.parametrize("alpha", [-1.5, 0.0, 1.5])
+@pytest.mark.parametrize("beta", [-1.5, 0.0, 1.5])
+def test_gemm(matrix_factory, device_type, trans_a, trans_b, alpha, beta):
     """Test the general matrix-matrix multiplication (GEMM) operation."""
-    A = array_factory(data_type, shape=(3, 3), device_type=device_type)
-    B = array_factory(data_type, shape=(3, 3), device_type=device_type)
-    C = array_factory(data_type, shape=(3, 3), device_type=device_type)
-    alpha = 1.5
-    beta = 1.5
+    # . make operands
+    A = matrix_factory("DenseMatrix", hw_target="host")
+    B = matrix_factory("DenseMatrix", hw_target="host")
+    C = matrix_factory("DenseMatrix", hw_target="host")
 
-    expected = alpha * A @ B + beta * C
-    X = gemm(A, B, device_type, c=C, alpha=alpha, beta=beta)
+    # Extract data array for reference computation
+    a_reference_data = A._data.copy()
+    b_reference_data = B._data.copy()
+    c_reference_data = C._data.copy()
+
+    # Compute expected result accordingly to trans parameters
+    if trans_a == "T" and trans_b == "T":
+        expected = (
+            alpha * a_reference_data.T @ b_reference_data.T + beta * c_reference_data
+        )
+    elif trans_a == "T" and trans_b == "N":
+        expected = (
+            alpha * a_reference_data.T @ b_reference_data + beta * c_reference_data
+        )
+    elif trans_a == "N" and trans_b == "T":
+        expected = (
+            alpha * a_reference_data @ b_reference_data.T + beta * c_reference_data
+        )
+    else:
+        expected = alpha * a_reference_data @ b_reference_data + beta * c_reference_data
+
+    gemm(
+        trans_a=trans_a,
+        trans_b=trans_b,
+        alpha=alpha,
+        a=A,
+        b=B,
+        beta=beta,
+        c=C,
+        hw_target=device_type,
+    )
+
     # Verify the result is correct
     if device_type == "accelerator":
-        X = X.get()
+        C = C.get()
         expected = expected.get()
-    assert np.allclose(X, expected)
+
+    assert np.allclose(C._data, expected)
