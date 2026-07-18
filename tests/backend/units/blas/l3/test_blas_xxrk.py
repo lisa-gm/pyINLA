@@ -8,7 +8,7 @@ if cupy_version is not None:
 
 from dalia.backend.blas.l3 import xxrk
 
-from .conftest import DATA_TYPES, INTERNAL_DEVICE_TYPES
+from ..conftest import DATA_TYPES, INTERNAL_DEVICE_TYPES
 
 
 @pytest.mark.parametrize("data_type", DATA_TYPES)
