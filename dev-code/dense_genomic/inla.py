@@ -95,7 +95,7 @@ from model import StatisticalModel
 from dalia.backend.blas.l2 import gemv
 from dalia.backend.blas.l3 import xxrk
 from dalia.backend.datastructures import Matrix, Vector
-
+from dalia.backend.linalg.solvers import LinearSolver, linear_solver_factory
 
 def assemble_conditional_precision(q_prior: Matrix, a: Matrix, q_lik: Matrix = None):
     """
@@ -200,10 +200,31 @@ def find_conditional_mode(
             where H = Hessian of log-likelihood at x_mode^(k)
         3. return x_mode^(k+1) when convergence is reached
     """
-    ...
-    # backend.factorize(q_cond)
-    # return backend.solve(information_vector)
+    # 0. Dummy
+    likelihood_is_gaussian = True
 
+    # 1. Instanciate Linear Solver
+    solver: LinearSolver = linear_solver_factory(
+        matrix=q_cond,
+        overwrite_matrix=True,
+    )
+
+    # 2. Factorize Q_cond to get L_cond
+    solver.factorize()
+
+    if likelihood_is_gaussian:
+        # 3. Solve Q_cond * x_mode = AᵀQ_lik y
+        # WARNING TODO: Here the mode is actually not wrapped inside a Vector object,
+        # but it is a numpy array
+        # mode: Vector = solver.solve(information_vector)
+        mode: np.ndarray = solver.solve(information_vector)
+    else:
+        raise NotImplementedError("Conditional mode finding for non-Gaussian likelihood is not implemented yet.")
+        # 3. Newton iterations to find mode
+        ...
+
+    # Return the mode and the Cholesky factor L_cond
+    return mode, solver._factors  
 
 def log_likelihood(mode): ...
 
@@ -257,20 +278,26 @@ def negative_log_marginal_posterior(
         observations=model.observations,
     )
 
-    matshow_matrices(
-        matrices=[q_prior.toarray(), q_cond.toarray(), information_vector.toarray()],
-        titles=["q_prior", "q_cond", "information_vector"],
-        plot_type="spy",
-    )
-
-    # Stop here for now, not implemented after...
-    exit_as_expected()
+    # matshow_matrices(
+    #     matrices=[q_prior.toarray(), q_cond.toarray(), information_vector.toarray()],
+    #     titles=["q_prior", "q_cond", "information_vector"],
+    #     plot_type="spy",
+    # )
 
     # . find_conditional_mode(q_prior, model, hp_dict)
     mode, l_cond = find_conditional_mode(
         q_cond=q_cond,
         information_vector=information_vector,
     )
+
+    matshow_matrices(
+        matrices=[mode, l_cond],
+        titles=["mode", "l_cond"],
+        plot_type="spy",
+    )
+
+    # Stop here for now, not implemented after...
+    exit_as_expected()
 
     # . compute the components of the INLA objective function
     f_likelihood = log_likelihood(mode=mode)
