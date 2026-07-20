@@ -213,6 +213,9 @@ def find_conditional_mode(
     # 2. Factorize Q_cond to get L_cond
     solver.factorize()
 
+    # Stop here for now, not implemented after...
+    exit_as_expected()
+
     if likelihood_is_gaussian:
         # 3. Solve Q_cond * x_mode = AᵀQ_lik y
         # WARNING TODO: Here the mode is actually not wrapped inside a Vector object,
@@ -282,11 +285,11 @@ def negative_log_marginal_posterior(
         observations=model.observations,
     )
 
-    # matshow_matrices(
-    #     matrices=[q_prior.toarray(), q_cond.toarray(), information_vector.toarray()],
-    #     titles=["q_prior", "q_cond", "information_vector"],
-    #     plot_type="spy",
-    # )
+    matshow_matrices(
+        matrices=[q_prior.toarray(), q_cond.toarray(), information_vector.toarray()],
+        titles=["q_prior", "q_cond", "information_vector"],
+        plot_type="spy",
+    )
 
     # . find_conditional_mode(q_prior, model, hp_dict)
     mode, l_cond = find_conditional_mode(
