@@ -10,7 +10,7 @@ if cupy_version is not None:
 
 # Type groups - reusable across all tests
 INTERNAL_DEVICE_TYPES = ["host"]
-DATA_TYPES = ["float32", "float64", "complex64", "complex128"]
+# DATA_TYPES = ["float32", "float64", "complex64", "complex128"]
 
 INTERNAL_DEVICE_TYPES.append(
     pytest.param(
@@ -21,4 +21,3 @@ INTERNAL_DEVICE_TYPES.append(
         ),
     )
 )
-

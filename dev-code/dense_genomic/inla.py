@@ -97,6 +97,7 @@ from dalia.backend.blas.l3 import xxrk
 from dalia.backend.datastructures import Matrix, Vector
 from dalia.backend.linalg.solvers import LinearSolver, linear_solver_factory
 
+
 def assemble_conditional_precision(q_prior: Matrix, a: Matrix, q_lik: Matrix = None):
     """
     Conditional precision matrix seems to be refere-able to as
@@ -219,12 +220,15 @@ def find_conditional_mode(
         # mode: Vector = solver.solve(information_vector)
         mode: np.ndarray = solver.solve(information_vector)
     else:
-        raise NotImplementedError("Conditional mode finding for non-Gaussian likelihood is not implemented yet.")
+        raise NotImplementedError(
+            "Conditional mode finding for non-Gaussian likelihood is not implemented yet."
+        )
         # 3. Newton iterations to find mode
         ...
 
     # Return the mode and the Cholesky factor L_cond
-    return mode, solver._factors  
+    return mode, solver._factors
+
 
 def log_likelihood(mode): ...
 

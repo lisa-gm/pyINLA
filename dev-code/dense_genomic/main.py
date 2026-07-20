@@ -89,10 +89,10 @@ if __name__ == "__main__":
     # . Configure the Genomic Model
     config: GenomicModelConfig = GenomicModelConfig(
         path_to_model_components=Path(
-            "/home/vmaillou/Repos/DALIA/dev-code/genomic_dataset"
+            "/home/vincent-maillou/Documents/Repository/dalia-project/DALIA/dev-code/genomic_dataset"
         ),
         path_to_observations=Path(
-            "/home/vmaillou/Repos/DALIA/dev-code/genomic_dataset"
+            "/home/vincent-maillou/Documents/Repository/dalia-project/DALIA/dev-code/genomic_dataset"
         ),
         hyperparameters=genomic_hps,
         # Component: iid

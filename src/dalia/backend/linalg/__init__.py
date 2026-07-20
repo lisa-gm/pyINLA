@@ -6,7 +6,4 @@ from dalia.backend.linalg.solvers import (
     SparseSolver,
 )
 
-
-
-
 __all__ = ["LinearSolver", "DenseSolver", "SparseSolver"]

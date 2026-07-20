@@ -8,7 +8,7 @@ if cupy_version is not None:
 
 from dalia.backend.blas.l3 import gemm
 
-from ..conftest import DATA_TYPES, INTERNAL_DEVICE_TYPES
+from ..conftest import INTERNAL_DEVICE_TYPES
 
 
 @pytest.mark.parametrize("device_type", INTERNAL_DEVICE_TYPES)
@@ -16,12 +16,20 @@ from ..conftest import DATA_TYPES, INTERNAL_DEVICE_TYPES
 @pytest.mark.parametrize("trans_b", ["N", "T"])
 @pytest.mark.parametrize("alpha", [-1.5, 0.0, 1.5])
 @pytest.mark.parametrize("beta", [-1.5, 0.0, 1.5])
-def test_gemm(matrix_factory, device_type, trans_a, trans_b, alpha, beta):
+def test_gemm(
+    matrix_factory,
+    data_type,
+    device_type,
+    trans_a,
+    trans_b,
+    alpha,
+    beta,
+):
     """Test the general matrix-matrix multiplication (GEMM) operation."""
     # . make operands
-    A = matrix_factory("DenseMatrix", hw_target="host")
-    B = matrix_factory("DenseMatrix", hw_target="host")
-    C = matrix_factory("DenseMatrix", hw_target="host")
+    A = matrix_factory("DenseMatrix", dtype=data_type, hw_target="host")
+    B = matrix_factory("DenseMatrix", dtype=data_type, hw_target="host")
+    C = matrix_factory("DenseMatrix", dtype=data_type, hw_target="host")
 
     # Extract data array for reference computation
     a_reference_data = A._data.copy()
@@ -31,15 +39,18 @@ def test_gemm(matrix_factory, device_type, trans_a, trans_b, alpha, beta):
     # Compute expected result accordingly to trans parameters
     if trans_a == "T" and trans_b == "T":
         expected = (
-            alpha * a_reference_data.T @ b_reference_data.T + beta * c_reference_data
+            alpha * a_reference_data.conj().T @ b_reference_data.conj().T
+            + beta * c_reference_data
         )
     elif trans_a == "T" and trans_b == "N":
         expected = (
-            alpha * a_reference_data.T @ b_reference_data + beta * c_reference_data
+            alpha * a_reference_data.conj().T @ b_reference_data
+            + beta * c_reference_data
         )
     elif trans_a == "N" and trans_b == "T":
         expected = (
-            alpha * a_reference_data @ b_reference_data.T + beta * c_reference_data
+            alpha * a_reference_data @ b_reference_data.conj().T
+            + beta * c_reference_data
         )
     else:
         expected = alpha * a_reference_data @ b_reference_data + beta * c_reference_data

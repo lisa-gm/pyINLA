@@ -20,8 +20,8 @@ from dalia.backend.datastructures import DenseMatrix, Matrix
 
 
 def gemm(
-    trans_a: Literal["N", "T", "C"],
-    trans_b: Literal["N", "T", "C"],
+    trans_a: Literal["N", "n", "T", "t", "C", "c"],
+    trans_b: Literal["N", "n", "T", "t", "C", "c"],
     alpha: float,
     a: Matrix,
     b: Matrix,
@@ -40,9 +40,9 @@ def gemm(
 
     Parameters
     ----------
-    trans_a : {'N', 'T', 'C'}
+    trans_a : {'N', 'n', 'T', 't', 'C', 'c'}
         Specifies the form of op(A) to be used in the matrix multiplication.
-    trans_b : {'N', 'T', 'C'}
+    trans_b : {'N', 'n', 'T', 't', 'C', 'c'}
         Specifies the form of op(B) to be used in the matrix multiplication.
     alpha : float
         Scalar multiplier for the product of op(A) and op(B).

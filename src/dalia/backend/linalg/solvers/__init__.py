@@ -4,6 +4,7 @@ from .linear_solver import LinearSolver
 from .sparse.cudss import CuDSS
 from .sparse.sparse_solver import SparseSolver
 
+
 def linear_solver_factory(matrix, overwrite_matrix=False) -> LinearSolver:
     """Factory for creating appropriate linear solver."""
     # pylint: disable=import-outside-toplevel
@@ -16,4 +17,10 @@ def linear_solver_factory(matrix, overwrite_matrix=False) -> LinearSolver:
     raise TypeError(f"Unknown matrix type: {type(matrix)}")
 
 
-__all__ = ["linear_solver_factory", "LinearSolver", "DenseSolver", "SparseSolver", "CuDSS"]
+__all__ = [
+    "linear_solver_factory",
+    "LinearSolver",
+    "DenseSolver",
+    "SparseSolver",
+    "CuDSS",
+]

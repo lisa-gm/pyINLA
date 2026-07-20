@@ -1,3 +1,12 @@
+"""
+Wrapper for performing symmetric (symv) and hermitian (hemv) matrix vector
+products on Matrix/Vector datastructures.
+"""
+
+# pylint: disable=too-many-arguments
+# pylint: disable=too-many-positional-arguments
+# pylint: disable=protected-access
+
 from typing import Literal
 
 import numpy as np
@@ -23,7 +32,7 @@ def xxmv(
         y = alpha * A @ x + beta * y
     were A is a symmetric (hermitian) matrix, x and y are vectors, and alpha and beta are scalars.
 
-    API: Wrapper for Matrix datastructures.
+    API: Wrapper for Matrix datastructures, arguments extended from the BLAS convention.
 
     Parameters
     ----------
@@ -91,14 +100,14 @@ def xxmv(
         y_data = y._data
         # . basic shape assertions
         if a_data.shape[0] != y_data.shape[0]:
-            raise ValueError(
-                f"Shapes of a {a_data.shape} and y {y_data.shape} are incompatible for vector-vector addition in the operation y = alpha * A @ x + beta * y"
-            )
+            raise ValueError(f"Shapes of a {a_data.shape} and y {y_data.shape} are \
+                incompatible for vector-vector addition in the operation \
+                y = alpha * A @ x + beta * y")
         # . additional shape assertions for multi-dimensional y (multiple RHS)
         if x_data.ndim != y_data.ndim:
-            raise ValueError(
-                f"Shapes of x {x_data.shape} and y {y_data.shape} are incompatible for vector-vector addition in the operation y = alpha * A @ x + beta * y"
-            )
+            raise ValueError(f"Shapes of x {x_data.shape} and y {y_data.shape} are \
+                incompatible for vector-vector addition in the operation \
+                y = alpha * A @ x + beta * y")
         if x_data.ndim == 2 and x_data.shape[1] != y_data.shape[1]:
             raise ValueError(
                 f"Shapes of x {x_data.shape} and y {y_data.shape} are incompatible for vector-vector addition in the operation y = alpha * A @ x + beta * y"
@@ -119,7 +128,7 @@ def xxmv(
 
     if hw_target == "host":
         _xxmv_host(
-            uplo=uplo,
+            uplo=uplo.upper(),
             alpha=alpha,
             a=a_data,
             x=x_data,
@@ -127,7 +136,7 @@ def xxmv(
             y=y_data,
         )
 
-        # if y:Vector wasn't provided, wrap and return
+        # If y:Vector wasn't provided, wrap and return
         # the result as a Vector datastructure
         if y is None:
             return Vector(data=y_data, hw_target="host")
@@ -142,7 +151,7 @@ def xxmv(
 
 # Host-side Kernels
 def _xxmv_host(
-    uplo: Literal["U", "u", "L", "l"],
+    uplo: Literal["U", "L"],
     alpha: float,
     a: np.ndarray,
     x: np.ndarray,
@@ -152,13 +161,13 @@ def _xxmv_host(
     """Call the appropriate BLAS function for symmetric/hermitian
     matrix-vector product based on the data type of `a` and `x`.
 
-    API: Direct array interface.
+    API: Direct array interface, argument order matching LAPACK conventions.
 
     Parameters
     ----------
-    uplo : {'U', 'u', 'L', 'l'}
+    uplo : {'U', 'L'}
         Specifies whether the upper or lower triangular part of the result is
-        to be referenced. 'U' or 'u' for upper, 'L' or 'l' for lower.
+        to be referenced. 'U' for upper, 'L' for lower.
     alpha : float
         Scalar to be multiplied with matrix `a`.
     a : np.ndarray
@@ -173,7 +182,7 @@ def _xxmv_host(
     Returns
     -------
     None
-        The result is stored in the `y` array, which is modified in-place.
+    - The result is stored in the `y` array, which is modified in-place.
     """
 
     if np.iscomplexobj(a):
@@ -187,6 +196,6 @@ def _xxmv_host(
         x=x,
         beta=beta,
         y=y,
-        lower=uplo in ["L", "l"],
+        lower=uplo in ["L"],
         overwrite_y=True,
     )

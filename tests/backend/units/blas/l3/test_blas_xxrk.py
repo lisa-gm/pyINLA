@@ -1,3 +1,9 @@
+""" """
+
+# pylint: disable=protected-access
+
+from typing import Literal
+
 import numpy as np
 import pytest
 
@@ -8,21 +14,50 @@ if cupy_version is not None:
 
 from dalia.backend.blas.l3 import xxrk
 
-from ..conftest import DATA_TYPES, INTERNAL_DEVICE_TYPES
+from ..conftest import INTERNAL_DEVICE_TYPES
 
 
-@pytest.mark.parametrize("data_type", DATA_TYPES)
 @pytest.mark.parametrize("device_type", INTERNAL_DEVICE_TYPES)
 @pytest.mark.parametrize("uplo", ["U", "L"])
-@pytest.mark.parametrize("trans_a", ["N", "T"])
+@pytest.mark.parametrize("trans_a", ["N", "T", "C"])
 @pytest.mark.parametrize("alpha", [-1.5, 0.0, 1.5])
 @pytest.mark.parametrize("beta", [-1.5, 0.0, 1.5])
-def test_xxrk(matrix_factory, device_type, data_type, uplo, trans_a, alpha, beta):
-    """Test the symmetric/hermitian rank-k update (SYHERK) operation.
+def test_xxrk(
+    matrix_factory: callable,
+    data_type: Literal["float64", "complex128"],
+    device_type: Literal["host", "accelerator"],
+    uplo: Literal["U", "L"],
+    trans_a: Literal["N", "T", "C"],
+    alpha: float,
+    beta: float,
+):
+    """Test the symmetric/hermitian rank-k update (SY/HERK) operation.
 
-    Notes:
-    - This is not testign the complex part (herk) at all
-    - the hw_device is hard coded to "host"
+    Parameters
+    ----------
+    matrix_factory: callable
+        A factory function to create matrices of different types.
+    data_type: Literal["float64", "complex128"]
+        The data type of the matrices.
+    device_type: Literal["host", "accelerator"]
+        The device type to run the test on.
+    uplo: Literal["U", "L"]
+        Specifies whether the upper or lower triangular part of the matrix is used.
+    trans_a: Literal["N", "T", "C"]
+        Specifies whether to transpose or conjugate transpose the matrix A.
+    alpha: float
+        Scalar multiplier for the rank-k update.
+    beta: float
+        Scalar multiplier for the existing matrix C.
+
+    Assert
+    ------
+    The result of the xxrk operation is compared against a reference
+    implementation using NumPy or CuPy on the raw data arrays.
+
+    Notes
+    -----
+    - Do not support "accelerator" testing.
     """
     if (
         nvmath_version is None
@@ -32,8 +67,8 @@ def test_xxrk(matrix_factory, device_type, data_type, uplo, trans_a, alpha, beta
         pytest.skip("nvmath needed for HERK")
 
     # . make operands
-    A = matrix_factory("DenseMatrix", hw_target="host")
-    C = matrix_factory("DenseMatrix", hw_target="host")
+    a = matrix_factory("DenseMatrix", dtype=data_type, hw_target="host")
+    c = matrix_factory("DenseMatrix", dtype=data_type, hw_target="host")
 
     # . TODO: this need work, this is hard-coded for now
     # -> The hw_target is hard-set to "host", the binding doesn't work for Nvidia accelerator yet
@@ -50,9 +85,9 @@ def test_xxrk(matrix_factory, device_type, data_type, uplo, trans_a, alpha, beta
         tri = xp.tril
         tri_indices = xp.tril_indices_from
 
-    a_reference_data = A._data.copy()
-    c_reference_data = C._data.copy()
-    c_reference_data[tri_indices(C._data)] *= beta
+    a_reference_data = a._data.copy()
+    c_reference_data = c._data.copy()
+    c_reference_data[tri_indices(c._data)] *= beta
 
     if trans_a == "N":
         expected = (
@@ -68,15 +103,15 @@ def test_xxrk(matrix_factory, device_type, data_type, uplo, trans_a, alpha, beta
         uplo=uplo,
         trans_a=trans_a,
         alpha=alpha,
-        a=A,
+        a=a,
         beta=beta,
-        c=C,
+        c=c,
         hw_target=device_type,
     )
 
     # Verify the result is correct
     if device_type == "accelerator":
-        C = C.get()
+        c = c.get()
         expected = expected.get()
 
-    assert np.allclose(C._data, expected)
+    assert np.allclose(c._data, expected)

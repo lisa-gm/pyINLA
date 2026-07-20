@@ -7,6 +7,10 @@ Credits:
 
 """
 
+# pylint: disable=too-many-arguments
+# pylint: disable=too-many-positional-arguments
+# pylint: disable=protected-access
+
 from typing import Literal
 
 import numpy as np
@@ -45,6 +49,8 @@ def xxrk(
     or
         C = alpha * op(A)^T/H @ op(A) + beta * C
 
+    API: Wrapper for Matrix datastructures, arguments extended from the BLAS convention.
+
     Parameters
     ----------
     uplo : {'U', 'u', 'L', 'l'}
@@ -74,7 +80,7 @@ def xxrk(
         is provided, it will be overwritten in-place with the result, and the
         routine will return None.
     """
-    # . assert operands types are valid
+    # General assertion on input types
     if not isinstance(a, Matrix):
         raise TypeError(f"Invalid type for a, given: {type(a)}, expected: Matrix")
     if c is not None and not isinstance(c, Matrix):
@@ -90,18 +96,36 @@ def xxrk(
             f"xxrk currently only supports DenseMatrix for output, given: {type(c)}"
         )
 
-    # . if c is given, perform in-place operation in c
-    if c is not None:
-        overwrite_c = True
-    else:
-        overwrite_c = False
-
-    # . map uplo to lower boolean
-    lower = uplo in ["L", "l"]
-
-    # . extract underlying data from Matrix datastructures
+    # Extract data arrays
     a_data = a._data
-    c_data = c._data if c is not None else None
+    # . shape assertions
+    if a_data.ndim != 2:
+        raise ValueError(f"Matrix a must be 2D, given: {a_data.ndim}D")
+    # . if c:Matrix is not provided, allocate a new
+    # data array (in F order) to store the result.
+    c_data: np.ndarray = None
+    if c is not None:
+        c_data = c._data
+        # . basic shape assertions
+        if c_data.shape[0] != c_data.shape[1]:
+            raise ValueError(f"Matrix c must be square, given: {c_data.shape}")
+        if trans_a in ["N", "n"]:
+            if c_data.shape[0] != a_data.shape[0]:
+                raise ValueError(
+                    f"Shapes of a {a_data.shape} and c {c_data.shape} are incompatible for the operation C = alpha * A @ A^T/H + beta * C"
+                )
+        else:
+            if c_data.shape[0] != a_data.shape[1]:
+                raise ValueError(
+                    f"Shapes of a {a_data.shape} and c {c_data.shape} are incompatible for the operation C = alpha * A^T/H @ A + beta * C"
+                )
+    else:
+        c_shape: tuple = (
+            (a_data.shape[0], a_data.shape[0])
+            if trans_a in ["N", "n"]
+            else (a_data.shape[1], a_data.shape[1])
+        )
+        c_data = np.zeros(c_shape, dtype=a_data.dtype, order="F")
 
     # Sanitize hw_target
     # . this needs to be unified throughout the
@@ -109,19 +133,21 @@ def xxrk(
     if hw_target == "default":
         hw_target = a.hw_target
 
-    # . sanitize trans_a (make it uppercase)
-    trans_a = trans_a.upper()
-
     if hw_target == "host":
-        return _xxrk_host(
-            a=a_data,
-            c=c_data,
+        _xxrk_host(
+            uplo=uplo.upper(),
+            trans_a=trans_a.upper(),
             alpha=alpha,
+            a=a_data,
             beta=beta,
-            trans=trans_a,
-            lower=lower,
-            overwrite_c=overwrite_c,
+            c=c_data,
         )
+
+        # If c:Matrix wasn't provided, wrap and return
+        # the result as a Matrix datastructure
+        if c is None:
+            return DenseMatrix(data=c_data, hw_target="host")
+
     elif hw_target == "accelerator":
         raise NotImplementedError(
             "Accelerator support for xxrk is not implemented yet. Please use the host target."
@@ -141,26 +167,60 @@ def xxrk(
 
 # Host-side Kernels
 def _xxrk_host(
-    a,
-    c,
-    alpha,
-    beta,
-    trans,
-    lower,
-    overwrite_c,
+    uplo: Literal["U", "L"],
+    trans_a: Literal["N", "T", "C"],
+    alpha: float,
+    a: np.ndarray,
+    beta: float,
+    c: np.ndarray,
 ):
-    """Computes SYRK and HERK on the host
+    """Call the appropriate BLAS function for symmetric/hermitian
+    rank-k update based on the data type of `a` and `c`.
 
-    additional Argument check_finite that checks if a is finite
+    API: Direct array interface, argument order matching LAPACK conventions.
+
+    Parameters
+    ----------
+    uplo : {'U', 'L'}
+        Specifies whether the upper or lower triangular part of the result is
+        to be referenced. 'U' for upper, 'L' for lower.
+    trans_a : {'N', 'T', 'C'}
+        Specifies the operation to be performed on matrix `a`. 'N' for no
+        transpose, 'T' for transpose, 'C' for conjugate transpose.
+    alpha : float
+        Scalar to be multiplied with matrix `a`.
+    a : np.ndarray
+        Matrix to be rank-updated.
+    beta : float
+        Scalar to be multiplied with matrix `c`.
+    c : np.ndarray
+        Output matrix that will be added to the result. This matrix will be modified in-place.
+
+    Returns
+    -------
+    None
+    - The result is stored in the `c` array, which is modified in-place.
     """
-    trans = {"N": 0, "T": 1, "C": 2}.get(trans, trans)
 
+    # Get the suited blas function and adapt parameters accordingly
     if np.iscomplexobj(a):
-        xxrk = get_blas_funcs(("herk"), (a, a))
+        _xxrk = get_blas_funcs(("herk"), (a,))
+        # . unify trans="T" and trans="C" for herk
+        trans_a = {"N": 0, "T": 2, "C": 2}.get(trans_a, trans_a)
     else:
-        xxrk = get_blas_funcs(("syrk"), (a, a))
+        _xxrk = get_blas_funcs(("syrk"), (a,))
+        # . unify trans_a="T" and trans_a="C" for syrk
+        trans_a = {"N": 0, "T": 1, "C": 1}.get(trans_a, trans_a)
 
-    return xxrk(alpha, a, beta, c, trans, lower, overwrite_c)
+    _xxrk(
+        alpha=alpha,
+        a=a,
+        beta=beta,
+        c=c,
+        trans=trans_a,
+        lower=uplo in ["L"],
+        overwrite_c=True,
+    )
 
 
 # # Nvidia Accelerator-side Kernels
