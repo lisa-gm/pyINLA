@@ -1,3 +1,13 @@
+"""
+
+Forked and modified from scipy.linalg.blas: https://github.com/scipy/scipy/blob/v1.15.3/scipy/linalg/_basic.py#L411
+
+"""
+
+# pylint: disable=too-many-arguments
+# pylint: disable=too-many-positional-arguments
+# pylint: disable=protected-access
+
 from typing import Literal
 
 import numpy as np
@@ -15,22 +25,23 @@ def gemv(
     beta: float,
     y: Vector = None,
     hw_target: Literal["default", "host", "accelerator"] = "default",
-) -> Matrix | None:
-    """Wrapper for performing general matrix vector
-    products on Matrix/Vector datastructures.
+) -> Vector | None:
+    """Wrapper for performing general matrix-vector products on
+    Matrix/Vector datastructures.
 
     This routine performs one of the following general matrix-vector operations:
-        y = alpha * A @ x + beta * y
-    or
-        y = alpha * A.T @ x + beta * y
-    were A is a general matrix, x and y are vectors, and alpha and beta are scalars.
+        y = alpha * op(A) @ x + beta * y
+    where op(A) is one of
+        op(A) = A        if trans_a == 'N'
+        op(A) = A.T/H    if trans_a == 'T' or 'C'
 
-    API: Wrapper for Matrix datastructures.
+    API: Wrapper for Matrix/Vector datastructures, arguments extended from the BLAS convention.
 
     Parameters
     ----------
     trans_a : {'N', 'n', 'T', 't', 'C', 'c'}
-        Specifies the operation to be performed on matrix `a`.
+        Specifies the operation to be performed on matrix `a`. 'N' or 'n' for
+        no transpose, 'T' or 't' or 'C' or 'c' for transpose/conjugate transpose.
     alpha : float
         Scalar to be multiplied with matrix `a`.
     a : Matrix
@@ -56,13 +67,13 @@ def gemv(
 
     Notes
     -----
-    - Need to sanitize the number of RHS (gemv only support single RHS)
-    - If several RHS are given, fall-back to GEMM (gemv is a special case of GEMM)
+    - Only supports single right-hand side (single column vector x).
+      For multiple RHS, use GEMM instead.
     """
     # General assertion on input types
     if not isinstance(a, Matrix):
         raise TypeError(f"Invalid type for a, given: {type(a)}, expected: Matrix")
-    if x is not None and not isinstance(x, Vector):
+    if not isinstance(x, Vector):
         raise TypeError(f"Invalid type for x, given: {type(x)}, expected: Vector")
     if y is not None and not isinstance(y, Vector):
         raise TypeError(f"Invalid type for y, given: {type(y)}, expected: Vector")
@@ -73,22 +84,44 @@ def gemv(
             f"gemv currently only supports DenseMatrix, given: {type(a)}"
         )
 
-    # Extract data-arrays
-    a_data: np.ndarray = a._data
-    x_data: np.ndarray = x._data
+    # Extract data arrays
+    a_data = a._data
+    x_data = x._data
     # . shape assertions
     if a_data.ndim != 2:
         raise ValueError(f"Matrix a must be 2D, given: {a_data.ndim}D")
+
+    # . if x is 2D (multiple RHS), fall back to GEMM
+    if x_data.ndim == 2:
+        from dalia.backend.blas.l3.gemm import gemm as _gemm_fallback
+
+        result = _gemm_fallback(
+            trans_a=trans_a,
+            trans_b="N",
+            alpha=alpha,
+            a=a,
+            b=x,
+            beta=beta,
+            c=y,
+            hw_target=hw_target,
+        )
+        # . gemm returns DenseMatrix when c=None, wrap as Vector
+        if y is None:
+            return Vector(data=result._data, hw_target=result.hw_target)
+        return None
+
     # . adapt the shape assertions given the trans_a parameter
     if trans_a in ["N", "n"]:
         if a_data.shape[1] != x_data.shape[0]:
             raise ValueError(
-                f"Shapes of a {a_data.shape} and x {x_data.shape} are incompatible for matrix-vector multiplication"
+                f"Shapes of a {a_data.shape} and x {x_data.shape} are incompatible "
+                "for matrix-vector multiplication y = alpha * A @ x + beta * y"
             )
     else:
         if a_data.shape[0] != x_data.shape[0]:
             raise ValueError(
-                f"Shapes of a {a_data.shape} and x {x_data.shape} are incompatible for matrix-vector multiplication"
+                f"Shapes of a {a_data.shape} and x {x_data.shape} are incompatible "
+                "for matrix-vector multiplication y = alpha * A.T/H @ x + beta * y"
             )
     # . if y:Vector is not provided, allocate a new
     # data array (in F order) to store the result.
@@ -96,18 +129,11 @@ def gemv(
     if y is not None:
         y_data = y._data
         # . basic shape assertions
-        if a_data.shape[0] != y_data.shape[0]:
+        row_dim = a_data.shape[0] if trans_a in ["N", "n"] else a_data.shape[1]
+        if y_data.shape[0] != row_dim:
             raise ValueError(
-                f"Shapes of a {a_data.shape} and y {y_data.shape} are incompatible for vector-vector addition in the operation y = alpha * A @ x + beta * y"
-            )
-        # . additional shape assertions for multi-dimensional y (multiple RHS)
-        if x_data.ndim != y_data.ndim:
-            raise ValueError(
-                f"Shapes of x {x_data.shape} and y {y_data.shape} are incompatible for vector-vector addition in the operation y = alpha * A @ x + beta * y"
-            )
-        if x_data.ndim == 2 and x_data.shape[1] != y_data.shape[1]:
-            raise ValueError(
-                f"Shapes of x {x_data.shape} and y {y_data.shape} are incompatible for vector-vector addition in the operation y = alpha * A @ x + beta * y"
+                f"Shapes of a {a_data.shape}, x {x_data.shape}, and y {y_data.shape} "
+                "are incompatible for the operation y = alpha * op(A) @ x + beta * y"
             )
     else:
         row_dim = a_data.shape[0] if trans_a in ["N", "n"] else a_data.shape[1]
@@ -122,7 +148,7 @@ def gemv(
 
     if hw_target == "host":
         _gemv_host(
-            trans_a=trans_a,
+            trans_a=trans_a.upper(),
             alpha=alpha,
             a=a_data,
             x=x_data,
@@ -130,10 +156,11 @@ def gemv(
             y=y_data,
         )
 
-        # if y:Vector wasn't provided, wrap and return
+        # If y:Vector wasn't provided, wrap and return
         # the result as a Vector datastructure
         if y is None:
             return Vector(data=y_data, hw_target="host")
+        return None
 
     elif hw_target == "accelerator":
         raise NotImplementedError(
@@ -145,22 +172,22 @@ def gemv(
 
 # Host-side Kernels
 def _gemv_host(
-    trans_a: Literal["N", "n", "T", "t", "C", "c"],
+    trans_a: Literal["N", "T", "C"],
     alpha: float,
     a: np.ndarray,
     x: np.ndarray,
     beta: float,
     y: np.ndarray,
 ) -> None:
-    """Call the appropriate BLAS function for symmetric/hermitian
-    matrix-vector product based on the data type of `a` and `x`.
+    """Call the appropriate BLAS function for general matrix-vector product.
 
-    API: Direct array interface.
+    API: Direct array interface, argument order matching LAPACK conventions.
 
     Parameters
     ----------
-    trans_a : {'N', 'n', 'T', 't', 'C', 'c'}
-        Specifies the operation to be performed on matrix `a`.
+    trans_a : {'N', 'T', 'C'}
+        Specifies the operation to be performed on matrix `a`. 'N' for no
+        transpose, 'T' for transpose, 'C' for conjugate transpose.
     alpha : float
         Scalar to be multiplied with matrix `a`.
     a : np.ndarray
@@ -175,11 +202,18 @@ def _gemv_host(
     Returns
     -------
     None
-        The result is stored in the `y` array, which is modified in-place.
+    - The result is stored in the `y` array, which is modified in-place.
     """
-    trans_a = trans_a.upper()
     trans_a = {"N": 0, "T": 1, "C": 2}.get(trans_a, trans_a)
 
-    gemv = get_blas_funcs(("gemv"), (a, x))
+    _gemv = get_blas_funcs(("gemv"), (a, x))
 
-    gemv(trans=trans_a, alpha=alpha, a=a, x=x, beta=beta, y=y, overwrite_y=True)
+    _gemv(
+        trans=trans_a,
+        alpha=alpha,
+        a=a,
+        x=x,
+        beta=beta,
+        y=y,
+        overwrite_y=True,
+    )

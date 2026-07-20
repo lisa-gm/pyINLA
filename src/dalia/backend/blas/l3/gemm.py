@@ -1,12 +1,17 @@
-# Copyright 2023-2025 ETH Zurich. All rights reserved.
-# Forked and modified from cupy.cublas.gemm: https://github.com/cupy/cupy/blob/3a2c950d64ee707096bc7ca1bf0b953a08206384/cupy/cublas.py#L689
-# and scipy.linal.solve_triangular: https://github.com/scipy/scipy/blob/v1.15.3/scipy/linalg/_basic.py#L411
+"""
+
+Forked and modified from cupy.cublas.gemm: https://github.com/cupy/cupy/blob/3a2c950d64ee707096bc7ca1bf0b953a08206384/cupy/cublas.py#L689
+and scipy.linal.solve_triangular: https://github.com/scipy/scipy/blob/v1.15.3/scipy/linalg/_basic.py#L411
+
+"""
+
+# pylint: disable=too-many-arguments
+# pylint: disable=too-many-positional-arguments
+# pylint: disable=protected-access
 
 from typing import Literal
 
 import numpy as np
-from scipy.linalg._decomp import _asarray_validated
-from scipy.linalg._misc import _datacopied
 from scipy.linalg.blas import get_blas_funcs
 
 # from dalia.backend.config import cupy_version
@@ -67,7 +72,7 @@ def gemm(
         is provided, it will be overwritten in-place with the result, and the
         routine will return None.
     """
-    # . assert operands types are valid
+    # General assertion on input types
     if not isinstance(a, Matrix):
         raise TypeError(f"Invalid type for a, given: {type(a)}, expected: Matrix")
     if not isinstance(b, Matrix):
@@ -78,27 +83,42 @@ def gemm(
     # . extra check as for now only support DenseMatrix
     if not isinstance(a, DenseMatrix):
         raise NotImplementedError(
-            f"xxrk currently only supports DenseMatrix, given: {type(a)}"
+            f"gemm currently only supports DenseMatrix, given: {type(a)}"
         )
     if not isinstance(b, DenseMatrix):
         raise NotImplementedError(
-            f"xxrk currently only supports DenseMatrix, given: {type(b)}"
+            f"gemm currently only supports DenseMatrix, given: {type(b)}"
         )
     if c is not None and not isinstance(c, DenseMatrix):
         raise NotImplementedError(
-            f"xxrk currently only supports DenseMatrix for output, given: {type(c)}"
+            f"gemm currently only supports DenseMatrix for output, given: {type(c)}"
         )
 
-    # . if c is given, perform in-place operation in c
-    if c is not None:
-        overwrite_c = True
-    else:
-        overwrite_c = False
-
-    # . extract underlying data from Matrix datastructures
+    # Extract data arrays
     a_data = a._data
     b_data = b._data
-    c_data = c._data if c is not None else None
+    # . if c:Matrix is not provided, allocate a new
+    # data array (in F order) to store the result.
+    c_data: np.ndarray = None
+    if c is not None:
+        c_data = c._data
+        # . basic shape assertions
+        m = a_data.shape[0] if trans_a == "N" else a_data.shape[1]
+        n = b_data.shape[1] if trans_b == "N" else b_data.shape[0]
+        if c_data.shape[0] != m:
+            raise ValueError(
+                f"Shapes of a {a_data.shape}, b {b_data.shape}, and c {c_data.shape} "
+                f"are incompatible for the operation C = alpha * op(A) @ op(B) + beta * C"
+            )
+        if c_data.shape[1] != n:
+            raise ValueError(
+                f"Shapes of a {a_data.shape}, b {b_data.shape}, and c {c_data.shape} "
+                f"are incompatible for the operation C = alpha * op(A) @ op(B) + beta * C"
+            )
+    else:
+        m = a_data.shape[0] if trans_a == "N" else a_data.shape[1]
+        n = b_data.shape[1] if trans_b == "N" else b_data.shape[0]
+        c_data = np.zeros((m, n), dtype=a_data.dtype, order="F")
 
     # Sanitize hw_target
     # . this needs to be unified throughout the
@@ -106,21 +126,23 @@ def gemm(
     if hw_target == "default":
         hw_target = a.hw_target
 
-    # . sanitize trans_a (make it uppercase)
-    trans_a = trans_a.upper()
-    trans_b = trans_b.upper()
-
     if hw_target == "host":
-        return _gemm_host(
+        _gemm_host(
+            trans_a=trans_a.upper(),
+            trans_b=trans_b.upper(),
+            alpha=alpha,
             a=a_data,
             b=b_data,
-            c=c_data,
-            alpha=alpha,
             beta=beta,
-            trans_a=trans_a,
-            trans_b=trans_b,
-            overwrite_c=overwrite_c,
+            c=c_data,
         )
+
+        # If c:Matrix wasn't provided, wrap and return
+        # the result as a Matrix datastructure
+        if c is None:
+            return DenseMatrix(data=c_data, hw_target="host")
+        return None
+
     elif hw_target == "accelerator":
         raise NotImplementedError(
             "Accelerator support for gemm is not implemented yet. Please use the host target."
@@ -135,31 +157,54 @@ def gemm(
         #     trans_b=trans_b,
         #     overwrite_c=overwrite_c,
         # )
+
     else:
-        ModuleNotFoundError("Unknown Module")
+        raise ModuleNotFoundError("Unknown Module")
 
 
 # Host-side Kernels
 def _gemm_host(
-    a,
-    b,
-    c,
-    alpha,
-    beta,
-    trans_a,
-    trans_b,
-    overwrite_c,
-):
-    """Computes GEMM on the host
+    trans_a: Literal["N", "T", "C"],
+    trans_b: Literal["N", "T", "C"],
+    alpha: float,
+    a: np.ndarray,
+    b: np.ndarray,
+    beta: float,
+    c: np.ndarray,
+) -> None:
+    """Call the appropriate BLAS function for general matrix-matrix multiplication.
 
-    additional Argument check_finite that checks if a and b are finite
+    API: Direct array interface, argument order matching LAPACK conventions.
+
+    Parameters
+    ----------
+    trans_a : {'N', 'T', 'C'}
+        Specifies the operation to be performed on matrix `a`. 'N' for no
+        transpose, 'T' for transpose, 'C' for conjugate transpose.
+    trans_b : {'N', 'T', 'C'}
+        Specifies the operation to be performed on matrix `b`. 'N' for no
+        transpose, 'T' for transpose, 'C' for conjugate transpose.
+    alpha : float
+        Scalar multiplier for the product of op(A) and op(B).
+    a : np.ndarray
+        First input matrix.
+    b : np.ndarray
+        Second input matrix.
+    beta : float
+        Scalar multiplier for the matrix C.
+    c : np.ndarray
+        Output matrix that will be added to the result. This matrix will be modified in-place.
+
+    Returns
+    -------
+    None
+    - The result is stored in the `c` array, which is modified in-place.
     """
-
     trans_a = {"N": 0, "T": 1, "C": 2}.get(trans_a, trans_a)
     trans_b = {"N": 0, "T": 1, "C": 2}.get(trans_b, trans_b)
-    (gemm,) = get_blas_funcs(("gemm",), (a, b))
+    (_gemm,) = get_blas_funcs(("gemm",), (a, b))
 
-    return gemm(
+    _gemm(
         alpha=alpha,
         a=a,
         b=b,
@@ -167,7 +212,7 @@ def _gemm_host(
         c=c,
         trans_a=trans_a,
         trans_b=trans_b,
-        overwrite_c=overwrite_c,
+        overwrite_c=True,
     )
 
 

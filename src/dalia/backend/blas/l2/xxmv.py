@@ -1,6 +1,10 @@
 """
-Wrapper for performing symmetric (symv) and hermitian (hemv) matrix vector
-products on Matrix/Vector datastructures.
+
+Wrapper for performing symmetric (symv) and hermitian (hemv) matrix-vector products on Matrix/Vector datastructures.
+
+Credits:
+- The host-side was forked and adapted from scipy.linalg.blas.
+
 """
 
 # pylint: disable=too-many-arguments
@@ -24,25 +28,26 @@ def xxmv(
     beta: float,
     y: Vector = None,
     hw_target: Literal["default", "host", "accelerator"] = "default",
-) -> Matrix | None:
-    """Wrapper for performing symmetric (symv) and hermitian (hemv) matrix vector
+) -> Vector | None:
+    """Wrapper for performing symmetric (symv) and hermitian (hemv) matrix-vector
     products on Matrix/Vector datastructures.
 
     This routine performs the following symmetric (hermitian) operation:
         y = alpha * A @ x + beta * y
-    were A is a symmetric (hermitian) matrix, x and y are vectors, and alpha and beta are scalars.
+    where A is a symmetric (hermitian) matrix, x and y are vectors,
+    and alpha and beta are scalars.
 
-    API: Wrapper for Matrix datastructures, arguments extended from the BLAS convention.
+    API: Wrapper for Matrix/Vector datastructures, arguments extended from the BLAS convention.
 
     Parameters
     ----------
     uplo : {'U', 'u', 'L', 'l'}
-        Specifies whether the upper or lower triangular part of the result is
-        to be referenced. 'U' or 'u' for upper, 'L' or 'l' for lower.
+        Specifies whether the upper or lower triangular part of the matrix `a`
+        is to be referenced. 'U' or 'u' for upper, 'L' or 'l' for lower.
     alpha : float
         Scalar to be multiplied with matrix `a`.
     a : Matrix
-        Matrix to apply to the vector `x`.
+        Symmetric (hermitian) matrix to apply to the vector `x`.
     x : Vector
         Vector to be multiplied with matrix `a`.
     beta : float
@@ -64,13 +69,13 @@ def xxmv(
 
     Notes
     -----
-    - Need to sanitize the number of RHS (xxmv only support single RHS)
-    - If several RHS are given, fall-back to SYMM/HEMM (xxmv is a special case of SYMM/HEMM)
+    - Only supports single right-hand side (single column vector x).
+      For multiple RHS, use SYMM/HEMM instead.
     """
     # General assertion on input types
     if not isinstance(a, Matrix):
         raise TypeError(f"Invalid type for a, given: {type(a)}, expected: Matrix")
-    if x is not None and not isinstance(x, Vector):
+    if not isinstance(x, Vector):
         raise TypeError(f"Invalid type for x, given: {type(x)}, expected: Vector")
     if y is not None and not isinstance(y, Vector):
         raise TypeError(f"Invalid type for y, given: {type(y)}, expected: Vector")
@@ -81,9 +86,9 @@ def xxmv(
             f"xxmv currently only supports DenseMatrix, given: {type(a)}"
         )
 
-    # Extract data-arrays
-    a_data: np.ndarray = a._data
-    x_data: np.ndarray = x._data
+    # Extract data arrays
+    a_data = a._data
+    x_data = x._data
     # . shape assertions
     if a_data.ndim != 2:
         raise ValueError(f"Matrix a must be 2D, given: {a_data.ndim}D")
@@ -91,7 +96,8 @@ def xxmv(
         raise ValueError(f"Matrix a must be square, given: {a_data.shape}")
     if a_data.shape[1] != x_data.shape[0]:
         raise ValueError(
-            f"Shapes of a {a_data.shape} and x {x_data.shape} are incompatible for matrix-vector multiplication"
+            f"Shapes of a {a_data.shape} and x {x_data.shape} are incompatible "
+            "for matrix-vector multiplication y = alpha * A @ x + beta * y"
         )
     # . if y:Vector is not provided, allocate a new
     # data array (in F order) to store the result.
@@ -99,18 +105,10 @@ def xxmv(
     if y is not None:
         y_data = y._data
         # . basic shape assertions
-        if a_data.shape[0] != y_data.shape[0]:
-            raise ValueError(f"Shapes of a {a_data.shape} and y {y_data.shape} are \
-                incompatible for vector-vector addition in the operation \
-                y = alpha * A @ x + beta * y")
-        # . additional shape assertions for multi-dimensional y (multiple RHS)
-        if x_data.ndim != y_data.ndim:
-            raise ValueError(f"Shapes of x {x_data.shape} and y {y_data.shape} are \
-                incompatible for vector-vector addition in the operation \
-                y = alpha * A @ x + beta * y")
-        if x_data.ndim == 2 and x_data.shape[1] != y_data.shape[1]:
+        if y_data.shape[0] != a_data.shape[0]:
             raise ValueError(
-                f"Shapes of x {x_data.shape} and y {y_data.shape} are incompatible for vector-vector addition in the operation y = alpha * A @ x + beta * y"
+                f"Shapes of a {a_data.shape}, x {x_data.shape}, and y {y_data.shape} "
+                "are incompatible for the operation y = alpha * A @ x + beta * y"
             )
     else:
         y_shape: tuple = (
@@ -140,6 +138,7 @@ def xxmv(
         # the result as a Vector datastructure
         if y is None:
             return Vector(data=y_data, hw_target="host")
+        return None
 
     elif hw_target == "accelerator":
         raise NotImplementedError(
@@ -166,12 +165,12 @@ def _xxmv_host(
     Parameters
     ----------
     uplo : {'U', 'L'}
-        Specifies whether the upper or lower triangular part of the result is
-        to be referenced. 'U' for upper, 'L' for lower.
+        Specifies whether the upper or lower triangular part of the matrix `a`
+        is to be referenced. 'U' for upper, 'L' for lower.
     alpha : float
         Scalar to be multiplied with matrix `a`.
     a : np.ndarray
-        Matrix to apply to the vector `x`.
+        Symmetric (hermitian) matrix to apply to the vector `x`.
     x : np.ndarray
         Vector to be multiplied with matrix `a`.
     beta : float
@@ -186,11 +185,11 @@ def _xxmv_host(
     """
 
     if np.iscomplexobj(a):
-        xxmv = get_blas_funcs(("hemv"), (a, x))
+        _xxmv = get_blas_funcs(("hemv"), (a, x))
     else:
-        xxmv = get_blas_funcs(("symv"), (a, x))
+        _xxmv = get_blas_funcs(("symv"), (a, x))
 
-    xxmv(
+    _xxmv(
         alpha=alpha,
         a=a,
         x=x,

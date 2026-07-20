@@ -147,6 +147,7 @@ def xxrk(
         # the result as a Matrix datastructure
         if c is None:
             return DenseMatrix(data=c_data, hw_target="host")
+        return None
 
     elif hw_target == "accelerator":
         raise NotImplementedError(
@@ -161,6 +162,7 @@ def xxrk(
         #     lower=lower,
         #     overwrite_c=overwrite_c,
         # )
+
     else:
         raise ModuleNotFoundError("Unknown Module")
 
@@ -173,7 +175,7 @@ def _xxrk_host(
     a: np.ndarray,
     beta: float,
     c: np.ndarray,
-):
+) -> None:
     """Call the appropriate BLAS function for symmetric/hermitian
     rank-k update based on the data type of `a` and `c`.
 
