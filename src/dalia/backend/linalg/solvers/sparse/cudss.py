@@ -133,7 +133,7 @@ class CuDSS(SparseSolver):
         cudss.matrix_destroy(self._b)
         cudss.matrix_destroy(self._A)
         cudss.destroy(self.cudss_handle)
-        
+
     # 11. Private/protected methods (start with _)
 
     def _analyze(self):
@@ -213,5 +213,36 @@ class CuDSS(SparseSolver):
         raise NotImplementedError("Log-determinant computation is not supported in cuDSS. Use SparseSolver instead.")
     
     def _compute_selected_inverse(self):
-        raise NotImplementedError("Selected inverse computation is not supported in cuDSS. Use SparseSolver instead.")
+        # WARNING: Not really selected inversion, bad for big operations.
+        self._b = cp.eye(self._n, dtype=self._dtype)
+        self._b = cudss.matrix_create_dn(
+            self._n,  # nrows
+            self._n,  # ncols (number of RHS)
+            self._n,  # leading dimension
+            self._b.data.ptr,  # values
+            self._cudss_dtype,  # complex128
+            cudss.Layout.COL_MAJOR,  # column-major (Fortran style)
+        )
+
+        x = cp.zeros((self._n, self._n), dtype=self._dtype)
+        self._x = cudss.matrix_create_dn(
+            self._n,  # nrows
+            self._n,  # ncols (number of RHS)
+            self._n,  # leading dimension
+            x.data.ptr,  # values
+            self._cudss_dtype,  # complex128
+            cudss.Layout.COL_MAJOR,  # column-major (Fortran style)
+        )
+
+        cudss.execute(
+            self.cudss_handle,
+            cudss.Phase.SOLVE,
+            self.cudss_config,
+            self.cudss_data,
+            self._A,
+            self._x,
+            self._b,
+        )
+
+        return x
     
