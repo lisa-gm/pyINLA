@@ -96,5 +96,28 @@ class SparseSolver(LinearSolver):
             raise ValueError(f"Invalid hardware target type '{self._target}'. Supported target types are {target_list}.")
         
     def _compute_selected_inverse(self):
+        
+        from dalia.backend.datastructures import SparseMatrix
+        n = self._factors.shape[0]
 
-        raise NotImplementedError("Log determinant not implemented for sparse solver yet.")
+        if self._target == "host":
+            # Compute L^{-1} by solving L X = I
+            L_inv = h_splu.spsolve_triangular(
+                self._factors, np.eye(n), lower=True, check_finite=False
+            )
+
+            # Compute A^{-1} = L_inv^T @ L_inv
+            #inv_array = L_inv.T @ L_inv
+            inv_array = L_inv.T @ L_inv
+        elif self._target == "accelerator":
+            # Compute L^{-1} by solving L X = I
+            L_inv = a_splu.spsolve_triangular(
+                self._factors, cp.eye(n), lower=True, check_finite=False
+            )
+
+            # Compute A^{-1} = L_inv^T @ L_inv
+            #inv_array = L_inv.T @ L_inv
+            inv_array = L_inv.T @ L_inv
+        else:
+            raise ValueError(f"Invalid hardware target type '{self._target}'. Supported target types are {target_list}.")
+        return SparseMatrix(inv_array)

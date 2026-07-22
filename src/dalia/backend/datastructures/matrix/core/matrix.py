@@ -2,7 +2,7 @@
 from abc import ABC
 
 from dalia.backend.datastructures.matrix.dispatch import Operation, blas_dispatch
-from dalia.backend.config import default_hw_target
+from dalia.backend.config import default_hw_target, default_override
 
 from .utils import toarray, wrap_result, tohost, toaccelerator, settarget
 
@@ -113,7 +113,7 @@ class Matrix(ABC):
     __array_ufunc__ = None  # Disable numpy ufuncs to avoid conflicts
 
     # 2. Initialization
-    def __init__(self, data, hw_target=default_hw_target):
+    def __init__(self, data, hw_target=default_hw_target, override:bool=default_override):
 
         
         if data.dtype.char not in 'fdFD':
@@ -123,6 +123,7 @@ class Matrix(ABC):
         
         self._hw_target = hw_target
         self._data = data
+        self._override = override
 
     # 3. Special representation methods
 
@@ -142,15 +143,15 @@ class Matrix(ABC):
         """Hardware where the matrix data is stored ('host' or 'accelerator')"""
         return self._hw_target
     
-    @hw_target.setter
-    def hw_target(self, hw_target):
-        """Set hardware target for the matrix data
-
-        Args:
-            hw_target (str): 'host' or if supported by the system: 'accelerator'.
-        """
-        if self._hw_target != hw_target:
-            self._data, self._hw_target = settarget(self._data, hw_target)
+    @property
+    def override(self):
+        """Override flag for memory management"""
+        return self._override
+    
+    @override.setter
+    def override(self, value: bool):
+        """Set the override flag for memory management"""
+        self._override = value
 
     # 5. Comparison operators (if needed)
 
@@ -304,6 +305,16 @@ class Matrix(ABC):
             array([[1, 2]])
         """
         return toarray(self._data)
+    
+    def tohost(self):
+        if self.hw_target == "accelerator":
+            self._data = tohost(self._data)
+            self._hw_target = "host"
+
+    def toaccelerator(self):
+        if self.hw_target == "host":
+            self._data = toaccelerator(self._data)
+            self._hw_target = "accelerator"
 
     # 11. Private/protected methods (start with _)
     def _wrap_result(self, data):

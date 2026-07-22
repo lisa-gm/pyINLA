@@ -61,9 +61,12 @@ class TestSolve:
         b = np.array([1., 2., 3.], dtype=np.float64)
         b = cp.asarray(b)
         solver = CuDSS(A)
+        solver.analyze()
+        solver.factorize()
         x = solver.solve(b)
         # Verify the solution is correct
         x = x.get()
         b = b.get()
+        print(A.toarray() @ x, x.T, b)
         assert np.allclose(A.toarray() @ x, b)
 

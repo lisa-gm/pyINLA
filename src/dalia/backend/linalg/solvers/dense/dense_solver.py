@@ -1,7 +1,6 @@
 # src/dalia/backend/linalg/solvers/dense/dense_linear_solver.py
 
-from dalia.backend.config import cupy_version
-
+from dalia.backend.config import cupy_version, nvmath_version, target_list
 import numpy as np
 import scipy.linalg as sp_la
 # from scipy.linalg import cholesky, get_lapack_funcs, solve_triangular
@@ -11,8 +10,11 @@ if cupy_version is not None:
     import cupy as cp
     import cupy.linalg as cp_la
 
+if nvmath_version is not None:
+    from nvmath.bindings import cublas as nvcublas
+
 from dalia.backend.linalg.solvers.linear_solver import LinearSolver
-from dalia.backend.BLAS import trsm
+from dalia.backend.BLAS import trsm, gemm
 
 class DenseSolver(LinearSolver):
     """Base Dense linear solver class.
@@ -112,7 +114,12 @@ class DenseSolver(LinearSolver):
         float
             Log-determinant of the matrix.
         """
-        return 2.0 * np.sum(np.log(np.diag(self._factors)))
+        if self._target == "host":
+            return 2.0 * np.sum(np.log(np.diag(self._factors)))
+        elif self._target == "accelerator":
+            return 2.0 * cp.sum(cp.log(cp.diag(self._factors)))
+        else:
+            raise ValueError(f"Invalid hardware target type '{self._target}'. Supported target types are {target_list}.")
 
     def _compute_selected_inverse(self, overwrite_factors: bool = False):
         """Compute full matrix inverse as DenseMatrix.
@@ -151,33 +158,74 @@ class DenseSolver(LinearSolver):
         from dalia.backend.datastructures import DenseMatrix
 
         n = self._factors.shape[0]
-        if overwrite_factors:
-            # Avoid extra copies and fully work in-place.
-            #   - This uses LAPACK POTRI to directly inverse the L factor, after
-            #   the call, self._factors contains the inverse in its lower triangle.
-            #   - As POTRI only fills the lower triangle, we symmetrize afterward.
-            xp_la = self._set_library(self._target)
-            (potri,) = xp_la.get_lapack_funcs(("potri",), (self._factors,))
+        if self._target == "host":
+            if overwrite_factors:
+                # Avoid extra copies and fully work in-place.
+                #   - This uses LAPACK POTRI to directly inverse the L factor, after
+                #   the call, self._factors contains the inverse in its lower triangle.
+                #   - As POTRI only fills the lower triangle, we symmetrize afterward.
+                
+                (potri,) = sp_la.get_lapack_funcs(("potri",), (self._factors,))
 
-            inv_array, info = potri(self._factors, lower=True, overwrite_c=True)
+                inv_array, info = potri(self._factors, lower=True, overwrite_c=True)
 
-            if info != 0:
-                raise np.linalg.LinAlgError(f"POTRI failed with error code {info}")
+                if info != 0:
+                    raise np.linalg.LinAlgError(f"POTRI failed with error code {info}")
 
-            i_lower = np.tril_indices(n, -1)
-            inv_array[i_lower[::-1]] = inv_array[i_lower]
+                i_lower = np.tril_indices(n, -1)
+                inv_array[i_lower[::-1]] = inv_array[i_lower]
 
+            else:
+                # Safe: compute in new memory, preserving factors
+                # This allocates 2xn² additional memory at peak
+
+                # Compute L^{-1} by solving L X = I
+                L_inv = sp_la.solve_triangular(
+                    self._factors, np.eye(n), lower=True, check_finite=False
+                )
+
+                # Compute A^{-1} = L_inv^T @ L_inv
+                inv_array = L_inv.T @ L_inv
+        elif self._target == "accelerator":
+            if overwrite_factors and nvmath_version is not None:
+                # Avoid extra copies and fully work in-place.
+                #   - This uses LAPACK POTRI to directly inverse the L factor, after
+                #   the call, self._factors contains the inverse in its lower triangle.
+                #   - As POTRI only fills the lower triangle, we symmetrize afterward.
+
+                dtype = self._factors.dtype.char
+                if dtype == 'f':
+                    func = nvcublas.spotri
+                elif dtype == 'd':
+                    func = nvcublas.dpotri
+                elif dtype == 'F':
+                    func = nvcublas.cpotri
+                elif dtype == 'D':
+                    func = nvcublas.zpotri
+                else:
+                    raise TypeError('invalid dtype')
+                
+                inv_array, info = potri(self._factors, lower=True, overwrite_c=True)
+
+                if info != 0:
+                    raise cp.linalg.LinAlgError(f"POTRI failed with error code {info}")
+                
+                i_lower = cp.tril_indices(n, -1)
+                inv_array[i_lower[::-1]] = inv_array[i_lower]
+
+            else:
+                # Safe: compute in new memory, preserving factors
+                # This allocates 2xn² additional memory at peak
+
+                # Compute L^{-1} by solving L X = I
+                L_inv = cp_la.solve_triangular(
+                    self._factors, cp.eye(n), lower=True, check_finite=False
+                )
+
+                # Compute A^{-1} = L_inv^T @ L_inv
+                #inv_array = L_inv.T @ L_inv
+                inv_array = gemm(L_inv, L_inv, hw_target=self._target, transa="T")
         else:
-            # Safe: compute in new memory, preserving factors
-            # This allocates 2xn² additional memory at peak
-
-            # Compute L^{-1} by solving L X = I
-            L_inv = xp_la.solve_triangular(
-                self._factors, np.eye(n), lower=True, check_finite=False
-            )
-
-            # Compute A^{-1} = L_inv^T @ L_inv
-            inv_array = L_inv.T @ L_inv
-
+            raise ValueError(f"Invalid hardware target type '{self._target}'. Supported target types are {target_list}.")
         return DenseMatrix(inv_array)
     
