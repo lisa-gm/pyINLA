@@ -218,13 +218,13 @@ class DenseSolver(LinearSolver):
                 # This allocates 2xn² additional memory at peak
 
                 # Compute L^{-1} by solving L X = I
-                L_inv = cp_la.solve_triangular(
-                    self._factors, cp.eye(n), lower=True, check_finite=False
+                L_inv = trsm(
+                    self._factors, cp.eye(n), hw_target=self._target, lower=True, check_finite=False
                 )
 
                 # Compute A^{-1} = L_inv^T @ L_inv
                 #inv_array = L_inv.T @ L_inv
-                inv_array = gemm(L_inv, L_inv, hw_target=self._target, transa="T")
+                inv_array = gemm(L_inv, L_inv, hw_target=self._target, trans_a="T")
         else:
             raise ValueError(f"Invalid hardware target type '{self._target}'. Supported target types are {target_list}.")
         return DenseMatrix(inv_array)

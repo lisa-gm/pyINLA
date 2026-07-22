@@ -67,6 +67,5 @@ class TestSolve:
         # Verify the solution is correct
         x = x.get()
         b = b.get()
-        print(A.toarray() @ x, x.T, b)
         assert np.allclose(A.toarray() @ x, b)
 

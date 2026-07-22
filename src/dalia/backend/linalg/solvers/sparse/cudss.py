@@ -29,13 +29,16 @@ class CuDSS(SparseSolver):
         self._is_analyzed = False
         self._is_factorized = False
 
-        self._data = matrix._data.data
-        self._indices = matrix._data.indices
-        self._indptr = matrix._data.indptr
-        self._n = len(self._indptr) - 1
-        self._nnz = len(self._data)
+        self._A_csr = matrix._data
+        self._data = self._A_csr.data
+        self._indices = self._A_csr.indices
+        self._indptr = self._A_csr.indptr
+        self._n = self._A_csr.shape[0]  # Standard way to get number of rows
+        self._nnz = self._A_csr.nnz     # Standard way to get number of non-zero entries
         self._rhs = rhs
-        self._dtype = matrix._data.dtype
+        self._dtype = self._A_csr.dtype
+
+        # 3. Determine the correct cuDSS data types
         if self._dtype == np.float32:
             self._cudss_dtype = nm.CudaDataType.CUDA_R_32F
         elif self._dtype == np.float64:
@@ -44,25 +47,21 @@ class CuDSS(SparseSolver):
             self._cudss_dtype = nm.CudaDataType.CUDA_C_32F
         elif self._dtype == np.complex128:
             self._cudss_dtype = nm.CudaDataType.CUDA_C_64F
-        
 
-        self._d_data = cp.asarray(self._data, dtype=self._dtype)
-        self._d_indices = cp.asarray(self._indices, dtype=cp.int32)
-        self._d_indptr = cp.asarray(self._indptr, dtype=cp.int32)
-
+        # 4. Create the cuDSS matrix handle utilizing the data memory pointers
         self._A = cudss.matrix_create_csr(
-            self._n,  # nrows
-            self._n,  # ncols
-            self._nnz,  # nnz
-            self._d_indptr.data.ptr,  # row_start (beginning of row offset array)
-            0,  # row_end (NULL/0 - not used in standard CSR)
-            self._d_indices.data.ptr,  # column indices
-            self._d_data.data.ptr,  # values
-            nm.CudaDataType.CUDA_R_32I,  # index type (int32)
-            self._cudss_dtype,  # value type (complex128)
-            cudss.MatrixType.GENERAL,  # matrix type (general)
-            cudss.MatrixViewType.FULL,  # matrix view (full)
-            cudss.IndexBase.ZERO,  # 0-based indexing
+            self._n,
+            self._n,
+            self._nnz,
+            self._indptr.data.ptr,
+            0,
+            self._indices.data.ptr,
+            self._data.data.ptr,
+            nm.CudaDataType.CUDA_R_32I,
+            self._cudss_dtype,
+            cudss.MatrixType.GENERAL,
+            cudss.MatrixViewType.FULL,
+            cudss.IndexBase.ZERO,
         )
 
         # Create right-hand side and solution vectors of the given batchsize
@@ -123,8 +122,18 @@ class CuDSS(SparseSolver):
     # 8. In-place operators (if supported)
     # 9. Other special methods
     # 10. Public methods
+
     def analyze(self):
         self._analyze()
+
+    def __del__(self):
+        cudss.data_destroy(self.cudss_handle, self.cudss_data)
+        cudss.config_destroy(self.cudss_config)
+        cudss.matrix_destroy(self._x)
+        cudss.matrix_destroy(self._b)
+        cudss.matrix_destroy(self._A)
+        cudss.destroy(self.cudss_handle)
+        
     # 11. Private/protected methods (start with _)
 
     def _analyze(self):
@@ -143,7 +152,6 @@ class CuDSS(SparseSolver):
         
         if not self._is_analyzed:
             self._analyze()
-
         cudss.execute(
             self.cudss_handle,
             cudss.Phase.FACTORIZATION,
@@ -155,7 +163,7 @@ class CuDSS(SparseSolver):
         )
 
         self._is_factorized = True
-        return None # cuDSS does not support separate factorization step, so we return None
+        return None # cuDSS has opaque L and U factors that can't be returned.
 
     def _solve_system(self, b):
 
@@ -200,4 +208,10 @@ class CuDSS(SparseSolver):
         )
 
         return x if self._rhs > 1 else x.ravel()
+    
+    def _compute_logdet(self):
+        raise NotImplementedError("Log-determinant computation is not supported in cuDSS. Use SparseSolver instead.")
+    
+    def _compute_selected_inverse(self):
+        raise NotImplementedError("Selected inverse computation is not supported in cuDSS. Use SparseSolver instead.")
     

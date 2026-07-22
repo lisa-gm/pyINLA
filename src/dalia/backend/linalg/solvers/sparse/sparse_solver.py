@@ -5,13 +5,16 @@
 import numpy as np
 import scipy.sparse as sp
 from scipy.sparse.linalg import splu as h_splu
+from scipy.sparse.linalg import spsolve_triangular as h_spsolve_triangular
 
 from dalia.backend.linalg.solvers.linear_solver import LinearSolver
 from dalia.backend.config import cupy_version, target_list
 
 if cupy_version is not None:
     import cupy as cp
+    import cupyx.scipy.sparse as cu_sp
     from cupyx.scipy.sparse.linalg import splu as a_splu
+    from cupyx.scipy.sparse.linalg import spsolve_triangular as a_spsolve_triangular
 
 class SparseSolver(LinearSolver):
     ...
@@ -95,29 +98,21 @@ class SparseSolver(LinearSolver):
         else:
             raise ValueError(f"Invalid hardware target type '{self._target}'. Supported target types are {target_list}.")
         
-    def _compute_selected_inverse(self):
-        
+    def _compute_selected_inverse(self, overwrite_factors: bool = False):
+        # TODO: Implement actual sparse selected inverion
         from dalia.backend.datastructures import SparseMatrix
         n = self._factors.shape[0]
 
         if self._target == "host":
-            # Compute L^{-1} by solving L X = I
-            L_inv = h_splu.spsolve_triangular(
-                self._factors, np.eye(n), lower=True, check_finite=False
-            )
 
-            # Compute A^{-1} = L_inv^T @ L_inv
-            #inv_array = L_inv.T @ L_inv
-            inv_array = L_inv.T @ L_inv
+            inv_array = self._factors.solve(np.eye(n))
+
+            inv_array = sp.csr_matrix(inv_array)  # Ensure the result is a sparse matrix
         elif self._target == "accelerator":
-            # Compute L^{-1} by solving L X = I
-            L_inv = a_splu.spsolve_triangular(
-                self._factors, cp.eye(n), lower=True, check_finite=False
-            )
 
-            # Compute A^{-1} = L_inv^T @ L_inv
-            #inv_array = L_inv.T @ L_inv
-            inv_array = L_inv.T @ L_inv
+            inv_array = self._factors.solve(cp.eye(n))
+
+            inv_array = cu_sp.csr_matrix(inv_array)  # Ensure the result is a sparse matrix
         else:
             raise ValueError(f"Invalid hardware target type '{self._target}'. Supported target types are {target_list}.")
         return SparseMatrix(inv_array)
