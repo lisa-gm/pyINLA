@@ -258,6 +258,12 @@ class Model(ABC):
                             config=submodel.config.ph_sigma1,
                         )
                     )
+                elif isinstance(submodel.config.ph_sigma1, GammaPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GammaPriorHyperparameters(
+                            config=submodel.config.ph_sigma1,
+                        )
+                    )
                 else:
                     raise ValueError(
                         "Unsupported prior hyperparameter type for sigma1 in LKJSubModel."
@@ -276,6 +282,13 @@ class Model(ABC):
                 ):
                     self.prior_hyperparameters.append(
                         HalfCauchyPriorHyperparameters(
+                            config=submodel.config.ph_sigma2,
+                        )
+                    )
+                    
+                elif isinstance(submodel.config.ph_sigma2, GammaPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GammaPriorHyperparameters(
                             config=submodel.config.ph_sigma2,
                         )
                     )

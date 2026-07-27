@@ -4,16 +4,14 @@ import sys
 import numpy as np
 
 from dalia import xp
-from dalia.configs import dalia_config, likelihood_config, submodels_config
+from dalia.configs import dalia_config, likelihood_config, submodels_config, models_config
 from dalia.core.dalia import DALIA
 from dalia.core.model import Model
+from dalia.models import ReplicateModel
 from dalia.submodels import LKJSubModel
 from dalia.utils import (
     extract_diagonal,
-    get_host,
     print_msg,
-    plot_marginal_distributions_hp,
-    plot_prior_hp,
 )
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -23,46 +21,64 @@ from examples_utils.parser_utils import parse_args  # noqa: E402
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
-    print_msg("--- Example: LKJ Submodel ---")
+    print_msg("--- Example: LKJ Submodel with Multiple Replicates ---")
 
     # Check for parsed parameters
     args = parse_args()
 
-    # Configurations of the LKJ submodel
-    # 2D latent with LKJ prior on correlation and HalfNormal on variances
-    lkj_dict = {
-        "type": "lkj",
-        "input_dir": f"{BASE_DIR}/inputs_lkj",
-        # Initial guesses on hyperparameters (external space)
-        "sigma1": 1.0,
-        "sigma2": 1.0,
-        "rho": 0.0,
-        # Prior hyperparameters
-        "ph_sigma1": {"type": "half_normal", "precision": 0.5},  # variance = 2
-        "ph_sigma2": {"type": "half_normal", "precision": 0.5},  # variance = 2
-        "ph_rho": {"type": "lkj_2d", "eta": 2.0},
+    n_replicates = 500  # Must match n_replicates in generate_data.py
+
+    # Create a model for each replicate
+    models = []
+    for i in range(n_replicates):
+        # Configurations of the LKJ submodel
+        # 2D latent with LKJ prior on correlation and HalfNormal on variances
+        lkj_dict = {
+            "type": "lkj",
+            "input_dir": f"{BASE_DIR}/inputs_nrep{n_replicates}/replicate_{i+1}/inputs_lkj",
+            "sigma1": 1.0,
+            "sigma2": 1.0,
+            "rho": 0.0,
+            # Prior hyperparameters
+            "ph_sigma1": {"type": "half_normal", "precision": 0.5},  # variance = 2
+            "ph_sigma2": {"type": "half_normal", "precision": 0.5},  # variance = 2
+            "ph_rho": {"type": "lkj_2d", "eta": 1.0},
+        }
+        lkj = LKJSubModel(
+            config=submodels_config.parse_config(lkj_dict),
+        )
+
+        # Likelihood
+        likelihood_dict = {
+            "type": "gaussian",
+            "prec_o": 1.0,
+            "prior_hyperparameters": {"type": "gamma", "alpha": 1.0, "beta": 1e-1},
+        }
+        # Creation of the model by combining the LKJ submodel and the likelihood
+        local_model = Model(
+            submodels=[lkj],
+            likelihood_config=likelihood_config.parse_config(likelihood_dict),
+        )
+        models.append(local_model)
+
+    print_msg(models[0])
+
+    # Create ReplicateModel to combine all replicates
+    replicate_dict = {
+        "type": "replicate",
+        "n_replicates": len(models),
+        "theta": models[0].theta_external.tolist(),
+        "theta_keys": list(models[0].theta_keys),
     }
-    lkj = LKJSubModel(
-        config=submodels_config.parse_config(lkj_dict),
+    replicate_model = ReplicateModel(
+        models=models,
+        replicate_model_config=models_config.parse_config(replicate_dict),
     )
 
-    # Likelihood
-    likelihood_dict = {
-        "type": "gaussian",
-        "prec_o": 1.0,
-        "prior_hyperparameters": {"type": "gamma", "alpha": 1.0, "beta": 1e-1},
-    }
-    # Creation of the model by combining the LKJ submodel and the likelihood
-    model = Model(
-        submodels=[lkj],
-        likelihood_config=likelihood_config.parse_config(likelihood_dict),
-    )
-    print_msg(model)
-
-    print(f"Internal theta values: {model.theta_internal}")
-    print(f"External theta values: {model.theta_external}")
-    Qprior = model.construct_Q_prior()
-    print(f"Q_prior:\n{Qprior.toarray()}")
+    print_msg(f"Internal theta values: {replicate_model.theta_internal}")
+    print_msg(f"External theta values: {replicate_model.theta_external}")
+    Qprior = replicate_model.construct_Q_prior()
+    print_msg(f"Q_prior shape: {Qprior.shape}")
 
     # Configurations of DALIA
     dalia_dict = {
@@ -70,12 +86,12 @@ if __name__ == "__main__":
         "simulation_dir": ".",
     }
     dalia = DALIA(
-        model=model,
+        model=replicate_model,
         config=dalia_config.parse_config(dalia_dict),
     )
 
-    theta_ref = xp.load(f"{BASE_DIR}/reference_outputs/theta_ref.npy")
-    x_ref = xp.load(f"{BASE_DIR}/reference_outputs/x_ref.npy")
+    theta_ref = xp.load(f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs/theta_ref.npy")
+    x_ref = xp.load(f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs/x_ref.npy")
 
     results = dalia.run()
 
@@ -102,7 +118,9 @@ if __name__ == "__main__":
 
     # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
-    Qconditional = dalia.model.construct_Q_conditional(eta=model.a @ model.x)
+    Qconditional = dalia.model.construct_Q_conditional(
+        eta=replicate_model.a @ replicate_model.x
+    )
     Qinv_ref = xp.linalg.inv(Qconditional.toarray())
     print_msg(
         "Norm (marg var latent - ref):    ",
@@ -113,19 +131,11 @@ if __name__ == "__main__":
     var_obs = dalia.get_marginal_variances_observations(
         theta_external=theta_ref, x_star=x_ref
     )
-    var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
+    var_obs_ref = extract_diagonal(replicate_model.a @ Qinv_ref @ replicate_model.a.T)
     print_msg(
         "Norm (var_obs - var_obs_ref):    ",
         f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
     )
-
-    # print_msg("\n--- Marginal distributions of the hyperparameters ---")
-    # marginals_hp = dalia.marginal_distributions_hp()
-
-    # fig, axes = plot_marginal_distributions_hp(marginals_hp)
-    # import matplotlib.pyplot as plt
-
-    # plt.savefig(f"lkj_marginal_distributions_hp.png")
 
     ## construct estimated LKJ covariance matrix of latent parameters
     lkj_est = xp.array(
