@@ -138,18 +138,8 @@ if __name__ == "__main__":
     )
 
     ## construct estimated LKJ covariance matrix of latent parameters
-    lkj_est = xp.array(
-        [
-            [
-                theta_est[0] ** 2,
-                theta_est[0] * theta_est[1] * theta_est[2],
-            ],
-            [
-                theta_est[0] * theta_est[1] * theta_est[2],
-                theta_est[1] ** 2,
-            ],
-        ]
-    )
+    lkj_est = lkj.lkj_covariance_matrix(theta_est[:3])
+    print("LKJ estimated covariance matrix: \n", lkj_est)
 
     lkj_ref = np.array(
         [

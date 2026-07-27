@@ -17,7 +17,7 @@ if __name__ == "__main__":
     n_obs = 10
     n_replicates = 500  # number of replicates
 
-    # True hyperparameters (external space) - shared across all replicates
+    # True hyperparameters - shared across all replicates
     sigma1_true = 1.5
     sigma2_true = 0.8
     rho_true = -0.3  # correlation

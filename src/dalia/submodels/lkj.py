@@ -54,6 +54,22 @@ class LKJSubModel(SubModel):
         Q_prior = sp.sparse.coo_matrix((data, (row, col)), shape=(2, 2))
 
         return Q_prior
+    
+        # additional method to return LKJ covariance matrix given theta
+    def lkj_covariance_matrix(self, theta_external):
+        """
+        Construct the LKJ covariance matrix for a 2x2 correlation matrix given the external parameter theta.
+
+        Returns
+        -------
+        np.ndarray
+            2x2 covariance matrix corresponding to the LKJ prior.
+        """
+        
+        cov_matrix = xp.array([[theta_external[0]**2, theta_external[2] * theta_external[0] * theta_external[1]],
+                               [theta_external[2] * theta_external[0] * theta_external[1], theta_external[1]**2]])
+
+        return cov_matrix
 
     def __str__(self) -> str:
         """String representation of the submodel."""
