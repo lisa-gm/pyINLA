@@ -17,9 +17,9 @@ np.random.seed(41)
 path = os.path.dirname(__file__)
 
 if __name__ == "__main__":
-    n_observations = 50
+    n_observations = 100
     n_latent_parameters = 6
-    n_replicates = 1  # number of replicates
+    n_replicates = 10  # number of replicates
 
     prior_precision = 1e-3
     Sigma_prior = 1 / prior_precision * np.eye(n_latent_parameters)
@@ -27,50 +27,43 @@ if __name__ == "__main__":
 
     theta_observations = 2.0
     print(f"theta_observations: {theta_observations}")
-    theta_likelihood: dict = {"theta_observations": theta_observations}
 
     # generate x from a gaussian distribution of dimensions n_latent_parameters with mean 0 and precision exp(theta_observations)
     variance = 1 / theta_observations
 
-    x_ref = np.zeros(
-        n_replicates * n_latent_parameters
-    )  # to store all x_ref for all replicates
+    # one shared A matrix for all replicates
+    a = sparse.random(n_observations, n_latent_parameters, density=0.5)
+    a = csr_matrix(a)
 
-    # Sample multiple latent parameters from the prior --- write everything in a loop
-    # this makes writing to file easier
+    # store all replicates consecutively
+    x_ref = np.zeros(n_replicates * n_latent_parameters)
+    y_ref = np.zeros(n_replicates * n_observations)
+
+    print("A: \n", a[:10, :n_latent_parameters].toarray())
+
+    # Sample multiple latent parameters from the prior
     for i in range(n_replicates):
         np.random.seed(41 + i)  # change the seed for each replicate
         z = np.random.normal(size=(n_latent_parameters,))
 
         x = L_Sigma_prior @ z
-        a = sparse.random(n_observations, n_latent_parameters, density=0.5)
 
         eta = a @ x
         y = np.random.normal(eta, scale=np.sqrt(variance), size=n_observations)
         print(f"x: {x}")
-        # print(f"y: {y}")
-        # print(f"a: {a}")
-
-        a = csr_matrix(a)
-        print("A: \n", a[:10, :n_latent_parameters].toarray())
         print("y: ", y[:10])
-
-        input_dir = f"{path}/inputs_nrep{n_replicates}/replicate_{i+1}"
-        os.makedirs(input_dir, exist_ok=True)
-
-        # save the synthetic data
-        np.save(f"{input_dir}/y.npy", y)
-        # save a as .npz
-        os.makedirs(f"{input_dir}/inputs_regression", exist_ok=True)
-        sparse.save_npz(f"{input_dir}/inputs_regression/a.npz", a)
 
         # accumulate reference x
         x_ref[i * n_latent_parameters : (i + 1) * n_latent_parameters] = x
+        y_ref[i * n_observations : (i + 1) * n_observations] = y
 
-    # save original hyperparameter theta
-    os.makedirs(f"{path}/inputs_nrep{n_replicates}/reference_outputs", exist_ok=True)
-    np.save(
-        f"{path}/inputs_nrep{n_replicates}/reference_outputs/theta_ref.npy",
-        theta_observations,
-    )
-    np.save(f"{path}/inputs_nrep{n_replicates}/reference_outputs/x_ref.npy", x_ref)
+    # save consolidated dataset under inputs_nrep*
+    output_dir = f"{path}/inputs_nrep{n_replicates}"
+    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(f"{output_dir}/inputs_regression", exist_ok=True)
+    os.makedirs(f"{output_dir}/reference_outputs", exist_ok=True)
+
+    sparse.save_npz(f"{output_dir}/inputs_regression/a.npz", a)
+    np.save(f"{output_dir}/y.npy", y_ref)
+    np.save(f"{output_dir}/reference_outputs/x_ref.npy", x_ref)
+    np.save(f"{output_dir}/reference_outputs/theta_ref.npy", theta_observations)

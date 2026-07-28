@@ -70,7 +70,7 @@ class SpatialSubModel(SubModel):
         diff = self.g2 - self.g2.T
         assert np.all(np.abs(diff.data) < 1e-10), "Spatial matrix c0 is not symmetric."
 
-    def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
+    def _construct_Q_prior_core(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
 
         gamma_s, gamma_e = self._interpretable2compute(

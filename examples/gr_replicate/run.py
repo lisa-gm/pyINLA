@@ -8,11 +8,9 @@ from dalia.configs import (
     dalia_config,
     likelihood_config,
     submodels_config,
-    models_config,
 )
 from dalia.core.dalia import DALIA
 from dalia.core.model import Model
-from dalia.models import ReplicateModel
 from dalia.submodels import RegressionSubModel
 from dalia.utils import (
     extract_diagonal,
@@ -32,48 +30,30 @@ if __name__ == "__main__":
     # Check for parsed parameters
     args = parse_args()
 
-    n_replicates = 1  # number of replicates
+    n_replicates = 10  # number of replicates
 
-    # setup 1 model for each replicate
-    models = []
-    for i in range(n_replicates):
-        # Configurations of the regression submodel
-        path_dir = (
-            f"{BASE_DIR}/inputs_nrep{n_replicates}/replicate_{i+1}/inputs_regression"
-        )
-        regression_dict = {
-            "type": "regression",
-            "input_dir": path_dir,
-            "n_fixed_effects": 6,
-        }
-        regression = RegressionSubModel(
-            config=submodels_config.parse_config(regression_dict),
-        )
-        likelihood_dict = {
-            "type": "gaussian",
-            "prec_o": 1.0,
-            "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 1e-1},
-        }
-        local_model = Model(
-            submodels=[regression],
-            likelihood_config=likelihood_config.parse_config(likelihood_dict),
-        )
-        models.append(local_model)
-
-    print_msg(models)
-
-    replicate_dict = {
-        "type": "replicate",
-        "n_replicates": len(models),
-        "theta": models[0].theta_external.tolist(),
-        "theta_keys": list(models[0].theta_keys),
+    # Configurations of the regression submodel with built-in replication
+    regression_dict = {
+        "type": "regression",
+        "input_dir": f"{BASE_DIR}/inputs_nrep{n_replicates}/inputs_regression",
+        "n_fixed_effects": 6,
+        "n_replicates": n_replicates,
     }
-    replicate_model = ReplicateModel(
-        models=models,
-        replicate_model_config=models_config.parse_config(replicate_dict),
+    regression = RegressionSubModel(
+        config=submodels_config.parse_config(regression_dict),
     )
+    likelihood_dict = {
+        "type": "gaussian",
+        "prec_o": 1.0,
+        "prior_hyperparameters": {"type": "gamma", "alpha": 2.0, "beta": 1e-1},
+    }
+    model = Model(
+        submodels=[regression],
+        likelihood_config=likelihood_config.parse_config(likelihood_dict),
+        input_dir=f"{BASE_DIR}/inputs_nrep{n_replicates}",
+    )
+    print_msg(model)
 
-    # Qprior = replicate_model.construct_Q_prior()
     # print(f"Q_prior:\n{Qprior.toarray()}")
 
     # Qconditional = replicate_model.construct_Q_conditional(
@@ -95,7 +75,7 @@ if __name__ == "__main__":
         "simulation_dir": ".",
     }
     dalia = DALIA(
-        model=replicate_model,
+        model=model,
         config=dalia_config.parse_config(dalia_dict),
     )
 
@@ -128,7 +108,7 @@ if __name__ == "__main__":
     # Compare marginal variances of latent parameters
     var_latent_params = results["marginal_variances_latent"]
     Qconditional = dalia.model.construct_Q_conditional(
-        eta=replicate_model.a @ replicate_model.x
+        eta=model.a @ results["x"]
     )
     Qinv_ref = xp.linalg.inv(Qconditional.toarray())
     print_msg(
@@ -139,7 +119,7 @@ if __name__ == "__main__":
     # Compare marginal variances of observations
     var_obs = dalia.get_marginal_variances_observations()
 
-    var_obs_ref = extract_diagonal(replicate_model.a @ Qinv_ref @ replicate_model.a.T)
+    var_obs_ref = extract_diagonal(model.a @ Qinv_ref @ model.a.T)
     print_msg(
         "Norm (var_obs - var_obs_ref):    ",
         f"{xp.linalg.norm(var_obs - var_obs_ref):.4e}",
@@ -149,7 +129,7 @@ if __name__ == "__main__":
     if save_dalia_results:
         save_to_json(
             results=results,
-            filename=f"{BASE_DIR}/reference_outputs/dalia_estimates.json",
+            filename=f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs/dalia_estimates.json",
         )
 
     print_msg("\n--- Finished ---")

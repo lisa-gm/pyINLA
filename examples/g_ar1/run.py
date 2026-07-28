@@ -278,8 +278,6 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()
 
-    exit()
-
     Qprior = model.construct_Q_prior()
     Qinv = xp.linalg.inv(Qprior.toarray())
 

@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 
 import numpy as np
@@ -11,12 +12,13 @@ BASE_DIR: Path = Path(__file__).parent
 
 if __name__ == "__main__":
 
-    np.random.seed(359)
-    n = 100
-    n_replicates = 1  # number of replicates
+    np.random.seed(5)
+    n = 1000
+    n_replicates = 3  # number of replicates
+    replicate_intercept = False  # if True, each replicate gets its own intercept latent
 
     ## define priors
-    phi = 0.7
+    phi = 0.9
     s2 = 5
     tau = 1 / s2
     # noise obs
@@ -43,10 +45,20 @@ if __name__ == "__main__":
     L_dense = cholesky(Q_dense, lower=True)
     L = csc_matrix(L_dense)
 
+    # True intercept is always singular; replicate_intercept controls model flexibility
     intercept = np.random.uniform(-5, 5)
+    intercepts = np.full(n_replicates if replicate_intercept else 1, intercept)
 
-    # Store reference x for all replicates
-    x_ref = np.zeros(n_replicates * (n + 1))
+    x_ref_ar1 = np.zeros(n_replicates * n)
+    y_ref = np.zeros(n_replicates * n)
+
+    # Store A once
+    a_ar1 = sp.eye(n, format="csr")
+    # Regression design matrix: when intercept is shared, replicate across all obs.
+    if replicate_intercept:
+        a_regression = sp.csr_matrix(np.ones((n, 1)))
+    else:
+        a_regression = sp.csr_matrix(np.ones((n_replicates * n, 1)))
 
     # Generate data for each replicate
     for rep in range(n_replicates):
@@ -55,39 +67,43 @@ if __name__ == "__main__":
         # Sample latent AR1 process for this replicate
         z = np.random.normal(0, 1, size=n)
         u = spsolve_triangular(L, z, lower=True)
-        x = np.concatenate((u, [intercept]))
 
         print(f"\n--- Replicate {rep + 1} ---")
-        print("x: ", x[:10])
+        print("u: ", u[:10])
 
-        # Same latent structure for all replicates, but different observation noise
-        a_ar1 = sp.eye(n)
-        a_regression = sp.csr_matrix(np.ones((n, 1)))
-        a = sp.hstack([a_ar1, a_regression])  # Combined observation matrix
-
-        eta = a @ x
+        intercept = intercepts[rep] if replicate_intercept else intercepts[0]
+        eta = u + intercept
         noise = np.random.normal(0, np.sqrt(1 / obs_noise_prec), size=eta.shape)
         y = eta + noise
 
         print("y: ", y[:10])
 
-        # Save replicate-specific data
-        replicate_dir = BASE_DIR / "inputs" / f"replicate_{rep + 1}"
-        os.makedirs(replicate_dir / "inputs_ar1", exist_ok=True)
-        os.makedirs(replicate_dir / "inputs_regression", exist_ok=True)
+        # Store concatenated AR1 latent states and observations
+        x_ref_ar1[rep * n : (rep + 1) * n] = u
+        y_ref[rep * n : (rep + 1) * n] = y
 
-        np.save(replicate_dir / "y.npy", y)
-        sp.save_npz(replicate_dir / "inputs_ar1" / "a.npz", a_ar1)
-        sp.save_npz(replicate_dir / "inputs_regression" / "a.npz", a_regression)
+    # Final x_ref layout matches model latent ordering.
+    # shared-intercept mode: [all AR1 states, one intercept]
+    # replicated-intercept mode: [all AR1 states, intercept per replicate]
+    x_ref = np.concatenate((x_ref_ar1, intercepts))
 
-        # Store reference x
-        x_ref[rep * (n + 1) : (rep + 1) * (n + 1)] = x
+    # Save consolidated dataset under inputs_nrep*
+    output_dir = BASE_DIR / f"inputs_nrep{n_replicates}"
+    os.makedirs(output_dir / "inputs_ar1", exist_ok=True)
+    os.makedirs(output_dir / "inputs_regression", exist_ok=True)
+    os.makedirs(output_dir / "reference_outputs", exist_ok=True)
 
-    # Save reference outputs (shared by all replicates)
-    os.makedirs(BASE_DIR / "reference_outputs", exist_ok=True)
-    np.save(BASE_DIR / "reference_outputs" / "x_ref.npy", x_ref)
-    np.save(BASE_DIR / "reference_outputs" / "theta_original.npy", theta_original)
+    np.save(output_dir / "y.npy", y_ref)
+    sp.save_npz(output_dir / "inputs_ar1" / "a.npz", a_ar1)
+    sp.save_npz(output_dir / "inputs_regression" / "a.npz", a_regression)
+
+    np.save(output_dir / "reference_outputs" / "x_ref.npy", x_ref)
+    np.save(output_dir / "reference_outputs" / "theta_ref.npy", theta_original)
 
     print("\n--- Summary ---")
     print(f"Generated {n_replicates} replicates with {n} observations each")
-    print(f"Latent dimension per replicate: {n + 1} (n={n}, +1 for intercept)")
+    print(f"AR1 latent dimension total: {n_replicates * n}")
+    if replicate_intercept:
+        print(f"Replicated intercept latent dimension total: {n_replicates}")
+    else:
+        print("Shared intercept latent dimension: 1")

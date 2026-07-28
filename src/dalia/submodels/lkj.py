@@ -23,7 +23,7 @@ class LKJSubModel(SubModel):
             self.n_latent_parameters == 2
         ), f"LKJSubModel only supports 2D latent variables, got {self.n_latent_parameters}"
 
-    def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
+    def _construct_Q_prior_core(self, **kwargs) -> sp.sparse.coo_matrix:
         """
         Construct the 2x2 prior precision matrix Q from covariance structure.
 

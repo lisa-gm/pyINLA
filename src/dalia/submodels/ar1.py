@@ -22,7 +22,7 @@ class AR1SubModel(SubModel):
         # check that dimensions match
 
 
-    def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
+    def _construct_Q_prior_core(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
 
         # kwargs expects hyperparameters in external scale
@@ -31,10 +31,10 @@ class AR1SubModel(SubModel):
 
         s2 = 1 / tau
         denom = s2 * (1 - phi**2)
-        
-        diag = [(1 + phi**2) / denom] * self.n_latent_parameters
+
+        diag = [(1 + phi**2) / denom] * self.n_latent_parameters_core
         diag[0] = diag[-1] = 1 / denom
-        off_diag = [-phi / denom] * (self.n_latent_parameters - 1)
+        off_diag = [-phi / denom] * (self.n_latent_parameters_core - 1)
 
         Q_prior = sp.sparse.diags([off_diag, diag, off_diag], [-1, 0, 1])
         
