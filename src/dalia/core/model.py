@@ -756,7 +756,9 @@ class Model(ABC):
 
         ATDA = self.construct_ATDA(eta)
         self.Q_conditional = self.Q_prior - ATDA
-
+        if type(self.Q_conditional) is xp.matrix:
+            self.Q_conditional = xp.asarray(self.Q_conditional)
+            
         return self.Q_conditional
 
     def construct_information_vector(

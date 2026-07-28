@@ -196,6 +196,9 @@ class FederatedModel(Model):
             # negative hessian, therefore minus in front
             self.Q_conditional -= model.construct_ATDA(eta=eta)
 
+        if type(self.Q_conditional) is xp.matrix:
+            self.Q_conditional = xp.asarray(self.Q_conditional)
+
         return self.Q_conditional
 
     def construct_information_vector(
