@@ -270,6 +270,9 @@ class FederatedModel(Model):
             idx = xp.asarray(model.fed_col_to_global, dtype=int)
             self.Q_conditional[xp.ix_(idx, idx)] -= ATDA_local
 
+        if type(self.Q_conditional) is xp.matrix:
+            self.Q_conditional = xp.asarray(self.Q_conditional)
+
         return self.Q_conditional
 
     def construct_information_vector(
