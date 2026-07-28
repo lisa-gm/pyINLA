@@ -48,7 +48,7 @@ class GenericSubModel(SubModel):
             f"Successfully loaded precision matrix of shape {self.q.shape} for generic model."
         )
 
-    def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
+    def _construct_Q_prior_core(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
 
         tau = kwargs.get("tau")

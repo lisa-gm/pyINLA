@@ -51,7 +51,7 @@ class BrainiacSubModel(SubModel):
         ), f"Numbers rows in z ({self.z.shape[0]}) must match number of columns in a ({self.a.shape[1]})."
 
 
-    def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
+    def _construct_Q_prior_core(self, **kwargs) -> sp.sparse.coo_matrix:
         """Construct the prior precision matrix."""
         # Extract all alpha_x values and put them into an array
         alpha_keys = sorted([key for key in kwargs if key.startswith("alpha_")])

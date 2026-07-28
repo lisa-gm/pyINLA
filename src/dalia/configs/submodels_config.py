@@ -27,6 +27,8 @@ class SubModelConfig(BaseModel, ABC):
     type: Literal[
         "spatio_temporal", "spatial", "regression", "brainiac", "ar1", "generic", "lkj"
     ] = None
+    
+    n_replicates: PositiveInt = 1  # Number of replicates for this submodel
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
