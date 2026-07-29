@@ -1,7 +1,7 @@
 import os
 import sys
 
-from dalia import xp
+from dalia import xp, sp
 from dalia.configs import (
     dalia_config,
     likelihood_config,
@@ -29,8 +29,8 @@ if __name__ == "__main__":
     # Check for parsed parameters
     args = parse_args()
 
-    n_replicates = 3 # number of AR1 replicates
-    n_replicates_regression = 1  # number of regression replicates
+    n_replicates = 2 # number of AR1 replicates
+    n_replicates_regression = 2  # number of regression replicates
 
     # AR1 submodel: replicated
     ar1_dict = {
@@ -84,6 +84,13 @@ if __name__ == "__main__":
     plt.title("Design matrix A")
     plt.savefig(f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs/a.png")
     plt.close() 
+    
+    sp.sparse.save_npz(f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs/A.npz", model.a)
+    sp.sparse.save_npz(f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs/Qprior.npz", Qprior)
+    Qconditional = model.construct_Q_conditional(
+        eta=model.a @ model.x
+    )
+    sp.sparse.save_npz(f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs/Qconditional.npz", Qconditional)
 
     # Configurations of DALIA
     dalia_dict = {
@@ -94,11 +101,17 @@ if __name__ == "__main__":
         model=model,
         config=dalia_config.parse_config(dalia_dict),
     )
-
+    
     theta_ref = xp.load(
         f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs/theta_ref.npy"
     )
     x_ref = xp.load(f"{BASE_DIR}/inputs_nrep{n_replicates}/reference_outputs/x_ref.npy")
+
+    f_value = dalia._evaluate_f(theta_ref)
+    
+    print(f"f(theta_ref) = {f_value:.4e}")
+    #print(f"Gradient at theta_ref: {gradient}")
+
 
     results = dalia.run()
 

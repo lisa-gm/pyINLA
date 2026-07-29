@@ -320,10 +320,10 @@ class ReplicateModel(Model):
         log_prior = 0.0
 
         # TODO: do I need this local re-assignment?
-        theta_external = self.theta_external
+        theta_internal = self.theta_internal
 
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-            log_prior += prior_hyperparameter.evaluate_log_prior(theta_external[i])
+            log_prior += prior_hyperparameter.evaluate_internal_log_prior(theta_internal[i])
 
         return log_prior
 
