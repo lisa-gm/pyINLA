@@ -12,13 +12,13 @@ BASE_DIR: Path = Path(__file__).parent
 
 if __name__ == "__main__":
 
-    np.random.seed(5)
-    n = 1000
-    n_replicates = 3  # number of replicates
-    replicate_intercept = False  # if True, each replicate gets its own intercept latent
+    np.random.seed(359)
+    n = 100
+    n_replicates = 2  # number of replicates
+    replicate_intercept = True  # if True, each replicate gets its own intercept latent
 
     ## define priors
-    phi = 0.9
+    phi = 0.7
     s2 = 5
     tau = 1 / s2
     # noise obs
