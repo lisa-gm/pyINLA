@@ -17,27 +17,34 @@ if __name__ == "__main__":
     n_obs = 10
     n_replicates = 500  # number of replicates
 
-    # True hyperparameters - shared across all replicates
-    sigma1_true = 1.5
-    sigma2_true = 0.8
-    rho_true = -0.3  # correlation
+    # True hyperparameters (external space)
+    sigma1_true = 1.5  # variance of intercept
+    sigma2_true = 0.8  # variance of slope
+    rho_true = 0.6  # correlation between intercept and slope
     sigma_eps_true = 0.1  # observation noise
     prec_obs = 1.0 / (sigma_eps_true**2)  # precision of observation noise
 
-    # Construct true covariance matrix Σ for 2D latent
+    # Construct true covariance matrix Σ for (intercept, slope)
+    sigma_eps_var = sigma_eps_true**2
     cov_matrix = np.array(
         [
             [sigma1_true**2, rho_true * sigma1_true * sigma2_true],
             [rho_true * sigma1_true * sigma2_true, sigma2_true**2],
         ]
     )
+
+    # Sample latent parameters from the prior
+    # x = [intercept, slope] ~ N(0, Σ)
     L_cov = np.linalg.cholesky(cov_matrix)
 
     # Storage for all x_ref (concatenated across replicates)
     x_ref_all = np.zeros(n_replicates * 2)
 
-    # Construct observation matrix A -> resuse same covariates for all replicates
-    a_dense = np.hstack([np.ones((n_obs, 1)), np.random.randn(n_obs, 1)])
+    # Construct observation matrix A for random slope model
+    intercept_col = np.ones(n_obs)
+    slope_col = np.random.normal(0, 1, n_obs)  # random predictor
+    
+    a_dense = np.column_stack([intercept_col, slope_col])
     a = sp.csr_matrix(a_dense)
 
     # Generate each replicate
@@ -81,11 +88,11 @@ if __name__ == "__main__":
     theta_ref = np.array([sigma1_true, sigma2_true, rho_true, prec_obs])
     np.save(f"{path}/inputs_nrep{n_replicates}/reference_outputs/theta_ref.npy", theta_ref)
 
-    print(f"\nGenerated synthetic LKJ data with {n_replicates} replicates:")
-    print(f"  n_obs per replicate = {n_obs}")
-    print(f"  n_replicates = {n_replicates}")
+    print(f"Generated synthetic LKJ data (random slope model):")
+    print(f"  n_obs = {n_obs}")
+    print(f"  x_true = {x_true}")
     print(
-        f"  sigma1_true = {sigma1_true}, sigma2_true = {sigma2_true}, rho_true = {rho_true}"
+        f"  sigma1_true (intercept) = {sigma1_true}, sigma2_true (slope) = {sigma2_true}, rho_true = {rho_true}"
     )
     print(f"  sigma_eps_true = {sigma_eps_true}")
     print(f"  prec_obs_true = {prec_obs}")
