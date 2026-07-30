@@ -10,10 +10,7 @@ from dalia.core.model import Model
 from dalia.submodels import LKJSubModel
 from dalia.utils import (
     extract_diagonal,
-    get_host,
     print_msg,
-    plot_marginal_distributions_hp,
-    plot_prior_hp,
 )
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

@@ -16,13 +16,13 @@ if __name__ == "__main__":
     n_obs = 1000
 
     # True hyperparameters (external space)
-    sigma1_true = 1.5
-    sigma2_true = 0.8
-    rho_true = 0.6  # correlation
+    sigma1_true = 1.5  # variance of intercept
+    sigma2_true = 0.8  # variance of slope
+    rho_true = 0.6  # correlation between intercept and slope
     sigma_eps_true = 0.1  # observation noise
     prec_obs = 1.0 / (sigma_eps_true**2)  # precision of observation noise
 
-    # Construct true covariance matrix Σ for 2D latent
+    # Construct true covariance matrix Σ for (intercept, slope)
     sigma_eps_var = sigma_eps_true**2
     cov_matrix = np.array(
         [
@@ -32,15 +32,16 @@ if __name__ == "__main__":
     )
 
     # Sample latent parameters from the prior
-    # x ~ N(0, Σ)
+    # x = [intercept, slope] ~ N(0, Σ)
     L_cov = np.linalg.cholesky(cov_matrix)
     z = np.random.normal(size=2)
     x_true = L_cov @ z
 
-    # Construct observation matrix A
-    # A is n_obs × 2, can be sparse or dense
-    # Simple design: some random entries, some structure
-    a_dense = np.random.randn(n_obs, 2) * 0.5 + np.ones((n_obs, 2))
+    # Construct observation matrix A for random slope model
+    intercept_col = np.ones(n_obs)
+    slope_col = np.random.normal(0, 1, n_obs)  # random predictor
+    
+    a_dense = np.column_stack([intercept_col, slope_col])
     a = sp.csr_matrix(a_dense)
 
     # Generate observations: y = Ax + ε
@@ -63,11 +64,11 @@ if __name__ == "__main__":
     theta_ref = np.array([sigma1_true, sigma2_true, rho_true, prec_obs])
     np.save(f"{path}/reference_outputs/theta_ref.npy", theta_ref)
 
-    print(f"Generated synthetic LKJ data:")
+    print(f"Generated synthetic LKJ data (random slope model):")
     print(f"  n_obs = {n_obs}")
     print(f"  x_true = {x_true}")
     print(
-        f"  sigma1_true = {sigma1_true}, sigma2_true = {sigma2_true}, rho_true = {rho_true}"
+        f"  sigma1_true (intercept) = {sigma1_true}, sigma2_true (slope) = {sigma2_true}, rho_true = {rho_true}"
     )
     print(f"  sigma_eps_true = {sigma_eps_true}")
     print(f"  Covariance matrix:\n{cov_matrix}")
