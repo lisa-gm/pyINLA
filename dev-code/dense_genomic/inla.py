@@ -20,7 +20,7 @@ f_cond = compute_laplace_correction(
 ```
 
 We suggest new names:
-- conditional_latent_parameters(Q_cond) -> laplace_correction()
+- conditional_latent_parameters(Q_cond) -> log_latent_conditional()
 - prior_latent_parameters(Q_prior) -> log_latent_prior()
 - likelihood(observations, A, Q_cond) -> log_likelihood()
 - log_prior_hyperparameters(hp_dict) -> log_hyper_prior()
@@ -39,7 +39,7 @@ Backend knows:
 INLA knows:
 - q_cond
 - mode
-- laplace_correction
+- log_latent_conditional
 
 This means that the Model might need to be able to assemble the information vector:
 Model
@@ -73,7 +73,7 @@ objective(theta)
 │
 ├── log_hyper_prior(theta)
 │
-├── laplace_correction(mode)
+├── log_latent_conditional(mode)
 │
 └── return
       laplace
@@ -242,7 +242,15 @@ def log_latent_prior(mode): ...
 def log_hyper_prior(hp_dict): ...
 
 
-def laplace_correction(l_cond, mode): ...
+def log_latent_conditional(l_cond, mode): 
+    """
+    
+    
+    
+    Notes: describe the approx being made ...
+    
+    """
+    ...
 
 
 def negative_log_marginal_posterior(
@@ -310,7 +318,7 @@ def negative_log_marginal_posterior(
     f_likelihood = log_likelihood(mode=mode)
     f_log_latent_prior = log_latent_prior(mode=mode)
     f_log_hyper_prior = log_hyper_prior(hp_dict=hp_dict)
-    f_laplace_correction = laplace_correction(l_cond=l_cond, mode=mode)
+    f_laplace_correction = log_latent_conditional(l_cond=l_cond, mode=mode)
 
     # . assemble the final objective function value
     f = f_laplace_correction - f_log_latent_prior - f_likelihood - f_log_hyper_prior

@@ -69,6 +69,11 @@ def fit_model(
 if __name__ == "__main__":
     # Configure and initialize the Genomic Model
     # . Configure the hyperparameters
+    # tau_iid: Prior = Prior(
+    #     name="tau_iid",
+    #     distribution: Distribution = LogNormal(mean=0.0, std=1.0),
+    #     initial_value=2.3,  # Synthetic True = 3.0
+    # )
     tau_iid: Hyperparameter = Hyperparameter(
         name="tau_iid",
         value=2.3,  # Synthetic True = 3.0
@@ -89,10 +94,10 @@ if __name__ == "__main__":
     # . Configure the Genomic Model
     config: GenomicModelConfig = GenomicModelConfig(
         path_to_model_components=Path(
-            "/home/vincent-maillou/Documents/Repository/dalia-project/DALIA/dev-code/genomic_dataset"
+            "/home/vmaillou/Repos/DALIA/dev-code/genomic_dataset"
         ),
         path_to_observations=Path(
-            "/home/vincent-maillou/Documents/Repository/dalia-project/DALIA/dev-code/genomic_dataset"
+            "/home/vmaillou/Repos/DALIA/dev-code/genomic_dataset"
         ),
         hyperparameters=genomic_hps,
         # Component: iid
