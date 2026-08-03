@@ -29,7 +29,10 @@ class SubModelConfig(BaseModel, ABC):
     ] = None
     
     n_replicates: PositiveInt = 1  # Number of replicates for this submodel
-
+    # Whether to replicate the design matrix for this submodel, only relevant if n_replicates > 1
+    # should be set to false if the design matrix is already replicated in the input file
+    replicate_a: bool = True 
+     
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
 

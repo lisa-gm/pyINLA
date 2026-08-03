@@ -31,6 +31,8 @@ class FederatedModelConfig(ModelConfig):
     n_models: PositiveInt = None
     theta: list[float] = None
     theta_keys: list[str] = None
+    # treat submodel components as fixed or random effects
+    effect_type: list[Literal["fixed", "random"]] = ["fixed"]
 
     @model_validator(mode="after")
     def check_theta_and_keys(self):
