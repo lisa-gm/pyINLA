@@ -80,7 +80,7 @@ if __name__ == "__main__":
     y = (a @ x_true) + np.random.normal(scale=sigma_eps_true, size=n_obs)
 
     # Save the synthetic data
-    output_dir = f"{path}/ngroups{n_groups}"
+    output_dir = f"{path}/inputs_ngroups{n_groups}"
     os.makedirs(f"{output_dir}/inputs_lkj", exist_ok=True)
     os.makedirs(f"{output_dir}/inputs_regression", exist_ok=True)
     os.makedirs(f"{output_dir}/reference_outputs", exist_ok=True)

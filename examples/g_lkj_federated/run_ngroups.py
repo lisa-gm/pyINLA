@@ -39,7 +39,7 @@ if __name__ == "__main__":
     # All replicates share the same hyperparameters (sigma1, sigma2, rho)
     lkj_dict = {
         "type": "lkj",
-        "input_dir": f"{BASE_DIR}/ngroups{n_groups}/inputs_lkj",
+        "input_dir": f"{BASE_DIR}/inputs_ngroups{n_groups}/inputs_lkj",
         "n_replicates": n_groups,  # One LKJ submodel per group
         "replicate_a": False,  # design matrix is already replicated in input file
         # Initial guesses on hyperparameters (external space)
