@@ -20,7 +20,7 @@ class LKJSubModel(SubModel):
 
         # Enforce 2D constraint
         assert (
-            self.n_latent_parameters == 2
+            self.n_latent_parameters_core == 2
         ), f"LKJSubModel only supports 2D latent variables, got {self.n_latent_parameters}"
 
     def _construct_Q_prior_core(self, **kwargs) -> sp.sparse.coo_matrix:

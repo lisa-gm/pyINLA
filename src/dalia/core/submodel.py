@@ -22,15 +22,15 @@ class SubModel(ABC):
         self.input_path = Path(config.input_dir)
         self.submodel_type = config.type
         self.n_replicates = config.n_replicates
-
+        self.replicate_a = config.replicate_a
+        
         # --- Load design matrix
-
         try:
             a: spmatrix = load_npz(self.input_path.joinpath("a.npz"))
             self.a = sp.sparse.csc_matrix(a)
             
             # replicate if n_replicates > 1
-            if self.n_replicates > 1:
+            if self.n_replicates > 1 and self.replicate_a:
                 self.a = sp.sparse.block_diag([self.a] * self.n_replicates, format="csc")
                 
         except FileNotFoundError:
@@ -42,7 +42,7 @@ class SubModel(ABC):
                 else:
                     self.a: NDArray = xp.array(a)
                     
-                if self.n_replicates > 1:
+                if self.n_replicates > 1 and self.replicate_a:
                     self.a = sp.block_diag([self.a] * self.n_replicates)
                     
             except FileNotFoundError:
