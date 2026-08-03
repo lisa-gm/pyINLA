@@ -1,9 +1,7 @@
 import os
 import sys
 
-import numpy as np
-
-from dalia import xp, sp
+from dalia import xp
 from dalia.configs import (
     dalia_config,
     likelihood_config,
@@ -30,7 +28,7 @@ if __name__ == "__main__":
     # Check for parsed parameters
     args = parse_args()
 
-    n_sites = 5  # Number of groups/sites
+    n_sites = 50  # Number of groups/sites
     print_msg(f"Using data from {n_sites} sites")
 
     # Construct a local model for each site
@@ -139,25 +137,9 @@ if __name__ == "__main__":
     )
 
     ## Construct estimated LKJ covariance matrix (shared across all sites)
-    lkj_est = xp.array(
-        [
-            [
-                results["theta"][0] ** 2,
-                results["theta"][0] * results["theta"][1] * results["theta"][2],
-            ],
-            [
-                results["theta"][0] * results["theta"][1] * results["theta"][2],
-                results["theta"][1] ** 2,
-            ],
-        ]
-    )
-
-    lkj_ref = np.array(
-        [
-            [theta_ref[0] ** 2, theta_ref[0] * theta_ref[1] * theta_ref[2]],
-            [theta_ref[0] * theta_ref[1] * theta_ref[2], theta_ref[1] ** 2],
-        ]
-    )
+    lkj_est = lkj.lkj_covariance_matrix(results["theta"][:3])
+    lkj_ref = lkj.lkj_covariance_matrix(theta_ref[:3])
+    
     print_msg("\n--- LKJ Covariance Matrix of Latent Parameters (Shared Across Sites) ---")
     print_msg("Estimated LKJ covariance matrix:\n", lkj_est)
     print_msg("Reference LKJ covariance matrix:\n", lkj_ref)
@@ -166,7 +148,8 @@ if __name__ == "__main__":
     print_msg(f"Reference global slope: {x_ref[-1]}")
     print_msg(f"Estimated global slope: {results['x'][-1]}")
     
-    print_msg("\n--- Site-specific Random Effects ---")
-    for site_id, site_idx in enumerate(range(1, n_sites + 1), start=1):
-        print_msg(f"Site {site_idx} random effects: {results['x'][2*(site_idx-1):2*site_idx]}")
+    if n_sites <= 10:
+        print_msg("\n--- Site-specific Random Effects ---")
+        for site_id, site_idx in enumerate(range(1, n_sites + 1), start=1):
+            print_msg(f"Site {site_idx} random effects: {results['x'][2*(site_idx-1):2*site_idx]}")
 

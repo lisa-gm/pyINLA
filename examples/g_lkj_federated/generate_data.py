@@ -16,7 +16,7 @@ path = os.path.dirname(__file__)
 
 if __name__ == "__main__":
     # Number of groups and observations
-    n_groups = 5
+    n_groups = 50
     n_obs_per_group = 25
     n_obs = n_groups * n_obs_per_group
 

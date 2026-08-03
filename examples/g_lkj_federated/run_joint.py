@@ -32,7 +32,7 @@ if __name__ == "__main__":
     # Check for parsed parameters
     args = parse_args()
 
-    n_groups = 5  # Number of groups
+    n_groups = 50  # Number of groups
 
     # LKJ submodel: replicated for each group
     # Each replicate handles [u_g, v_g] (group-specific random intercept and slope)
@@ -143,25 +143,9 @@ if __name__ == "__main__":
     )
 
     ## Construct estimated LKJ covariance matrix (shared across all groups)
-    lkj_est = xp.array(
-        [
-            [
-                results["theta"][0] ** 2,
-                results["theta"][0] * results["theta"][1] * results["theta"][2],
-            ],
-            [
-                results["theta"][0] * results["theta"][1] * results["theta"][2],
-                results["theta"][1] ** 2,
-            ],
-        ]
-    )
-
-    lkj_ref = np.array(
-        [
-            [theta_ref[0] ** 2, theta_ref[0] * theta_ref[1] * theta_ref[2]],
-            [theta_ref[0] * theta_ref[1] * theta_ref[2], theta_ref[1] ** 2],
-        ]
-    )
+    lkj_est = lkj.lkj_covariance_matrix(results["theta"][:3])
+    lkj_ref = lkj.lkj_covariance_matrix(theta_ref[:3])
+    
     print_msg("\n--- LKJ Covariance Matrix of Latent Parameters (Shared) ---")
     print_msg("Estimated LKJ covariance matrix:\n", lkj_est)
     print_msg("Reference LKJ covariance matrix:\n", lkj_ref)
@@ -175,6 +159,7 @@ if __name__ == "__main__":
         f"Estimated global effects [ beta_0]: {results['x'][global_idx_start:]}"
     )
 
-    print_msg("\n--- Group-specific Random Effects ---")
-    for group_id in range(1, n_groups + 1):
-        print_msg(f"Group {group_id} random effects: {results['x'][2*(group_id-1):2*group_id]}")
+    if n_groups <= 10:
+        print_msg("\n--- Group-specific Random Effects ---")
+        for group_id in range(1, n_groups + 1):
+            print_msg(f"Group {group_id} random effects: {results['x'][2*(group_id-1):2*group_id]}")

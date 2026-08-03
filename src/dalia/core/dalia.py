@@ -711,9 +711,7 @@ class DALIA:
                 synchronize_gpu()
                 toc = time.perf_counter()
                 self.t_construction_qconditional += toc - tic
-
-                print(f"model.theta_external: {self.model.theta_external}")
-                print(f"model.theta_internal: {self.model.theta_internal}")
+                
                 self.solver.factorize(A=Q_conditional, sparsity="bta")
 
                 rhs: NDArray = self.model.construct_information_vector(

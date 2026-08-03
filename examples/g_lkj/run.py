@@ -78,7 +78,6 @@ if __name__ == "__main__":
     print_msg(f"Internal theta values: {replicate_model.theta_internal}")
     print_msg(f"External theta values: {replicate_model.theta_external}")
     Qprior = replicate_model.construct_Q_prior()
-    print_msg(f"Q_prior shape: {Qprior.shape}")
 
     # Configurations of DALIA
     dalia_dict = {
