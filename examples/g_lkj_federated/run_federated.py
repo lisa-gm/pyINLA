@@ -37,7 +37,7 @@ if __name__ == "__main__":
     # Construct a local model for each site
     models = []
     for site_id in range(1, n_sites + 1):
-        site_dir = f"{BASE_DIR}/ngroups{n_sites}_federated/site{site_id}"
+        site_dir = f"{BASE_DIR}/inputs_ngroups{n_sites}_federated/site{site_id}"
         
         # LKJ submodel for this site (2D: intercept and slope)
         lkj_dict = {
