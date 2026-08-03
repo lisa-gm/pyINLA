@@ -59,7 +59,7 @@ if __name__ == "__main__":
     # Handles [ beta_0]
     regression_dict = {
         "type": "regression",
-        "input_dir": f"{BASE_DIR}/ngroups{n_groups}/inputs_regression",
+        "input_dir": f"{BASE_DIR}/inputs_ngroups{n_groups}/inputs_regression",
         "n_replicates": 1,  # Single shared fixed effects
         "fixed_effects_prior_precision": 0.001,
     }
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     model = Model(
         submodels=[lkj, regression],
         likelihood_config=likelihood_config.parse_config(likelihood_dict),
-        input_dir=f"{BASE_DIR}/ngroups{n_groups}",
+        input_dir=f"{BASE_DIR}/inputs_ngroups{n_groups}",
     )
     print_msg(model)
 
@@ -98,9 +98,9 @@ if __name__ == "__main__":
     )
 
     theta_ref = xp.load(
-        f"{BASE_DIR}/ngroups{n_groups}/reference_outputs/theta_ref.npy"
+        f"{BASE_DIR}/inputs_ngroups{n_groups}/reference_outputs/theta_ref.npy"
     )
-    x_ref = xp.load(f"{BASE_DIR}/ngroups{n_groups}/reference_outputs/x_ref.npy")
+    x_ref = xp.load(f"{BASE_DIR}/inputs_ngroups{n_groups}/reference_outputs/x_ref.npy")
 
     results = dalia.run()
 

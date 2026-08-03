@@ -120,7 +120,7 @@ if __name__ == "__main__":
     # ============================================================================
     # Generate federated data: each group becomes a site with local a and y
     # ============================================================================
-    federated_output_dir = f"{path}/ngroups{n_groups}_federated"
+    federated_output_dir = f"{path}/inputs_ngroups{n_groups}_federated"
     
     # Create shared reference outputs folder (same as centralized)
     os.makedirs(f"{federated_output_dir}/reference_outputs", exist_ok=True)

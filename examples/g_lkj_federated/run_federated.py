@@ -15,7 +15,6 @@ from dalia.core.model import Model
 from dalia.models.federated_model import FederatedModel
 from dalia.submodels import LKJSubModel, RegressionSubModel
 from dalia.utils import (
-    extract_diagonal,
     print_msg,
 )
 
@@ -114,9 +113,9 @@ if __name__ == "__main__":
     )
 
     theta_ref = xp.load(
-        f"{BASE_DIR}/ngroups{n_sites}_federated/reference_outputs/theta_ref.npy"
+        f"{BASE_DIR}/inputs_ngroups{n_sites}_federated/reference_outputs/theta_ref.npy"
     )
-    x_ref = xp.load(f"{BASE_DIR}/ngroups{n_sites}_federated/reference_outputs/x_ref.npy")
+    x_ref = xp.load(f"{BASE_DIR}/inputs_ngroups{n_sites}_federated/reference_outputs/x_ref.npy")
 
     results = dalia.run()
 
