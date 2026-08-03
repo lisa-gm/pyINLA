@@ -134,13 +134,7 @@ if __name__ == "__main__":
 
     n_iid_latent = generic_iid.n_latent_parameters
 
-    # randomly sample subset of indices
-    no_sub_indices = 10
-    iid_indices = np.sort(
-        np.random.choice(np.arange(n_iid_latent), no_sub_indices, replace=False)
-    )
-    print_msg("Subindices: ", iid_indices)
-
+    iid_indices = xp.arange(n_iid_latent)  # indices of the iid latent parameters
     # compute generic indices corresponding to the same latent variables
     # NOTE: check that the iid submodel is actually first in the model, then generic & that they have the same number
     if generic_queenGRMinv.n_latent_parameters != n_iid_latent:
@@ -148,19 +142,26 @@ if __name__ == "__main__":
             "The number of latent parameters in the generic submodel should be the same as in the iid submodel for this."
         )
     generic_indices = iid_indices + n_iid_latent
-    print_msg("Randomly sampled iid indices: ", iid_indices)
-    print_msg("Corresponding generic indices: ", generic_indices)
 
     # extract subset of relevant samples from different latent components
-    relevant_latent_idd = results["x"][iid_indices]
-    relevant_latent_generic = results["x"][generic_indices]
+    mean_latent_idd = results["x"][iid_indices]
+    mean_latent_generic = results["x"][generic_indices]
+    
     samples_iid = samples[iid_indices, :]
     samples_generic = samples[generic_indices, :]
-
-    # check sample means are close to the relevant latent parameters
-    print_msg("Mean of samples (iid)           : ", np.mean(samples_iid, axis=1))
-    print_msg("Relevant latent parameters (iid): ", relevant_latent_idd)
-    print_msg("Mean of samples (generic)       : ", np.mean(samples_generic, axis=1))
-    print_msg("Relevant latent parameters (generic): ", relevant_latent_generic)
-
+    
+    print_msg("theta_keys: ", marginals_hp["hyperparameters"].keys())
+    
+    est_var_tau_iid = 1 / results['marginals_hp']['hyperparameters']['tau']['mean_external']
+    print_msg(f"\nVariance of latent iid:        {xp.var(mean_latent_idd):.4e}")
+    print_msg(f"Variance of samples (iid):     {np.mean(xp.var(samples_iid, axis=0)):.4e}")
+    print_msg(f"Est. variance from iid hp:     {est_var_tau_iid:.4e}")
+    print_msg(f"ref variance of iid hp:        {1 / theta_ref_external[0]:.4e}")
+    
+    est_var_tau_generic = 1 / results['marginals_hp']['hyperparameters']['tau_2']['mean_external']
+    print_msg(f"\nVariance of latent generic:      {xp.var(mean_latent_generic):.4e}")
+    print_msg(f"Variance of samples (generic):   {np.mean(xp.var(samples_generic, axis=0)):.4e}")
+    print_msg(f"Est. variance from generic hp:   {est_var_tau_generic:.4e}")
+    print_msg(f"ref variance of generic hp:      {1 / theta_ref_external[1]:.4e}")
+    
     print_msg("\n--- Finished ---")
