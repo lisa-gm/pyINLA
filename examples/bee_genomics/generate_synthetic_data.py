@@ -19,17 +19,17 @@ def make_balanced_group_indices(n_obs: int, n_groups: int) -> np.ndarray:
 
 
 def main() -> None:
-    rng = np.random.default_rng(41)
+    rng = np.random.default_rng(419)
 
     # Keep model structure identical to run.py, but generate stable synthetic data.
-    n_obs = 4000
-    n_fixed = 10
-    n_iid = 40
-    n_dense = 40
+    n_obs = 400
+    n_fixed = 20
+    n_iid = 120
+    n_dense = 120
 
-    tau_iid_true = 3.0
-    tau_dense_true = 10.0
-    prec_o_true = 50.0
+    tau_iid_true = 4.0
+    tau_dense_true = 0.9
+    prec_o_true = 10.0
 
     # Directories expected by run.py
     inputs_iid_dir = BASE_DIR / "inputs_iid"
@@ -57,12 +57,12 @@ def main() -> None:
     m = rng.normal(loc=0.0, scale=0.2, size=(n_dense, n_dense))
     q_dense_np = m.T @ m + np.eye(n_dense)
     q_dense = sparse.csc_matrix(q_dense_np)
-
+    
     cov_dense = np.linalg.inv(tau_dense_true * q_dense_np)
     l_dense = np.linalg.cholesky(cov_dense)
     u_dense = l_dense @ rng.normal(size=n_dense)
 
-    # 3) Regression component: intercept + near-orthonormal covariates.
+    # 3) Regression component: intercept 
     x_raw = rng.normal(size=(n_obs, n_fixed - 1))
     q_cov, _ = np.linalg.qr(x_raw, mode="reduced")
     a_fixed = np.column_stack([np.ones(n_obs), q_cov])

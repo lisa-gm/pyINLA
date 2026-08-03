@@ -21,6 +21,9 @@ def compute_variance_gauss_hermite(mean_internal, variance_internal, transform, 
     E[Y²] = E[φ⁻¹(X)φ⁻¹(X)] =  E[φ⁻¹(μ + σZ) φ⁻¹(μ + σZ)] 
     """
     
+    if variance_internal <= 0:
+        raise ValueError(f"Variance must be positive, got {variance_internal}")
+    
     # Get Gauss-Hermite quadrature points and weights
     nodes, weights = roots_hermite(n_points)
     
