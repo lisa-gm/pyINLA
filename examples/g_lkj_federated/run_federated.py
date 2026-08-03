@@ -29,7 +29,6 @@ if __name__ == "__main__":
     args = parse_args()
 
     n_sites = 50  # Number of groups/sites
-    print_msg(f"Using data from {n_sites} sites")
 
     # Construct a local model for each site
     models = []

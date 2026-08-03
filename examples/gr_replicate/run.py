@@ -15,7 +15,8 @@ from dalia.submodels import RegressionSubModel
 from dalia.utils import (
     extract_diagonal,
     print_msg,
-    save_to_json,)
+    save_to_json,
+)
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
@@ -26,7 +27,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if __name__ == "__main__":
     print_msg("--- Example: Gaussian Regression with multiple replicates ---")
 
-    save_dalia_results = True  # Set to True to save results to JSON
+    save_dalia_results = False  # Set to True to save results to JSON
     # Check for parsed parameters
     args = parse_args()
 
