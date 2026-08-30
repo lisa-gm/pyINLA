@@ -52,8 +52,8 @@ if __name__ == "__main__":
     # Efficient sampling: generate z ~ N(0,I), then solve L @ u = z
     z = np.random.normal(0, 1, size=n)
 
-    # Solve L @ u = z using sparse triangular solver
-    u = spsolve_triangular(L, z, lower=True)
+    # Solve L.T @ u = z using sparse triangular solver
+    u = spsolve_triangular(L.T.tocsr(), z, lower=False)
 
     # Verify the sampling worked correctly
     print("Sample u statistics - mean:", np.mean(u), "std:", np.std(u), ". Should be around sqrt(s2) =", np.sqrt(s2))
