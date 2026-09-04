@@ -22,7 +22,7 @@ class SubModelConfig(BaseModel, ABC):
 
     # Input folder for this specific submodel
     input_dir: str = None
-    type: Literal["spatio_temporal", "spatial", "regression", "brainiac", "ar1"] = None
+    type: Literal["spatio_temporal", "spatial", "regression", "brainiac", "ar1", "ar2"] = None
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
@@ -60,6 +60,28 @@ class AR1SubModelConfig(SubModelConfig):
         theta = xp.array([self.phi, self.tau])
         #theta_internal = xp.array([self.phi, self.tau])
         theta_keys = ["phi", "tau"]
+
+        return theta, theta_keys
+
+
+class AR2SubModelConfig(SubModelConfig):
+
+    ## The AR(2) process is parametrized through its partial autocorrelations
+    ## (pacf1, pacf2), each in (0, 1), which guarantees stationarity.
+    ## The AR coefficients follow as phi2 = pacf2 and phi1 = pacf1 * (1 - pacf2).
+    pacf1: float = None  # first partial autocorrelation (= lag-1 autocorrelation)
+    pacf2: float = None  # second partial autocorrelation (= phi2)
+    ph_pacf1: PriorHyperparametersConfig = None
+    ph_pacf2: PriorHyperparametersConfig = None
+
+    ## marginal precision of the process
+    tau: float = None  # Precision
+    ph_tau: PriorHyperparametersConfig = None
+
+    def read_hyperparameters(self):
+
+        theta = xp.array([self.pacf1, self.pacf2, self.tau])
+        theta_keys = ["pacf1", "pacf2", "tau"]
 
         return theta, theta_keys
 
@@ -147,4 +169,9 @@ def parse_config(config: dict | str) -> SubModelConfig:
         config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
         config["ph_phi"] = parse_priorhyperparameters_config(config["ph_phi"])
         return AR1SubModelConfig(**config)
+    if model_type == "ar2":
+        config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
+        config["ph_pacf1"] = parse_priorhyperparameters_config(config["ph_pacf1"])
+        config["ph_pacf2"] = parse_priorhyperparameters_config(config["ph_pacf2"])
+        return AR2SubModelConfig(**config)
     raise ValueError(f"Unknown submodel type: {model_type}")

@@ -33,6 +33,7 @@ from dalia.submodels import (
     SpatialSubModel,
     SpatioTemporalSubModel,
     AR1SubModel,
+    AR2SubModel,
 )
 from dalia.utils import add_str_header, boxify, scaled_logit
 from dalia.utils.scalar_ndarray import ensure_scalar
@@ -189,6 +190,50 @@ class Model(ABC):
                         )
                     )
                 if isinstance(submodel.config.ph_tau, GammaPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GammaPriorHyperparameters(
+                            config=submodel.config.ph_tau,
+                        )
+                    )
+                else:
+                    raise ValueError("Unknown prior hyperparameter type for ph_tau")
+
+            elif isinstance(submodel, AR2SubModel):
+
+                for ph_pacf, hp_type in [
+                    (submodel.config.ph_pacf1, "pacf1"),
+                    (submodel.config.ph_pacf2, "pacf2"),
+                ]:
+                    if isinstance(ph_pacf, BetaPriorHyperparametersConfig):
+                        self.prior_hyperparameters.append(
+                            BetaPriorHyperparameters(
+                                config=ph_pacf,
+                            )
+                        )
+                    elif isinstance(
+                        ph_pacf,
+                        PenalizedComplexityPriorHyperparametersConfig,
+                    ):
+                        self.prior_hyperparameters.append(
+                            PenalizedComplexityPriorHyperparameters(
+                                config=ph_pacf,
+                                hyperparameter_type=hp_type,
+                            )
+                        )
+                    else:
+                        raise ValueError(
+                            f"Unknown prior hyperparameter type for ph_{hp_type}"
+                        )
+
+                if isinstance(
+                    submodel.config.ph_tau, GaussianPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_tau,
+                        )
+                    )
+                elif isinstance(submodel.config.ph_tau, GammaPriorHyperparametersConfig):
                     self.prior_hyperparameters.append(
                         GammaPriorHyperparameters(
                             config=submodel.config.ph_tau,
@@ -477,6 +522,14 @@ class Model(ABC):
                             self.theta_external[hp_idx]
                         )
                         # kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
+                elif isinstance(submodel, AR2SubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(
+                            self.theta_external[hp_idx]
+                        )
+                        # kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
                 elif isinstance(submodel, RegressionSubModel):
                     ...
 
@@ -530,6 +583,14 @@ class Model(ABC):
                         )
                         # kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
                 elif isinstance(submodel, AR1SubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(
+                            self.theta_external[hp_idx]
+                        )
+                        # kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
+                elif isinstance(submodel, AR2SubModel):
                     for hp_idx in range(
                         self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
                     ):
