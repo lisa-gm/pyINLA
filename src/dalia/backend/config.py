@@ -7,6 +7,7 @@ nvmath_version = None
 gputil_version = None
 target_list = ["host"]
 regime_list = ["manual"]
+default_override = False
 
 def check_cupy_availability():
     """Check if CuPy is available.
@@ -124,6 +125,20 @@ def set_memory_threshold(threshold):
     memory_threshold = threshold
     return memory_threshold
 
+def set_override(override):
+    """Set the override flag for memory management.
+
+    This flag determines whether to override the default memory management behavior.
+
+    Args:
+        value (bool): True to enable override, False to disable.
+    Returns:
+        bool: The set override value.
+    """
+    global default_override
+    default_override = override
+    return default_override
+
 __all__ = [
     "default_hw_target",
     "memory_regime",
@@ -131,4 +146,5 @@ __all__ = [
     "cupy_version",
     "nvmath_version",
     "target_list",
+    "default_override",
 ]
