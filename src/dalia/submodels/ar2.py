@@ -16,7 +16,8 @@ class AR2SubModel(SubModel):
     through its partial autocorrelations (pacf1, pacf2), each in (0, 1), and its
     marginal precision tau. The AR coefficients follow as
 
-        phi2 = pacf2,    phi1 = pacf1 * (1 - pacf2),
+    phi1 = pacf1 * (1 - pacf2),
+    phi2 = pacf2,
 
     which guarantees a stationary process for any admissible (pacf1, pacf2).
     """
@@ -36,11 +37,12 @@ class AR2SubModel(SubModel):
             )
 
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
-        """Construct the prior precision matrix.
+        """
+        Construct the prior precision matrix.
 
-        The precision of the stationary AR(2) process is pentadiagonal. It is
-        obtained from the conditional densities p(x_t | x_{t-1}, x_{t-2}) for
-        t >= 3 combined with the exact stationary distribution of (x_1, x_2).
+        The precision of the stationary AR(2) is obtained from the conditional
+        densities p(x_t | x_{t-1}, x_{t-2}) for t >= 3 combined with the exact
+        stationary distribution of (x_1, x_2).
         """
 
         # kwargs expects hyperparameters in external scale
