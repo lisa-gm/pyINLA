@@ -67,8 +67,10 @@ class AR1SubModelConfig(SubModelConfig):
 class AR2SubModelConfig(SubModelConfig):
 
     ## The AR(2) process is parametrized through its partial autocorrelations
-    ## (pacf1, pacf2), each in (0, 1), which guarantees stationarity.
+    ## (pacf1, pacf2), each in (-1, 1), which guarantees stationarity.
     ## The AR coefficients follow as phi2 = pacf2 and phi1 = pacf1 * (1 - pacf2).
+    ## Use a beta prior with support (-1, 1) to cover the full range; the
+    ## default beta support (0, 1) restricts the pacf to positive values.
     pacf1: float = None  # first partial autocorrelation (= lag-1 autocorrelation)
     pacf2: float = None  # second partial autocorrelation (= phi2)
     ph_pacf1: PriorHyperparametersConfig = None

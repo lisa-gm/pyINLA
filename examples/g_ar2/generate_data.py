@@ -17,9 +17,9 @@ if __name__ == "__main__":
     ## define priors
     s2 = 5
     tau = 1 / s2
-    # partial autocorrelations, each in (0, 1) -> stationary AR(2)
-    pacf1 = 0.8
-    pacf2 = 0.4
+    # partial autocorrelations, each in (-1, 1) -> stationary AR(2)
+    pacf1 = 0.6
+    pacf2 = -0.4
     # noise obs
     obs_noise_prec = 100
     theta_original = [
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         [off_diag_2, off_diag_1, diag, off_diag_1, off_diag_2], [-2, -1, 0, 1, 2]
     )
 
-    # Compute sparse Cholesky factorization: Q = L @ L.T
+    # Compute sparse Cholesky factorization: Q = L_upper.T @ L_upper
     # For pentadiagonal matrix, we can use dense Cholesky on small blocks or scipy
     Q_csc = Q.tocsc()
 
@@ -58,16 +58,16 @@ if __name__ == "__main__":
 
     # Method 1: Use dense Cholesky (for moderate sizes this is still efficient)
     Q_dense = Q.toarray()
-    L_dense = cholesky(Q_dense, lower=True)
-    L = csc_matrix(L_dense)
+    L_upper_dense = cholesky(Q_dense, lower=False)
+    L_upper = csc_matrix(L_upper_dense)
 
-    print("L nnz:", L.nnz, "L sparsity:", 100 * L.nnz / (L.shape[0] * L.shape[1]), "%")
+    print("L_upper nnz:", L_upper.nnz, "L_upper sparsity:", 100 * L_upper.nnz / (L_upper.shape[0] * L_upper.shape[1]), "%")
 
     # Efficient sampling: generate z ~ N(0,I), then solve L.T @ u = z
     z = np.random.normal(0, 1, size=n)
 
-    # Solve L.T @ u = z using sparse triangular solver so that Cov(u) = Q^{-1}
-    u = spsolve_triangular(L.T.tocsr(), z, lower=False)
+    # cov(u) = L_upper^{-1} L_upper^{-T} = (L_upper.T @ L_upper)^{-1} = Q^{-1}
+    u = spsolve_triangular(L_upper, z, lower=False)
 
     # Verify the sampling worked correctly
     print("Sample u statistics - mean:", np.mean(u), "std:", np.std(u), ". Should be around sqrt(s2) =", np.sqrt(s2))

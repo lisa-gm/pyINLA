@@ -29,11 +29,13 @@ if __name__ == "__main__":
     ar2_dict = {
         "type": "ar2",
         "input_dir": f"{BASE_DIR}/inputs_ar2",
-        # partial autocorrelations, both have to be between 0 and 1
-        "pacf1": 0.5,
-        "ph_pacf1": {"type": "beta", "alpha": 5.0, "beta": 1.0},
-        "pacf2": 0.5,
-        "ph_pacf2": {"type": "beta", "alpha": 2.0, "beta": 2.0},
+        # partial autocorrelations, both have to be between -1 and 1;
+        # the beta prior is scaled to the support (-1, 1) and Beta(2, 2) is
+        # symmetric around 0
+        "pacf1": 0.3,
+        "ph_pacf1": {"type": "beta", "alpha": 2.0, "beta": 2.0, "support": [-1.0, 1.0]},
+        "pacf2": 0.1,
+        "ph_pacf2": {"type": "beta", "alpha": 2.0, "beta": 2.0, "support": [-1.0, 1.0]},
         # initial guess on the precision
         "tau": 3,  # has to be positive
         "ph_tau": {"type": "gamma", "alpha": 2.0, "beta": 1.0},
