@@ -4,7 +4,7 @@
 
 This example fits a Gaussian likelihood model with an AR(2) latent process and one fixed effect (an intercept). The data consists of n = 1000 observations generated as y = eta + noise, where eta = u + intercept, u is a zero mean stationary AR(2) process with marginal variance s2 = 5 (precision tau = 1/s2), and the observation noise is Gaussian with precision 100.
 
-The AR(2) process x_t = phi1 x_{t-1} + phi2 x_{t-2} + eps_t is parametrized through its partial autocorrelations (pacf1, pacf2), each in (-1, 1). The AR coefficients follow as phi2 = pacf2 and phi1 = pacf1 (1 - pacf2), which guarantees a stationary process and therefore a positive definite precision matrix for every admissible value of the hyperparameters. The data is generated with pacf1 = 0.6 and pacf2 = -0.4, i.e. phi1 = 0.84 and phi2 = -0.4.
+The AR(2) process x_t = phi1 x_{t-1} + phi2 x_{t-2} + eps_t is parametrized through its partial autocorrelations (pacf1, pacf2), each in (-1, 1). The AR coefficients follow as phi2 = pacf2 and phi1 = pacf1 (1 - pacf2), which guarantees a stationary process and therefore a positive definite precision matrix for every admissible value of the hyperparameters. This is the same parametrization R-INLA uses for its `ar` latent model (see References). The data is generated with pacf1 = 0.6 and pacf2 = -0.4, i.e. phi1 = 0.84 and phi2 = -0.4.
 
 The model contains four hyperparameters, theta = (pacf1, pacf2, tau, prec_o):
 
@@ -33,3 +33,11 @@ python run.py
 ```
 
 Both scripts resolve paths relative to their own location, so they can be executed from any directory.
+
+### References
+
+The parametrization of the AR(2) process by its partial autocorrelations and marginal precision follows R-INLA and the time series literature:
+
+- R-INLA, [Autoregressive model of order p (AR(p))](https://inla.r-inla-download.org/r-inla.org/doc/latent/ar.pdf), latent model documentation. States the motivation directly: the AR coefficients have "severe non-linear constraints" for stationarity, so the model is re-parametrized by the partial autocorrelations. Its footnote gives the p = 2 map used here, psi1 = phi1 / (1 - phi2) and psi2 = phi2.
+- S. E. Heaps (2022), [Enforcing stationarity through the prior in vector autoregressions](https://arxiv.org/abs/2004.09455), *Journal of Computational and Graphical Statistics*. Section 1 gives a short, readable account of the univariate case: Barndorff-Nielsen and Schou (1973) establish a bijection between the stationary AR(p) coefficients and the first p partial autocorrelations, which "are interpretable and only constrained to lie in the Cartesian product space (-1, 1)^p", and a uniform prior on the stationary region induces a closed-form prior on the partial autocorrelations.
+
