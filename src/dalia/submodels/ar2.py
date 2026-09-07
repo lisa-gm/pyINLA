@@ -13,8 +13,8 @@ class AR2SubModel(SubModel):
     """Fit an AR(2) model.
 
     The process x_t = phi1 * x_{t-1} + phi2 * x_{t-2} + eps_t is parametrized
-    through its partial autocorrelations (pacf1, pacf2), each in (0, 1), and its
-    marginal precision tau. The AR coefficients follow as
+    through its partial autocorrelations (pacf1, pacf2), each in (-1, 1), and
+    its marginal precision tau. The AR coefficients follow as
 
     phi1 = pacf1 * (1 - pacf2),
     phi2 = pacf2,
