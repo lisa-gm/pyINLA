@@ -1,4 +1,5 @@
 import os
+import pickle
 from pathlib import Path
 
 import numpy as np
@@ -34,7 +35,7 @@ if __name__ == "__main__":
 
     Q = sp.diags([diag, off_diag, off_diag], [0, -1, 1])
 
-    # Compute sparse Cholesky factorization: Q = L @ L.T
+    # Compute sparse Cholesky factorization: Q = L_upper.T @ L_upper
     # For tridiagonal matrix, we can use dense Cholesky on small blocks or scipy
     Q_csc = Q.tocsc()
 
@@ -44,16 +45,16 @@ if __name__ == "__main__":
 
     # Method 1: Use dense Cholesky (for moderate sizes this is still efficient)
     Q_dense = Q.toarray()
-    L_dense = cholesky(Q_dense, lower=True)
-    L = csc_matrix(L_dense)
+    L_upper_dense = cholesky(Q_dense, lower=False)
+    L_upper = csc_matrix(L_upper_dense)
 
-    print("L nnz:", L.nnz, "L sparsity:", 100 * L.nnz / (L.shape[0] * L.shape[1]), "%")
+    print("L_upper nnz:", L_upper.nnz, "L_upper sparsity:", 100 * L_upper.nnz / (L_upper.shape[0] * L_upper.shape[1]), "%")
 
-    # Efficient sampling: generate z ~ N(0,I), then solve L @ u = z
+    # Efficient sampling: generate z ~ N(0,I), then solve L_upper @ u = z
     z = np.random.normal(0, 1, size=n)
 
-    # Solve L.T @ u = z using sparse triangular solver
-    u = spsolve_triangular(L.T.tocsr(), z, lower=False)
+    # Cov(u) = L_upper^{-1} L_upper^{-T} = (L_upper.T @ L_upper)^{-1} = Q^{-1}
+    u = spsolve_triangular(L_upper, z, lower=False)
 
     # Verify the sampling worked correctly
     print("Sample u statistics - mean:", np.mean(u), "std:", np.std(u), ". Should be around sqrt(s2) =", np.sqrt(s2))
