@@ -17,7 +17,10 @@ class RegressionSubModel(SubModel):
         """Initializes the model."""
         super().__init__(config)
 
-        self.n_fixed_effects: int = config.n_fixed_effects
+        if config.n_fixed_effects is None:
+            self.n_fixed_effects = self.n_latent_parameters
+        else:
+            self.n_fixed_effects = config.n_fixed_effects
         self.fixed_effects_prior_precision: float = config.fixed_effects_prior_precision
 
         # Check that design_matrix shape match number of fixed effects

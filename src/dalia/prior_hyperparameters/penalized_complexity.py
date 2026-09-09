@@ -46,10 +46,15 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
 
     def rescale_hyperparameters_to_internal(self, theta, direction):
         """Rescale hyperparameters to and from internal scale.
-        
-        TODO: Implement the re-scaling.
+
+        TODO: Implement the re-scaling. But requires adaptation of evaluate_log_prior to none-log scale. Therefore assume input in log-scale for now.
         """
+
         return super().rescale_hyperparameters_to_internal(theta, direction)
+
+    def evaluate_prior(self, theta: float, **kwargs) -> float:
+        """Evaluate the prior hyperparameters."""
+        return xp.exp(self.evaluate_log_prior(theta, **kwargs))
 
     def evaluate_log_prior(self, theta: float, **kwargs) -> float:
         """Evaluate the prior hyperparameters."""
@@ -90,3 +95,17 @@ class PenalizedComplexityPriorHyperparameters(PriorHyperparameters):
             # print("log prior prec o: ", log_prior)
 
         return log_prior
+
+    def evaluate_internal_log_prior(self, theta: float, **kwargs) -> float:
+        """Evaluate the transformed log prior hyperparameters in internal representation."""
+
+        theta_internal = self.rescale_hyperparameters_to_internal(
+            theta, direction="backward"
+        )
+        transformed_log_prior = self.evaluate_log_prior(
+            theta, **kwargs
+        ) + self.rescale_hyperparameters_to_internal(
+            theta_internal, direction="backward_log_jacobian"
+        )
+
+        return transformed_log_prior

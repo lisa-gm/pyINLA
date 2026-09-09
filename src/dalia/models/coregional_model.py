@@ -717,17 +717,20 @@ class CoregionalModel(Model):
                 y=self.y[self.n_observations_idx[i] : self.n_observations_idx[i + 1]],
                 theta=float(self.theta_external[self.hyperparameters_idx[i + 1] - 1]),
             )
-   
+
         return ensure_scalar(likelihood)
 
     def evaluate_log_prior_hyperparameters(self) -> float:
         """Evaluate the log prior hyperparameters."""
         log_prior = 0.0
 
-        theta_interpret = self.theta_external
+        # TODO: do i need this local reassignment?
+        theta_internal = self.theta_internal
 
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
-            log_prior += prior_hyperparameter.evaluate_log_prior(theta_interpret[i])
+            log_prior += prior_hyperparameter.evaluate_internal_log_prior(
+                theta_internal[i]
+            )
 
         return log_prior
 

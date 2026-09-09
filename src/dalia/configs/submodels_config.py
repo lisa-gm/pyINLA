@@ -4,7 +4,7 @@ import tomllib
 from abc import ABC, abstractmethod
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, PositiveFloat
 from typing_extensions import Annotated
 
 from dalia.__init__ import ArrayLike, xp
@@ -12,28 +12,46 @@ from dalia.configs.priorhyperparameters_config import (
     BetaPriorHyperparametersConfig,
     GaussianMVNPriorHyperparametersConfig,
     PriorHyperparametersConfig,
+    LKJCorrPriorHyperparametersConfig,
 )
 from dalia.configs.priorhyperparameters_config import (
     parse_config as parse_priorhyperparameters_config,
 )
+
 
 class SubModelConfig(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     # Input folder for this specific submodel
     input_dir: str = None
-    type: Literal["spatio_temporal", "spatial", "regression", "brainiac", "ar1"] = None
+    type: Literal[
+        "spatio_temporal", "spatial", "regression", "brainiac", "ar1", "generic", "lkj"
+    ] = None
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
 
 
 class RegressionSubModelConfig(SubModelConfig):
-    n_fixed_effects: Annotated[int, Field(strict=True, ge=1)] = 1
+    n_fixed_effects: Annotated[int | None, Field(strict=True, ge=1)] = None
     fixed_effects_prior_precision: float = 0.001
 
     def read_hyperparameters(self):
         return xp.array([]), []
+
+
+class GenericSubModelConfig(SubModelConfig):
+    tau: PositiveFloat = (
+        4.0  # Precision of the Gaussian prior on the latent parameters, offer initial guess, has to be positive
+    )
+
+    ph_tau: PriorHyperparametersConfig = None
+
+    def read_hyperparameters(self):
+        theta = xp.array([self.tau])
+        theta_keys = ["tau"]
+
+        return theta, theta_keys
 
 
 class AR1SubModelConfig(SubModelConfig):
@@ -46,19 +64,18 @@ class AR1SubModelConfig(SubModelConfig):
     # check inla.doc("pc.cor1")
 
     ## either define tau or sigma2
-    tau: float = None  # Precision
+    tau: PositiveFloat = None  # Precision
     # sigma2: float = None  # Marginal variance
-    
-    
+
     ph_tau: PriorHyperparametersConfig = None
     # ph_sigma2: PriorHyperparametersConfig = None
 
     def read_hyperparameters(self):
 
         # input of phi is in (0,1), rescale to -/+ INF
-        #self.phi_scaled = scaled_logit(self.phi, direction="forward")
+        # self.phi_scaled = scaled_logit(self.phi, direction="forward")
         theta = xp.array([self.phi, self.tau])
-        #theta_internal = xp.array([self.phi, self.tau])
+        # theta_internal = xp.array([self.phi, self.tau])
         theta_keys = ["phi", "tau"]
 
         return theta, theta_keys
@@ -122,6 +139,24 @@ class BrainiacSubModelConfig(SubModelConfig):
         return theta, theta_keys
 
 
+class LKJSubModelConfig(SubModelConfig):
+    sigma1: PositiveFloat = None
+    sigma2: PositiveFloat = None
+    rho: float = None
+
+    ph_sigma1: PriorHyperparametersConfig = (
+        None  # This is more flexible, in general we assume prior on standard deviations
+    )
+    ph_sigma2: PriorHyperparametersConfig = (
+        None  # This is more flexible, in general we assume prior on standard deviations
+    )
+    ph_rho: LKJCorrPriorHyperparametersConfig = None  # Enforce LKJ prior on rho
+
+    def read_hyperparameters(self):
+        theta = xp.array([self.sigma1, self.sigma2, self.rho])
+        theta_keys = ["sigma1", "sigma2", "rho"]
+        return theta, theta_keys
+
 
 def parse_config(config: dict | str) -> SubModelConfig:
     if isinstance(config, str):
@@ -147,4 +182,14 @@ def parse_config(config: dict | str) -> SubModelConfig:
         config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
         config["ph_phi"] = parse_priorhyperparameters_config(config["ph_phi"])
         return AR1SubModelConfig(**config)
-    raise ValueError(f"Unknown submodel type: {model_type}")
+    if model_type == "lkj":
+        config["ph_sigma1"] = parse_priorhyperparameters_config(config["ph_sigma1"])
+        config["ph_sigma2"] = parse_priorhyperparameters_config(config["ph_sigma2"])
+        config["ph_rho"] = parse_priorhyperparameters_config(config["ph_rho"])
+        return LKJSubModelConfig(**config)
+    elif model_type == "generic":
+        config["ph_tau"] = parse_priorhyperparameters_config(config["ph_tau"])
+        return GenericSubModelConfig(**config)
+    # Add more elif branches for other submodel types
+    else:
+        raise ValueError(f"Unknown submodel type: {model_type}")

@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PositiveFloat
 from scipy.sparse import spmatrix
 from typing_extensions import Annotated
 
@@ -14,7 +14,15 @@ class PriorHyperparametersConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     type: Literal[
-        "gaussian", "penalized_complexity", "beta", "gaussian_mvn", "gamma", "inverse_gamma"
+        "gaussian",
+        "penalized_complexity",
+        "beta",
+        "gaussian_mvn",
+        "gamma",
+        "inverse_gamma",
+        "half_cauchy",
+        "half_normal",
+        "lkj_2d",
     ] = None
 
 
@@ -32,27 +40,32 @@ class PenalizedComplexityPriorHyperparametersConfig(PriorHyperparametersConfig):
     alpha: float = None
     u: float = None
 
-    # Generalized formula:
-    # lambda = - log(alpha) * pow(u, c_l)
-    #
-    # log_prior = a + b + c
-    # a = log(lambda)
-    # b = -lambda * exp(c_b * r)
-    # c = c_c * r
-
 
 class BetaPriorHyperparametersConfig(PriorHyperparametersConfig):
-    alpha: float = None
-    beta: float = None
+    alpha: PositiveFloat = None
+    beta: PositiveFloat = None
 
 
 class GammaPriorHyperparametersConfig(PriorHyperparametersConfig):
-    alpha: float = None
-    beta: float = None
-    
+    alpha: PositiveFloat = None
+    beta: PositiveFloat = None
+
+
 class InverseGammaPriorHyperparametersConfig(PriorHyperparametersConfig):
-    alpha: float = None
-    beta: float = None
+    alpha: PositiveFloat = None
+    beta: PositiveFloat = None
+
+
+class HalfCauchyPriorHyperparametersConfig(PriorHyperparametersConfig):
+    scale: PositiveFloat = 25.0
+
+
+class HalfNormalPriorHyperparametersConfig(PriorHyperparametersConfig):
+    precision: PositiveFloat = 0.001
+
+
+class LKJCorrPriorHyperparametersConfig(PriorHyperparametersConfig):
+    eta: PositiveFloat = 1.0
 
 
 def parse_config(config: dict) -> PriorHyperparametersConfig:
@@ -69,4 +82,10 @@ def parse_config(config: dict) -> PriorHyperparametersConfig:
         return GammaPriorHyperparametersConfig(**config)
     if prior_type == "inverse_gamma":
         return InverseGammaPriorHyperparametersConfig(**config)
+    if prior_type == "half_cauchy":
+        return HalfCauchyPriorHyperparametersConfig(**config)
+    if prior_type == "half_normal":
+        return HalfNormalPriorHyperparametersConfig(**config)
+    if prior_type == "lkj_2d":
+        return LKJCorrPriorHyperparametersConfig(**config)
     raise ValueError(f"Unknown prior hyperparameters config type: {prior_type}")

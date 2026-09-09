@@ -14,7 +14,7 @@ def plot_prior_hp(param_name, theta_interval, prior_hp, log=False):
     param_name : str
         Name of the hyperparameter.
     theta_interval: tuple of float
-        Interval (min, max) for plotting the prior.
+        Interval (min, max) for plotting the prior. Assumes theta to be in external / user scale.
     prior_hp : PriorHyperparameters
         Prior hyperparameter object.
     log : bool, optional
@@ -36,13 +36,15 @@ def plot_prior_hp(param_name, theta_interval, prior_hp, log=False):
         theta_interval = (1e-6, theta_interval[1])
 
     theta_vals = np.linspace(theta_interval[0], theta_interval[1], 200)
-    prior_vals = np.array([prior_hp.evaluate_log_prior(theta) for theta in theta_vals])
 
     if log:
         xlabel = f"{param_name}"
         ylabel = "Log Prior Density"
+        prior_vals = np.array(
+            [prior_hp.evaluate_log_prior(theta) for theta in theta_vals]
+        )
     else:
-        prior_vals = np.exp(prior_vals)
+        prior_vals = np.array([prior_hp.evaluate_prior(theta) for theta in theta_vals])
         xlabel = f"{param_name}"
         ylabel = "Prior Density"
 

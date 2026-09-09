@@ -15,6 +15,10 @@ from dalia.configs.priorhyperparameters_config import (
     GaussianPriorHyperparametersConfig,
     PenalizedComplexityPriorHyperparametersConfig,
     GammaPriorHyperparametersConfig,
+    InverseGammaPriorHyperparametersConfig,
+    HalfCauchyPriorHyperparametersConfig,
+    HalfNormalPriorHyperparametersConfig,
+    LKJCorrPriorHyperparametersConfig,
 )
 from dalia.core.likelihood import Likelihood
 from dalia.core.prior_hyperparameters import PriorHyperparameters
@@ -26,6 +30,10 @@ from dalia.prior_hyperparameters import (
     GaussianPriorHyperparameters,
     PenalizedComplexityPriorHyperparameters,
     GammaPriorHyperparameters,
+    InverseGammaPriorHyperparameters,
+    HalfCauchyPriorHyperparameters,
+    HalfNormalPriorHyperparameters,
+    LKJCorrPriorHyperparameters,
 )
 from dalia.submodels import (
     BrainiacSubModel,
@@ -33,8 +41,10 @@ from dalia.submodels import (
     SpatialSubModel,
     SpatioTemporalSubModel,
     AR1SubModel,
+    GenericSubModel,
+    LKJSubModel,
 )
-from dalia.utils import add_str_header, boxify, scaled_logit
+from dalia.utils import add_str_header, boxify
 from dalia.utils.scalar_ndarray import ensure_scalar
 
 
@@ -194,8 +204,111 @@ class Model(ABC):
                             config=submodel.config.ph_tau,
                         )
                     )
+
+            elif isinstance(submodel, GenericSubModel):
+                print(
+                    "Generic submodel detected. Initializing prior hyperparameters for generic submodel."
+                )
+                print(submodel.config.ph_tau)
+                if isinstance(submodel.config.ph_tau, GammaPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GammaPriorHyperparameters(
+                            config=submodel.config.ph_tau,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_tau,
+                    PenalizedComplexityPriorHyperparametersConfig,
+                ):
+                    self.prior_hyperparameters.append(
+                        PenalizedComplexityPriorHyperparameters(
+                            config=submodel.config.ph_tau,
+                            hyperparameter_type="tau",
+                        )
+                    )
+                # doesn't really make sense to allow Gaussian prior on precision
+                # implement proper check to raise error later
+                elif isinstance(
+                    submodel.config.ph_tau, GaussianPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        GaussianPriorHyperparameters(
+                            config=submodel.config.ph_tau,
+                        )
+                    )
                 else:
-                    raise ValueError("Unknown prior hyperparameter type for ph_tau")
+                    raise ValueError(
+                        "Unsupported prior hyperparameter type for tau in GenericSubModel."
+                    )
+
+            elif isinstance(submodel, LKJSubModel):
+                if isinstance(
+                    submodel.config.ph_sigma1, HalfNormalPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        HalfNormalPriorHyperparameters(
+                            config=submodel.config.ph_sigma1,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_sigma1, HalfCauchyPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        HalfCauchyPriorHyperparameters(
+                            config=submodel.config.ph_sigma1,
+                        )
+                    )
+                elif isinstance(submodel.config.ph_sigma1, GammaPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GammaPriorHyperparameters(
+                            config=submodel.config.ph_sigma1,
+                        )
+                    )
+                else:
+                    raise ValueError(
+                        "Unsupported prior hyperparameter type for sigma1 in LKJSubModel."
+                    )
+
+                if isinstance(
+                    submodel.config.ph_sigma2, HalfNormalPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        HalfNormalPriorHyperparameters(
+                            config=submodel.config.ph_sigma2,
+                        )
+                    )
+                elif isinstance(
+                    submodel.config.ph_sigma2, HalfCauchyPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        HalfCauchyPriorHyperparameters(
+                            config=submodel.config.ph_sigma2,
+                        )
+                    )
+                    
+                elif isinstance(submodel.config.ph_sigma2, GammaPriorHyperparametersConfig):
+                    self.prior_hyperparameters.append(
+                        GammaPriorHyperparameters(
+                            config=submodel.config.ph_sigma2,
+                        )
+                    )
+                else:
+                    raise ValueError(
+                        "Unsupported prior hyperparameter type for sigma2 in LKJSubModel."
+                    )
+
+                if isinstance(
+                    submodel.config.ph_rho, LKJCorrPriorHyperparametersConfig
+                ):
+                    self.prior_hyperparameters.append(
+                        LKJCorrPriorHyperparameters(
+                            config=submodel.config.ph_rho,
+                        )
+                    )
+                else:
+                    raise ValueError(
+                        "Unsupported prior hyperparameter type for rho in LKJSubModel."
+                    )
 
             elif isinstance(submodel, BrainiacSubModel):
                 # h2 hyperparameters
@@ -362,6 +475,33 @@ class Model(ABC):
                         config=likelihood_config.prior_hyperparameters,
                     )
                 )
+            elif isinstance(
+                likelihood_config.prior_hyperparameters,
+                InverseGammaPriorHyperparametersConfig,
+            ):
+                self.prior_hyperparameters.append(
+                    InverseGammaPriorHyperparameters(
+                        config=likelihood_config.prior_hyperparameters,
+                    )
+                )
+            elif isinstance(
+                likelihood_config.prior_hyperparameters,
+                HalfCauchyPriorHyperparametersConfig,
+            ):
+                self.prior_hyperparameters.append(
+                    HalfCauchyPriorHyperparameters(
+                        config=likelihood_config.prior_hyperparameters,
+                    )
+                )
+            elif isinstance(
+                likelihood_config.prior_hyperparameters,
+                HalfNormalPriorHyperparametersConfig,
+            ):
+                self.prior_hyperparameters.append(
+                    HalfNormalPriorHyperparameters(
+                        config=likelihood_config.prior_hyperparameters,
+                    )
+                )
         elif likelihood_config.type == "poisson":
             self.likelihood: Likelihood = PoissonLikelihood(
                 n_observations=self.n_observations,
@@ -383,9 +523,6 @@ class Model(ABC):
 
         theta_external.append(lh_hyperparameters)
         self.theta_external = xp.concatenate(theta_external)
-
-        print("Initial hyperparameters (external scale): ", self.theta_external)
-        print("Initial hyperparameters (internal scale): ", self.theta_internal)
 
         theta_keys += lh_hyperparameters_keys
         self.theta_keys: NDArray = theta_keys
@@ -477,6 +614,22 @@ class Model(ABC):
                             self.theta_external[hp_idx]
                         )
                         # kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
+                elif isinstance(submodel, GenericSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(
+                            self.theta_external[hp_idx]
+                        )
+
+                elif isinstance(submodel, LKJSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(
+                            self.theta_external[hp_idx]
+                        )
+
                 elif isinstance(submodel, RegressionSubModel):
                     ...
 
@@ -537,6 +690,21 @@ class Model(ABC):
                             self.theta_external[hp_idx]
                         )
                         # kwargs[self.theta_keys[hp_idx]] = float(theta_interpret[hp_idx])
+                elif isinstance(submodel, GenericSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(
+                            self.theta_external[hp_idx]
+                        )
+
+                elif isinstance(submodel, LKJSubModel):
+                    for hp_idx in range(
+                        self.hyperparameters_idx[i], self.hyperparameters_idx[i + 1]
+                    ):
+                        kwargs[self.theta_keys[hp_idx]] = float(
+                            self.theta_external[hp_idx]
+                        )
 
                 submodel_Q_prior = submodel.construct_Q_prior(**kwargs)
 
@@ -546,18 +714,8 @@ class Model(ABC):
 
         return self.Q_prior
 
-    def construct_Q_conditional(
-        self,
-        eta: NDArray,
-    ):
-        """Construct the conditional precision matrix.
-
-        Note
-        ----
-        Input of the hessian of the likelihood is a diagonal matrix.
-        The negative hessian is required, therefore the minus in front.
-
-        """
+    def construct_ATDA(self, eta: NDArray) -> sp.sparse.spmatrix:
+        """Construct the A^T D A matrix where D is the diagonal matrix of second derivatives of the likelihood."""
 
         if self.likelihood_config.type == "gaussian":
             kwargs = {
@@ -580,20 +738,37 @@ class Model(ABC):
         # if self.a is sparse -> Q_conditional should be sparse, else dense
         if sp.sparse.issparse(self.a):
             if self.aTa is not None:
-                self.Q_conditional = self.Q_prior - d_matrix.diagonal()[0] * self.aTa
+                ATDA = d_matrix.diagonal()[0] * self.aTa
             else:
-                self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
+                ATDA = self.a.T @ d_matrix @ self.a
             # self.Q_conditional = self.Q_prior - self.a.T @ d_matrix @ self.a
         else:
             if self.aTa is not None:
-                self.Q_conditional = (
-                    self.Q_prior.toarray() - d_matrix.diagonal()[0] * self.aTa
-                )
+                ATDA = d_matrix.diagonal()[0] * self.aTa
             else:
-                self.Q_conditional = (
-                    self.Q_prior.toarray() - self.a.T @ d_matrix @ self.a
-                )
+                ATDA = self.a.T @ d_matrix @ self.a
             # self.Q_conditional = self.Q_prior.toarray() - self.a.T @ d_matrix @ self.a
+
+        return ATDA
+
+    def construct_Q_conditional(
+        self, eta: NDArray, x: NDArray = None
+    ) -> sp.sparse.spmatrix:
+        """Construct the conditional precision matrix.
+
+        Note
+        ----
+        Input of the hessian of the likelihood is a diagonal matrix.
+        The negative hessian is required, therefore the minus in front.
+
+        """
+
+        # overwrite eta if x is provided as eta can be private
+        if x is not None:
+            eta = self.a @ x
+
+        ATDA = self.construct_ATDA(eta)
+        self.Q_conditional = self.Q_prior - ATDA
 
         return self.Q_conditional
 
@@ -634,12 +809,12 @@ class Model(ABC):
         for i, prior_hyperparameter in enumerate(self.prior_hyperparameters):
             if isinstance(prior_hyperparameter, GaussianMVNPriorHyperparameters):
                 # for MVN prior hyperparameters, we need to pass the full vector
-                log_prior += prior_hyperparameter.evaluate_log_prior(
-                    self.theta_external[i : i + prior_hyperparameter.mean.shape[0]]
+                log_prior += prior_hyperparameter.evaluate_internal_log_prior(
+                    self.theta_internal[i : i + prior_hyperparameter.mean.shape[0]]
                 )
             else:
-                log_prior += prior_hyperparameter.evaluate_log_prior(
-                    self.theta_external[i]
+                log_prior += prior_hyperparameter.evaluate_internal_log_prior(
+                    self.theta_internal[i]
                 )
 
         return log_prior
@@ -672,7 +847,7 @@ class Model(ABC):
 
         return theta_internal
 
-    def evaluate_likelihood(self, eta: NDArray, **kwargs) -> float:
+    def evaluate_likelihood(self, eta: NDArray, x: NDArray = None, **kwargs) -> float:
         """Evaluate the likelihood.
         
         Parameters
@@ -698,8 +873,6 @@ class Model(ABC):
             )
 
         return ensure_scalar(likelihood)
-
-        
 
     def __str__(self) -> str:
         """String representation of the model."""

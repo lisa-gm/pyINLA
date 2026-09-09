@@ -20,10 +20,51 @@ class ModelConfig(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid")
 
     # Input folder for this specific submodel
-    type: Literal["coregional"] = None
+    type: Literal["coregional", "federated"] = None
 
     @abstractmethod
     def read_hyperparameters(self) -> tuple[ArrayLike, list]: ...
+
+
+class FederatedModelConfig(ModelConfig):
+    type: Literal["federated"] = "federated"
+    n_models: PositiveInt = None
+    theta: list[float] = None
+    theta_keys: list[str] = None
+
+    @model_validator(mode="after")
+    def check_theta_and_keys(self):
+        if self.theta is None or self.theta_keys is None:
+            raise ValueError("FederatedModelConfig requires both theta and theta_keys.")
+        if len(self.theta) != len(self.theta_keys):
+            raise ValueError(
+                f"Length of theta ({len(self.theta)}) does not match length of theta_keys ({len(self.theta_keys)}).")
+    
+        return self
+    
+    def read_hyperparameters(self):
+        return xp.array(self.theta), self.theta_keys
+
+class ReplicateModelConfig(ModelConfig):
+    type: Literal["replicate"] = "replicate"
+    n_replicates: PositiveInt = None
+
+    theta: list[float] = None  # Hyperparameters
+    theta_keys: list[str] = None  # Hyperparameter keys
+
+    @model_validator(mode="after")
+    def check_theta_and_theta_keys(self):
+        if len(self.theta) != len(self.theta_keys):
+            raise ValueError(
+                "Length of theta and theta_keys must be the same in ReplicateModelConfig."
+            )
+        return self
+
+    def read_hyperparameters(self):
+        theta = xp.array(self.theta)
+        theta_keys = self.theta_keys
+        
+        return theta, theta_keys
 
 
 class CoregionalModelConfig(ModelConfig):
@@ -95,6 +136,10 @@ def parse_config(config: dict | str) -> ModelConfig:
                 config["ph_lambdas"][i]
             )
         return CoregionalModelConfig(**config)
+    elif type == "federated":
+        return FederatedModelConfig(**config)
+    if type == "replicate":
+        return ReplicateModelConfig(**config)
     # Add more elif branches for other model types
     else:
-        raise ValueError(f"Invalid submodel type: {type}")
+        raise ValueError(f"Invalid model type: {type}")

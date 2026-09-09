@@ -37,7 +37,7 @@ class SubModel(ABC):
                     self.a: NDArray = xp.array(a)
             except FileNotFoundError:
                 raise FileNotFoundError(
-                    "No design matrix found. Please provide a valid design matrix."
+                    f"No design matrix found under {self.input_path}. Please provide a valid design matrix."
                 )
 
         self.n_latent_parameters: int = self.a.shape[1]
@@ -51,7 +51,6 @@ class SubModel(ABC):
                 self.x_initial: NDArray = xp.array(x_initial)
         except FileNotFoundError:
             self.x_initial: NDArray = xp.zeros((self.a.shape[1]), dtype=float)
-
 
     @abstractmethod
     def construct_Q_prior(self, **kwargs) -> sp.sparse.coo_matrix:
